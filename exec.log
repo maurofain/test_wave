@@ -4981,3 +4981,516 @@ entry 0x4ff29eda
 [0;33mW (353) i2c: This driver is an old driver, please migrate your application code to adapt `driver/i2c_master.h`[0m
 [0;32mI (363) main_task: Started on CPU0[0m
 [0m
+Executing action: all (aliases: build)
+Running ninja in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build
+Executing "ninja all"...
+[1/5] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/partition_table/partition-table.bin /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.bin
+test_wave.bin binary size 0xc93f0 bytes. Smallest app partition is 0x300000 bytes. 0x236c10 bytes (74%) free.
+[2/5] Performing build step for 'bootloader'
+[1/1] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.bin
+Bootloader binary size 0x5810 bytes. 0x7f0 bytes (8%) free.
+[3/5] No install step for 'bootloader'
+[4/5] Completed 'bootloader'
+[5/5] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/main && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/spiffs/spiffsgen.py 0x2ee000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/spiffs /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/storage.bin --page-size=256 --obj-name-len=32 --meta-len=4 --use-magic --use-magic-len
+
+Project build complete. To flash, run:
+ idf.py flash
+or
+ idf.py -p PORT flash
+or
+ python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 16MB --flash_freq 80m 0x2000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/test_wave.bin 0xd10000 build/ota_data_initial.bin 0xd12000 build/storage.bin
+or from the "/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build" directory
+ python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"
+Executing action: flash
+Running ninja in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build
+Executing "ninja flash"...
+[1/6] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/partition_table/partition-table.bin /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.bin
+test_wave.bin binary size 0xc93f0 bytes. Smallest app partition is 0x300000 bytes. 0x236c10 bytes (74%) free.
+[2/6] Performing build step for 'bootloader'
+[1/1] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.bin
+Bootloader binary size 0x5810 bytes. 0x7f0 bytes (8%) free.
+[3/6] No install step for 'bootloader'
+[4/6] Completed 'bootloader'
+[5/6] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/main && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/spiffs/spiffsgen.py 0x2ee000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/spiffs /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/storage.bin --page-size=256 --obj-name-len=32 --meta-len=4 --use-magic --use-magic-len
+[5/6] cd /home/mauro/esp/v5.5.1/esp-idf/components/esptool_py && /home/mauro/.espressif/tools/cmake/3.30.2/bin/cmake -D IDF_PATH=/home/mauro/esp/v5.5.1/esp-idf -D "SERIAL_TOOL=/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python;;/home/mauro/esp/v5.5.1/esp-idf/components/esptool_py/esptool/esptool.py;--chip;esp32p4" -D "SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@flash_args" -D WORKING_DIRECTORY=/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build -P /home/mauro/esp/v5.5.1/esp-idf/components/esptool_py/run_serial_tool.cmake
+esptool.py --chip esp32p4 -p /dev/ttyACM0 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x2000 bootloader/bootloader.bin 0x10000 test_wave.bin 0x8000 partition_table/partition-table.bin 0xd10000 ota_data_initial.bin 0xd12000 storage.bin
+esptool.py v4.11.dev2
+Serial port /dev/ttyACM0
+Connecting....
+Chip is ESP32-P4 (revision v1.0)
+Features: High-Performance MCU
+Crystal is 40MHz
+MAC: 30:ed:a0:e1:f4:87
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00002000 to 0x00007fff...
+Flash will be erased from 0x00010000 to 0x000d9fff...
+Flash will be erased from 0x00008000 to 0x00008fff...
+Flash will be erased from 0x00d10000 to 0x00d11fff...
+Flash will be erased from 0x00d12000 to 0x00ffffff...
+SHA digest in image updated
+Compressed 22544 bytes to 13870...
+Writing at 0x00002000... (100 %)
+Wrote 22544 bytes (13870 compressed) at 0x00002000 in 0.6 seconds (effective 290.2 kbit/s)...
+Hash of data verified.
+Compressed 824304 bytes to 425688...
+Writing at 0x00010000... (3 %)
+Writing at 0x0001db04... (7 %)
+Writing at 0x0002b0ac... (11 %)
+Writing at 0x00034092... (15 %)
+Writing at 0x0003a7c2... (19 %)
+Writing at 0x00041c10... (23 %)
+Writing at 0x00048c2b... (26 %)
+Writing at 0x00050af2... (30 %)
+Writing at 0x000597a6... (34 %)
+Writing at 0x000602ae... (38 %)
+Writing at 0x00067631... (42 %)
+Writing at 0x0006e3e2... (46 %)
+Writing at 0x000759b3... (50 %)
+Writing at 0x0007c8b5... (53 %)
+Writing at 0x0008357a... (57 %)
+Writing at 0x0008a8f9... (61 %)
+Writing at 0x00091a8c... (65 %)
+Writing at 0x00099021... (69 %)
+Writing at 0x0009fe4b... (73 %)
+Writing at 0x000a63d3... (76 %)
+Writing at 0x000ad360... (80 %)
+Writing at 0x000b3b20... (84 %)
+Writing at 0x000ba13a... (88 %)
+Writing at 0x000c0a06... (92 %)
+Writing at 0x000c975c... (96 %)
+Writing at 0x000d0d0e... (100 %)
+Wrote 824304 bytes (425688 compressed) at 0x00010000 in 10.5 seconds (effective 630.0 kbit/s)...
+Hash of data verified.
+Compressed 3072 bytes to 149...
+Writing at 0x00008000... (100 %)
+Wrote 3072 bytes (149 compressed) at 0x00008000 in 0.0 seconds (effective 493.0 kbit/s)...
+Hash of data verified.
+Compressed 8192 bytes to 31...
+Writing at 0x00d10000... (100 %)
+Wrote 8192 bytes (31 compressed) at 0x00d10000 in 0.1 seconds (effective 1203.6 kbit/s)...
+Hash of data verified.
+Compressed 3072000 bytes to 5895...
+Writing at 0x00d12000... (100 %)
+Wrote 3072000 bytes (5895 compressed) at 0x00d12000 in 15.2 seconds (effective 1612.9 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...
+Done
+[0;33m--- esp-idf-monitor 1.9.0 on /dev/ttyACM0 115200[0m
+[0;33m--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H[0m
+Executing action: monitor
+Running idf_monitor in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave
+Executing "/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.elf /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.elf -m '/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python' '/home/mauro/esp/v5.5.1/esp-idf/tools/idf.py'"...
+xxxx�x x��x�xxxxx �xESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x1 (POWERON),boot:0x31f (SPI_FAST_FLASH_BOOT)
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x164c
+load:0x4ff29ed0,len:0xdfc
+[0m--- 0x4ff29ed0: [0;33mesp_bootloader_get_description[0m[0m at [0;32m/home/mauro/esp/v5.5.1/esp-idf/components/esp_bootloader_format/esp_bootloader_desc.c[0m[0m:[1;31m39[0m
+load:0x4ff2cbd0,len:0x336c
+[0m--- 0x4ff2cbd0: [0;33mesp_flash_encryption_enabled[0m[0m at [0;32m/home/mauro/esp/v5.5.1/esp-idf/components/bootloader_support/src/flash_encrypt.c[0m[0m:[1;31m89[0m
+entry 0x4ff29eda
+[0m--- 0x4ff29eda: [0;33mcall_start_cpu0[0m[0m at [0;32m/home/mauro/esp/v5.5.1/esp-idf/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m25[0m
+[0;32mI (25) boot: ESP-IDF v5.5.1-1-g048a31001-dirty 2nd stage bootloader[0m
+[0;32mI (26) boot: compile time Jan 27 2026 17:26:27[0m
+[0;32mI (26) boot: Multicore bootloader[0m
+[0;32mI (29) boot: chip revision: v1.0[0m
+[0;32mI (30) boot: efuse block revision: v0.3[0m
+[0;32mI (34) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (38) boot.esp32p4: SPI Mode       : DIO[0m
+[0;32mI (41) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (45) boot: Enabling RNG early entropy source...[0m
+[0;32mI (50) boot: Partition Table:[0m
+[0;32mI (52) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (59) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (65) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (72) boot:  2 factory          factory app      00 00 00010000 00300000[0m
+[0;32mI (78) boot:  3 ota_0            OTA app          00 10 00310000 00a00000[0m
+[0;32mI (85) boot:  4 otadata          OTA data         01 00 00d10000 00002000[0m
+[0;32mI (91) boot:  5 storage          Unknown data     01 82 00d12000 002ee000[0m
+[0;32mI (99) boot: End of partition table[0m
+[0;32mI (102) boot: Defaulting to factory image[0m
+[0;32mI (105) esp_image: segment 0: paddr=00010020 vaddr=40090020 size=2386ch (145516) map[0m
+[0;32mI (138) esp_image: segment 1: paddr=00033894 vaddr=30100000 size=00088h (   136) load[0m
+[0;32mI (140) esp_image: segment 2: paddr=00033924 vaddr=4ff00000 size=0c6f4h ( 50932) load[0m
+[0;32mI (153) esp_image: segment 3: paddr=00040020 vaddr=40000020 size=8f9b8h (588216) map[0m
+[0;32mI (252) esp_image: segment 4: paddr=000cf9e0 vaddr=4ff0c6f4 size=07380h ( 29568) load[0m
+[0;32mI (259) esp_image: segment 5: paddr=000d6d68 vaddr=4ff13a80 size=02630h (  9776) load[0m
+[0;32mI (263) esp_image: segment 6: paddr=000d93a0 vaddr=50108080 size=00020h (    32) load[0m
+[0;32mI (269) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (269) boot: Disabling RNG early entropy source...[0m
+[0;32mI (287) cpu_start: Multicore app[0m
+[0;32mI (296) cpu_start: Pro cpu start user code[0m
+[0;32mI (296) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (296) app_init: Application information:[0m
+[0;32mI (296) app_init: Project name:     test_wave[0m
+[0;32mI (300) app_init: App version:      68b13ce[0m
+[0;32mI (304) app_init: Compile time:     Jan 27 2026 17:46:16[0m
+[0;32mI (309) app_init: ELF file SHA256:  f2971dd9d...[0m
+[0;32mI (313) app_init: ESP-IDF:          v5.5.1-1-g048a31001-dirty[0m
+[0;32mI (319) efuse_init: Min chip rev:     v0.1[0m
+[0;32mI (323) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (327) efuse_init: Chip rev:         v1.0[0m
+[0;32mI (331) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (337) heap_init: At 4FF189B0 len 00022610 (137 KiB): RAM[0m
+[0;32mI (342) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (347) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (353) heap_init: At 501080A0 len 00007F60 (31 KiB): RTCRAM[0m
+[0;32mI (358) heap_init: At 30100088 len 00001F78 (7 KiB): TCM[0m
+[0;32mI (364) spi_flash: detected chip: gd[0m
+[0;32mI (366) spi_flash: flash io: dio[0m
+[0;33mW (369) i2c: This driver is an old driver, please migrate your application code to adapt `driver/i2c_master.h`[0m
+[0;32mI (379) main_task: Started on CPU0[0m
+[0;32mI (419) main_task: Calling app_main()[0m
+[0;32mI (549) INIT: [F] SPIFFS montato: totale=2816471, usato=753[0m
+[0;32mI (549) INIT: [F] Partizione in esecuzione: factory (tipo 0, sottotipo 0)[0m
+[0;32mI (549) INIT: [F] Partizione boot      : factory (tipo 0, sottotipo 0)[0m
+[0;32mI (559) INIT: [F] Reset PHY Ethernet su GPIO 51[0m
+[0;32mI (619) INIT: [F] Inizializzazione Ethernet: MDC=31, MDIO=52, PHY_ADDR=1, RST_GPIO=51[0m
+[1;31mE (649) lan87xx: lan87xx_init(346): wrong chip OUI[0m
+[1;31mE (649) esp_eth: esp_eth_driver_install(251): init phy failed[0m
+[1;31mE (649) INIT: [F] Installazione driver Ethernet fallita: ESP_FAIL[0m
+[0;33mW (649) INIT: [F] Ethernet non disponibile, continuo senza Ethernet[0m
+[0;32mI (659) INIT: [F] Server HTTP avviato sulla porta 80[0m
+[0;32mI (659) INIT: [F] I2C inizializzato su porta 0 (SDA=27, SCL=26)[0m
+[0;32mI (669) INIT: [F] Pulsante BOOT configurato su GPIO 35[0m
+[0;32mI (669) INIT: [F] Striscia WS2812 inizializzata su GPIO 5 (8 LED)[0m
+[0;32mI (679) INIT: [F] UART RS232 inizializzata su porta 1 (TX=36, RX=46)[0m
+[0;32mI (679) INIT: [F] UART RS485 inizializzata su porta 2 (TX=4, RX=19, DE=21)[0m
+[0;32mI (689) INIT: [F] UART MDB inizializzata su porta 3 (TX=22, RX=23)[0m
+[0;32mI (699) INIT: [F] Uscite PWM configurate su GPIO 47 e GPIO 48[0m
+[0;32mI (699) INIT: [F] Sensore SHT40 stub: aggiungere driver sensore ESP-IDF quando disponibile (I2C 0)[0m
+[0;32mI (709) TASKS: [F] Task saltato eeprom (state=1)[0m
+[0;32mI (709) TASKS: [F] Task saltato io_expander (state=1)[0m
+[0;32mI (719) TASKS: [F] Task saltato sht40 (state=1)[0m
+[0;32mI (719) TASKS: [F] Task saltato rs232 (state=1)[0m
+[0;32mI (729) TASKS: [F] Task saltato rs485 (state=1)[0m
+[0;32mI (729) TASKS: [F] Task saltato mdb (state=1)[0m
+[0;32mI (739) TASKS: [F] Task saltato pwm (state=1)[0m
+[0;32mI (739) TASKS: [F] Task saltato touchscreen (state=1)[0m
+[0;32mI (739) TASKS: [F] Task saltato lvgl (state=1)[0m
+[0;32mI (749) APP: [F] App factory pronta: endpoint HTTP /status e /ota disponibili[0m
+[0;32mI (759) main_task: Returned from app_main()[0m
+[0m
+Executing action: all (aliases: build)
+Running ninja in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build
+Executing "ninja all"...
+[1/5] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/partition_table/partition-table.bin /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.bin
+test_wave.bin binary size 0xc93f0 bytes. Smallest app partition is 0x300000 bytes. 0x236c10 bytes (74%) free.
+[2/5] Performing build step for 'bootloader'
+[1/1] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.bin
+Bootloader binary size 0x5810 bytes. 0x7f0 bytes (8%) free.
+[3/5] No install step for 'bootloader'
+[4/5] Completed 'bootloader'
+[5/5] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/main && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/spiffs/spiffsgen.py 0x2ee000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/spiffs /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/storage.bin --page-size=256 --obj-name-len=32 --meta-len=4 --use-magic --use-magic-len
+
+Project build complete. To flash, run:
+ idf.py flash
+or
+ idf.py -p PORT flash
+or
+ python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 16MB --flash_freq 80m 0x2000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/test_wave.bin 0xd10000 build/ota_data_initial.bin 0xd12000 build/storage.bin
+or from the "/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build" directory
+ python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"
+Executing action: flash
+Running ninja in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build
+Executing "ninja flash"...
+[1/6] Performing build step for 'bootloader'
+[1/1] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.bin
+Bootloader binary size 0x5810 bytes. 0x7f0 bytes (8%) free.
+[2/6] No install step for 'bootloader'
+[3/6] Completed 'bootloader'
+[4/6] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/partition_table/partition-table.bin /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.bin
+test_wave.bin binary size 0xc93f0 bytes. Smallest app partition is 0x300000 bytes. 0x236c10 bytes (74%) free.
+[5/6] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/main && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/spiffs/spiffsgen.py 0x2ee000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/spiffs /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/storage.bin --page-size=256 --obj-name-len=32 --meta-len=4 --use-magic --use-magic-len
+[5/6] cd /home/mauro/esp/v5.5.1/esp-idf/components/esptool_py && /home/mauro/.espressif/tools/cmake/3.30.2/bin/cmake -D IDF_PATH=/home/mauro/esp/v5.5.1/esp-idf -D "SERIAL_TOOL=/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python;;/home/mauro/esp/v5.5.1/esp-idf/components/esptool_py/esptool/esptool.py;--chip;esp32p4" -D "SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@flash_args" -D WORKING_DIRECTORY=/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build -P /home/mauro/esp/v5.5.1/esp-idf/components/esptool_py/run_serial_tool.cmake
+esptool.py --chip esp32p4 -p /dev/ttyACM0 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x2000 bootloader/bootloader.bin 0x10000 test_wave.bin 0x8000 partition_table/partition-table.bin 0xd10000 ota_data_initial.bin 0xd12000 storage.bin
+esptool.py v4.11.dev2
+Serial port /dev/ttyACM0
+Connecting....
+Chip is ESP32-P4 (revision v1.0)
+Features: High-Performance MCU
+Crystal is 40MHz
+MAC: 30:ed:a0:e1:f4:87
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00002000 to 0x00007fff...
+Flash will be erased from 0x00010000 to 0x000d9fff...
+Flash will be erased from 0x00008000 to 0x00008fff...
+Flash will be erased from 0x00d10000 to 0x00d11fff...
+Flash will be erased from 0x00d12000 to 0x00ffffff...
+SHA digest in image updated
+Compressed 22544 bytes to 13870...
+Writing at 0x00002000... (100 %)
+Wrote 22544 bytes (13870 compressed) at 0x00002000 in 0.6 seconds (effective 288.7 kbit/s)...
+Hash of data verified.
+Compressed 824304 bytes to 425690...
+Writing at 0x00010000... (3 %)
+Writing at 0x0001daff... (7 %)
+Writing at 0x0002b09e... (11 %)
+Writing at 0x0003408d... (15 %)
+Writing at 0x0003a7c0... (19 %)
+Writing at 0x00041c10... (23 %)
+Writing at 0x00048c27... (26 %)
+Writing at 0x00050af0... (30 %)
+Writing at 0x000597a4... (34 %)
+Writing at 0x000602ac... (38 %)
+Writing at 0x00067626... (42 %)
+Writing at 0x0006e3df... (46 %)
+Writing at 0x000759b1... (50 %)
+Writing at 0x0007c8b1... (53 %)
+Writing at 0x00083578... (57 %)
+Writing at 0x0008a8f7... (61 %)
+Writing at 0x00091a8a... (65 %)
+Writing at 0x00099020... (69 %)
+Writing at 0x0009fe49... (73 %)
+Writing at 0x000a63d2... (76 %)
+Writing at 0x000ad35e... (80 %)
+Writing at 0x000b3b1c... (84 %)
+Writing at 0x000ba138... (88 %)
+Writing at 0x000c0a04... (92 %)
+Writing at 0x000c9759... (96 %)
+Writing at 0x000d0d0e... (100 %)
+Wrote 824304 bytes (425690 compressed) at 0x00010000 in 10.5 seconds (effective 630.3 kbit/s)...
+Hash of data verified.
+Compressed 3072 bytes to 149...
+Writing at 0x00008000... (100 %)
+Wrote 3072 bytes (149 compressed) at 0x00008000 in 0.0 seconds (effective 496.6 kbit/s)...
+Hash of data verified.
+Compressed 8192 bytes to 31...
+Writing at 0x00d10000... (100 %)
+Wrote 8192 bytes (31 compressed) at 0x00d10000 in 0.1 seconds (effective 1220.5 kbit/s)...
+Hash of data verified.
+Compressed 3072000 bytes to 5895...
+Writing at 0x00d12000... (100 %)
+Wrote 3072000 bytes (5895 compressed) at 0x00d12000 in 15.1 seconds (effective 1623.4 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...
+Done
+[0;33m--- esp-idf-monitor 1.9.0 on /dev/ttyACM0 115200[0m
+[0;33m--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H[0m
+Executing action: monitor
+Running idf_monitor in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave
+Executing "/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.elf /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.elf -m '/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python' '/home/mauro/esp/v5.5.1/esp-idf/tools/idf.py'"...
+xx�x x��x�xxxxx �xESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x1 (POWERON),boot:0x31f (SPI_FAST_FLASH_BOOT)
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x164c
+load:0x4ff29ed0,len:0xdfc
+[0m--- 0x4ff29ed0: [0;33mesp_bootloader_get_description[0m[0m at [0;32m/home/mauro/esp/v5.5.1/esp-idf/components/esp_bootloader_format/esp_bootloader_desc.c[0m[0m:[1;31m39[0m
+load:0x4ff2cbd0,len:0x336c
+[0m--- 0x4ff2cbd0: [0;33mesp_flash_encryption_enabled[0m[0m at [0;32m/home/mauro/esp/v5.5.1/esp-idf/components/bootloader_support/src/flash_encrypt.c[0m[0m:[1;31m89[0m
+entry 0x4ff29eda
+[0m--- 0x4ff29eda: [0;33mcall_start_cpu0[0m[0m at [0;32m/home/mauro/esp/v5.5.1/esp-idf/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m25[0m
+[0;32mI (25) boot: ESP-IDF v5.5.1-1-g048a31001-dirty 2nd stage bootloader[0m
+[0;32mI (26) boot: compile time Jan 27 2026 17:26:27[0m
+[0;32mI (26) boot: Multicore bootloader[0m
+[0;32mI (29) boot: chip revision: v1.0[0m
+[0;32mI (30) boot: efuse block revision: v0.3[0m
+[0;32mI (34) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (38) boot.esp32p4: SPI Mode       : DIO[0m
+[0;32mI (41) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (45) boot: Enabling RNG early entropy source...[0m
+[0;32mI (50) boot: Partition Table:[0m
+[0;32mI (52) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (59) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (65) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (72) boot:  2 factory          factory app      00 00 00010000 00300000[0m
+[0;32mI (78) boot:  3 ota_0            OTA app          00 10 00310000 00a00000[0m
+[0;32mI (85) boot:  4 otadata          OTA data         01 00 00d10000 00002000[0m
+[0;32mI (91) boot:  5 storage          Unknown data     01 82 00d12000 002ee000[0m
+[0;32mI (99) boot: End of partition table[0m
+[0;32mI (102) boot: Defaulting to factory image[0m
+[0;32mI (105) esp_image: segment 0: paddr=00010020 vaddr=40090020 size=2386ch (145516) map[0m
+[0;32mI (138) esp_image: segment 1: paddr=00033894 vaddr=30100000 size=00088h (   136) load[0m
+[0;32mI (140) esp_image: segment 2: paddr=00033924 vaddr=4ff00000 size=0c6f4h ( 50932) load[0m
+[0;32mI (153) esp_image: segment 3: paddr=00040020 vaddr=40000020 size=8f9b8h (588216) map[0m
+[0;32mI (252) esp_image: segment 4: paddr=000cf9e0 vaddr=4ff0c6f4 size=07380h ( 29568) load[0m
+[0;32mI (259) esp_image: segment 5: paddr=000d6d68 vaddr=4ff13a80 size=02630h (  9776) load[0m
+[0;32mI (263) esp_image: segment 6: paddr=000d93a0 vaddr=50108080 size=00020h (    32) load[0m
+[0;32mI (269) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (269) boot: Disabling RNG early entropy source...[0m
+[0;32mI (287) cpu_start: Multicore app[0m
+[0;32mI (296) cpu_start: Pro cpu start user code[0m
+[0;32mI (296) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (296) app_init: Application information:[0m
+[0;32mI (296) app_init: Project name:     test_wave[0m
+[0;32mI (300) app_init: App version:      68b13ce-dirty[0m
+[0;32mI (304) app_init: Compile time:     Jan 27 2026 17:50:14[0m
+[0;32mI (310) app_init: ELF file SHA256:  dcd2de35d...[0m
+[0;32mI (314) app_init: ESP-IDF:          v5.5.1-1-g048a31001-dirty[0m
+[0;32mI (319) efuse_init: Min chip rev:     v0.1[0m
+[0;32mI (323) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (327) efuse_init: Chip rev:         v1.0[0m
+[0;32mI (331) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (337) heap_init: At 4FF189B0 len 00022610 (137 KiB): RAM[0m
+[0;32mI (342) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (348) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (353) heap_init: At 501080A0 len 00007F60 (31 KiB): RTCRAM[0m
+[0;32mI (358) heap_init: At 30100088 len 00001F78 (7 KiB): TCM[0m
+[0;32mI (364) spi_flash: detected chip: gd[0m
+[0;32mI (366) spi_flash: flash io: dio[0m
+[0;33mW (370) i2c: This driver is an old driver, please migrate your application code to adapt `driver/i2c_master.h`[0m
+[0;32mI (380) main_task: Started on CPU0[0m
+[0;32mI (420) main_task: Calling app_main()[0m
+[0;32mI (550) INIT: [F] SPIFFS montato: totale=2816471, usato=753[0m
+[0;32mI (550) INIT: [F] Partizione in esecuzione: factory (tipo 0, sottotipo 0)[0m
+[0;32mI (550) INIT: [F] Partizione boot      : factory (tipo 0, sottotipo 0)[0m
+[0;32mI (560) INIT: [F] Reset PHY Ethernet su GPIO 51[0m
+[0;32mI (620) INIT: [F] Inizializzazione Ethernet: MDC=31, MDIO=52, PHY_ADDR=1, RST_GPIO=51[0m
+[1;31mE (650) lan87xx: lan87xx_init(346): wrong chip OUI[0m
+[1;31mE (650) esp_eth: esp_eth_driver_install(251): init phy failed[0m
+[1;31mE (650) INIT: [F] Installazione driver Ethernet fallita: ESP_FAIL[0m
+[0;33mW (650) INIT: [F] Ethernet non disponibile, continuo senza Ethernet[0m
+[0;32mI (660) INIT: [F] Server HTTP avviato sulla porta 80[0m
+[0;32mI (660) INIT: [F] I2C inizializzato su porta 0 (SDA=27, SCL=26)[0m
+[0;32mI (670) INIT: [F] Pulsante BOOT configurato su GPIO 35[0m
+[0;32mI (670) INIT: [F] Striscia WS2812 inizializzata su GPIO 5 (8 LED)[0m
+[0;32mI (680) INIT: [F] UART RS232 inizializzata su porta 1 (TX=36, RX=46)[0m
+[0;32mI (680) INIT: [F] UART RS485 inizializzata su porta 2 (TX=4, RX=19, DE=21)[0m
+[0;32mI (690) INIT: [F] UART MDB inizializzata su porta 3 (TX=22, RX=23)[0m
+[0;32mI (700) INIT: [F] Uscite PWM configurate su GPIO 47 e GPIO 48[0m
+[0;32mI (700) INIT: [F] Sensore SHT40 stub: aggiungere driver sensore ESP-IDF quando disponibile (I2C 0)[0m
+[0;32mI (710) TASKS: [F] Task saltato eeprom (state=1)[0m
+[0;32mI (710) TASKS: [F] Task saltato io_expander (state=1)[0m
+[0;32mI (720) TASKS: [F] Task saltato sht40 (state=1)[0m
+[0;32mI (720) TASKS: [F] Task saltato rs232 (state=1)[0m
+[0;32mI (730) TASKS: [F] Task saltato rs485 (state=1)[0m
+[0;32mI (730) TASKS: [F] Task saltato mdb (state=1)[0m
+[0;32mI (740) TASKS: [F] Task saltato pwm (state=1)[0m
+[0;32mI (740) TASKS: [F] Task saltato touchscreen (state=1)[0m
+[0;32mI (740) TASKS: [F] Task saltato lvgl (state=1)[0m
+[0;32mI (750) APP: [F] App factory pronta: endpoint HTTP /status e /ota disponibili[0m
+[0;32mI (760) main_task: Returned from app_main()[0m
+[0m
+Executing action: all (aliases: build)
+Running ninja in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build
+Executing "ninja all"...
+[1/10] Performing build step for 'bootloader'
+[1/1] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.bin
+Bootloader binary size 0x5810 bytes. 0x7f0 bytes (8%) free.
+[2/10] No install step for 'bootloader'
+[3/10] Completed 'bootloader'
+[4/10] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/main && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/spiffs/spiffsgen.py 0x2ee000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/spiffs /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/storage.bin --page-size=256 --obj-name-len=32 --meta-len=4 --use-magic --use-magic-len
+[5/10] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/init.c.obj
+/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/init.c:320:18: warning: 'start_wifi' defined but not used [-Wunused-function]
+  320 | static esp_err_t start_wifi(void)
+      |                  ^~~~~~~~~~
+/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/init.c:242:13: warning: 'wifi_event_handler' defined but not used [-Wunused-function]
+  242 | static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+      |             ^~~~~~~~~~~~~~~~~~
+[6/10] Linking C static library esp-idf/main/libmain.a
+[7/10] Generating esp-idf/esp_system/ld/sections.ld
+[8/10] Linking CXX executable test_wave.elf
+[9/10] Generating binary image from built executable
+esptool.py v4.11.dev2
+Creating esp32p4 image...
+Merged 3 ELF sections
+Successfully created esp32p4 image.
+Generated /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.bin
+[10/10] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/partition_table/partition-table.bin /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.bin
+test_wave.bin binary size 0xc9060 bytes. Smallest app partition is 0x300000 bytes. 0x236fa0 bytes (74%) free.
+
+Project build complete. To flash, run:
+ idf.py flash
+or
+ idf.py -p PORT flash
+or
+ python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 16MB --flash_freq 80m 0x2000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/test_wave.bin 0xd10000 build/ota_data_initial.bin 0xd12000 build/storage.bin
+or from the "/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build" directory
+ python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"
+Executing action: flash
+Running ninja in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build
+Executing "ninja flash"...
+[1/6] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/partition_table/partition-table.bin /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.bin
+test_wave.bin binary size 0xc9060 bytes. Smallest app partition is 0x300000 bytes. 0x236fa0 bytes (74%) free.
+[2/6] Performing build step for 'bootloader'
+[1/1] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/esp-idf/esptool_py && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.bin
+Bootloader binary size 0x5810 bytes. 0x7f0 bytes (8%) free.
+[3/6] No install step for 'bootloader'
+[4/6] Completed 'bootloader'
+[5/6] cd /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/esp-idf/main && /home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.1/esp-idf/components/spiffs/spiffsgen.py 0x2ee000 /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/main/spiffs /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/storage.bin --page-size=256 --obj-name-len=32 --meta-len=4 --use-magic --use-magic-len
+[5/6] cd /home/mauro/esp/v5.5.1/esp-idf/components/esptool_py && /home/mauro/.espressif/tools/cmake/3.30.2/bin/cmake -D IDF_PATH=/home/mauro/esp/v5.5.1/esp-idf -D "SERIAL_TOOL=/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python;;/home/mauro/esp/v5.5.1/esp-idf/components/esptool_py/esptool/esptool.py;--chip;esp32p4" -D "SERIAL_TOOL_ARGS=--before=default_reset;--after=hard_reset;write_flash;@flash_args" -D WORKING_DIRECTORY=/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build -P /home/mauro/esp/v5.5.1/esp-idf/components/esptool_py/run_serial_tool.cmake
+esptool.py --chip esp32p4 -p /dev/ttyACM0 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB 0x2000 bootloader/bootloader.bin 0x10000 test_wave.bin 0x8000 partition_table/partition-table.bin 0xd10000 ota_data_initial.bin 0xd12000 storage.bin
+esptool.py v4.11.dev2
+Serial port /dev/ttyACM0
+Connecting...
+Chip is ESP32-P4 (revision v1.0)
+Features: High-Performance MCU
+Crystal is 40MHz
+MAC: 30:ed:a0:e1:f4:87
+Uploading stub...
+Running stub...
+Stub running...
+Changing baud rate to 460800
+Changed.
+Configuring flash size...
+Flash will be erased from 0x00002000 to 0x00007fff...
+Flash will be erased from 0x00010000 to 0x000d9fff...
+Flash will be erased from 0x00008000 to 0x00008fff...
+Flash will be erased from 0x00d10000 to 0x00d11fff...
+Flash will be erased from 0x00d12000 to 0x00ffffff...
+SHA digest in image updated
+Compressed 22544 bytes to 13870...
+Writing at 0x00002000... (100 %)
+Wrote 22544 bytes (13870 compressed) at 0x00002000 in 0.6 seconds (effective 283.9 kbit/s)...
+Hash of data verified.
+Compressed 823392 bytes to 425229...
+Writing at 0x00010000... (3 %)
+Writing at 0x0001dac5... (7 %)
+Writing at 0x0002b0f6... (11 %)
+Writing at 0x00033fb3... (15 %)
+Writing at 0x0003a784... (19 %)
+Writing at 0x00041bdc... (23 %)
+Writing at 0x00048be2... (26 %)
+Writing at 0x00050a9f... (30 %)
+Writing at 0x00059692... (34 %)
+Writing at 0x000601a4... (38 %)
+Writing at 0x000676e4... (42 %)
+Writing at 0x0006e318... (46 %)
+Writing at 0x00075899... (50 %)
+Writing at 0x0007c7a2... (53 %)
+Writing at 0x00083488... (57 %)
+Writing at 0x0008a7e8... (61 %)
+Writing at 0x0009192f... (65 %)
+Writing at 0x00098fdf... (69 %)
+Writing at 0x0009fd25... (73 %)
+Writing at 0x000a62ea... (76 %)
+Writing at 0x000ad29e... (80 %)
+Writing at 0x000b39ff... (84 %)
+Writing at 0x000ba082... (88 %)
+Writing at 0x000c0940... (92 %)
+Writing at 0x000c96dc... (96 %)
+Writing at 0x000d0c8f... (100 %)
+Wrote 823392 bytes (425229 compressed) at 0x00010000 in 10.5 seconds (effective 628.6 kbit/s)...
+Hash of data verified.
+Compressed 3072 bytes to 149...
+Writing at 0x00008000... (100 %)
+Wrote 3072 bytes (149 compressed) at 0x00008000 in 0.1 seconds (effective 479.3 kbit/s)...
+Hash of data verified.
+Compressed 8192 bytes to 31...
+Writing at 0x00d10000... (100 %)
+Wrote 8192 bytes (31 compressed) at 0x00d10000 in 0.1 seconds (effective 1142.4 kbit/s)...
+Hash of data verified.
+Compressed 3072000 bytes to 5895...
+Writing at 0x00d12000... (100 %)
+Wrote 3072000 bytes (5895 compressed) at 0x00d12000 in 15.2 seconds (effective 1615.6 kbit/s)...
+Hash of data verified.
+
+Leaving...
+Hard resetting via RTS pin...
+Done

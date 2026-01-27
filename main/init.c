@@ -439,8 +439,8 @@ static esp_err_t start_ethernet(void)
         return ESP_FAIL;
     }
     
-    // Create new PHY instance (LAN87xx for LAN8720)
-    esp_eth_phy_t *phy = esp_eth_phy_new_lan87xx(&phy_config);
+    // Create new PHY instance (IP101 for ESP32-P4 Module DEV KIT)
+    esp_eth_phy_t *phy = esp_eth_phy_new_ip101(&phy_config);
     if (!phy) {
         ESP_LOGE(TAG, "[F] Impossibile creare Ethernet PHY");
         mac->del(mac);

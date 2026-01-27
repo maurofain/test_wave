@@ -19,6 +19,8 @@
   - gestione del touchscreen (implementazione futura)
   - gestione della grafica tramite LVGL (implementazione futura)
 
+- la scheda waveshare usa il chip IP101
+
 - nell'interfaccia web OTA creiamo le funzioni per il caricamento OTA della partizione main e un pulsante per una pagina di configurazione e per una pagina di statistiche. 
   La pagina di configurazione devge permettere di editare :
 
