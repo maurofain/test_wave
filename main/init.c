@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
+#include "esp_netif_net_stack.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_wifi.h"
@@ -23,6 +24,8 @@
 #include "driver/rmt_tx.h"
 #include "led_strip.h"
 #include "lwip/ip4_addr.h"
+#include "lwip/etharp.h"
+#include "lwip/netif.h"
 #include "init.h"
 #include "sdkconfig.h"
 
@@ -33,6 +36,7 @@ static esp_netif_t *s_netif_sta;
 static esp_netif_t *s_netif_eth;
 static httpd_handle_t s_httpd;
 static led_strip_handle_t s_led_strip;
+static esp_eth_handle_t s_eth_handle;
 
 // -----------------------------------------------------------------------------
 // Inizializzazione hardware
@@ -278,10 +282,21 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
     }
     if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        ESP_LOGI(TAG, "[F] Ethernet got IP: %s (netmask: %s, gateway: %s)", 
-                 ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.ip),
-                 ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.netmask),
-                 ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.gw));
+        const esp_netif_ip_info_t *ip_info = &event->ip_info;
+        ESP_LOGI(TAG, "[F] Ethernet Got IP Address");
+        ESP_LOGI(TAG, "[F] ~~~~~~~~~~~");
+        ESP_LOGI(TAG, "[F] ETHIP:" IPSTR, IP2STR(&ip_info->ip));
+        ESP_LOGI(TAG, "[F] ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
+        ESP_LOGI(TAG, "[F] ETHGW:" IPSTR, IP2STR(&ip_info->gw));
+        ESP_LOGI(TAG, "[F] ~~~~~~~~~~~");
+
+        if (s_netif_eth) {
+            struct netif *lwip_netif = (struct netif *)esp_netif_get_netif_impl(s_netif_eth);
+            if (lwip_netif) {
+                etharp_gratuitous(lwip_netif);
+                ESP_LOGI(TAG, "[F] Gratuitous ARP inviato");
+            }
+        }
     }
 }
 
@@ -290,7 +305,15 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
     (void)arg;
     switch (event_id) {
     case ETHERNET_EVENT_CONNECTED:
-        ESP_LOGI(TAG, "[F] Collegamento Ethernet attivo");
+        {
+            uint8_t mac_addr[6] = {0};
+            esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
+            esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
+            ESP_LOGI(TAG, "[F] Collegamento Ethernet attivo");
+            ESP_LOGI(TAG, "[F] Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
+                     mac_addr[0], mac_addr[1], mac_addr[2],
+                     mac_addr[3], mac_addr[4], mac_addr[5]);
+        }
         break;
     case ETHERNET_EVENT_DISCONNECTED:
         ESP_LOGW(TAG, "[F] Collegamento Ethernet inattivo");
@@ -308,12 +331,9 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
 
 static esp_err_t init_event_loop(void)
 {
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    // [F] WiFi disabled due to linker issues
-    // ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
+    // Nota: esp_netif_init() e esp_event_loop_create_default() vengono chiamati in start_ethernet()
+    // DOPO aver inizializzato il driver Ethernet, come nell'esempio funzionante
+    // Questa funzione ora è vuota perché tutto viene fatto in start_ethernet()
     return ESP_OK;
 }
 
@@ -376,98 +396,108 @@ static esp_err_t start_wifi(void)
     return ESP_OK;
 }
 
+static esp_eth_handle_t eth_init_internal(void)
+{
+    esp_err_t ret = ESP_OK;
+    // Init common MAC and PHY configs to default
+    // Nota: Il reset PHY viene gestito automaticamente dal driver quando phy_config.reset_gpio_num è configurato
+    eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
+
+    // Update PHY config based on board specific configuration
+    phy_config.phy_addr = CONFIG_APP_ETH_PHY_ADDR;
+    phy_config.reset_gpio_num = CONFIG_APP_ETH_PHY_RST_GPIO;
+
+    // Init vendor specific MAC config to default
+    eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
+    // Update vendor specific MAC config based on board configuration
+    esp32_emac_config.smi_gpio.mdc_num = CONFIG_APP_ETH_MDC_GPIO;
+    esp32_emac_config.smi_gpio.mdio_num = CONFIG_APP_ETH_MDIO_GPIO;
+
+    // Create new ESP32 Ethernet MAC instance
+    esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
+    // Create new PHY instance (IP101 for ESP32-P4 Module DEV KIT)
+    esp_eth_phy_t *phy = esp_eth_phy_new_ip101(&phy_config);
+    // Init Ethernet driver to default and install it
+    esp_eth_handle_t eth_handle = NULL;
+    esp_eth_config_t eth_config = ETH_DEFAULT_CONFIG(mac, phy);
+    ESP_GOTO_ON_FALSE(esp_eth_driver_install(&eth_config, &eth_handle) == ESP_OK, ESP_FAIL,
+                      err, TAG, "Ethernet driver install failed");
+
+    return eth_handle;
+err:
+    if (eth_handle != NULL) {
+        esp_eth_driver_uninstall(eth_handle);
+    }
+    if (mac != NULL) {
+        mac->del(mac);
+    }
+    if (phy != NULL) {
+        phy->del(phy);
+    }
+    return NULL;
+}
+
 static esp_err_t start_ethernet(void)
 {
 #if CONFIG_APP_ETH_ENABLED
+    esp_err_t ret = ESP_OK;
+    
     // Check for GPIO conflicts
     if (CONFIG_APP_ETH_MDC_GPIO == CONFIG_APP_MDB_RX_GPIO) {
         ESP_LOGW(TAG, "[F] ATTENZIONE: Conflitto GPIO! ETH_MDC_GPIO (%d) e MDB_RX_GPIO (%d) usano lo stesso pin", 
                  CONFIG_APP_ETH_MDC_GPIO, CONFIG_APP_MDB_RX_GPIO);
     }
 
+    ESP_LOGI(TAG, "[F] Inizializzazione Ethernet: MDC=%d, MDIO=%d, PHY_ADDR=%d, RST_GPIO=%d",
+             CONFIG_APP_ETH_MDC_GPIO, CONFIG_APP_ETH_MDIO_GPIO, 
+             CONFIG_APP_ETH_PHY_ADDR, CONFIG_APP_ETH_PHY_RST_GPIO);
+
+    // Init Ethernet driver to default and install it
+    esp_eth_handle_t eth_handle = eth_init_internal();
+    if (!eth_handle) {
+        ESP_LOGE(TAG, "[F] Installazione driver Ethernet fallita");
+        return ESP_FAIL;
+    }
+    
+    // Salva l'handle Ethernet per riferimento futuro
+    s_eth_handle = eth_handle;
+    
+    // Inizializza esp_netif e event loop DOPO aver installato il driver (come nell'esempio funzionante)
+    ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "esp_netif_init failed");
+    ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG, "esp_event_loop_create_default failed");
+    
+    // Create netif AFTER installing the driver and initializing netif (come nell'esempio funzionante)
     esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
     s_netif_eth = esp_netif_new(&netif_cfg);
     if (!s_netif_eth) {
         ESP_LOGE(TAG, "[F] Impossibile allocare Ethernet netif");
-        return ESP_FAIL;
-    }
-
-    // Enable DHCP for Ethernet
-    ESP_RETURN_ON_ERROR(esp_netif_dhcpc_start(s_netif_eth), TAG, "DHCP client start failed");
-
-    // Manual PHY reset if reset GPIO is configured
-    if (CONFIG_APP_ETH_PHY_RST_GPIO >= 0) {
-        ESP_LOGI(TAG, "[F] Reset PHY Ethernet su GPIO %d", CONFIG_APP_ETH_PHY_RST_GPIO);
-        gpio_config_t io_conf = {
-            .pin_bit_mask = (1ULL << CONFIG_APP_ETH_PHY_RST_GPIO),
-            .mode = GPIO_MODE_OUTPUT,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_DISABLE,
-            .intr_type = GPIO_INTR_DISABLE,
-        };
-        ESP_RETURN_ON_ERROR(gpio_config(&io_conf), TAG, "PHY reset GPIO config failed");
-        
-        // Reset sequence: low -> delay -> high
-        gpio_set_level(CONFIG_APP_ETH_PHY_RST_GPIO, 0);
-        vTaskDelay(pdMS_TO_TICKS(10)); // 10ms delay
-        gpio_set_level(CONFIG_APP_ETH_PHY_RST_GPIO, 1);
-        vTaskDelay(pdMS_TO_TICKS(50)); // Wait 50ms after reset before initializing PHY
-    }
-
-    // Init common MAC and PHY configs to default
-    eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
-    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
-    
-    // Update PHY config based on board specific configuration
-    phy_config.phy_addr = CONFIG_APP_ETH_PHY_ADDR;
-    phy_config.reset_gpio_num = CONFIG_APP_ETH_PHY_RST_GPIO;
-    
-    // Init vendor specific MAC config to default
-    eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
-    // Update vendor specific MAC config based on board configuration
-    esp32_emac_config.smi_gpio.mdc_num = CONFIG_APP_ETH_MDC_GPIO;
-    esp32_emac_config.smi_gpio.mdio_num = CONFIG_APP_ETH_MDIO_GPIO;
-    
-    ESP_LOGI(TAG, "[F] Inizializzazione Ethernet: MDC=%d, MDIO=%d, PHY_ADDR=%d, RST_GPIO=%d",
-             CONFIG_APP_ETH_MDC_GPIO, CONFIG_APP_ETH_MDIO_GPIO, 
-             CONFIG_APP_ETH_PHY_ADDR, CONFIG_APP_ETH_PHY_RST_GPIO);
-    
-    // Create new ESP32 Ethernet MAC instance
-    esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
-    if (!mac) {
-        ESP_LOGE(TAG, "[F] Impossibile creare Ethernet MAC");
+        esp_eth_driver_uninstall(eth_handle);
         return ESP_FAIL;
     }
     
-    // Create new PHY instance (IP101 for ESP32-P4 Module DEV KIT)
-    esp_eth_phy_t *phy = esp_eth_phy_new_ip101(&phy_config);
-    if (!phy) {
-        ESP_LOGE(TAG, "[F] Impossibile creare Ethernet PHY");
-        mac->del(mac);
-        return ESP_FAIL;
-    }
-    
-    // Init Ethernet driver to default and install it
-    esp_eth_handle_t eth_handle = NULL;
-    esp_eth_config_t eth_config = ETH_DEFAULT_CONFIG(mac, phy);
-    esp_err_t ret = esp_eth_driver_install(&eth_config, &eth_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[F] Installazione driver Ethernet fallita: %s", esp_err_to_name(ret));
-        phy->del(phy);
-        mac->del(mac);
-        return ret;
-    }
-    
+    // Create glue and attach netif
     esp_eth_netif_glue_handle_t glue = esp_eth_new_netif_glue(eth_handle);
     ESP_RETURN_ON_ERROR(esp_netif_attach(s_netif_eth, glue), TAG, "Netif attach failed");
+
+    // Allinea MAC del netif a quello del driver Ethernet
+    uint8_t mac_addr[6] = {0};
+    esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
+    ESP_RETURN_ON_ERROR(esp_netif_set_mac(s_netif_eth, mac_addr), TAG, "esp_netif_set_mac failed");
+    ESP_LOGI(TAG, "[F] Netif MAC impostato a %02x:%02x:%02x:%02x:%02x:%02x",
+             mac_addr[0], mac_addr[1], mac_addr[2],
+             mac_addr[3], mac_addr[4], mac_addr[5]);
     
+    // Register event handlers AFTER creating netif (come nel progetto factory)
+    ESP_RETURN_ON_ERROR(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL), TAG, "register ETH_EVENT failed");
+    ESP_RETURN_ON_ERROR(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ip_event_handler, NULL), TAG, "register IP_EVENT failed");
+    
+    // Start Ethernet driver (come nel progetto factory)
     ret = esp_eth_start(eth_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[F] Avvio Ethernet fallito: %s", esp_err_to_name(ret));
         esp_eth_del_netif_glue(glue);
         esp_eth_driver_uninstall(eth_handle);
-        phy->del(phy);
-        mac->del(mac);
         return ret;
     }
     
@@ -518,14 +548,31 @@ static esp_err_t perform_ota(const char *url)
     return ret;
 }
 
+static esp_err_t root_get_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[F] Connessione HTTP GET su / (URI: %s)", req->uri);
+    const char *resp = "ESP32-P4 Factory Server\nEndpoints: /status, /ota\n";
+    httpd_resp_set_type(req, "text/plain");
+    return httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+}
+
 static esp_err_t status_get_handler(httpd_req_t *req)
 {
+    ESP_LOGI(TAG, "[F] Connessione HTTP GET su /status (URI: %s)", req->uri);
+    
     char ap_ip[16] = "0.0.0.0";
     char sta_ip[16] = "0.0.0.0";
     char eth_ip[16] = "0.0.0.0";
-    ip_to_str(s_netif_ap, ap_ip, sizeof(ap_ip));
-    ip_to_str(s_netif_sta, sta_ip, sizeof(sta_ip));
-    ip_to_str(s_netif_eth, eth_ip, sizeof(eth_ip));
+    
+    if (s_netif_ap) {
+        ip_to_str(s_netif_ap, ap_ip, sizeof(ap_ip));
+    }
+    if (s_netif_sta) {
+        ip_to_str(s_netif_sta, sta_ip, sizeof(sta_ip));
+    }
+    if (s_netif_eth) {
+        ip_to_str(s_netif_eth, eth_ip, sizeof(eth_ip));
+    }
 
     const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *boot = esp_ota_get_boot_partition();
@@ -543,12 +590,25 @@ static esp_err_t status_get_handler(httpd_req_t *req)
                        boot ? boot->label : "?",
                        ap_ip, sta_ip, eth_ip);
 
+    if (len < 0 || len >= sizeof(resp)) {
+        ESP_LOGE(TAG, "[F] Errore nella formattazione della risposta status (len=%d)", len);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "text/plain");
+        return httpd_resp_send(req, "Internal Server Error", HTTPD_RESP_USE_STRLEN);
+    }
+
+    ESP_LOGI(TAG, "[F] Invio risposta status (len=%d): %s", len, resp);
     httpd_resp_set_type(req, "application/json");
-    return httpd_resp_send(req, resp, len);
+    esp_err_t ret = httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[F] Errore nell'invio della risposta: %s", esp_err_to_name(ret));
+    }
+    return ret;
 }
 
 static esp_err_t ota_post_handler(httpd_req_t *req)
 {
+    ESP_LOGI(TAG, "[F] Connessione HTTP POST su /ota");
     char query[256];
     char url[200] = {0};
 
@@ -572,16 +632,45 @@ static esp_err_t ota_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
+{
+    ESP_LOGW(TAG, "[F] Richiesta HTTP per URI non trovato: %s (errore: %d)", req->uri, error);
+    httpd_resp_set_status(req, "404 Not Found");
+    httpd_resp_set_type(req, "text/plain");
+    return httpd_resp_send(req, "404 Not Found", HTTPD_RESP_USE_STRLEN);
+}
+
 static esp_err_t start_http_server(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = CONFIG_APP_HTTP_PORT;
-    config.uri_match_fn = httpd_uri_match_wildcard;
+    config.max_uri_handlers = 10;
+    config.max_resp_headers = 8;
+    config.stack_size = 8192;
+    config.lru_purge_enable = true;
 
-    if (httpd_start(&s_httpd, &config) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start HTTP server");
+    ESP_LOGI(TAG, "[F] Avvio server HTTP sulla porta %d", config.server_port);
+    esp_err_t ret = httpd_start(&s_httpd, &config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[F] Impossibile avviare server HTTP: %s", esp_err_to_name(ret));
         return ESP_FAIL;
     }
+    ESP_LOGI(TAG, "[F] Server HTTP avviato con successo");
+
+    // Register root endpoint for testing
+    httpd_uri_t root_uri = {
+        .uri = "/",
+        .method = HTTP_GET,
+        .handler = root_get_handler,
+        .user_ctx = NULL,
+    };
+    ret = httpd_register_uri_handler(s_httpd, &root_uri);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[F] Errore nella registrazione dell'URI /: %s", esp_err_to_name(ret));
+        httpd_stop(s_httpd);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "[F] URI / registrato con successo");
 
     httpd_uri_t status_uri = {
         .uri = "/status",
@@ -589,7 +678,13 @@ static esp_err_t start_http_server(void)
         .handler = status_get_handler,
         .user_ctx = NULL,
     };
-    httpd_register_uri_handler(s_httpd, &status_uri);
+    ret = httpd_register_uri_handler(s_httpd, &status_uri);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[F] Errore nella registrazione dell'URI /status: %s", esp_err_to_name(ret));
+        httpd_stop(s_httpd);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "[F] URI /status registrato con successo");
 
     httpd_uri_t ota_uri = {
         .uri = "/ota",
@@ -597,13 +692,23 @@ static esp_err_t start_http_server(void)
         .handler = ota_post_handler,
         .user_ctx = NULL,
     };
-    httpd_register_uri_handler(s_httpd, &ota_uri);
+    ret = httpd_register_uri_handler(s_httpd, &ota_uri);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[F] Errore nella registrazione dell'URI /ota: %s", esp_err_to_name(ret));
+        httpd_stop(s_httpd);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "[F] URI /ota registrato con successo");
+
+    // Register 404 handler
+    httpd_register_err_handler(s_httpd, HTTPD_404_NOT_FOUND, not_found_handler);
 
     ESP_LOGI(TAG, "[F] Server HTTP avviato sulla porta %d", config.server_port);
     return ESP_OK;
 }
 
 // -----------------------------------------------------------------------------
+
 // Public API
 // -----------------------------------------------------------------------------
 
@@ -620,17 +725,19 @@ esp_err_t init_run_factory(void)
     if (eth_ret != ESP_OK) {
         ESP_LOGW(TAG, "[F] Ethernet non disponibile, continuo senza Ethernet");
     }
+    
     ESP_ERROR_CHECK(start_http_server());
 
-    ESP_ERROR_CHECK(init_i2c());
-    ESP_ERROR_CHECK(init_boot_button());
-    ESP_ERROR_CHECK(init_ws2812());
-    ESP_ERROR_CHECK(init_uart_rs232());
-    ESP_ERROR_CHECK(init_uart_rs485());
-    ESP_ERROR_CHECK(init_uart_mdb());
-    ESP_ERROR_CHECK(init_pwm());
+    // TEMPORANEAMENTE DISABILITATE per testare se interferiscono con Ethernet
+    // ESP_ERROR_CHECK(init_i2c());
+    // ESP_ERROR_CHECK(init_boot_button());
+    // ESP_ERROR_CHECK(init_ws2812());
+    // ESP_ERROR_CHECK(init_uart_rs232());
+    // ESP_ERROR_CHECK(init_uart_rs485());
+    // ESP_ERROR_CHECK(init_uart_mdb());
+    // ESP_ERROR_CHECK(init_pwm());
 
-    log_sht40_stub();
+    // log_sht40_stub();
     return ESP_OK;
 }
 
