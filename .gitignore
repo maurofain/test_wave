@@ -1,0 +1,33 @@
+# Build directories
+build/
+*.o
+*.a
+*.lib
+
+# ESP-IDF generated files
+sdkconfig
+sdkconfig.old
+sdkconfig.cmake
+*.img
+*.bin
+*.elf
+
+# Editor
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Dependencies
+managed_components/
+
+# IDE
+.idea/
+*.sublime-workspace
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride

@@ -1,0 +1,11 @@
+name,state,priority,core,period_ms,stack_words
+ws2812_blink,run,5,0,500,2048
+eeprom,idle,4,0,1000,2048
+io_expander,idle,4,0,500,2048
+sht40,idle,4,0,2000,2048
+rs232,idle,5,0,10,4096
+rs485,idle,5,0,10,4096
+mdb,idle,5,0,10,4096
+pwm,idle,4,0,20,2048
+touchscreen,idle,4,0,20,4096
+lvgl,idle,5,0,16,4096

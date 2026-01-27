@@ -1,0 +1,136 @@
+menu "Application configuration"
+
+config APP_I2C_PORT
+    int "I2C master port"
+    default 0
+
+config APP_I2C_SDA_GPIO
+    int "I2C SDA GPIO"
+    default 27
+
+config APP_I2C_SCL_GPIO
+    int "I2C SCL GPIO"
+    default 26
+
+config APP_I2C_CLOCK_HZ
+    int "I2C clock (Hz)"
+    default 400000
+
+config APP_WS2812_GPIO
+    int "WS2812 data GPIO"
+    default 5
+
+config APP_WS2812_LEDS
+    int "WS2812 LED count"
+    default 8
+
+config APP_RS232_UART_PORT
+    int "RS232 UART port"
+    range 0 3
+    default 1
+
+config APP_RS232_TX_GPIO
+    int "RS232 TX GPIO"
+    default 36
+
+config APP_RS232_RX_GPIO
+    int "RS232 RX GPIO"
+    default 46
+
+config APP_RS485_UART_PORT
+    int "RS485 UART port"
+    range 0 3
+    default 2
+
+config APP_RS485_TX_GPIO
+    int "RS485 TX GPIO"
+    default 4
+
+config APP_RS485_RX_GPIO
+    int "RS485 RX GPIO"
+    default 19
+
+config APP_RS485_DE_GPIO
+    int "RS485 DE GPIO"
+    default 21
+
+config APP_MDB_UART_PORT
+    int "MDB UART port"
+    range 0 3
+    default 3
+
+config APP_MDB_TX_GPIO
+    int "MDB TX GPIO"
+    default 22
+
+config APP_MDB_RX_GPIO
+    int "MDB RX GPIO"
+    default 23
+
+config APP_PWM_OUT1_GPIO
+    int "PWM OUT1 GPIO"
+    default 47
+
+config APP_PWM_OUT2_GPIO
+    int "PWM OUT2 GPIO"
+    default 48
+
+config APP_BOOT_BUTTON_GPIO
+    int "BOOT button GPIO"
+    default 35
+
+config APP_WIFI_AP_SSID
+    string "Factory Wi-Fi AP SSID"
+    default "factory-setup"
+
+config APP_WIFI_AP_PASSWORD
+    string "Factory Wi-Fi AP password (min 8 chars or empty for open)"
+    default "factory123"
+
+config APP_WIFI_AP_CHANNEL
+    int "Factory Wi-Fi AP channel"
+    range 1 13
+    default 6
+
+config APP_WIFI_STA_ENABLE
+    bool "Enable Wi-Fi station"
+    default n
+
+config APP_WIFI_STA_SSID
+    string "Wi-Fi station SSID"
+    default ""
+
+config APP_WIFI_STA_PASSWORD
+    string "Wi-Fi station password"
+    default ""
+
+config APP_ETH_ENABLED
+    bool "Enable Ethernet (RMII PHY)"
+    default n
+
+config APP_ETH_PHY_ADDR
+    int "Ethernet PHY address"
+    range 0 31
+    default 1
+
+config APP_ETH_PHY_RST_GPIO
+    int "Ethernet PHY reset GPIO (-1 to disable)"
+    default -1
+
+config APP_ETH_MDC_GPIO
+    int "Ethernet MDC GPIO"
+    default 23
+
+config APP_ETH_MDIO_GPIO
+    int "Ethernet MDIO GPIO"
+    default 18
+
+config APP_HTTP_PORT
+    int "HTTP server port"
+    default 80
+
+config APP_OTA_DEFAULT_URL
+    string "Default OTA URL (optional)"
+    default ""
+
+endmenu

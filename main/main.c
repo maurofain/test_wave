@@ -1,0 +1,15 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "init.h"
+#include "tasks.h"
+
+static const char *TAG = "APP";
+
+void app_main(void)
+{
+    ESP_ERROR_CHECK(init_run_factory());
+    tasks_load_config("/spiffs/tasks.csv");
+    tasks_start_all();
+    ESP_LOGI(TAG, "[F] App factory pronta: endpoint HTTP /status e /ota disponibili");
+}
