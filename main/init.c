@@ -27,6 +27,7 @@
 #include "lwip/etharp.h"
 #include "lwip/netif.h"
 #include "init.h"
+#include "led_control.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "INIT";
@@ -35,7 +36,6 @@ static esp_netif_t *s_netif_ap;
 static esp_netif_t *s_netif_sta;
 static esp_netif_t *s_netif_eth;
 static httpd_handle_t s_httpd;
-static led_strip_handle_t s_led_strip;
 static esp_eth_handle_t s_eth_handle;
 
 // -----------------------------------------------------------------------------
@@ -56,39 +56,6 @@ static esp_err_t init_i2c(void)
     ESP_RETURN_ON_ERROR(i2c_param_config(CONFIG_APP_I2C_PORT, &conf), TAG, "I2C param config failed");
     ESP_RETURN_ON_ERROR(i2c_driver_install(CONFIG_APP_I2C_PORT, conf.mode, 0, 0, 0), TAG, "I2C install failed");
     ESP_LOGI(TAG, "[F] I2C inizializzato su porta %d (SDA=%d, SCL=%d)", CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
-    return ESP_OK;
-}
-
-static esp_err_t init_boot_button(void)
-{
-    const gpio_config_t cfg = {
-        .pin_bit_mask = 1ULL << CONFIG_APP_BOOT_BUTTON_GPIO,
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_RETURN_ON_ERROR(gpio_config(&cfg), TAG, "Boot button config failed");
-    ESP_LOGI(TAG, "[F] Pulsante BOOT configurato su GPIO %d", CONFIG_APP_BOOT_BUTTON_GPIO);
-    return ESP_OK;
-}
-
-static esp_err_t init_ws2812(void)
-{
-    led_strip_config_t strip_config = {
-        .strip_gpio_num = CONFIG_APP_WS2812_GPIO,
-        .max_leds = CONFIG_APP_WS2812_LEDS,
-        .led_model = LED_MODEL_WS2812,
-        .flags.invert_out = false,
-    };
-
-    led_strip_rmt_config_t rmt_config_strip = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = 10 * 1000 * 1000,
-    };
-
-    ESP_RETURN_ON_ERROR(led_strip_new_rmt_device(&strip_config, &rmt_config_strip, &s_led_strip), TAG, "LED strip create failed");
-    ESP_LOGI(TAG, "[F] Striscia WS2812 inizializzata su GPIO %d (%d LED)", CONFIG_APP_WS2812_GPIO, CONFIG_APP_WS2812_LEDS);
     return ESP_OK;
 }
 
@@ -729,13 +696,13 @@ esp_err_t init_run_factory(void)
     ESP_ERROR_CHECK(start_http_server());
 
     // TEMPORANEAMENTE DISABILITATE per testare se interferiscono con Ethernet
-    // ESP_ERROR_CHECK(init_i2c());
-    // ESP_ERROR_CHECK(init_boot_button());
-    // ESP_ERROR_CHECK(init_ws2812());
-    // ESP_ERROR_CHECK(init_uart_rs232());
-    // ESP_ERROR_CHECK(init_uart_rs485());
-    // ESP_ERROR_CHECK(init_uart_mdb());
-    // ESP_ERROR_CHECK(init_pwm());
+    ESP_ERROR_CHECK(init_i2c());  //OK con Ethernet
+    // NOTE: Boot button removed - GPIO 35 è riservato per TX_EN (Ethernet RMII), vedi docs/NOTES_HW.md
+    ESP_ERROR_CHECK(led_control_init());  // Inizializza LED strip (crea hardware + setup)
+    ESP_ERROR_CHECK(init_uart_rs232());  //OK con Ethernet
+    ESP_ERROR_CHECK(init_uart_rs485());  //OK con Ethernet
+    ESP_ERROR_CHECK(init_uart_mdb()); //OK con Ethernet
+    ESP_ERROR_CHECK(init_pwm());  //OK con Ethernet
 
     // log_sht40_stub();
     return ESP_OK;
@@ -743,5 +710,5 @@ esp_err_t init_run_factory(void)
 
 led_strip_handle_t init_get_ws2812_handle(void)
 {
-    return s_led_strip;
+    return led_control_get_handle();
 }

@@ -1,0 +1,226 @@
+#include <math.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "esp_check.h"
+#include "led_strip.h"
+#include "led_control.h"
+#include "sdkconfig.h"
+
+static const char *TAG = "LED_CTRL";
+
+static led_strip_handle_t s_led_strip = NULL;
+static uint32_t s_led_count = 0;
+
+esp_err_t led_control_init(void)
+{
+    // Crea la configurazione della striscia LED
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = CONFIG_APP_WS2812_GPIO,
+        .max_leds = CONFIG_APP_WS2812_LEDS,
+        .led_model = LED_MODEL_WS2812,
+        .flags.invert_out = false,
+    };
+
+    led_strip_rmt_config_t rmt_config_strip = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = 10 * 1000 * 1000,
+    };
+
+    ESP_RETURN_ON_ERROR(led_strip_new_rmt_device(&strip_config, &rmt_config_strip, &s_led_strip), TAG, "LED strip create failed");
+    
+    s_led_count = CONFIG_APP_WS2812_LEDS;
+    
+    ESP_LOGI(TAG, "[C] LED controller inizializzato con %lu LED su GPIO %d", s_led_count, CONFIG_APP_WS2812_GPIO);
+    return ESP_OK;
+}
+
+led_strip_handle_t led_control_get_handle(void)
+{
+    return s_led_strip;
+}
+
+esp_err_t led_control_clear(void)
+{
+    if (!s_led_strip) {
+        ESP_LOGE(TAG, "[C] LED strip non inizializzato");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    ESP_RETURN_ON_ERROR(led_strip_clear(s_led_strip), TAG, "Errore durante clear");
+    return ESP_OK;
+}
+
+esp_err_t led_control_fill_color(uint8_t red, uint8_t green, uint8_t blue)
+{
+    if (!s_led_strip) {
+        ESP_LOGE(TAG, "[C] LED strip non inizializzato");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    for (uint32_t i = 0; i < s_led_count; i++) {
+        ESP_RETURN_ON_ERROR(led_strip_set_pixel(s_led_strip, i, red, green, blue), TAG, "Errore set pixel");
+    }
+    
+    ESP_RETURN_ON_ERROR(led_strip_refresh(s_led_strip), TAG, "Errore refresh");
+    ESP_LOGI(TAG, "[C] Fill color RGB(%d, %d, %d)", red, green, blue);
+    return ESP_OK;
+}
+
+esp_err_t led_control_set_pixel(uint32_t index, uint8_t red, uint8_t green, uint8_t blue)
+{
+    if (!s_led_strip) {
+        ESP_LOGE(TAG, "[C] LED strip non inizializzato");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (index >= s_led_count) {
+        ESP_LOGW(TAG, "[C] Index %lu fuori range (max: %lu)", index, s_led_count - 1);
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    ESP_RETURN_ON_ERROR(led_strip_set_pixel(s_led_strip, index, red, green, blue), TAG, "Errore set pixel");
+    ESP_RETURN_ON_ERROR(led_strip_refresh(s_led_strip), TAG, "Errore refresh");
+    return ESP_OK;
+}
+
+esp_err_t led_control_breathe(uint8_t red, uint8_t green, uint8_t blue, uint32_t duration_ms)
+{
+    if (!s_led_strip) {
+        ESP_LOGE(TAG, "[C] LED strip non inizializzato");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    uint32_t step_duration = duration_ms / 100;
+    if (step_duration < 10) step_duration = 10;
+    
+    ESP_LOGI(TAG, "[C] Animazione breathe RGB(%d, %d, %d) durata %lu ms", red, green, blue, duration_ms);
+    
+    // Pulsazione in avanti
+    for (int i = 0; i <= 100; i += 5) {
+        uint8_t r = (red * i) / 100;
+        uint8_t g = (green * i) / 100;
+        uint8_t b = (blue * i) / 100;
+        
+        for (uint32_t idx = 0; idx < s_led_count; idx++) {
+            led_strip_set_pixel(s_led_strip, idx, r, g, b);
+        }
+        led_strip_refresh(s_led_strip);
+        vTaskDelay(pdMS_TO_TICKS(step_duration));
+    }
+    
+    // Pulsazione indietro
+    for (int i = 100; i >= 0; i -= 5) {
+        uint8_t r = (red * i) / 100;
+        uint8_t g = (green * i) / 100;
+        uint8_t b = (blue * i) / 100;
+        
+        for (uint32_t idx = 0; idx < s_led_count; idx++) {
+            led_strip_set_pixel(s_led_strip, idx, r, g, b);
+        }
+        led_strip_refresh(s_led_strip);
+        vTaskDelay(pdMS_TO_TICKS(step_duration));
+    }
+    
+    return ESP_OK;
+}
+
+// Helper per generare colore HSV
+static void hsv_to_rgb(uint16_t hue, uint8_t sat, uint8_t val, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+    uint16_t h = (hue / 60) % 6;
+    uint16_t f = (hue % 60);
+    
+    uint8_t p = val * (255 - sat) / 255;
+    uint8_t q = val * (255 - (sat * f) / 60) / 255;
+    uint8_t t = val * (255 - (sat * (60 - f)) / 60) / 255;
+    
+    switch (h) {
+        case 0: *r = val; *g = t; *b = p; break;
+        case 1: *r = q; *g = val; *b = p; break;
+        case 2: *r = p; *g = val; *b = t; break;
+        case 3: *r = p; *g = q; *b = val; break;
+        case 4: *r = t; *g = p; *b = val; break;
+        default: *r = val; *g = p; *b = q; break;
+    }
+}
+
+esp_err_t led_control_rainbow(uint32_t duration_ms)
+{
+    if (!s_led_strip) {
+        ESP_LOGE(TAG, "[C] LED strip non inizializzato");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    uint32_t step_duration = duration_ms / 360;
+    if (step_duration < 5) step_duration = 5;
+    
+    ESP_LOGI(TAG, "[C] Animazione rainbow durata %lu ms", duration_ms);
+    
+    for (uint16_t hue = 0; hue < 360; hue += 6) {
+        for (uint32_t i = 0; i < s_led_count; i++) {
+            uint8_t r, g, b;
+            uint16_t pixel_hue = (hue + (i * 360 / s_led_count)) % 360;
+            hsv_to_rgb(pixel_hue, 255, 255, &r, &g, &b);
+            led_strip_set_pixel(s_led_strip, i, r, g, b);
+        }
+        led_strip_refresh(s_led_strip);
+        vTaskDelay(pdMS_TO_TICKS(step_duration));
+    }
+    
+    return ESP_OK;
+}
+
+esp_err_t led_control_fade_in(uint8_t red, uint8_t green, uint8_t blue, uint32_t steps, uint32_t step_duration_ms)
+{
+    if (!s_led_strip) {
+        ESP_LOGE(TAG, "[C] LED strip non inizializzato");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (steps == 0) steps = 50;
+    
+    ESP_LOGI(TAG, "[C] Fade in RGB(%d, %d, %d) in %lu step", red, green, blue, steps);
+    
+    for (uint32_t step = 0; step <= steps; step++) {
+        uint8_t r = (red * step) / steps;
+        uint8_t g = (green * step) / steps;
+        uint8_t b = (blue * step) / steps;
+        
+        for (uint32_t i = 0; i < s_led_count; i++) {
+            led_strip_set_pixel(s_led_strip, i, r, g, b);
+        }
+        led_strip_refresh(s_led_strip);
+        vTaskDelay(pdMS_TO_TICKS(step_duration_ms));
+    }
+    
+    return ESP_OK;
+}
+
+esp_err_t led_control_fade_out(uint32_t steps, uint32_t step_duration_ms)
+{
+    if (!s_led_strip) {
+        ESP_LOGE(TAG, "[C] LED strip non inizializzato");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (steps == 0) steps = 50;
+    
+    ESP_LOGI(TAG, "[C] Fade out in %lu step", steps);
+    
+    // Leggi il colore attuale (assumiamo RGB di primo LED)
+    // Per semplicità, fadeout a nero
+    for (uint32_t step = steps; step > 0; step--) {
+        uint8_t brightness = (255 * step) / steps;
+        
+        for (uint32_t i = 0; i < s_led_count; i++) {
+            led_strip_set_pixel(s_led_strip, i, brightness, brightness, brightness);
+        }
+        led_strip_refresh(s_led_strip);
+        vTaskDelay(pdMS_TO_TICKS(step_duration_ms));
+    }
+    
+    led_strip_clear(s_led_strip);
+    
+    return ESP_OK;
+}
