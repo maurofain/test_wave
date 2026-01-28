@@ -9,7 +9,7 @@ static const char *TAG = "PWM_TEST";
 static void pwm_sweep_task(void *arg) {
     int channel = (int)arg;
     ledc_channel_t ch = (channel == 1) ? LEDC_CHANNEL_0 : LEDC_CHANNEL_1;
-    ESP_LOGI(TAG, "Avvio Sweep PWM canale %d", channel);
+    ESP_LOGI(TAG, "Avvio scansione PWM canale %d", channel);
     
     while(1) {
         for (int freq = 1000; freq <= 10000; freq += 1000) {

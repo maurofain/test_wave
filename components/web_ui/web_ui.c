@@ -20,17 +20,20 @@
 #include "serial_test.h"
 #include "led_test.h"
 #include "mdb_test.h"
+#include "io_expander.h"
 #include "io_expander_test.h"
+#include "eeprom_test.h"
+#include "pwm.h"
 #include "pwm_test.h"
 
 static const char *TAG = "WEB_UI";
 static httpd_handle_t s_server = NULL;
 
-// Common HTML elements
-static const char *HTML_NAV = "<nav><a href='/'>🏠 Home</a><a href='/config'>⚙️ Config</a><a href='/stats'>📈 Stats</a><a href='/tasks'>📋 Tasks</a><a href='/test'>🔧 Test</a><a href='/ota'>🔄 OTA</a></nav>";
+// Elementi HTML comuni
+static const char *HTML_NAV = "<nav><a href='/'>🏠 Home</a><a href='/config'>⚙️ Config</a><a href='/stats'>📈 Statistiche</a><a href='/tasks'>📋 Task</a><a href='/test'>🔧 Test</a><a href='/ota'>🔄 OTA</a></nav>";
 
 static const char *HTML_STYLE_NAV = 
-    "nav{background:#34495e;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
+    "nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
     "nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}"
     "nav a:hover{background:#3498db}";
 
@@ -39,7 +42,7 @@ static esp_err_t send_head(httpd_req_t *req, const char *title, const char *extr
     if (!buf) return ESP_ERR_NO_MEM;
     snprintf(buf, 4096, 
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>%s</title><style>"
-        "body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
+        "body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
         ".container{max-width:1000px;margin:20px auto;padding:0 20px}"
         "%s %s"
         "</style></head><body>"
@@ -50,15 +53,15 @@ static esp_err_t send_head(httpd_req_t *req, const char *title, const char *extr
     return ESP_OK;
 }
 
-// Test tasks handles for Serial Blink Test
+// Handle dei task di test per Serial Blink Test
 static TaskHandle_t s_rs232_test_handle = NULL;
 static TaskHandle_t s_rs485_test_handle = NULL;
 
-// UART TEST: 0x55, 0xAA, 0x01, 0x07 (periodico)
+// TEST UART: 0x55, 0xAA, 0x01, 0x07 (periodico)
 static void uart_test_task(void *arg) {
     uart_port_t port = (uart_port_t)arg;
     uint8_t seq[] = {0x55, 0xAA, 0x01, 0x07};
-    ESP_LOGI(TAG, "UART Port %d Test: Avvio", port);
+    ESP_LOGI(TAG, "Test Porta UART %d: Avvio", port);
     while(1) {
         for (int i=0; i<4; i++) {
             ESP_LOGD(TAG, "UART %d invio 0x%02X", port, seq[i]);
@@ -70,9 +73,9 @@ static void uart_test_task(void *arg) {
     }
 }
 
-// --- HANDLERS ---
+// --- GESTORI (HANDLERS) ---
 
-// Utility: IP info to string
+// Utilità: converte info IP in stringa
 static void ip_to_str(esp_netif_t *netif, char *out, size_t len)
 {
     if (!netif || !out) return;
@@ -82,23 +85,23 @@ static void ip_to_str(esp_netif_t *netif, char *out, size_t len)
     }
 }
 
-// Utility: Perform OTA
+// Utilità: esegue l'aggiornamento OTA
 static esp_err_t perform_ota(const char *url)
 {
     if (!url || strlen(url) == 0) return ESP_ERR_INVALID_ARG;
-    ESP_LOGI(TAG, "Starting OTA from %s", url);
+    ESP_LOGI(TAG, "Avvio OTA da %s", url);
     esp_http_client_config_t client_cfg = {.url = url, .timeout_ms = 15000, .cert_pem = NULL, .skip_cert_common_name_check = true};
     esp_https_ota_config_t ota_cfg = {.http_config = &client_cfg};
     esp_err_t ret = esp_https_ota(&ota_cfg);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "OTA successful. Rebooting...");
+        ESP_LOGI(TAG, "OTA riuscito. Riavvio in corso...");
         vTaskDelay(pdMS_TO_TICKS(500));
         esp_restart();
     }
     return ret;
 }
 
-// Handler Homepage
+// Handler della Homepage
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
     const char *extra_style = 
@@ -146,7 +149,7 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler Logo
+// Handler del Logo
 static esp_err_t logo_get_handler(httpd_req_t *req)
 {
     FILE *f = fopen("/spiffs/logo.jpg", "r");
@@ -160,7 +163,7 @@ static esp_err_t logo_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler Status JSON
+// Handler per lo stato JSON
 static esp_err_t status_get_handler(httpd_req_t *req)
 {
     esp_netif_t *ap, *sta, *eth;
@@ -182,7 +185,7 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     return httpd_resp_send(req, resp, strlen(resp));
 }
 
-// Handler OTA Page
+// Handler per la pagina OTA
 static esp_err_t ota_get_handler(httpd_req_t *req)
 {
     const char *extra_style = 
@@ -191,18 +194,18 @@ static esp_err_t ota_get_handler(httpd_req_t *req)
         "button{background:#e67e22;color:white;font-weight:bold;cursor:pointer}button:hover{background:#d35400}";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "OTA Update", extra_style, true);
+    send_head(req, "Aggiornamento OTA", extra_style, true);
 
     const char *body = 
         "<div class='container'><div class='card'>"
-        "<form id='f' enctype='multipart/form-data'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Upload</button></form>"
+        "<form id='f' enctype='multipart/form-data'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Carica Firmware</button></form>"
         "<div id='s'></div></div></div><script>"
         "document.getElementById('f').onsubmit=async function(e){e.preventDefault();"
         "const fd=new FormData();fd.append('f',document.getElementById('i').files[0]);"
         "document.getElementById('s').innerText='Upload in corso...';"
         "try{const r=await fetch('/ota/upload',{method:'POST',body:fd});"
         "if(r.ok) document.getElementById('s').innerText='✅ Successo! Riavvio...';"
-        "else document.getElementById('s').innerText='❌ Errore';}catch(e){document.getElementById('s').innerText='❌ Error: '+e;}};"
+        "else document.getElementById('s').innerText='❌ Errore';}catch(e){document.getElementById('s').innerText='❌ Errore: '+e;}};"
         "</script></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);
@@ -210,7 +213,7 @@ static esp_err_t ota_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler OTA Upload (POST)
+// Handler per l'upload OTA (POST)
 static esp_err_t ota_upload_handler(httpd_req_t *req)
 {
     if (req->content_len <= 0) return ESP_FAIL;
@@ -224,12 +227,12 @@ static esp_err_t ota_upload_handler(httpd_req_t *req)
         esp_ota_write(h, b, n); rem -= n;
     }
     esp_ota_end(h); esp_ota_set_boot_partition(p);
-    httpd_resp_send(req, "OTA Success, rebooting...", -1);
+    httpd_resp_send(req, "OTA completato con successo, riavvio in corso...", -1);
     vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart();
     return ESP_OK;
 }
 
-// Handler OTA URL (POST)
+// Handler per l'URL OTA (POST)
 static esp_err_t ota_post_handler(httpd_req_t *req)
 {
     char q[256], u[200] = {0};
@@ -239,11 +242,11 @@ static esp_err_t ota_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler 404
+// Handler per errore 404
 static esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
 {
-    httpd_resp_set_status(req, "404 Not Found");
-    return httpd_resp_send(req, "404 Not Found", -1);
+    httpd_resp_set_status(req, "404 Non Trovato");
+    return httpd_resp_send(req, "404 Non Trovato", -1);
 }
 
 // Handler per pagina configurazione
@@ -274,6 +277,12 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<div id='alert'></div>"
         "<form id='configForm'>"
         
+        "<div class='section' style='background:#f1f4f6; border-left:5px solid #3498db;'>"
+        "<h2>🆔 Identità Dispositivo</h2>"
+        "<div class='form-group'><label>Nome Dispositivo</label>"
+        "<input type='text' id='dev_name' name='dev_name' placeholder='es: TestWave-01' style='font-size:1.1em; font-weight:bold;'></div>"
+        "</div>"
+
         "<div class='section'><h2>🌐 Ethernet</h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='eth_en' name='eth_en'><span class='slider'></span></label><span>Abilitato</span></div>"
         "<div class='indent'>"
@@ -302,6 +311,11 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm2' name='pwm2'><span class='slider'></span></label><span>PWM Canale 2</span></div>"
         "</div>"
 
+        "<div class='section'><h2>📺 Display</h2>"
+        "<div class='form-group'><label>Luminosità LCD (<span id='bright_val'>--</span>%)</label>"
+        "<input type='range' id='lcd_bright' name='lcd_bright' min='0' max='100' style='width:100%' oninput='document.getElementById(\"bright_val\").innerText=this.value'></div>"
+        "</div>"
+
         "<div class='section' style='display:flex; justify-content:center; gap:20px;'>"
         "<button type='submit' style='flex:1; max-width:200px;'>💾 Salva Configurazione</button>"
         "<button type='button' onclick='loadConfig()' style='background:#3498db; flex:1; max-width:200px;'>🔄 Aggiorna Dati</button>"
@@ -314,6 +328,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "async function loadConfig(){"
         "try{const r=await fetch('/api/config');if(!r.ok)throw new Error('HTTP '+r.status);"
         "const c=await r.json();"
+        "document.getElementById('dev_name').value=c.device_name || '';"
         "document.getElementById('eth_en').checked=c.eth.enabled;"
         "document.getElementById('eth_dhcp').checked=c.eth.dhcp_enabled;"
         "document.getElementById('eth_ip').value=c.eth.ip;"
@@ -331,10 +346,18 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('mdb').checked=c.sensors.mdb_enabled;"
         "document.getElementById('pwm1').checked=c.sensors.pwm1_enabled;"
         "document.getElementById('pwm2').checked=c.sensors.pwm2_enabled;"
+        "document.getElementById('lcd_bright').value=c.display.lcd_brightness;"
+        "document.getElementById('bright_val').innerText=c.display.lcd_brightness;"
         "}catch(e){console.error(e);}"
         "}"
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
-        "const cfg={eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked}};"
+        "const cfg={"
+        "device_name:document.getElementById('dev_name').value,"
+        "eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},"
+        "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
+        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
+        "display:{lcd_brightness:parseInt(document.getElementById('lcd_bright').value)}"
+        "};"
         "const r=await fetch('/api/config/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});"
         "if(r.ok) alert('✅ Configurazione salvata!'); else alert('❌ Errore durante il salvataggio!');"
         "}"
@@ -348,11 +371,12 @@ static esp_err_t config_page_handler(httpd_req_t *req)
 // Handler API GET /api/config
 static esp_err_t api_config_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/config (Forcing NVS reload)");
+    ESP_LOGI(TAG, "[C] GET /api/config (Forzo ricaricamento NVS)");
     device_config_t *cfg = device_config_get();
     device_config_load(cfg); // Forza rilettura da NVS
     
     cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "device_name", cfg->device_name);
     
     cJSON *eth = cJSON_CreateObject();
     cJSON_AddBoolToObject(eth, "enabled", cfg->eth.enabled);
@@ -382,6 +406,10 @@ static esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
     cJSON_AddBoolToObject(sensors, "pwm2_enabled", cfg->sensors.pwm2_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors);
+
+    cJSON *display = cJSON_CreateObject();
+    cJSON_AddNumberToObject(display, "lcd_brightness", cfg->display.lcd_brightness);
+    cJSON_AddItemToObject(root, "display", display);
     
     char *json = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -407,6 +435,9 @@ static esp_err_t api_config_save(httpd_req_t *req)
     }
     
     device_config_t *cfg = device_config_get();
+
+    cJSON *name_obj = cJSON_GetObjectItem(root, "device_name");
+    if (name_obj && name_obj->valuestring) strncpy(cfg->device_name, name_obj->valuestring, sizeof(cfg->device_name)-1);
     
     cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
     if (eth_obj) {
@@ -441,7 +472,20 @@ static esp_err_t api_config_save(httpd_req_t *req)
         cfg->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled"));
         cfg->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
     }
+
+    cJSON *display_obj = cJSON_GetObjectItem(root, "display");
+    if (display_obj) {
+        cJSON *bright = cJSON_GetObjectItem(display_obj, "lcd_brightness");
+        if (bright) {
+            cfg->display.lcd_brightness = (uint8_t)bright->valueint;
+            // Applica immediatamente la luminosità se il PWM è abilitato
+            if (cfg->sensors.pwm1_enabled) {
+                pwm_set_duty(0, cfg->display.lcd_brightness);
+            }
+        }
+    }
     
+    cfg->updated = true;
     device_config_save(cfg);
     cJSON_Delete(root);
     
@@ -530,10 +574,10 @@ static esp_err_t tasks_page_handler(httpd_req_t *req)
 
     const char *body = 
         "<div class='container'>"
-        "<div class='section'><h2>📋 Tasks Configuration</h2>"
+        "<div class='section'><h2>📋 Configurazione Task</h2>"
         "<div id='status'></div>"
         "<table id='tasksTable'><thead><tr>"
-        "<th>Name</th><th>State</th><th>Priority</th><th>Core</th><th>Period (ms)</th><th>Stack Words</th>"
+        "<th>Nome</th><th>Stato</th><th>Priorità</th><th>Core</th><th>Periodo (ms)</th><th>Stack Words</th>"
         "</tr></thead><tbody id='tasksBody'>Caricamento...</tbody></table>"
         "<div style='display:flex; gap:10px;'>"
         "<button type='button' class='btn-add' onclick='addRow()'>➕ Aggiungi Task</button>"
@@ -575,13 +619,13 @@ static esp_err_t tasks_page_handler(httpd_req_t *req)
 // Handler API GET /api/tasks
 static esp_err_t api_tasks_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/tasks (Reading SPIFFS)");
+    ESP_LOGI(TAG, "[C] GET /api/tasks (Lettura da SPIFFS)");
     
     FILE *f = fopen("/spiffs/tasks.csv", "r");
     if (!f) {
         ESP_LOGE(TAG, "[C] Impossibile aprire tasks.csv");
         httpd_resp_set_status(req, "500");
-        const char *resp_str = "{\"error\":\"File not found\"}";
+        const char *resp_str = "{\"error\":\"File non trovato\"}";
         httpd_resp_send(req, resp_str, strlen(resp_str));
         return ESP_FAIL;
     }
@@ -633,14 +677,14 @@ static esp_err_t api_tasks_save(httpd_req_t *req)
     char buf[4096] = {0};
     int len = httpd_req_recv(req, buf, sizeof(buf)-1);
     if (len <= 0) {
-        const char *resp_str = "{\"error\":\"No data\"}";
+        const char *resp_str = "{\"error\":\"Nessun dato ricevuto\"}";
         httpd_resp_send(req, resp_str, strlen(resp_str));
         return ESP_OK;
     }
     
     cJSON *root = cJSON_Parse(buf);
     if (!root || !cJSON_IsArray(root)) {
-        const char *resp_str = "{\"error\":\"Invalid JSON\"}";
+        const char *resp_str = "{\"error\":\"JSON non valido\"}";
     httpd_resp_send(req, resp_str, strlen(resp_str));
         if (root) cJSON_Delete(root);
         return ESP_OK;
@@ -652,7 +696,7 @@ static esp_err_t api_tasks_save(httpd_req_t *req)
         ESP_LOGE(TAG, "[C] Impossibile aprire tasks.csv per scrittura");
         cJSON_Delete(root);
         httpd_resp_set_status(req, "500");
-        const char *resp_str = "{\"error\":\"Cannot write file\"}";
+        const char *resp_str = "{\"error\":\"Impossibile scrivere il file\"}";
         httpd_resp_send(req, resp_str, strlen(resp_str));
         return ESP_FAIL;
     }
@@ -716,40 +760,55 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div class='container'>"
         "<div style='text-align:right;'><button class='refresh-btn' onclick='location.reload()'>🔄 Aggiorna Pagina</button></div>"
         
-        "<div class='section'><h2>💡 LED Stripe (WS2812)</h2>"
-        "<div class='test-item'><span class='test-label'>Full RGB Pattern (40s)</span>"
-        "<div class='test-controls'><button onclick=\"runTest('led_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('led_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='section'><h2>💡 Striscia LED (WS2812)</h2>"
+        "<div class='test-item'><span class='test-label'>Pattern RGB Completo (40s)</span>"
+        "<div class='test-controls'><button onclick=\"runTest('led_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('led_stop')\">⏹️ Ferma</button></div></div>"
         "<div id='led_status' class='status-box'>Pronto per test LED</div></div>"
 
         "<div class='section'><h2>🔌 I/O Expander</h2>"
-        "<div class='test-item'><span class='test-label'>Blink All Ports (1Hz)</span>"
-        "<div class='test-controls'><button onclick=\"runTest('ioexp_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('ioexp_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='test-item'><span class='test-label'>Blink Tutte le Porte (1Hz)</span>"
+        "<div class='test-controls'><button onclick=\"runTest('ioexp_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('ioexp_stop')\">⏹️ Ferma</button></div></div>"
+        
+        "<h3>Controllo Manuale</h3>"
+        "<div id='io_manual_control' style='display:grid; grid-template-columns: 1fr 1fr; gap: 20px;'>"
+        "  <div><h4>Uscite (Chip 0x43)</h4><div id='outputs_grid' style='display:flex; flex-wrap:wrap; gap:5px;'></div></div>"
+        "  <div><h4>Ingressi (Chip 0x44)</h4><div id='inputs_grid' style='display:flex; flex-wrap:wrap; gap:5px;'></div></div>"
+        "</div>"
+        
         "<div id='ioexp_status' class='status-box'>Pronto per test I/O Expander</div></div>"
         
         "<div class='section'><h2>⚡ PWM</h2>"
         "<div class='test-item'><span class='test-label'>PWM1 Duty Cycle Sweep</span>"
-        "<div class='test-controls'><button onclick=\"runTest('pwm1_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('pwm1_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='test-controls'><button onclick=\"runTest('pwm1_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('pwm1_stop')\">⏹️ Ferma</button></div></div>"
         "<div class='test-item'><span class='test-label'>PWM2 Duty Cycle Sweep</span>"
-        "<div class='test-controls'><button onclick=\"runTest('pwm2_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('pwm2_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='test-controls'><button onclick=\"runTest('pwm2_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('pwm2_stop')\">⏹️ Ferma</button></div></div>"
         "<div id='pwm_status' class='status-box'>Pronto per test PWM</div></div>"
         
         "<div class='section'><h2>📡 Seriale RS232</h2>"
-        "<div class='test-item'><span class='test-label'>Loopback Test: 0x55, 0xAA, 0x01, 0x07</span>"
-        "<div class='test-controls'><button onclick=\"runTest('rs232_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('rs232_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='test-item'><span class='test-label'>Test Loopback: 0x55, 0xAA, 0x01, 0x07</span>"
+        "<div class='test-controls'><button onclick=\"runTest('rs232_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('rs232_stop')\">⏹️ Ferma</button></div></div>"
         "<div class='test-item'><span>Invia Stringa (es: \\0x55\\0xAA\\r\\n)</span>"
         "<div class='test-controls'><input type='text' id='rs232_input' placeholder='\\0x55 Test...'><button onclick=\"sendSerial('rs232')\">🚀 Invia</button></div></div>"
         "<div id='rs232_status' class='status-box'>Monitor:</div></div>"
         
         "<div class='section'><h2>📡 Seriale RS485</h2>"
-        "<div class='test-item'><span class='test-label'>Loopback Test: 0x55, 0xAA, 0x01, 0x07</span>"
-        "<div class='test-controls'><button onclick=\"runTest('rs485_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('rs485_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='test-item'><span class='test-label'>Test Loopback: 0x55, 0xAA, 0x01, 0x07</span>"
+        "<div class='test-controls'><button onclick=\"runTest('rs485_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('rs485_stop')\">⏹️ Ferma</button></div></div>"
         "<div class='test-item'><span>Invia Stringa</span>"
         "<div class='test-controls'><input type='text' id='rs485_input' placeholder='Richiesta...'><button onclick=\"sendSerial('rs485')\">🚀 Invia</button></div></div>"
         "<div id='rs485_status' class='status-box'>Monitor:</div></div>"
         
+        "<div class='section'><h2>💾 EEPROM 24LC16</h2>"
+        "<div class='test-item'><span>Indirizzo (0-2047)</span>"
+        "<div class='test-controls'><input type='number' id='eeprom_addr' value='0' min='0' max='2047' style='width:80px'></div></div>"
+        "<div class='test-item'><span>Dato Byte (0-255)</span>"
+        "<div class='test-controls'><input type='number' id='eeprom_val' value='123' min='0' max='255' style='width:80px'>"
+        "<button onclick=\"testEEPROM('write')\">✍️ Scrivi</button><button onclick=\"testEEPROM('read')\" style='background:#3498db'>📖 Leggi</button></div></div>"
+        "<div id='eeprom_status' class='status-box'>Pronto per test EEPROM</div></div>"
+
         "<div class='section'><h2>🎰 MDB (Multi-Drop Bus)</h2>"
         "<div class='test-item'><span class='test-label'>Test Loopback/Echo</span>"
-        "<div class='test-controls'><button onclick=\"runTest('mdb_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('mdb_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='test-controls'><button onclick=\"runTest('mdb_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('mdb_stop')\">⏹️ Ferma</button></div></div>"
         "<div class='test-item'><span>Invia Stringa (Hex, es: 08 00)</span>"
         "<div class='test-controls'><input type='text' id='mdb_input' placeholder='08 00...'><button onclick=\"sendSerial('mdb')\">🚀 Invia</button></div></div>"
         "<div id='mdb_status' class='status-box'>Pronto per test MDB</div></div>"
@@ -779,8 +838,68 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "const res=await r.json();"
         "if(res.log){"
         "document.getElementById('rs232_status').innerText = res.log;"
-        "document.getElementById('rs485_status').innerText = res.log;"        "document.getElementById('mdb_status').innerText = res.log;"        "}"
+        "document.getElementById('rs485_status').innerText = res.log;"
+        "document.getElementById('mdb_status').innerText = res.log;"
         "}"
+        
+        "const rio=await fetch('/api/test/io_get',{method:'POST'});"
+        "const io=await rio.json();"
+        "if(io){"
+        "  const out_grid = document.getElementById('outputs_grid');"
+        "  const in_grid = document.getElementById('inputs_grid');"
+        "  if(out_grid && out_grid.children.length === 0){"
+        "    for(let i=0;i<8;i++){"
+        "      let b = document.createElement('button');"
+        "      b.innerText = 'OUT'+i;"
+        "      b.id = 'out_btn_'+i;"
+        "      b.onclick = () => toggleIO(i);"
+        "      out_grid.appendChild(b);"
+        "      let s = document.createElement('span');"
+        "      s.id = 'in_val_'+i;"
+        "      s.style = 'padding:8px; border:1px solid #ccc; border-radius:4px; min-width:40px; text-align:center; background:#eee; color:#333;';"
+        "      s.innerText = 'IN'+i;"
+        "      in_grid.appendChild(s);"
+        "    }"
+        "  }"
+        "  for(let i=0;i<8;i++){"
+        "    const b = document.getElementById('out_btn_'+i);"
+        "    if(b){"
+        "      const is_on = (io.output >> i) & 1;"
+        "      b.style.background = is_on ? '#2ecc71' : '#95a5a6';"
+        "    }"
+        "    const s = document.getElementById('in_val_'+i);"
+        "    if(s){"
+        "      const is_on = (io.input >> i) & 1;"
+        "      s.style.background = is_on ? '#2ecc71' : '#34495e';"
+        "      s.style.color = is_on ? '#fff' : '#bdc3c7';"
+        "    }"
+        "  }"
+        "}"
+        "}"
+        
+        "async function toggleIO(pin){"
+        "const rio=await fetch('/api/test/io_get',{method:'POST'});"
+        "const io=await rio.json();"
+        "const cur = (io.output >> pin) & 1;"
+        "await fetch('/api/test/io_set',{method:'POST',body:JSON.stringify({pin:pin, val:cur?0:1})});"
+        "}"
+        
+        "async function testEEPROM(op){"
+        "const addr=parseInt(document.getElementById('eeprom_addr').value);"
+        "const val=parseInt(document.getElementById('eeprom_val').value);"
+        "const statusBox=document.getElementById('eeprom_status');"
+        "let body={op:op, addr:addr};"
+        "if(op==='write') body.data=[val]; else body.len=1;"
+        "try{"
+        "const r=await fetch('/api/test/eeprom',{method:'POST',body:JSON.stringify(body)});"
+        "const res=await r.json();"
+        "if(res.status==='ok'){"
+        "  if(op==='read') statusBox.innerHTML='<div class=\"result\">📖 Letto da '+addr+': <b>'+res.data[0]+'</b> (0x'+res.data[0].toString(16).toUpperCase()+')</div>';"
+        "  else statusBox.innerHTML='<div class=\"result\">✅ Scritto '+val+' a '+addr+'</div>';"
+        "}else statusBox.innerHTML='<div class=\"result\">❌ Errore operazione</div>';"
+        "}catch(e){statusBox.innerHTML='<div class=\"result\">❌ Errore: '+e+'</div>';}"
+        "}"
+        
         "setInterval(updateMonitors, 1000);"
         "</script></body></html>";
 
@@ -796,7 +915,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
     const char *test_name = req->uri + strlen("/api/test/");
     char response[256] = {0};
 
-    // --- LED TEST ---
+    // --- TEST LED ---
     if (strcmp(test_name, "led_start") == 0) {
         if (led_test_start() == ESP_OK) {
             snprintf(response, sizeof(response), "{\"message\":\"Test LED avviato\"}");
@@ -806,7 +925,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test LED fermato\"}");
     }
 
-    // --- PWM1 TEST ---
+    // --- TEST PWM1 ---
     else if (strcmp(test_name, "pwm1_start") == 0) {
         pwm_test_start(1);
         snprintf(response, sizeof(response), "{\"message\":\"Test PWM1 avviato\"}");
@@ -815,7 +934,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test PWM1 fermato\"}");
     }
 
-    // --- PWM2 TEST ---
+    // --- TEST PWM2 ---
     else if (strcmp(test_name, "pwm2_start") == 0) {
         pwm_test_start(2);
         snprintf(response, sizeof(response), "{\"message\":\"Test PWM2 avviato\"}");
@@ -824,7 +943,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test PWM2 fermato\"}");
     }
 
-    // --- I/O EXPANDER TEST ---
+    // --- TEST I/O EXPANDER ---
     else if (strcmp(test_name, "ioexp_start") == 0) {
         io_expander_test_start();
         snprintf(response, sizeof(response), "{\"message\":\"Test I/O Expander avviato (1Hz)\"}");
@@ -833,7 +952,27 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test I/O Expander fermato\"}");
     }
 
-    // --- RS232 TEST ---
+    // --- CONTROLLO MANUALE I/O EXPANDER ---
+    else if (strcmp(test_name, "io_set") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *pin_obj = cJSON_GetObjectItem(root, "pin");
+            cJSON *val_obj = cJSON_GetObjectItem(root, "val");
+            if (pin_obj && val_obj) {
+                io_set_pin(pin_obj->valueint, val_obj->valueint);
+                snprintf(response, sizeof(response), "{\"status\":\"ok\",\"output\":%d}", io_output_state);
+            }
+            cJSON_Delete(root);
+        }
+    }
+    else if (strcmp(test_name, "io_get") == 0) {
+        uint8_t in = io_get();
+        snprintf(response, sizeof(response), "{\"input\":%d,\"output\":%d}", in, io_output_state);
+    }
+
+    // --- TEST RS232 ---
     else if (strcmp(test_name, "rs232_start") == 0) {
         if (!s_rs232_test_handle) {
             xTaskCreate(uart_test_task, "rs232_test", 2048, (void*)CONFIG_APP_RS232_UART_PORT, 5, &s_rs232_test_handle);
@@ -844,7 +983,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test RS232 fermato\"}");
     }
 
-    // --- RS485 TEST ---
+    // --- TEST RS485 ---
     else if (strcmp(test_name, "rs485_start") == 0) {
         if (!s_rs485_test_handle) {
             xTaskCreate(uart_test_task, "rs485_test", 2048, (void*)CONFIG_APP_RS485_UART_PORT, 5, &s_rs485_test_handle);
@@ -854,8 +993,13 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         if (s_rs485_test_handle) { vTaskDelete(s_rs485_test_handle); s_rs485_test_handle = NULL; }
         snprintf(response, sizeof(response), "{\"message\":\"Test RS485 fermato\"}");
     }
-    
-    // --- MDB TEST ---
+
+    // --- TEST EEPROM ---
+    else if (strcmp(test_name, "eeprom") == 0) {
+        return eeprom_test_handler(req);
+    }
+
+    // --- TEST MDB ---
     if (strcmp(test_name, "mdb_start") == 0) {
         if (mdb_test_start() == ESP_OK) {
             snprintf(response, sizeof(response), "{\"message\":\"Test MDB avviato\"}");
@@ -865,7 +1009,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test MDB fermato\"}");
     }
     
-    // --- SERIAL SEND TEST (RS232/RS485/MDB) ---
+    // --- TEST INVIO SERIALE (RS232/RS485/MDB) ---
     else if (strcmp(test_name, "serial_send") == 0) {
         char buf[512] = {0};
         httpd_req_recv(req, buf, sizeof(buf)-1);
@@ -875,7 +1019,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
             const char *data_str = cJSON_GetStringValue(cJSON_GetObjectItem(root, "data"));
             
             if (port_raw && strcmp(port_raw, "mdb") == 0) {
-                // MDB Send Logic
+                // Logica di invio MDB
                 if (data_str) {
                     uint8_t mdb_packet[32];
                     int mdb_len = 0;
@@ -897,10 +1041,10 @@ static esp_err_t api_test_handler(httpd_req_t *req)
                 }
             }
             cJSON_Delete(root);
-        } else snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+        } else snprintf(response, sizeof(response), "{\"error\":\"JSON non valido\"}");
     }
     
-    // --- SERIAL MONITOR ---
+    // --- MONITOR SERIALE ---
     else if (strcmp(test_name, "serial_monitor") == 0) {
         snprintf(response, sizeof(response), "{\"log\":\"%s\"}", serial_test_get_monitor());
     }

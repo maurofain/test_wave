@@ -78,3 +78,15 @@ Stato dei PWM
 ### Test
 
 nelle funzioni di test dei dispositivi seriali aggiugi la possibilità di inviare una stringa (con gestione degli escape esempio \0x41 per A ) con un tasto invia e monitoraggio delle risposte. Crea glie endpoint dei test e predisponi nella cartella components una sottocartella per ogni componenete con il sorgente per i test
+
+### I/O Expander
+
+gli I/O expander usano 2 chip FXL6408UMX : 
+
+- il primo con tutte le porte in output usa l'indirizzo i2c 0x86 in Write e 0x87 in Read
+
+- il secondo con tutte le porte in input usa l'indirizzo i2c 0x88 in Write e 0x89 in Read 
+
+  Dobbiamo verificare se esiste una libreria espressif ufficiale, se manca creare una libreria per i comandi I2C
+
+  Vanno creare due variabili di tipo uint_8t per lo stato delle le porte con possibilità di settare e leggere le singole porte e funzioni tipo void io_set_pin(port_n, value), void io_set_port(uint_8t val),  bool io_get_pin(port_n), uint_8t io_get()

@@ -2,6 +2,7 @@
 #include "init.h"
 #include "esp_log.h"
 #include "led_strip.h"
+#include "device_config.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -17,8 +18,15 @@ static void ws2812_blink_task(void *arg)
 
     while (true) {
         if (!strip) {
-            ESP_LOGW(TAG, "[F] Handle WS2812 non pronto");
+            // Se i LED sono disabilitati in config, evitiamo di spammare log
+            if (!device_config_get()->sensors.led_enabled) {
+                vTaskDelay(pdMS_TO_TICKS(5000));
+                strip = init_get_ws2812_handle(); // Riprova a prenderlo in caso sia stato abilitato
+                continue;
+            }
+            ESP_LOGW(TAG, "[M] Handle WS2812 non pronto");
             vTaskDelay(pdMS_TO_TICKS(500));
+            strip = init_get_ws2812_handle(); 
             continue;
         }
         color += 25;
@@ -28,7 +36,7 @@ static void ws2812_blink_task(void *arg)
     }
 }
 
-// Skeleton tasks (structure only, logic to be implemented)
+// Task scheletro (solo struttura, logica da implementare)
 
 static void eeprom_task(void *arg)
 {
@@ -225,7 +233,7 @@ static task_param_t s_tasks[] = {
 };
 
 // -----------------------------------------------------------------------------
-// Config loader (CSV from SPIFFS)
+// Caricatore configurazione (CSV da SPIFFS)
 // -----------------------------------------------------------------------------
 
 static task_param_t *find_task_by_name(const char *name)
@@ -251,12 +259,12 @@ void tasks_load_config(const char *path)
 {
     FILE *f = fopen(path, "r");
     if (!f) {
-        ESP_LOGW(TAG, "[F] Impossibile aprire %s; uso configurazioni predefinite", path);
+        ESP_LOGW(TAG, "[M] Impossibile aprire %s; uso configurazioni predefinite", path);
         return;
     }
 
     char line[160];
-    // skip header
+    // Salta intestazione
     if (!fgets(line, sizeof(line), f)) {
         fclose(f);
         return;
@@ -275,7 +283,7 @@ void tasks_load_config(const char *path)
 
         task_param_t *t = find_task_by_name(name);
         if (!t) {
-            ESP_LOGW(TAG, "[F] Task sconosciuto '%s' nella configurazione", name);
+            ESP_LOGW(TAG, "[M] Task sconosciuto '%s' nella configurazione", name);
             continue;
         }
 
@@ -293,13 +301,13 @@ void tasks_start_all(void)
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
         if (t->state != TASK_STATE_RUN) {
-            ESP_LOGI(TAG, "[F] Task saltato %s (state=%d)", t->name, t->state);
+            ESP_LOGI(TAG, "[M] Task saltato %s (stato=%d)", t->name, (int)t->state);
             continue;
         }
         t->arg = t;
         BaseType_t res = xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
         if (res != pdPASS) {
-            ESP_LOGE(TAG, "[F] Fallimento avvio task %s", t->name);
+            ESP_LOGE(TAG, "[M] Fallimento avvio task %s", t->name);
         }
     }
 }

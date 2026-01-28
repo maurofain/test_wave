@@ -9,7 +9,7 @@ static TaskHandle_t s_led_test_handle = NULL;
 static bool s_run = false;
 
 static void led_test_task(void *arg) {
-    ESP_LOGI(TAG, "Avvio Test LED Strip WS2812 (Rainbow)");
+    ESP_LOGI(TAG, "Avvio Test Striscia LED WS2812 (Rainbow)");
     int hue = 0;
     while(s_run) {
         for (int i = 0; i < 16; i++) { // Assumiamo 16 LED per test

@@ -51,13 +51,23 @@ typedef struct {
 } device_mdb_config_t;
 
 /**
+ * @brief Struttura di configurazione Display
+ */
+typedef struct {
+    uint8_t lcd_brightness;     ///< Luminosità LCD (0-100)
+} device_display_config_t;
+
+/**
  * @brief Configurazione generale device
  */
 typedef struct {
+    char device_name[32];       ///< Nome del dispositivo
+    bool updated;               ///< Indica se la configurazione è stata aggiornata
     device_eth_config_t eth;
     device_wifi_config_t wifi;
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;
+    device_display_config_t display;
 } device_config_t;
 
 /**

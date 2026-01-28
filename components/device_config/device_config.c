@@ -4,25 +4,46 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "cJSON.h"
+#include "esp_rom_crc.h"
+#include "eeprom_24lc16.h"
 #include <string.h>
+#include <stdio.h>
+#include <sys/stat.h>
 
 static const char *TAG = "DEVICE_CFG";
 static const char *NVS_NAMESPACE = "device_config";
 
+#define EEPROM_MAGIC 0x57415645 // "WAVE"
+#define EEPROM_HEADER_ADDR 0
+
+typedef struct {
+    uint32_t magic;
+    uint32_t crc;
+    uint32_t length;
+    uint16_t modified;
+    uint16_t version;
+} eeprom_header_t;
+
 static device_config_t s_config = {0};
 static bool s_initialized = false;
 
-// Default configuration
+// Configurazione predefinita
 static void _set_defaults(device_config_t *config)
 {
-    // Ethernet defaults
+    memset(config, 0, sizeof(device_config_t));
+    config->updated = false;
+
+    // Nome dispositivo
+    strncpy(config->device_name, "TestWave-Device", sizeof(config->device_name) - 1);
+
+    // Default Ethernet
     config->eth.enabled = true;
     config->eth.dhcp_enabled = true;
     strncpy(config->eth.ip, "192.168.1.100", sizeof(config->eth.ip) - 1);
     strncpy(config->eth.subnet, "255.255.255.0", sizeof(config->eth.subnet) - 1);
     strncpy(config->eth.gateway, "192.168.1.1", sizeof(config->eth.gateway) - 1);
 
-    // WiFi defaults
+    // Default WiFi
     config->wifi.sta_enabled = false;
     config->wifi.dhcp_enabled = true;
     strncpy(config->wifi.ssid, "", sizeof(config->wifi.ssid) - 1);
@@ -31,7 +52,7 @@ static void _set_defaults(device_config_t *config)
     strncpy(config->wifi.subnet, "255.255.255.0", sizeof(config->wifi.subnet) - 1);
     strncpy(config->wifi.gateway, "192.168.1.1", sizeof(config->wifi.gateway) - 1);
 
-    // Sensors defaults (all enabled by default)
+    // Default Sensori (tutti abilitati per impostazione predefinita)
     config->sensors.io_expander_enabled = true;
     config->sensors.temperature_enabled = true;
     config->sensors.led_enabled = true;
@@ -41,10 +62,103 @@ static void _set_defaults(device_config_t *config)
     config->sensors.pwm1_enabled = true;
     config->sensors.pwm2_enabled = true;
 
-    // MDB defaults
+    // Default MDB
     config->mdb.coin_acceptor_en = true;
     config->mdb.bill_validator_en = false;
     config->mdb.cashless_en = false;
+
+    // Default Display
+    config->display.lcd_brightness = 80;
+}
+
+// -----------------------------------------------------------------------------
+// Helper EEProm
+// -----------------------------------------------------------------------------
+
+static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
+{
+    eeprom_header_t header;
+    header.magic = EEPROM_MAGIC;
+    header.length = strlen(json_str);
+    header.crc = esp_rom_crc32_le(0, (const uint8_t *)json_str, header.length);
+    header.modified = modified ? 1 : 0;
+    header.version = 1;
+
+    // Scrivi header
+    ESP_RETURN_ON_ERROR(eeprom_24lc16_write(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header)), TAG, "Scrittura header EEPROM fallita");
+    // Scrivi dati subito dopo l'header
+    ESP_RETURN_ON_ERROR(eeprom_24lc16_write(EEPROM_HEADER_ADDR + sizeof(header), (const uint8_t *)json_str, header.length), TAG, "Scrittura JSON EEPROM fallita");
+
+    ESP_LOGI(TAG, "[C] Config salvata in EEPROM (len=%lu, crc=0x%08lX, modified=%d)", 
+             (unsigned long)header.length, (unsigned long)header.crc, header.modified);
+    return ESP_OK;
+}
+
+static char* _read_from_eeprom(bool *out_modified)
+{
+    eeprom_header_t header;
+    if (eeprom_24lc16_read(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header)) != ESP_OK) return NULL;
+
+    if (header.magic != EEPROM_MAGIC) {
+        ESP_LOGW(TAG, "[C] Magic EEPROM non valido (0x%08lX)", (unsigned long)header.magic);
+        return NULL;
+    }
+
+    if (header.length == 0 || header.length > 1500) {
+        ESP_LOGW(TAG, "[C] Lunghezza JSON EEPROM non valida (%lu)", (unsigned long)header.length);
+        return NULL;
+    }
+
+    char *json_str = malloc(header.length + 1);
+    if (!json_str) return NULL;
+
+    if (eeprom_24lc16_read(EEPROM_HEADER_ADDR + sizeof(header), (uint8_t *)json_str, header.length) != ESP_OK) {
+        free(json_str);
+        return NULL;
+    }
+    json_str[header.length] = '\0';
+
+    uint32_t calc_crc = esp_rom_crc32_le(0, (const uint8_t *)json_str, header.length);
+    if (calc_crc != header.crc) {
+        ESP_LOGE(TAG, "[C] Errore CRC EEPROM: calc=0x%08lX, saved=0x%08lX", (unsigned long)calc_crc, (unsigned long)header.crc);
+        free(json_str);
+        return NULL;
+    }
+
+    if (out_modified) *out_modified = (header.modified == 1);
+    ESP_LOGI(TAG, "[C] Config caricata da EEPROM (modified=%d)", header.modified);
+    return json_str;
+}
+
+// -----------------------------------------------------------------------------
+// Helper NVS
+// -----------------------------------------------------------------------------
+
+static esp_err_t _write_to_nvs(const char *json_str)
+{
+    nvs_handle_t handle;
+    ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle), TAG, "Apertura NVS fallita");
+    esp_err_t ret = nvs_set_str(handle, "config_json", json_str);
+    if (ret == ESP_OK) nvs_commit(handle);
+    nvs_close(handle);
+    return ret;
+}
+
+static char* _read_from_nvs(void)
+{
+    nvs_handle_t handle;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return NULL;
+    
+    size_t size = 0;
+    char *json_str = NULL;
+    if (nvs_get_str(handle, "config_json", NULL, &size) == ESP_OK && size > 0) {
+        json_str = malloc(size);
+        if (json_str) {
+            nvs_get_str(handle, "config_json", json_str, &size);
+        }
+    }
+    nvs_close(handle);
+    return json_str;
 }
 
 esp_err_t device_config_init(void)
@@ -57,35 +171,60 @@ esp_err_t device_config_init(void)
 
 esp_err_t device_config_load(device_config_t *config)
 {
-    if (!config) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    if (!config) return ESP_ERR_INVALID_ARG;
 
-    nvs_handle_t handle;
-    esp_err_t ret = nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle);
-    
-    // Se il namespace non esiste al primo avvio, usa i default
-    if (ret == ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGI(TAG, "[C] Namespace NVS non trovato, uso configurazione default");
-        _set_defaults(config);
-        return ESP_OK;
-    }
-    
-    ESP_RETURN_ON_ERROR(ret, TAG, "NVS open failed");
+    _set_defaults(config);
 
-    // Leggi JSON dalla NVS
-    size_t json_size = 0;
-    char *json_str = NULL;
-    
-    ret = nvs_get_str(handle, "config_json", NULL, &json_size);
-    if (ret == ESP_OK && json_size > 0) {
-        json_str = malloc(json_size);
+    bool eeprom_modified = false;
+    char *json_str = _read_from_eeprom(&eeprom_modified);
+    bool source_is_eeprom = false;
+
+    if (json_str) {
+        // EEPROM valida
+        source_is_eeprom = true;
+        ESP_LOGI(TAG, "[C] Configurazione valida in EEPROM");
+        
+        if (eeprom_modified) {
+            ESP_LOGI(TAG, "[C] Flag 'modified' attivo: sincronizzo EEPROM -> NVS");
+            if (_write_to_nvs(json_str) == ESP_OK) {
+                // Riscrivi in EEPROM per azzerare il flag di modifica
+                _write_to_eeprom(json_str, false);
+            }
+        }
+    } else {
+        // EEPROM non valida, prova NVS
+        ESP_LOGI(TAG, "[C] EEPROM non valida, provo NVS...");
+        json_str = _read_from_nvs();
         if (json_str) {
-            nvs_get_str(handle, "config_json", json_str, &json_size);
-            
-            cJSON *root = cJSON_Parse(json_str);
-            if (root) {
-                // Parse Ethernet config
+            ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
+            // Sincronizza NVS -> EEPROM e imposta flag 'modified' (come da specifica 2.1)
+            _write_to_eeprom(json_str, true);
+        } else {
+            // Niente né in EEPROM né in NVS: Defaults
+            ESP_LOGI(TAG, "[C] Nessun config trovato: inizializzo Defaults su NVS e EEPROM");
+            cJSON *def_root = cJSON_CreateObject();
+            // (Qui potremmo creare il JSON dai defaults, ma per semplicità salviamo al primo save()
+            // o usiamo una stringa vuota per ora, ma meglio creare un JSON minimo)
+            cJSON_AddStringToObject(def_root, "device_name", config->device_name);
+            char *def_json = cJSON_PrintUnformatted(def_root);
+            if (def_json) {
+                _write_to_nvs(def_json);
+                _write_to_eeprom(def_json, false);
+                free(def_json);
+            }
+            cJSON_Delete(def_root);
+            return ESP_OK; // Caricati i defaults in s_config via _set_defaults
+        }
+    }
+
+    if (json_str) {
+        cJSON *root = cJSON_Parse(json_str);
+        if (root) {
+            // Nome dispositivo
+            cJSON *name = cJSON_GetObjectItem(root, "device_name");
+            if (name && name->valuestring) strncpy(config->device_name, name->valuestring, sizeof(config->device_name) - 1);
+
+                // Analisi config Ethernet
                 cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
                 if (eth_obj) {
                     config->eth.enabled = cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "enabled"));
@@ -98,7 +237,7 @@ esp_err_t device_config_load(device_config_t *config)
                     if (gateway && gateway->valuestring) strncpy(config->eth.gateway, gateway->valuestring, sizeof(config->eth.gateway) - 1);
                 }
 
-                // Parse WiFi config
+                // Analisi config WiFi
                 cJSON *wifi_obj = cJSON_GetObjectItem(root, "wifi");
                 if (wifi_obj) {
                     config->wifi.sta_enabled = cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "sta_enabled"));
@@ -115,7 +254,7 @@ esp_err_t device_config_load(device_config_t *config)
                     if (gateway && gateway->valuestring) strncpy(config->wifi.gateway, gateway->valuestring, sizeof(config->wifi.gateway) - 1);
                 }
 
-                // Parse Sensors config
+                // Analisi config Sensori
                 cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
                 if (sensors_obj) {
                     config->sensors.io_expander_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "io_expander_enabled"));
@@ -128,7 +267,7 @@ esp_err_t device_config_load(device_config_t *config)
                     config->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
                 }
 
-                // Parse MDB config
+                // Analisi config MDB
                 cJSON *mdb_obj = cJSON_GetObjectItem(root, "mdb");
                 if (mdb_obj) {
                     config->mdb.coin_acceptor_en = cJSON_IsTrue(cJSON_GetObjectItem(mdb_obj, "coin_en"));
@@ -136,17 +275,21 @@ esp_err_t device_config_load(device_config_t *config)
                     config->mdb.cashless_en = cJSON_IsTrue(cJSON_GetObjectItem(mdb_obj, "cashless_en"));
                 }
 
-                cJSON_Delete(root);
-                ESP_LOGI(TAG, "[C] Configurazione caricata da NVS");
-            }
-            free(json_str);
+                // Analisi config Display
+                cJSON *disp_obj = cJSON_GetObjectItem(root, "display");
+                if (disp_obj) {
+                    cJSON *bright = cJSON_GetObjectItem(disp_obj, "lcd_brightness");
+                    if (bright) config->display.lcd_brightness = (uint8_t)bright->valueint;
+                }
+
+            cJSON_Delete(root);
+            ESP_LOGI(TAG, "[C] Configurazione caricata correttamente da %s", source_is_eeprom ? "EEPROM" : "NVS");
+        } else {
+            ESP_LOGE(TAG, "[C] Errore parsing JSON!");
         }
-    } else {
-        ESP_LOGI(TAG, "[C] Nessuna configurazione trovata, usando defaults");
-        _set_defaults(config);
+        free(json_str);
     }
 
-    nvs_close(handle);
     return ESP_OK;
 }
 
@@ -156,11 +299,14 @@ esp_err_t device_config_save(const device_config_t *config)
         return ESP_ERR_INVALID_ARG;
     }
 
-    nvs_handle_t handle;
-    ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle), TAG, "NVS open failed");
-
     // Crea JSON
     cJSON *root = cJSON_CreateObject();
+
+    // Updated flag
+    cJSON_AddBoolToObject(root, "updated", config->updated);
+
+    // Nome dispositivo
+    cJSON_AddStringToObject(root, "device_name", config->device_name);
 
     // Ethernet
     cJSON *eth_obj = cJSON_CreateObject();
@@ -201,16 +347,20 @@ esp_err_t device_config_save(const device_config_t *config)
     cJSON_AddBoolToObject(mdb_obj, "cashless_en", config->mdb.cashless_en);
     cJSON_AddItemToObject(root, "mdb", mdb_obj);
 
-    char *json_str = cJSON_Print(root);
+    // Display
+    cJSON *disp_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(disp_obj, "lcd_brightness", config->display.lcd_brightness);
+    cJSON_AddItemToObject(root, "display", disp_obj);
+
+    char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
-        nvs_set_str(handle, "config_json", json_str);
-        nvs_commit(handle);
+        // Alla modifica (tasto save), salviamo SOLO in EEPROM con flag 'modified' (Specifica 3)
+        // L'allineamento con NVS avverrà al prossimo riavvio (Specifica 4)
+        _write_to_eeprom(json_str, true);
         free(json_str);
-        ESP_LOGI(TAG, "[C] Configurazione salvata in NVS");
     }
 
     cJSON_Delete(root);
-    nvs_close(handle);
     return ESP_OK;
 }
 

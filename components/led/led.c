@@ -27,7 +27,7 @@ esp_err_t led_init(void)
         .resolution_hz = 10 * 1000 * 1000,
     };
 
-    ESP_RETURN_ON_ERROR(led_strip_new_rmt_device(&strip_config, &rmt_config_strip, &s_led_strip), TAG, "LED strip create failed");
+    ESP_RETURN_ON_ERROR(led_strip_new_rmt_device(&strip_config, &rmt_config_strip, &s_led_strip), TAG, "Creazione striscia LED fallita");
     
     s_led_count = CONFIG_APP_WS2812_LEDS;
     
@@ -69,7 +69,7 @@ esp_err_t led_fill_color(uint8_t red, uint8_t green, uint8_t blue)
     }
     
     ESP_RETURN_ON_ERROR(led_strip_refresh(s_led_strip), TAG, "Errore refresh");
-    ESP_LOGI(TAG, "[C] Fill color RGB(%d, %d, %d)", red, green, blue);
+    ESP_LOGI(TAG, "[C] Riempimento colore RGB(%d, %d, %d)", red, green, blue);
     return ESP_OK;
 }
 
@@ -126,7 +126,7 @@ esp_err_t led_breathe(uint8_t red, uint8_t green, uint8_t blue, uint32_t duratio
     uint32_t step_duration = duration_ms / 100;
     if (step_duration < 10) step_duration = 10;
     
-    ESP_LOGI(TAG, "[C] Animazione breathe RGB(%d, %d, %d) durata %lu ms", red, green, blue, duration_ms);
+    ESP_LOGI(TAG, "[C] Animazione pulsante (breathe) RGB(%d, %d, %d) durata %lu ms", red, green, blue, duration_ms);
     
     // Pulsazione in avanti
     for (int i = 0; i <= 100; i += 5) {
@@ -192,7 +192,7 @@ esp_err_t led_fade_in(uint8_t red, uint8_t green, uint8_t blue, uint32_t steps, 
     
     if (steps == 0) steps = 50;
     
-    ESP_LOGI(TAG, "[C] Fade in RGB(%d, %d, %d) in %lu step", red, green, blue, steps);
+    ESP_LOGI(TAG, "[C] Dissolvenza in entrata (fade in) RGB(%d, %d, %d) in %lu passi", red, green, blue, steps);
     
     for (uint32_t step = 0; step <= steps; step++) {
         uint8_t r = (red * step) / steps;
@@ -218,7 +218,7 @@ esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms)
     
     if (steps == 0) steps = 50;
     
-    ESP_LOGI(TAG, "[C] Fade out in %lu step", steps);
+    ESP_LOGI(TAG, "[C] Dissolvenza in uscita (fade out) in %lu passi", steps);
     
     // Leggi il colore attuale (assumiamo RGB di primo LED)
     // Per semplicità, fadeout a nero

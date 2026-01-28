@@ -35,7 +35,7 @@ static void mdb_send_ack(void) {
     uart_wait_tx_done(MDB_UART_PORT, pdMS_TO_TICKS(10));
 }
 
-// Logic for Coin Acceptor State Machine
+// Logica per la Macchina a Stati della Gettoniera (Coin Acceptor)
 static void mdb_coin_sm(void) {
     uint8_t rx[36];
     size_t rx_len;
@@ -47,14 +47,14 @@ static void mdb_coin_sm(void) {
             break;
 
         case MDB_STATE_INIT_RESET:
-            ESP_LOGI(TAG, "MDB Coin: Sending RESET...");
+            ESP_LOGI(TAG, "Gettoniera MDB: Invio RESET...");
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_RESET, NULL, 0);
             vTaskDelay(pdMS_TO_TICKS(500)); // Aspetta reboot periferica
             s_mdb_status.coin.state = MDB_STATE_INIT_SETUP;
             break;
 
         case MDB_STATE_INIT_SETUP:
-            ESP_LOGI(TAG, "MDB Coin: Sending SETUP...");
+            ESP_LOGI(TAG, "Gettoniera MDB: Invio SETUP...");
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_SETUP, NULL, 0);
             if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 100) == ESP_OK) {
                 if (rx_len >= 23) {
@@ -67,7 +67,7 @@ static void mdb_coin_sm(void) {
                         s_mdb_status.coin.coin_values[i] = rx[7 + i];
                     }
                     
-                    ESP_LOGI(TAG, "MDB Coin Setup: Level %d, Currency %04X, Scaling %d, Decimal %d", 
+                    ESP_LOGI(TAG, "Setup Gettoniera MDB: Livello %d, Valuta %04X, Fattore di Scala %d, Decimali %d", 
                              s_mdb_status.coin.feature_level, s_mdb_status.coin.currency_code,
                              s_mdb_status.coin.scaling_factor, s_mdb_status.coin.decimal_places);
                     
@@ -75,19 +75,19 @@ static void mdb_coin_sm(void) {
                     s_mdb_status.coin.state = MDB_STATE_INIT_ENABLE; // Passa alla fase di abilitazione
                     s_mdb_status.coin.is_online = true;
                 } else {
-                    ESP_LOGW(TAG, "MDB Coin: Setup response too short (%d)", rx_len);
+                    ESP_LOGW(TAG, "Gettoniera MDB: Risposta di setup troppo breve (%zu)", rx_len);
                 }
             }
             break;
 
         case MDB_STATE_INIT_ENABLE:
-            ESP_LOGI(TAG, "MDB Coin: Enabling all coin types...");
+            ESP_LOGI(TAG, "Gettoniera MDB: Abilitazione di tutti i tipi di monete...");
             {
                 uint8_t enable_data[4] = {0xFF, 0xFF, 0xFF, 0xFF}; // Abilita tutto (Accept & Dispense)
                 mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_COIN_CMD_COIN_TYPE, enable_data, 4);
             }
             if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 50) == ESP_OK && rx[0] == MDB_ACK) {
-                ESP_LOGI(TAG, "MDB Coin: Enabled!");
+                ESP_LOGI(TAG, "Gettoniera MDB: Abilitata!");
                 s_mdb_status.coin.state = MDB_STATE_IDLE_POLLING;
             }
             break;
@@ -100,20 +100,20 @@ static void mdb_coin_sm(void) {
                     // Tutto OK, nessun evento
                 } else {
                     // Dati ricevuti (es. moneta inserita)
-                    ESP_LOGI(TAG, "MDB Coin Event: Received %d bytes", (int)rx_len);
+                    ESP_LOGI(TAG, "Evento Gettoniera MDB: Ricevuti %zu byte", rx_len);
                     mdb_send_ack();
                     
                     // Parsing eventi (solo i più importanti)
-                    for (int i=0; i < rx_len-1; i++) { // L'ultimo è il checksum
+                    for (int i=0; i < (int)rx_len-1; i++) { // L'ultimo è il checksum
                         uint8_t b = rx[i];
                         if ((b & 0x80) == 0) { // Moneta accettata
-                            uint8_t routing = (b >> 4) & 0x03; // 00: Cash box, 01: Tubes, 02: Not Used, 03: Reject
+                            uint8_t routing = (b >> 4) & 0x03; // 00: Cassetto, 01: Tubi, 02: Non Usato, 03: Rifiutata
                             uint8_t type = b & 0x0F;
                             uint16_t real_val = s_mdb_status.coin.coin_values[type] * s_mdb_status.coin.scaling_factor;
                             s_mdb_status.coin.credit_cents += real_val;
-                            ESP_LOGI(TAG, "MDB Coin: Moneta tipo %d accreditata (+%d units), Routing: %d", type, real_val, routing);
-                        } else if (b == 0x0B) { // Changer Reset
-                            ESP_LOGW(TAG, "MDB Coin: Reset rilevato, ri-inizializzazione...");
+                            ESP_LOGI(TAG, "Gettoniera MDB: Moneta tipo %d accreditata (+%d unità), Routing: %d", type, real_val, routing);
+                        } else if (b == 0x0B) { // Reset del Changer
+                            ESP_LOGW(TAG, "Gettoniera MDB: Reset rilevato, ri-inizializzazione...");
                             s_mdb_status.coin.state = MDB_STATE_INIT_SETUP;
                         }
                     }
@@ -121,7 +121,7 @@ static void mdb_coin_sm(void) {
                 s_mdb_status.coin.is_online = true;
             } else {
                 s_mdb_status.coin.is_online = false;
-                ESP_LOGD(TAG, "MDB Coin: No response");
+                ESP_LOGD(TAG, "Gettoniera MDB: Nessuna risposta");
             }
             break;
             
@@ -130,7 +130,7 @@ static void mdb_coin_sm(void) {
 }
 
 static void mdb_engine_task(void *arg) {
-    ESP_LOGI(TAG, "MDB Polling Engine avviato");
+    ESP_LOGI(TAG, "Motore di polling MDB avviato");
     while (1) {
         mdb_coin_sm();
         // mdb_bill_sm(); // futuro
@@ -198,7 +198,7 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
     uint8_t checksum = address;
     
-    ESP_LOGD(TAG, "Sending MDB packet: Addr 0x%02X, Len %zu", address, len);
+    ESP_LOGD(TAG, "Invio pacchetto MDB: Indirizzo 0x%02X, Lunghezza %zu", address, len);
 
     // Svuota buffer RX prima di inviare
     uart_flush_input(MDB_UART_PORT);
@@ -250,7 +250,7 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
     for (size_t i = 0; i < received - 1; i++) checksum += out_data[i];
     
     if (checksum != out_data[received - 1]) {
-        ESP_LOGW(TAG, "MDB Checksum Error: Calc 0x%02X != Recv 0x%02X", checksum, out_data[received-1]);
+        ESP_LOGW(TAG, "Errore Checksum MDB: Calcolato 0x%02X != Ricevuto 0x%02X", checksum, out_data[received-1]);
         return ESP_ERR_INVALID_CRC;
     }
 

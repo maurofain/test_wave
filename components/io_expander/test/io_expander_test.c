@@ -9,11 +9,11 @@ static TaskHandle_t s_test_handle = NULL;
 static bool s_run = false;
 
 static void io_expander_test_task(void *arg) {
-    ESP_LOGI(TAG, "Avvio Test IO Expander (1Hz blink)");
+    ESP_LOGI(TAG, "Avvio Test IO Expander (lampeggio 1Hz)");
     while(s_run) {
-        io_expander_write_output(0xFFFF);
+        io_set_port(0xFF);
         vTaskDelay(pdMS_TO_TICKS(500));
-        io_expander_write_output(0x0000);
+        io_set_port(0x00);
         vTaskDelay(pdMS_TO_TICKS(500));
     }
     s_test_handle = NULL;

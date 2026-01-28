@@ -9,7 +9,7 @@ static TaskHandle_t s_mdb_test_handle = NULL;
 static bool s_run = false;
 
 static void mdb_test_task(void *arg) {
-    ESP_LOGI(TAG, "MDB Test: Invio sequenziale RESET/POLL...");
+    ESP_LOGI(TAG, "Test MDB: Invio sequenziale RESET/POLL...");
     while(s_run) {
         // Test di basso livello: invio pacchetto RESET alla gettoniera (0x08)
         mdb_send_packet(0x08 | 0x00, NULL, 0); 

@@ -1,6 +1,39 @@
 #pragma once
 #include "esp_err.h"
 #include <stdint.h>
+#include <stdbool.h>
 
+extern uint8_t io_output_state;
+extern uint8_t io_input_state;
+
+/**
+ * @brief Inizializza gli I/O Expander (FXL6408)
+ * @return ESP_OK in caso di successo
+ */
 esp_err_t io_expander_init(void);
-esp_err_t io_expander_write_output(uint16_t mask);
+
+/**
+ * @brief Imposta un pin di uscita specifico
+ * @param pin Numero del pin (0-7)
+ * @param value 0 o 1
+ */
+void io_set_pin(int pin, int value);
+
+/**
+ * @brief Imposta tutti i pin di uscita contemporaneamente
+ * @param val Valore a 8 bit da impostare
+ */
+void io_set_port(uint8_t val);
+
+/**
+ * @brief Legge un pin di ingresso specifico
+ * @param pin Numero del pin (0-7)
+ * @return true se alto, false se basso
+ */
+bool io_get_pin(int pin);
+
+/**
+ * @brief Legge tutti i pin di ingresso contemporaneamente
+ * @return Valore a 8 bit della porta di ingresso
+ */
+uint8_t io_get(void);
