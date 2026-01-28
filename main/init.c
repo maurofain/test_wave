@@ -501,7 +501,10 @@ esp_err_t init_run_factory(void)
     // Inizializzazioni condizionali basate su NVS
     if (cfg->sensors.io_expander_enabled) {
         // La porta I2C è già inizializzata sopra, io_expander_init la riutilizzerà
-        ESP_ERROR_CHECK(io_expander_init());
+        esp_err_t io_ret = io_expander_init();
+        if (io_ret != ESP_OK) {
+            ESP_LOGE(TAG, "[M] Inizializzazione I/O Expander fallita!");
+        }
     } else {
         ESP_LOGI(TAG, "I/O Expander disabilitato da config");
     }

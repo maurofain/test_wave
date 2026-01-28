@@ -16,6 +16,8 @@ static const char *TAG = "EEPROM";
 
 #define EEPROM_WRITE_TIMEOUT_MS 10
 
+static bool s_eeprom_available = false;
+
 static uint8_t get_device_addr(uint16_t address) {
     // L'indirizzo I2C include i 3 bit più significativi dell'indirizzo di memoria (0-2047)
     // Per chip 24LC16BT: 1010 B2 B1 B0
@@ -32,8 +34,10 @@ static uint8_t get_mem_addr(uint16_t address) {
  * Il chip non risponde all'indirizzo I2C finché il ciclo di scrittura interno (max 5ms) non è terminato.
  */
 static esp_err_t wait_until_ready(uint8_t dev_addr) {
+    uint8_t dummy;
     for (int i = 0; i < EEPROM_WRITE_TIMEOUT_MS; i++) {
-        esp_err_t ret = i2c_master_write_to_device(I2C_PORT, dev_addr, NULL, 0, pdMS_TO_TICKS(10));
+        // Usiamo una lettura di 1 byte invece di una scrittura a 0 byte per evitare "i2c null address error" su alcuni driver
+        esp_err_t ret = i2c_master_read_from_device(I2C_PORT, dev_addr, &dummy, 1, pdMS_TO_TICKS(10));
         if (ret == ESP_OK) return ESP_OK;
         vTaskDelay(pdMS_TO_TICKS(1));
     }
@@ -46,11 +50,17 @@ esp_err_t eeprom_24lc16_init(void) {
     esp_err_t ret = wait_until_ready(EEPROM_BASE_ADDR);
     
     if (ret == ESP_OK) {
+        s_eeprom_available = true;
         ESP_LOGI(TAG, "[C] EEPROM 24LC16BT trovata e pronta (I2C port %d)", I2C_PORT);
     } else {
+        s_eeprom_available = false;
         ESP_LOGW(TAG, "[C] EEPROM 24LC16BT non risponde (check I2C pins o indirizzo 0x50)");
     }
-    return ESP_OK; 
+    return ESP_OK; // Restituiamo sempre OK per permettere il boot con fallback su NVS
+}
+
+bool eeprom_24lc16_is_available(void) {
+    return s_eeprom_available;
 }
 
 esp_err_t eeprom_24lc16_read(uint16_t address, uint8_t *buffer, size_t length) {

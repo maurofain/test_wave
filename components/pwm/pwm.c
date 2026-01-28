@@ -19,6 +19,12 @@ esp_err_t pwm_set_duty(int channel, int duty_percent) {
     return ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)channel);
 }
 
+int pwm_get_duty(int channel) {
+    uint32_t duty = ledc_get_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)channel);
+    // Riconverti in percentuale (risoluzione 10 bit = 1023)
+    return (int)((duty * 100) / 1023);
+}
+
 esp_err_t pwm_init(void) {
     device_config_t *cfg = device_config_get();
 

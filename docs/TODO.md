@@ -32,6 +32,18 @@
 
   9. creare le funzioni per l'init delle periferiche descritte in HARDWARE_SETUP, un task per ogni periferica e una utility di test gestibile da interfaccia WEB
 
+  10. Implementare la gestione della EEProm 24LC16BT-I/OT  , creiamo il codice per interfacciarsi in i2c e la gestione CRC
+  11. Usare la EEProm per memorizzare i dati di config. Implementiamo la seguente logica :
+       1. I dati di config devono avere un valore di CRC
+       2. all'avvio verifichiamo se c'è il config in EEPROM e se è valido
+          1. altrimenti lo leggiamo da NVS e settiamo il flag di modificato in EEProm
+          2. se non c'è in NVS o non è validi (CRC) carichiamo i valori di default, scriviamo EEProm e NVS
+          3. 3. alla modifica dei parametri (tasto save in configurazione) salviamo i dati nella EEProm e sempre nella eeprom  settiamo flag di modificato 
+          4. al successivo riavvio salviamo i dati (se validi) in NVS - se non validi li riprendiamo da NVS e settiamo il flag di modificato
+12. Driver PWM
+13. 
+
+
   
 
 # ⏸️ RITARDATI
@@ -42,17 +54,9 @@
 
 # 📋 DA FARE
 
-1. Implementare la gestione della EEProm 24LC16  , creiamo il codice per interfacciarsi in i2c
-2. Usare la EEProm per memorizzare i dati di config. Implementiamo la seguente logica :
-   1. I dati di config devono avere un valore di CRC
-   2. all'avvio verifichiamo se c'è il config in EEPROM e se è valido
-      1. altrimenti lo leggiamo da NVS e settiamo il flag di modificato in EEProm
-      2. se non c'è in NVS o non è validi (CRC) carichiamo i valori di default, scriviamo EEProm e NVS
-   3. alla modifica dei parametri (tasto save in configurazione) salviamo i dati nella EEProm e sempre nella eeprom  settiamo flag di modificato 
-   4. al successivo riavvio salviamo i dati (se validi) in NVS - se non validi li riprendiamo da NVS e settiamo il flag di modificato
-3. Duplicare tutto il codice di main in una cartella app dove svilupperemo il sfirmaware di produzione
-4. Driver PWM1
-5. Driver RS485
+- Factory 
+    1. Duplicare tutto il codice di main in una cartella app dove svilupperemo il firmaware di produzione.
+    2.  Driver RS485
 
 - App
   1. Configurazione monitor/touch e integrazione LVGL 

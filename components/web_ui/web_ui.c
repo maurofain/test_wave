@@ -16,6 +16,7 @@
 #include "driver/ledc.h"
 #include "driver/uart.h"
 #include "driver/i2c.h"
+#include "app_version.h"
 
 #include "serial_test.h"
 #include "led_test.h"
@@ -46,8 +47,11 @@ static esp_err_t send_head(httpd_req_t *req, const char *title, const char *extr
         ".container{max-width:1000px;margin:20px auto;padding:0 20px}"
         "%s %s"
         "</style></head><body>"
-        "<header><div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s</h1></div></header>"
-        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, show_nav?HTML_NAV:"");
+        "<header>"
+        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s</h1></div>"
+        "<div style='text-align:right;font-size:12px;opacity:0.8;'>v%s (%s)</div>"
+        "</header>"
+        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
     httpd_resp_sendstr_chunk(req, buf);
     free(buf);
     return ESP_OK;

@@ -8,6 +8,7 @@
 #include "eeprom_24lc16.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <sys/stat.h>
 
 static const char *TAG = "DEVICE_CFG";
@@ -71,16 +72,24 @@ static void _set_defaults(device_config_t *config)
     config->display.lcd_brightness = 80;
 }
 
+static uint32_t _calculate_crc(const char *json_str)
+{
+    if (!json_str) return 0;
+    return esp_rom_crc32_le(0, (const uint8_t *)json_str, strlen(json_str));
+}
+
 // -----------------------------------------------------------------------------
 // Helper EEProm
 // -----------------------------------------------------------------------------
 
 static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
 {
+    if (!eeprom_24lc16_is_available()) return ESP_ERR_INVALID_STATE;
+
     eeprom_header_t header;
     header.magic = EEPROM_MAGIC;
     header.length = strlen(json_str);
-    header.crc = esp_rom_crc32_le(0, (const uint8_t *)json_str, header.length);
+    header.crc = _calculate_crc(json_str);
     header.modified = modified ? 1 : 0;
     header.version = 1;
 
@@ -96,6 +105,8 @@ static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
 
 static char* _read_from_eeprom(bool *out_modified)
 {
+    if (!eeprom_24lc16_is_available()) return NULL;
+
     eeprom_header_t header;
     if (eeprom_24lc16_read(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header)) != ESP_OK) return NULL;
 
@@ -117,10 +128,11 @@ static char* _read_from_eeprom(bool *out_modified)
         return NULL;
     }
     json_str[header.length] = '\0';
+    ESP_LOGI(TAG, "[C] EEPROM JSON caricato: %s", json_str);
 
-    uint32_t calc_crc = esp_rom_crc32_le(0, (const uint8_t *)json_str, header.length);
-    if (calc_crc != header.crc) {
-        ESP_LOGE(TAG, "[C] Errore CRC EEPROM: calc=0x%08lX, saved=0x%08lX", (unsigned long)calc_crc, (unsigned long)header.crc);
+    uint32_t c_crc = _calculate_crc(json_str);
+    if (c_crc != header.crc) {
+        ESP_LOGE(TAG, "[C] Errore CRC EEPROM: calc=0x%08lX, saved=0x%08lX", (unsigned long)c_crc, (unsigned long)header.crc);
         free(json_str);
         return NULL;
     }
@@ -138,8 +150,19 @@ static esp_err_t _write_to_nvs(const char *json_str)
 {
     nvs_handle_t handle;
     ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle), TAG, "Apertura NVS fallita");
+    
     esp_err_t ret = nvs_set_str(handle, "config_json", json_str);
-    if (ret == ESP_OK) nvs_commit(handle);
+    if (ret == ESP_OK) {
+        // Salviamo il CRC in un JSON separato per evitare la dipendenza circolare (Specifica User)
+        uint32_t crc_val = _calculate_crc(json_str);
+        char meta_str[64];
+        snprintf(meta_str, sizeof(meta_str), "{\"crc\":%lu,\"len\":%u}", (unsigned long)crc_val, (unsigned int)strlen(json_str));
+        nvs_set_str(handle, "config_meta", meta_str);
+        
+        nvs_commit(handle);
+        ESP_LOGI(TAG, "[C] Backup NVS completato con meta: %s", meta_str);
+    }
+    
     nvs_close(handle);
     return ret;
 }
@@ -151,13 +174,45 @@ static char* _read_from_nvs(void)
     
     size_t size = 0;
     char *json_str = NULL;
-    if (nvs_get_str(handle, "config_json", NULL, &size) == ESP_OK && size > 0) {
-        json_str = malloc(size);
-        if (json_str) {
-            nvs_get_str(handle, "config_json", json_str, &size);
+    char meta_str[64];
+    size_t meta_size = sizeof(meta_str);
+    
+    bool valid = false;
+    
+    // Leggiamo il meta per verificare il CRC
+    if (nvs_get_str(handle, "config_meta", meta_str, &meta_size) == ESP_OK) {
+        ESP_LOGI(TAG, "[C] NVS Meta caricato: %s", meta_str);
+        cJSON *meta_root = cJSON_Parse(meta_str);
+        if (meta_root) {
+            uint32_t expected_crc = (uint32_t)cJSON_GetNumberValue(cJSON_GetObjectItem(meta_root, "crc"));
+            
+            if (nvs_get_str(handle, "config_json", NULL, &size) == ESP_OK && size > 1) {
+                json_str = malloc(size);
+                if (json_str) {
+                    if (nvs_get_str(handle, "config_json", json_str, &size) == ESP_OK) {
+                        ESP_LOGI(TAG, "[C] NVS JSON caricato: %s", json_str);
+                        uint32_t actual_crc = _calculate_crc(json_str);
+                        if (actual_crc == expected_crc) {
+                            valid = true;
+                        } else {
+                            ESP_LOGE(TAG, "[C] Errore CRC backup NVS! (Exp: %lx, Got: %lx)", (unsigned long)expected_crc, (unsigned long)actual_crc);
+                        }
+                    }
+                }
+            }
+            cJSON_Delete(meta_root);
         }
+    } else {
+        ESP_LOGW(TAG, "[C] Nessun dato Meta trovato in NVS");
     }
+    
     nvs_close(handle);
+    
+    if (!valid && json_str) {
+        free(json_str);
+        return NULL;
+    }
+    
     return json_str;
 }
 
@@ -354,9 +409,24 @@ esp_err_t device_config_save(const device_config_t *config)
 
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
-        // Alla modifica (tasto save), salviamo SOLO in EEPROM con flag 'modified' (Specifica 3)
-        // L'allineamento con NVS avverrà al prossimo riavvio (Specifica 4)
-        _write_to_eeprom(json_str, true);
+        esp_err_t err = ESP_ERR_INVALID_STATE;
+        
+        if (eeprom_24lc16_is_available()) {
+            // Alla modifica (tasto save), salviamo in EEPROM con flag 'modified' (Specifica 3)
+            err = _write_to_eeprom(json_str, true);
+        }
+
+        if (err != ESP_OK) {
+            // Se EEPROM non disponibile o salvataggio fallito, scriviamo direttamente in NVS (Specifica User)
+            _write_to_nvs(json_str);
+            if (err == ESP_ERR_INVALID_STATE) {
+                ESP_LOGW(TAG, "[C] EEPROM non disponibile, salvataggio diretto su NVS");
+            } else {
+                ESP_LOGE(TAG, "[C] Salvataggio EEPROM fallito (0x%x), ripiego su NVS", err);
+            }
+        } else {
+            ESP_LOGI(TAG, "[C] Config salvato in EEPROM (flag modified settato)");
+        }
         free(json_str);
     }
 

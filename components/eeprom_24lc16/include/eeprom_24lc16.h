@@ -3,12 +3,18 @@
 #include "esp_err.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 /**
  * @brief Inizializza l'interfaccia per la EEPROM 24LC16
  * @return ESP_OK se riuscito
  */
 esp_err_t eeprom_24lc16_init(void);
+
+/**
+ * @brief Verifica se la EEPROM è disponibile
+ */
+bool eeprom_24lc16_is_available(void);
 
 /**
  * @brief Legge dati dalla EEPROM
