@@ -13,6 +13,7 @@
 - il codice che si trova in  ~/Progetti/0.Clienti/MicroHard/WT99P4C5-S1 è un esempio per la stessa configurazione da cui prelevare codice di esempio : lo chiamerò PDR
 - il codice che si trova in  ~/Progetti/0.Clienti/MicroHard/test è una versione precedente di prova  per la stessa configurazione da cui prelevare porzioni di codice specifiche cha vanno riadattate al progetto attuale  : lo chiamerò PSI
 - i comandi git vanno fatti solo su mia richiesta
+- salvo esplicita richiesta i build flash e monitor vengono eseguiti in un terminale a parte
 - i file di documentazione vanno salvati in docs
 - quando indico che uno step previsto in TODO.md è completato spuntiamo la relativa voce
 - nei log ESP_LOGI/ESP_LOGW/ESP_LOGE va aggiunto un prefisso tra parentesi quadre all'inizio del messaggio per

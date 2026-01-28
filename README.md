@@ -2,6 +2,10 @@
 
 This project targets the Waveshare ESP32-P4 Module Dev Kit and an expansion board wired as described below. It initializes the basic peripherals (I2C bus, WS2812 strip, RS232/RS485/MDB UARTs, PWM outputs, BOOT button) and adds a **factory app** that exposes Wi-Fi AP (+optional STA), optional Ethernet, HTTP endpoints, and OTA to recover/refresh the main firmware in `ota_0`.
 
+[Specifiche](docs/specifiche.md)
+
+[RULES](docs/RULES.md)
+
 ## Hardware summary (per HARDWARE_SETUP)
 - I2C bus (SDA GPIO27, SCL GPIO26) for 26LC16 EEPROM, two FXL6408 IO expanders, SHT40 sensor.
 - WS2812 RGB strip on GPIO5.

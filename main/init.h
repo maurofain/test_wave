@@ -1,9 +1,15 @@
 #pragma once
 
 #include "esp_err.h"
+#include "esp_netif.h"
 #include "led_strip.h"
 
 esp_err_t init_run_factory(void);
+
+/**
+ * @brief Ottiene i netif per le varie interfacce
+ */
+void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth);
 
 /**
  * @brief Ottiene l'handle della LED strip

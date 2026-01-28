@@ -1,4 +1,7 @@
 #include <string.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include "freertos/FreeRTOS.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -28,14 +31,20 @@
 #include "lwip/netif.h"
 #include "init.h"
 #include "led_control.h"
+#include "device_config.h"
+#include "mdb_bus.h"
+#include "web_ui.h"
 #include "sdkconfig.h"
+
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 static const char *TAG = "INIT";
 
 static esp_netif_t *s_netif_ap;
 static esp_netif_t *s_netif_sta;
 static esp_netif_t *s_netif_eth;
-static httpd_handle_t s_httpd;
 static esp_eth_handle_t s_eth_handle;
 
 // -----------------------------------------------------------------------------
@@ -105,29 +114,6 @@ static esp_err_t init_uart_rs485(void)
 #endif
 }
 
-static esp_err_t init_uart_mdb(void)
-{
-#if SOC_UART_NUM >= 4
-    uart_config_t cfg = {
-        .baud_rate = 9600,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_EVEN,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
-    const uart_port_t port = CONFIG_APP_MDB_UART_PORT;
-    ESP_RETURN_ON_ERROR(uart_driver_install(port, 2048, 0, 0, NULL, 0), TAG, "MDB driver install failed");
-    ESP_RETURN_ON_ERROR(uart_param_config(port, &cfg), TAG, "MDB param config failed");
-    ESP_RETURN_ON_ERROR(uart_set_pin(port, CONFIG_APP_MDB_TX_GPIO, CONFIG_APP_MDB_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE), TAG, "MDB pin config failed");
-    ESP_LOGI(TAG, "[F] UART MDB inizializzata su porta %d (TX=%d, RX=%d)", port, CONFIG_APP_MDB_TX_GPIO, CONFIG_APP_MDB_RX_GPIO);
-    return ESP_OK;
-#else
-    ESP_LOGW(TAG, "[F] MDB non inizializzato: target ha solo %d UART", SOC_UART_NUM);
-    return ESP_OK;
-#endif
-}
-
 static esp_err_t init_pwm(void)
 {
     ledc_timer_config_t timer = {
@@ -171,6 +157,36 @@ static void log_sht40_stub(void)
 // Rete + HTTP + OTA (factory)
 // -----------------------------------------------------------------------------
 
+static void nvs_list_entries(void)
+{
+    nvs_iterator_t it = NULL;
+    esp_err_t ret = nvs_entry_find(NULL, NULL, NVS_TYPE_ANY, &it);
+    
+    if (ret == ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGI(TAG, "=== NVS vuota (no entries) ===");
+        return;
+    }
+    
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Avviso lettura NVS: %s (verranno usate le defaults)", esp_err_to_name(ret));
+        return;
+    }
+
+    ESP_LOGI(TAG, "=== Elenco NVS Entries ===");
+    int count = 0;
+    
+    while (it != NULL) {
+        nvs_entry_info_t info;
+        nvs_entry_info(it, &info);
+        count++;
+        ESP_LOGI(TAG, "  [%d] key='%s', type=%d", count, info.key, info.type);
+        ret = nvs_entry_next(&it);
+        if (ret != ESP_OK) break;
+    }
+    
+    ESP_LOGI(TAG, "=== Totale: %d entries ===", count);
+}
+
 static esp_err_t init_nvs(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -179,6 +195,10 @@ static esp_err_t init_nvs(void)
         ret = nvs_flash_init();
     }
     ESP_RETURN_ON_ERROR(ret, TAG, "NVS init failed");
+    
+    // Mostra l'elenco dei file/entries nella NVS
+    nvs_list_entries();
+    
     return ESP_OK;
 }
 
@@ -199,6 +219,46 @@ static esp_err_t init_spiffs(void)
     if (esp_spiffs_info(conf.partition_label, &total, &used) == ESP_OK) {
         ESP_LOGI(TAG, "[F] SPIFFS montato: totale=%u, usato=%u", (unsigned)total, (unsigned)used);
     }
+    
+    // Elenca file in SPIFFS
+    DIR *dir = opendir("/spiffs");
+    if (dir) {
+        ESP_LOGI(TAG, "[F] === Elenco file SPIFFS ===");
+        struct dirent *entry;
+        int file_count = 0;
+        while ((entry = readdir(dir)) != NULL) {
+            file_count++;
+            char filepath[300];
+            snprintf(filepath, sizeof(filepath), "/spiffs/%s", entry->d_name);
+            struct stat st;
+            if (stat(filepath, &st) == 0) {
+                ESP_LOGI(TAG, "[F]   [%d] %s (%ld bytes)", file_count, entry->d_name, st.st_size);
+            } else {
+                ESP_LOGI(TAG, "[F]   [%d] %s", file_count, entry->d_name);
+            }
+        }
+        closedir(dir);
+        ESP_LOGI(TAG, "[F] === Totale file: %d ===", file_count);
+    }
+    
+    // Leggi e mostra tasks.csv
+    FILE *f = fopen("/spiffs/tasks.csv", "r");
+    if (f) {
+        ESP_LOGI(TAG, "[F] === Contenuto tasks.csv ===");
+        char line[256];
+        int line_num = 0;
+        while (fgets(line, sizeof(line), f)) {
+            line_num++;
+            // Rimuovi newline
+            line[strcspn(line, "\r\n")] = 0;
+            ESP_LOGI(TAG, "[F]   [%d] %s", line_num, line);
+        }
+        fclose(f);
+        ESP_LOGI(TAG, "[F] ================================");
+    } else {
+        ESP_LOGW(TAG, "[F] File tasks.csv non trovato");
+    }
+    
     return ESP_OK;
 }
 
@@ -459,6 +519,18 @@ static esp_err_t start_ethernet(void)
     ESP_RETURN_ON_ERROR(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL), TAG, "register ETH_EVENT failed");
     ESP_RETURN_ON_ERROR(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ip_event_handler, NULL), TAG, "register IP_EVENT failed");
     
+    // Applica configurazione IP statica se DHCP è disabilitato
+    device_config_t *cfg = device_config_get();
+    if (!cfg->eth.dhcp_enabled && strlen(cfg->eth.ip) > 0) {
+        esp_netif_dhcpc_stop(s_netif_eth);
+        esp_netif_ip_info_t ip_info;
+        ip_info.ip.addr = ipaddr_addr(cfg->eth.ip);
+        ip_info.gw.addr = ipaddr_addr(cfg->eth.gateway);
+        ip_info.netmask.addr = ipaddr_addr(cfg->eth.subnet);
+        esp_netif_set_ip_info(s_netif_eth, &ip_info);
+        ESP_LOGI(TAG, "[F] Ethernet IP statico: %s", cfg->eth.ip);
+    }
+
     // Start Ethernet driver (come nel progetto factory)
     ret = esp_eth_start(eth_handle);
     if (ret != ESP_OK) {
@@ -475,205 +547,6 @@ static esp_err_t start_ethernet(void)
     return ESP_OK;
 }
 
-static void ip_to_str(esp_netif_t *netif, char *out, size_t len)
-{
-    if (!netif || !out) {
-        return;
-    }
-    esp_netif_ip_info_t info;
-    if (esp_netif_get_ip_info(netif, &info) == ESP_OK) {
-        ip4addr_ntoa_r((const ip4_addr_t *)&info.ip, out, len);
-    }
-}
-
-static esp_err_t perform_ota(const char *url)
-{
-    if (!url || strlen(url) == 0) {
-        ESP_LOGE(TAG, "OTA URL missing");
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    ESP_LOGI(TAG, "Starting OTA from %s", url);
-    esp_http_client_config_t client_cfg = {
-        .url = url,
-        .timeout_ms = 15000,
-        .cert_pem = NULL,
-        .skip_cert_common_name_check = true,
-    };
-    esp_https_ota_config_t ota_cfg = {
-        .http_config = &client_cfg,
-    };
-
-    esp_err_t ret = esp_https_ota(&ota_cfg);
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "OTA successful. Rebooting into new image...");
-        vTaskDelay(pdMS_TO_TICKS(500));
-        esp_restart();
-    } else {
-        ESP_LOGE(TAG, "OTA failed: %s", esp_err_to_name(ret));
-    }
-    return ret;
-}
-
-static esp_err_t root_get_handler(httpd_req_t *req)
-{
-    ESP_LOGI(TAG, "[F] Connessione HTTP GET su / (URI: %s)", req->uri);
-    const char *resp = "ESP32-P4 Factory Server\nEndpoints: /status, /ota\n";
-    httpd_resp_set_type(req, "text/plain");
-    return httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
-}
-
-static esp_err_t status_get_handler(httpd_req_t *req)
-{
-    ESP_LOGI(TAG, "[F] Connessione HTTP GET su /status (URI: %s)", req->uri);
-    
-    char ap_ip[16] = "0.0.0.0";
-    char sta_ip[16] = "0.0.0.0";
-    char eth_ip[16] = "0.0.0.0";
-    
-    if (s_netif_ap) {
-        ip_to_str(s_netif_ap, ap_ip, sizeof(ap_ip));
-    }
-    if (s_netif_sta) {
-        ip_to_str(s_netif_sta, sta_ip, sizeof(sta_ip));
-    }
-    if (s_netif_eth) {
-        ip_to_str(s_netif_eth, eth_ip, sizeof(eth_ip));
-    }
-
-    const esp_partition_t *running = esp_ota_get_running_partition();
-    const esp_partition_t *boot = esp_ota_get_boot_partition();
-
-    char resp[512];
-    int len = snprintf(resp, sizeof(resp),
-                       "{\n"
-                       "  \"partition_running\": \"%s\",\n"
-                       "  \"partition_boot\": \"%s\",\n"
-                       "  \"ip_ap\": \"%s\",\n"
-                       "  \"ip_sta\": \"%s\",\n"
-                       "  \"ip_eth\": \"%s\"\n"
-                       "}\n",
-                       running ? running->label : "?",
-                       boot ? boot->label : "?",
-                       ap_ip, sta_ip, eth_ip);
-
-    if (len < 0 || len >= sizeof(resp)) {
-        ESP_LOGE(TAG, "[F] Errore nella formattazione della risposta status (len=%d)", len);
-        httpd_resp_set_status(req, "500 Internal Server Error");
-        httpd_resp_set_type(req, "text/plain");
-        return httpd_resp_send(req, "Internal Server Error", HTTPD_RESP_USE_STRLEN);
-    }
-
-    ESP_LOGI(TAG, "[F] Invio risposta status (len=%d): %s", len, resp);
-    httpd_resp_set_type(req, "application/json");
-    esp_err_t ret = httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[F] Errore nell'invio della risposta: %s", esp_err_to_name(ret));
-    }
-    return ret;
-}
-
-static esp_err_t ota_post_handler(httpd_req_t *req)
-{
-    ESP_LOGI(TAG, "[F] Connessione HTTP POST su /ota");
-    char query[256];
-    char url[200] = {0};
-
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        httpd_query_key_value(query, "url", url, sizeof(url));
-    }
-    if (strlen(url) == 0 && strlen(CONFIG_APP_OTA_DEFAULT_URL) > 0) {
-        snprintf(url, sizeof(url), "%s", CONFIG_APP_OTA_DEFAULT_URL);
-    }
-
-    esp_err_t err = perform_ota(url);
-    if (err != ESP_OK) {
-        const char *msg = "OTA failed\n";
-        httpd_resp_set_status(req, "500");
-        httpd_resp_send(req, msg, strlen(msg));
-        return ESP_OK;
-    }
-
-    const char *msg = "OTA started\n";
-    httpd_resp_send(req, msg, strlen(msg));
-    return ESP_OK;
-}
-
-static esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
-{
-    ESP_LOGW(TAG, "[F] Richiesta HTTP per URI non trovato: %s (errore: %d)", req->uri, error);
-    httpd_resp_set_status(req, "404 Not Found");
-    httpd_resp_set_type(req, "text/plain");
-    return httpd_resp_send(req, "404 Not Found", HTTPD_RESP_USE_STRLEN);
-}
-
-static esp_err_t start_http_server(void)
-{
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.server_port = CONFIG_APP_HTTP_PORT;
-    config.max_uri_handlers = 10;
-    config.max_resp_headers = 8;
-    config.stack_size = 8192;
-    config.lru_purge_enable = true;
-
-    ESP_LOGI(TAG, "[F] Avvio server HTTP sulla porta %d", config.server_port);
-    esp_err_t ret = httpd_start(&s_httpd, &config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[F] Impossibile avviare server HTTP: %s", esp_err_to_name(ret));
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "[F] Server HTTP avviato con successo");
-
-    // Register root endpoint for testing
-    httpd_uri_t root_uri = {
-        .uri = "/",
-        .method = HTTP_GET,
-        .handler = root_get_handler,
-        .user_ctx = NULL,
-    };
-    ret = httpd_register_uri_handler(s_httpd, &root_uri);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[F] Errore nella registrazione dell'URI /: %s", esp_err_to_name(ret));
-        httpd_stop(s_httpd);
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "[F] URI / registrato con successo");
-
-    httpd_uri_t status_uri = {
-        .uri = "/status",
-        .method = HTTP_GET,
-        .handler = status_get_handler,
-        .user_ctx = NULL,
-    };
-    ret = httpd_register_uri_handler(s_httpd, &status_uri);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[F] Errore nella registrazione dell'URI /status: %s", esp_err_to_name(ret));
-        httpd_stop(s_httpd);
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "[F] URI /status registrato con successo");
-
-    httpd_uri_t ota_uri = {
-        .uri = "/ota",
-        .method = HTTP_POST,
-        .handler = ota_post_handler,
-        .user_ctx = NULL,
-    };
-    ret = httpd_register_uri_handler(s_httpd, &ota_uri);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[F] Errore nella registrazione dell'URI /ota: %s", esp_err_to_name(ret));
-        httpd_stop(s_httpd);
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "[F] URI /ota registrato con successo");
-
-    // Register 404 handler
-    httpd_register_err_handler(s_httpd, HTTPD_404_NOT_FOUND, not_found_handler);
-
-    ESP_LOGI(TAG, "[F] Server HTTP avviato sulla porta %d", config.server_port);
-    return ESP_OK;
-}
-
 // -----------------------------------------------------------------------------
 
 // Public API
@@ -685,30 +558,46 @@ esp_err_t init_run_factory(void)
     ESP_ERROR_CHECK(init_spiffs());
     log_partitions();
     ESP_ERROR_CHECK(init_event_loop());
-    // WiFi temporarily disabled due to linker issues (will be re-enabled after resolution)
-    // ESP_ERROR_CHECK(start_wifi());
-    // Ethernet initialization - continue even if it fails (non-critical for factory setup)
-    esp_err_t eth_ret = start_ethernet();
-    if (eth_ret != ESP_OK) {
-        ESP_LOGW(TAG, "[F] Ethernet non disponibile, continuo senza Ethernet");
+    
+    // Inizializza configurazione device PRIMA degli altri moduli
+    ESP_ERROR_CHECK(device_config_init());
+    device_config_t *cfg = device_config_get();
+
+    // Ethernet - continua anche se fallisce
+    if (cfg->eth.enabled) {
+        esp_err_t eth_ret = start_ethernet(); // TODO: aggiornare start_ethernet per usare cfg
+        if (eth_ret != ESP_OK) {
+            ESP_LOGW(TAG, "[F] Ethernet non disponibile, continuo senza");
+        }
+    } else {
+        ESP_LOGI(TAG, "[F] Ethernet disabilitato da config");
     }
     
-    ESP_ERROR_CHECK(start_http_server());
+    // Inizializza e avvia Web UI (Server + Handler)
+    ESP_ERROR_CHECK(web_ui_init());
 
-    // TEMPORANEAMENTE DISABILITATE per testare se interferiscono con Ethernet
-    ESP_ERROR_CHECK(init_i2c());  //OK con Ethernet
-    // NOTE: Boot button removed - GPIO 35 è riservato per TX_EN (Ethernet RMII), vedi docs/NOTES_HW.md
-    ESP_ERROR_CHECK(led_control_init());  // Inizializza LED strip (crea hardware + setup)
-    ESP_ERROR_CHECK(init_uart_rs232());  //OK con Ethernet
-    ESP_ERROR_CHECK(init_uart_rs485());  //OK con Ethernet
-    ESP_ERROR_CHECK(init_uart_mdb()); //OK con Ethernet
-    ESP_ERROR_CHECK(init_pwm());  //OK con Ethernet
+    // Inizializzazioni condizionali basate su NVS
+    if (cfg->sensors.io_expander_enabled) ESP_ERROR_CHECK(init_i2c());
+    if (cfg->sensors.led_enabled) ESP_ERROR_CHECK(led_control_init());
+    if (cfg->sensors.rs232_enabled) ESP_ERROR_CHECK(init_uart_rs232());
+    if (cfg->sensors.rs485_enabled) ESP_ERROR_CHECK(init_uart_rs485());
+    if (cfg->sensors.mdb_enabled) {
+        ESP_ERROR_CHECK(mdb_bus_init());
+        ESP_ERROR_CHECK(mdb_bus_start_engine());
+    }
+    if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled) ESP_ERROR_CHECK(init_pwm());
 
-    // log_sht40_stub();
     return ESP_OK;
 }
 
 led_strip_handle_t init_get_ws2812_handle(void)
 {
     return led_control_get_handle();
+}
+
+void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
+{
+    if (ap) *ap = s_netif_ap;
+    if (sta) *sta = s_netif_sta;
+    if (eth) *eth = s_netif_eth;
 }
