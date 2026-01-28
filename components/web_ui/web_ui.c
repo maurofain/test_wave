@@ -11,11 +11,17 @@
 #include <string.h>
 #include "sdkconfig.h"
 #include "init.h"
-#include "led_control.h"
-#include "mdb_bus.h"
+#include "led.h"
+#include "mdb.h"
 #include "driver/ledc.h"
 #include "driver/uart.h"
 #include "driver/i2c.h"
+
+#include "serial_test.h"
+#include "led_test.h"
+#include "mdb_test.h"
+#include "io_expander_test.h"
+#include "pwm_test.h"
 
 static const char *TAG = "WEB_UI";
 static httpd_handle_t s_server = NULL;
@@ -36,20 +42,20 @@ static void led_test_task(void *arg) {
     ESP_LOGI(TAG, "LED Test: Avvio (40s totali)");
     // 1. RGB Cycle (20s)
     for (int i=0; i<20; i++) {
-        led_control_fill_color(255, 0, 0); vTaskDelay(pdMS_TO_TICKS(333));
-        led_control_fill_color(0, 255, 0); vTaskDelay(pdMS_TO_TICKS(333));
-        led_control_fill_color(0, 0, 255); vTaskDelay(pdMS_TO_TICKS(333));
+        led_fill_color(255, 0, 0); vTaskDelay(pdMS_TO_TICKS(333));
+        led_fill_color(0, 255, 0); vTaskDelay(pdMS_TO_TICKS(333));
+        led_fill_color(0, 0, 255); vTaskDelay(pdMS_TO_TICKS(333));
     }
     // 2. Running LED (20s)
-    led_control_clear();
+    led_clear();
     for (int i=0; i<40; i++) {
         for (int j=0; j<8; j++) { // Assumiamo 8 LED
-             led_control_set_pixel(j, 255, 255, 255);
+             led_set_pixel(j, 255, 255, 255);
              vTaskDelay(pdMS_TO_TICKS(60));
-             led_control_set_pixel(j, 0, 0, 0);
+             led_set_pixel(j, 0, 0, 0);
         }
     }
-    led_control_clear();
+    led_clear();
     ESP_LOGI(TAG, "LED Test: Completato");
     s_led_test_handle = NULL;
     vTaskDelete(NULL);
@@ -120,9 +126,9 @@ static void mdb_test_task(void *arg) {
 
     while(1) {
         ESP_LOGD(TAG, "MDB Sending POLL 0x08...");
-        mdb_bus_send_packet(poll_cmd, NULL, 0);
+        mdb_send_packet(poll_cmd, NULL, 0);
         
-        esp_err_t ret = mdb_bus_receive_packet(rx_buf, sizeof(rx_buf), &rx_len, 20);
+        esp_err_t ret = mdb_receive_packet(rx_buf, sizeof(rx_buf), &rx_len, 20);
         if (ret == ESP_OK) {
             if (rx_len == 1 && rx_buf[0] == 0x00) {
                 ESP_LOGI(TAG, "MDB Recv: ACK (0x00)");
@@ -224,7 +230,7 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     ip_to_str(ap, ap_ip, 16); ip_to_str(sta, sta_ip, 16); ip_to_str(eth, eth_ip, 16);
     const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *boot = esp_ota_get_boot_partition();
-    const mdb_bus_status_t *mdb = mdb_bus_get_status();
+    const mdb_status_t *mdb = mdb_get_status();
 
     char resp[1024];
     snprintf(resp, sizeof(resp), 
@@ -750,14 +756,14 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div id='pwm_status' class='status-box'>Pronto per test PWM</div></div>"
         
         "<div class='section'><h2>📡 Seriale RS232</h2>"
-        "<div class='test-item'><span class='test-label'>Test Caratteri (55, AA, 01, 07)</span>"
-        "<div class='test-controls'><button onclick=\"runTest('rs232_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('rs232_stop')\">⏹️ Stop</button></div></div>"
-        "<div id='rs232_status' class='status-box'>Pronto per test RS232</div></div>"
+        "<div class='test-item'><span>Invia Stringa (es: \\0x55\\0xAA\\r\\n)</span>"
+        "<div class='test-controls'><input type='text' id='rs232_input' placeholder='\\0x55 Test...'><button onclick=\"sendSerial('rs232')\">🚀 Invia</button></div></div>"
+        "<div id='rs232_status' class='status-box'>Monitor:</div></div>"
         
         "<div class='section'><h2>📡 Seriale RS485</h2>"
-        "<div class='test-item'><span class='test-label'>Test Caratteri (55, AA, 01, 07)</span>"
-        "<div class='test-controls'><button onclick=\"runTest('rs485_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('rs485_stop')\">⏹️ Stop</button></div></div>"
-        "<div id='rs485_status' class='status-box'>Pronto per test RS485</div></div>"
+        "<div class='test-item'><span>Invia Stringa</span>"
+        "<div class='test-controls'><input type='text' id='rs485_input' placeholder='Richiesta...'><button onclick=\"sendSerial('rs485')\">🚀 Invia</button></div></div>"
+        "<div id='rs485_status' class='status-box'>Monitor:</div></div>"
         
         "<div class='section'><h2>🎰 MDB (Multi-Drop Bus)</h2>"
         "<div class='test-item'><span class='test-label'>Test Loopback/Echo</span>"
@@ -776,6 +782,24 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "else{statusBox.innerHTML+='<div class=\"result\">❌ Errore: '+(result.error||r.status)+'</div>';}}"
         "catch(e){statusBox.innerHTML+='<div class=\"result\">❌ Errore: '+e+'</div>';}"
         "statusBox.scrollTop=statusBox.scrollHeight;}"
+        
+        "async function sendSerial(port){"
+        "const data=document.getElementById(port+'_input').value;"
+        "const r=await fetch('/api/test/serial_send',{method:'POST',body:JSON.stringify({port,data})});"
+        "const res=await r.json();"
+        "if(!r.ok)alert(res.error);"
+        "}"
+        
+        "async function updateMonitors(){"
+        "const r=await fetch('/api/test/serial_monitor',{method:'POST'});"
+        "const res=await r.json();"
+        "if(res.log){"
+        "const logLines = res.log.split(' ');" // Semplificato
+        "document.getElementById('rs232_status').innerText = res.log;"
+        "document.getElementById('rs485_status').innerText = res.log;"
+        "}"
+        "}"
+        "setInterval(updateMonitors, 1000);"
         "</script></body></html>";
     
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -791,54 +815,38 @@ static esp_err_t api_test_handler(httpd_req_t *req)
 
     // --- LED TEST ---
     if (strcmp(test_name, "led_start") == 0) {
-        if (!s_led_test_handle) {
-            xTaskCreate(led_test_task, "led_test", 4096, NULL, 5, &s_led_test_handle);
-            snprintf(response, sizeof(response), "{\"message\":\"Test LED avviato (40s)\"}");
-        } else {
-            snprintf(response, sizeof(response), "{\"error\":\"Test già in esecuzione\"}");
-        }
+        if (led_test_start() == ESP_OK) {
+            snprintf(response, sizeof(response), "{\"message\":\"Test LED avviato\"}");
+        } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
     } else if (strcmp(test_name, "led_stop") == 0) {
-        if (s_led_test_handle) { vTaskDelete(s_led_test_handle); s_led_test_handle = NULL; }
-        led_control_clear();
+        led_test_stop();
         snprintf(response, sizeof(response), "{\"message\":\"Test LED fermato\"}");
     }
 
     // --- PWM1 TEST ---
     else if (strcmp(test_name, "pwm1_start") == 0) {
-        if (!s_pwm1_test_handle) {
-            xTaskCreate(pwm_test_task, "pwm1_test", 2048, (void*)1, 5, &s_pwm1_test_handle);
-            snprintf(response, sizeof(response), "{\"message\":\"Test PWM1 avviato\"}");
-        } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
+        pwm_test_start(1);
+        snprintf(response, sizeof(response), "{\"message\":\"Test PWM1 avviato\"}");
     } else if (strcmp(test_name, "pwm1_stop") == 0) {
-        if (s_pwm1_test_handle) { vTaskDelete(s_pwm1_test_handle); s_pwm1_test_handle = NULL; }
-        ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
-        ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+        pwm_test_stop(1);
         snprintf(response, sizeof(response), "{\"message\":\"Test PWM1 fermato\"}");
     }
 
     // --- PWM2 TEST ---
     else if (strcmp(test_name, "pwm2_start") == 0) {
-        if (!s_pwm2_test_handle) {
-            xTaskCreate(pwm_test_task, "pwm2_test", 2048, (void*)2, 5, &s_pwm2_test_handle);
-            snprintf(response, sizeof(response), "{\"message\":\"Test PWM2 avviato\"}");
-        } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
+        pwm_test_start(2);
+        snprintf(response, sizeof(response), "{\"message\":\"Test PWM2 avviato\"}");
     } else if (strcmp(test_name, "pwm2_stop") == 0) {
-        if (s_pwm2_test_handle) { vTaskDelete(s_pwm2_test_handle); s_pwm2_test_handle = NULL; }
-        ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, 0);
-        ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1);
+        pwm_test_stop(2);
         snprintf(response, sizeof(response), "{\"message\":\"Test PWM2 fermato\"}");
     }
 
     // --- I/O EXPANDER TEST ---
     else if (strcmp(test_name, "ioexp_start") == 0) {
-        if (!s_ioexp_test_handle) {
-            xTaskCreate(ioexp_test_task, "ioexp_test", 2048, NULL, 5, &s_ioexp_test_handle);
-            snprintf(response, sizeof(response), "{\"message\":\"Test I/O Expander avviato (1Hz)\"}");
-        } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
+        io_expander_test_start();
+        snprintf(response, sizeof(response), "{\"message\":\"Test I/O Expander avviato (1Hz)\"}");
     } else if (strcmp(test_name, "ioexp_stop") == 0) {
-        if (s_ioexp_test_handle) { vTaskDelete(s_ioexp_test_handle); s_ioexp_test_handle = NULL; }
-        uint8_t data_off[] = {0x02, 0x00, 0x00};
-        i2c_master_write_to_device(CONFIG_APP_I2C_PORT, 0x20, data_off, 3, pdMS_TO_TICKS(100));
+        io_expander_test_stop();
         snprintf(response, sizeof(response), "{\"message\":\"Test I/O Expander fermato\"}");
     }
 
@@ -866,15 +874,36 @@ static esp_err_t api_test_handler(httpd_req_t *req)
     
     // --- MDB TEST ---
     if (strcmp(test_name, "mdb_start") == 0) {
-        if (!s_mdb_test_handle) {
-            xTaskCreate(mdb_test_task, "mdb_test", 2048, NULL, 5, &s_mdb_test_handle);
-            snprintf(response, sizeof(response), "{\"message\":\"Test MDB avviato (Poll 0x08)\"}");
+        if (mdb_test_start() == ESP_OK) {
+            snprintf(response, sizeof(response), "{\"message\":\"Test MDB avviato\"}");
         } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
     } else if (strcmp(test_name, "mdb_stop") == 0) {
-        if (s_mdb_test_handle) { vTaskDelete(s_mdb_test_handle); s_mdb_test_handle = NULL; }
+        mdb_test_stop();
         snprintf(response, sizeof(response), "{\"message\":\"Test MDB fermato\"}");
     }
     
+    // --- SERIAL SEND TEST (RS232/RS485) ---
+    else if (strcmp(test_name, "serial_send") == 0) {
+        char buf[512] = {0};
+        int len_req = httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            const char *port_raw = cJSON_GetStringValue(cJSON_GetObjectItem(root, "port"));
+            const char *data_str = cJSON_GetStringValue(cJSON_GetObjectItem(root, "data"));
+            int port = (port_raw && strcmp(port_raw, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT : CONFIG_APP_RS232_UART_PORT;
+            if (data_str) {
+                serial_test_send_uart(port, data_str);
+                snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Inviato su %s\"}", port_raw);
+            }
+            cJSON_Delete(root);
+        } else snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+    }
+    
+    // --- SERIAL MONITOR ---
+    else if (strcmp(test_name, "serial_monitor") == 0) {
+        snprintf(response, sizeof(response), "{\"log\":\"%s\"}", serial_test_get_monitor());
+    }
+
     else {
         snprintf(response, sizeof(response), "{\"error\":\"Test sconosciuto: %s\"}", test_name);
         httpd_resp_set_status(req, "404");

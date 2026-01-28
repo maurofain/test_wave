@@ -20,21 +20,21 @@
 #include "esp_eth_phy.h"
 #include "esp_eth_mac_esp.h"
 #include "esp_spiffs.h"
-#include "driver/i2c.h"
-#include "driver/gpio.h"
-#include "driver/uart.h"
-#include "driver/ledc.h"
-#include "driver/rmt_tx.h"
 #include "led_strip.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/etharp.h"
 #include "lwip/netif.h"
 #include "init.h"
-#include "led_control.h"
+#include "led.h"
 #include "device_config.h"
-#include "mdb_bus.h"
+#include "mdb.h"
 #include "web_ui.h"
 #include "sdkconfig.h"
+#include "io_expander.h"
+#include "pwm.h"
+#include "rs232.h"
+#include "rs485.h"
+#include "serial_test.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -46,112 +46,6 @@ static esp_netif_t *s_netif_ap;
 static esp_netif_t *s_netif_sta;
 static esp_netif_t *s_netif_eth;
 static esp_eth_handle_t s_eth_handle;
-
-// -----------------------------------------------------------------------------
-// Inizializzazione hardware
-// -----------------------------------------------------------------------------
-
-static esp_err_t init_i2c(void)
-{
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = CONFIG_APP_I2C_SDA_GPIO,
-        .scl_io_num = CONFIG_APP_I2C_SCL_GPIO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = CONFIG_APP_I2C_CLOCK_HZ,
-    };
-
-    ESP_RETURN_ON_ERROR(i2c_param_config(CONFIG_APP_I2C_PORT, &conf), TAG, "I2C param config failed");
-    ESP_RETURN_ON_ERROR(i2c_driver_install(CONFIG_APP_I2C_PORT, conf.mode, 0, 0, 0), TAG, "I2C install failed");
-    ESP_LOGI(TAG, "[F] I2C inizializzato su porta %d (SDA=%d, SCL=%d)", CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
-    return ESP_OK;
-}
-
-static esp_err_t init_uart_rs232(void)
-{
-    uart_config_t cfg = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
-    const uart_port_t port = CONFIG_APP_RS232_UART_PORT;
-    ESP_RETURN_ON_ERROR(uart_driver_install(port, 2048, 0, 0, NULL, 0), TAG, "RS232 driver install failed");
-    ESP_RETURN_ON_ERROR(uart_param_config(port, &cfg), TAG, "RS232 param config failed");
-    ESP_RETURN_ON_ERROR(uart_set_pin(port, CONFIG_APP_RS232_TX_GPIO, CONFIG_APP_RS232_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE), TAG, "RS232 pin config failed");
-    ESP_LOGI(TAG, "[F] UART RS232 inizializzata su porta %d (TX=%d, RX=%d)", port, CONFIG_APP_RS232_TX_GPIO, CONFIG_APP_RS232_RX_GPIO);
-    return ESP_OK;
-}
-
-static esp_err_t init_uart_rs485(void)
-{
-#if SOC_UART_NUM >= 3
-    uart_config_t cfg = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
-    const uart_port_t port = CONFIG_APP_RS485_UART_PORT;
-    ESP_RETURN_ON_ERROR(uart_driver_install(port, 2048, 0, 0, NULL, 0), TAG, "RS485 driver install failed");
-    ESP_RETURN_ON_ERROR(uart_param_config(port, &cfg), TAG, "RS485 param config failed");
-    ESP_RETURN_ON_ERROR(uart_set_pin(port, CONFIG_APP_RS485_TX_GPIO, CONFIG_APP_RS485_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE), TAG, "RS485 pin config failed");
-    ESP_RETURN_ON_ERROR(uart_set_mode(port, UART_MODE_RS485_HALF_DUPLEX), TAG, "RS485 mode set failed");
-
-    gpio_set_direction(CONFIG_APP_RS485_DE_GPIO, GPIO_MODE_OUTPUT);
-    gpio_set_level(CONFIG_APP_RS485_DE_GPIO, 0);
-
-    ESP_LOGI(TAG, "[F] UART RS485 inizializzata su porta %d (TX=%d, RX=%d, DE=%d)", port, CONFIG_APP_RS485_TX_GPIO, CONFIG_APP_RS485_RX_GPIO, CONFIG_APP_RS485_DE_GPIO);
-    return ESP_OK;
-#else
-    ESP_LOGW(TAG, "[F] RS485 non inizializzato: target ha solo %d UART", SOC_UART_NUM);
-    return ESP_OK;
-#endif
-}
-
-static esp_err_t init_pwm(void)
-{
-    ledc_timer_config_t timer = {
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .duty_resolution = LEDC_TIMER_8_BIT,  // Ridotto da 12-bit per compatibilità
-        .timer_num = LEDC_TIMER_0,
-        .freq_hz = 5000,  // Ridotto da 20kHz a 5kHz
-        .clk_cfg = LEDC_AUTO_CLK,
-    };
-    ESP_RETURN_ON_ERROR(ledc_timer_config(&timer), TAG, "LEDC timer config failed");
-
-    ledc_channel_config_t ch0 = {
-        .gpio_num = CONFIG_APP_PWM_OUT1_GPIO,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = LEDC_CHANNEL_0,
-        .timer_sel = LEDC_TIMER_0,
-        .duty = 0,
-        .hpoint = 0,
-    };
-    ledc_channel_config_t ch1 = {
-        .gpio_num = CONFIG_APP_PWM_OUT2_GPIO,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = LEDC_CHANNEL_1,
-        .timer_sel = LEDC_TIMER_0,
-        .duty = 0,
-        .hpoint = 0,
-    };
-
-    ESP_RETURN_ON_ERROR(ledc_channel_config(&ch0), TAG, "PWM channel 0 config failed");
-    ESP_RETURN_ON_ERROR(ledc_channel_config(&ch1), TAG, "PWM channel 1 config failed");
-    ESP_LOGI(TAG, "[F] Uscite PWM configurate su GPIO %d e GPIO %d", CONFIG_APP_PWM_OUT1_GPIO, CONFIG_APP_PWM_OUT2_GPIO);
-    return ESP_OK;
-}
-
-static void log_sht40_stub(void)
-{
-    ESP_LOGI(TAG, "[F] Sensore SHT40 stub: aggiungere driver sensore ESP-IDF quando disponibile (I2C %d)", CONFIG_APP_I2C_PORT);
-}
 
 // -----------------------------------------------------------------------------
 // Rete + HTTP + OTA (factory)
@@ -573,26 +467,29 @@ esp_err_t init_run_factory(void)
         ESP_LOGI(TAG, "[F] Ethernet disabilitato da config");
     }
     
+    // Inizializza monitoraggio seriale per i test
+    serial_test_init();
+
     // Inizializza e avvia Web UI (Server + Handler)
     ESP_ERROR_CHECK(web_ui_init());
 
     // Inizializzazioni condizionali basate su NVS
-    if (cfg->sensors.io_expander_enabled) ESP_ERROR_CHECK(init_i2c());
-    if (cfg->sensors.led_enabled) ESP_ERROR_CHECK(led_control_init());
-    if (cfg->sensors.rs232_enabled) ESP_ERROR_CHECK(init_uart_rs232());
-    if (cfg->sensors.rs485_enabled) ESP_ERROR_CHECK(init_uart_rs485());
+    if (cfg->sensors.io_expander_enabled) ESP_ERROR_CHECK(io_expander_init());
+    if (cfg->sensors.led_enabled) ESP_ERROR_CHECK(led_init());
+    if (cfg->sensors.rs232_enabled) ESP_ERROR_CHECK(rs232_init());
+    if (cfg->sensors.rs485_enabled) ESP_ERROR_CHECK(rs485_init());
     if (cfg->sensors.mdb_enabled) {
-        ESP_ERROR_CHECK(mdb_bus_init());
-        ESP_ERROR_CHECK(mdb_bus_start_engine());
+        ESP_ERROR_CHECK(mdb_init());
+        ESP_ERROR_CHECK(mdb_start_engine());
     }
-    if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled) ESP_ERROR_CHECK(init_pwm());
+    if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled) ESP_ERROR_CHECK(pwm_init());
 
     return ESP_OK;
 }
 
 led_strip_handle_t init_get_ws2812_handle(void)
 {
-    return led_control_get_handle();
+    return led_get_handle();
 }
 
 void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)

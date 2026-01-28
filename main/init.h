@@ -14,7 +14,7 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth);
 /**
  * @brief Ottiene l'handle della LED strip
  * @note La LED strip è inizializzata automaticamente in init_run_factory()
- *       tramite led_control_init(). Usa questa funzione per ottenerla.
+ *       tramite led_init(). Usa questa funzione per ottenerla.
  * @return Handle della LED strip, NULL se non inizializzato
  */
 led_strip_handle_t init_get_ws2812_handle(void);
