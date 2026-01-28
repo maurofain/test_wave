@@ -6,6 +6,8 @@
 #include "cJSON.h"
 #include "esp_rom_crc.h"
 #include "eeprom_24lc16.h"
+#include "esp_ota_ops.h"
+#include "esp_system.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -409,6 +411,7 @@ esp_err_t device_config_save(const device_config_t *config)
 
     char *json_str = cJSON_PrintUnformatted(root);
     if (json_str) {
+        ESP_LOGI(TAG, "[C] Salvataggio configurazione completa: %s", json_str);
         esp_err_t err = ESP_ERR_INVALID_STATE;
         
         if (eeprom_24lc16_is_available()) {
@@ -443,4 +446,39 @@ esp_err_t device_config_reset_defaults(void)
 {
     _set_defaults(&s_config);
     return device_config_save(&s_config);
+}
+
+void device_config_reboot_factory(void)
+{
+    const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+    if (factory) {
+        ESP_LOGI(TAG, "Impostazione partizione di boot: FACTORY");
+        esp_ota_set_boot_partition(factory);
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "Partizione Factory non trovata!");
+    }
+}
+
+void device_config_reboot_app(void)
+{
+    const esp_partition_t *ota0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
+    if (ota0) {
+        ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_0 (Produzione)");
+        esp_ota_set_boot_partition(ota0);
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "Partizione OTA_0 non trovata!");
+    }
+}
+
+const char* device_config_get_running_app_name(void)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY) {
+        return "FACTORY (Test)";
+    } else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0) {
+        return "PRODUCTION";
+    }
+    return "UNKNOWN";
 }

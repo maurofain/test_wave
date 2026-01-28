@@ -48,10 +48,10 @@ static esp_err_t send_head(httpd_req_t *req, const char *title, const char *extr
         "%s %s"
         "</style></head><body>"
         "<header>"
-        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s</h1></div>"
+        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s [%s]</h1></div>"
         "<div style='text-align:right;font-size:12px;opacity:0.8;'>v%s (%s)</div>"
         "</header>"
-        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
+        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
     httpd_resp_sendstr_chunk(req, buf);
     free(buf);
     return ESP_OK;
@@ -105,6 +105,22 @@ static esp_err_t perform_ota(const char *url)
     return ret;
 }
 
+static esp_err_t reboot_factory_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in Factory Mode...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_factory();
+    return ESP_OK;
+}
+
+static esp_err_t reboot_app_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in Production Mode...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_app();
+    return ESP_OK;
+}
+
 // Handler della Homepage
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
@@ -116,7 +132,8 @@ static esp_err_t root_get_handler(httpd_req_t *req)
         ".btn-link:hover{background:#2980b9;box-shadow:0 4px 8px rgba(0,0,0,0.2)}"
         ".btn-config{background:#27ae60}.btn-config:hover{background:#219150}"
         ".btn-test{background:#e67e22}.btn-test:hover{background:#d35400}"
-        ".btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}";
+        ".btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}"
+        ".btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     send_head(req, "Factory Console", extra_style, false);
@@ -132,6 +149,11 @@ static esp_err_t root_get_handler(httpd_req_t *req)
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
         "<p>Questa interfaccia permette di configurare, testare e aggiornare la scheda <b>ESP32-P4</b>.</p>"
         "<p>Utilizzare il menu <b>Configurazione</b> per abilitare i driver hardware necessari prima di eseguire i test.</p>"
+        "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
+        "<strong>Azioni Rapide:</strong><br>"
+        "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>Reboot in Factory</a> "
+        "<a href='/reboot/app' class='btn-reboot' style='background:#27ae60;'>Reboot in App</a>"
+        "</div>"
         "</div>"
         "<div class='card'><h2>🔗 API Endpoints</h2>"
         "<div style='overflow-x:auto;'>"
@@ -1138,6 +1160,13 @@ esp_err_t web_ui_init(void)
     
     httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
     httpd_register_uri_handler(s_server, &uri_api_test);
+
+    // Reboot Handlers
+    httpd_uri_t uri_reboot_factory = {.uri = "/reboot/factory", .method = HTTP_GET, .handler = reboot_factory_handler};
+    httpd_register_uri_handler(s_server, &uri_reboot_factory);
+
+    httpd_uri_t uri_reboot_app = {.uri = "/reboot/app", .method = HTTP_GET, .handler = reboot_app_handler};
+    httpd_register_uri_handler(s_server, &uri_reboot_app);
 
     httpd_register_err_handler(s_server, HTTPD_404_NOT_FOUND, not_found_handler);
 

@@ -101,3 +101,18 @@ device_config_t* device_config_get(void);
  * @return ESP_OK se riuscito
  */
 esp_err_t device_config_reset_defaults(void);
+
+/**
+ * @brief Riavvia il dispositivo in modalità Factory
+ */
+void device_config_reboot_factory(void);
+
+/**
+ * @brief Riavvia il dispositivo in modalità Produzione (OTA_0)
+ */
+void device_config_reboot_app(void);
+
+/**
+ * @brief Ritorna una stringa descrittiva dell'app attualmente avviata
+ */
+const char* device_config_get_running_app_name(void);

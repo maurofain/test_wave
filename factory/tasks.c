@@ -1,0 +1,313 @@
+#include "tasks.h"
+#include "init.h"
+#include "esp_log.h"
+#include "led_strip.h"
+#include "device_config.h"
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+static const char *TAG = "TASKS";
+
+static void ws2812_blink_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    led_strip_handle_t strip = init_get_ws2812_handle();
+    TickType_t last_wake = xTaskGetTickCount();
+    uint8_t color = 0;
+
+    while (true) {
+        if (!strip) {
+            // Se i LED sono disabilitati in config, evitiamo di spammare log
+            if (!device_config_get()->sensors.led_enabled) {
+                vTaskDelay(pdMS_TO_TICKS(5000));
+                strip = init_get_ws2812_handle(); // Riprova a prenderlo in caso sia stato abilitato
+                continue;
+            }
+            ESP_LOGW(TAG, "[M] Handle WS2812 non pronto");
+            vTaskDelay(pdMS_TO_TICKS(500));
+            strip = init_get_ws2812_handle(); 
+            continue;
+        }
+        color += 25;
+        led_strip_set_pixel(strip, 0, color, 0, 255 - color);
+        led_strip_refresh(strip);
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+// Task scheletro (solo struttura, logica da implementare)
+
+static void eeprom_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void io_expander_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void sht40_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void rs232_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void rs485_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void mdb_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void pwm_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void touchscreen_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void lvgl_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static task_param_t s_tasks[] = {
+    {
+        .name = "ws2812_blink",
+        .state = TASK_STATE_RUN,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(500),
+        .task_fn = ws2812_blink_task,
+        .stack_words = 2048,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "eeprom",
+        .state = TASK_STATE_IDLE,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(1000),
+        .task_fn = eeprom_task,
+        .stack_words = 2048,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "io_expander",
+        .state = TASK_STATE_IDLE,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(500),
+        .task_fn = io_expander_task,
+        .stack_words = 2048,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "sht40",
+        .state = TASK_STATE_IDLE,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(2000),
+        .task_fn = sht40_task,
+        .stack_words = 2048,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "rs232",
+        .state = TASK_STATE_IDLE,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(10),
+        .task_fn = rs232_task,
+        .stack_words = 4096,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "rs485",
+        .state = TASK_STATE_IDLE,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(10),
+        .task_fn = rs485_task,
+        .stack_words = 4096,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "mdb",
+        .state = TASK_STATE_IDLE,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(10),
+        .task_fn = mdb_task,
+        .stack_words = 4096,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "pwm",
+        .state = TASK_STATE_IDLE,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(20),
+        .task_fn = pwm_task,
+        .stack_words = 2048,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "touchscreen",
+        .state = TASK_STATE_IDLE,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(20),
+        .task_fn = touchscreen_task,
+        .stack_words = 4096,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "lvgl",
+        .state = TASK_STATE_IDLE,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(16),
+        .task_fn = lvgl_task,
+        .stack_words = 4096,
+        .arg = NULL,
+        .handle = NULL,
+    },
+};
+
+// -----------------------------------------------------------------------------
+// Caricatore configurazione (CSV da SPIFFS)
+// -----------------------------------------------------------------------------
+
+static task_param_t *find_task_by_name(const char *name)
+{
+    for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
+        if (strcmp(s_tasks[i].name, name) == 0) {
+            return &s_tasks[i];
+        }
+    }
+    return NULL;
+}
+
+static task_state_t parse_state(const char *s, task_state_t def)
+{
+    if (!s) return def;
+    if (strcasecmp(s, "run") == 0) return TASK_STATE_RUN;
+    if (strcasecmp(s, "idle") == 0) return TASK_STATE_IDLE;
+    if (strcasecmp(s, "pause") == 0) return TASK_STATE_PAUSE;
+    return def;
+}
+
+void tasks_load_config(const char *path)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        ESP_LOGW(TAG, "[M] Impossibile aprire %s; uso configurazioni predefinite", path);
+        return;
+    }
+
+    char line[160];
+    // Salta intestazione
+    if (!fgets(line, sizeof(line), f)) {
+        fclose(f);
+        return;
+    }
+
+    while (fgets(line, sizeof(line), f)) {
+        // name,state,priority,core,period_ms,stack_words
+        char *save = NULL;
+        char *name = strtok_r(line, ",\r\n", &save);
+        char *state = strtok_r(NULL, ",\r\n", &save);
+        char *prio = strtok_r(NULL, ",\r\n", &save);
+        char *core = strtok_r(NULL, ",\r\n", &save);
+        char *period = strtok_r(NULL, ",\r\n", &save);
+        char *stack = strtok_r(NULL, ",\r\n", &save);
+        if (!name) continue;
+
+        task_param_t *t = find_task_by_name(name);
+        if (!t) {
+            ESP_LOGW(TAG, "[M] Task sconosciuto '%s' nella configurazione", name);
+            continue;
+        }
+
+        if (state) t->state = parse_state(state, t->state);
+        if (prio) t->priority = (UBaseType_t)atoi(prio);
+        if (core) t->core_id = (BaseType_t)atoi(core);
+        if (period) t->period_ticks = pdMS_TO_TICKS(atoi(period));
+        if (stack) t->stack_words = (uint32_t)atoi(stack);
+    }
+    fclose(f);
+}
+
+void tasks_start_all(void)
+{
+    for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
+        task_param_t *t = &s_tasks[i];
+        if (t->state != TASK_STATE_RUN) {
+            ESP_LOGI(TAG, "[M] Task saltato %s (stato=%d)", t->name, (int)t->state);
+            continue;
+        }
+        t->arg = t;
+        BaseType_t res = xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
+        if (res != pdPASS) {
+            ESP_LOGE(TAG, "[M] Fallimento avvio task %s", t->name);
+        }
+    }
+}
