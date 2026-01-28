@@ -474,15 +474,46 @@ esp_err_t init_run_factory(void)
     ESP_ERROR_CHECK(web_ui_init());
 
     // Inizializzazioni condizionali basate su NVS
-    if (cfg->sensors.io_expander_enabled) ESP_ERROR_CHECK(io_expander_init());
-    if (cfg->sensors.led_enabled) ESP_ERROR_CHECK(led_init());
-    if (cfg->sensors.rs232_enabled) ESP_ERROR_CHECK(rs232_init());
-    if (cfg->sensors.rs485_enabled) ESP_ERROR_CHECK(rs485_init());
+    if (cfg->sensors.io_expander_enabled) {
+        ESP_ERROR_CHECK(io_expander_init());
+    } else {
+        ESP_LOGI(TAG, "I/O Expander disabilitato da config");
+    }
+
+    if (cfg->sensors.led_enabled) {
+        ESP_ERROR_CHECK(led_init());
+    } else {
+        ESP_LOGI(TAG, "LED Strip disabilitato da config");
+    }
+
+    if (cfg->sensors.rs232_enabled) {
+        ESP_ERROR_CHECK(rs232_init());
+    } else {
+        ESP_LOGI(TAG, "UART RS232 disabilitato da config");
+    }
+
+    if (cfg->sensors.rs485_enabled) {
+        ESP_ERROR_CHECK(rs485_init());
+    } else {
+        ESP_LOGI(TAG, "UART RS485 disabilitato da config");
+    }
+
     if (cfg->sensors.mdb_enabled) {
         ESP_ERROR_CHECK(mdb_init());
         ESP_ERROR_CHECK(mdb_start_engine());
+    } else {
+        ESP_LOGI(TAG, "MDB Engine disabilitato da config");
     }
-    if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled) ESP_ERROR_CHECK(pwm_init());
+
+    if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled) {
+        ESP_ERROR_CHECK(pwm_init());
+    } else {
+        ESP_LOGI(TAG, "PWM Hardware disabilitato da config");
+    }
+
+    if (cfg->sensors.temperature_enabled) {
+        ESP_LOGI(TAG, "TODO: Inizializzare ADC per sensore temperatura");
+    }
 
     return ESP_OK;
 }

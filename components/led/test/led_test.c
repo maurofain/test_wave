@@ -1,5 +1,5 @@
 #include "led_test.h"
-#include "led_control.h"
+#include "led.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -14,13 +14,13 @@ static void led_test_task(void *arg) {
     while(s_run) {
         for (int i = 0; i < 16; i++) { // Assumiamo 16 LED per test
             int h = (hue + (i * 360 / 16)) % 360;
-            led_control_set_pixel_hsv(i, h, 255, 100);
+            led_set_pixel_hsv(i, h, 255, 100);
         }
-        led_control_refresh();
+        led_refresh();
         hue = (hue + 5) % 360;
         vTaskDelay(pdMS_TO_TICKS(50));
     }
-    led_control_clear();
+    led_clear();
     s_led_test_handle = NULL;
     vTaskDelete(NULL);
 }

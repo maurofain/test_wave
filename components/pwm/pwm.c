@@ -1,11 +1,11 @@
-#include "pwm_control.h"
+#include "pwm.h"
 #include "driver/ledc.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "PWM_CTRL";
 
-esp_err_t pwm_control_init(void) {
+esp_err_t pwm_init(void) {
     ledc_timer_config_t timer_cfg = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_10_BIT,
@@ -16,7 +16,7 @@ esp_err_t pwm_control_init(void) {
     ledc_timer_config(&timer_cfg);
 
     ledc_channel_config_t ch0 = {
-        .gpio_num = CONFIG_APP_PWM1_GPIO,
+        .gpio_num = CONFIG_APP_PWM_OUT1_GPIO,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel = LEDC_CHANNEL_0,
         .timer_sel = LEDC_TIMER_0,
@@ -26,7 +26,7 @@ esp_err_t pwm_control_init(void) {
     ledc_channel_config(&ch0);
 
     ledc_channel_config_t ch1 = {
-        .gpio_num = CONFIG_APP_PWM2_GPIO,
+        .gpio_num = CONFIG_APP_PWM_OUT2_GPIO,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel = LEDC_CHANNEL_1,
         .timer_sel = LEDC_TIMER_0,
@@ -35,5 +35,6 @@ esp_err_t pwm_control_init(void) {
     };
     ledc_channel_config(&ch1);
     
+    ESP_LOGI(TAG, "[C] PWM inizializzato");
     return ESP_OK;
 }

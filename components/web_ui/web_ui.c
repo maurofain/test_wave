@@ -26,82 +26,35 @@
 static const char *TAG = "WEB_UI";
 static httpd_handle_t s_server = NULL;
 
-// Test tasks handles
-static TaskHandle_t s_led_test_handle = NULL;
-static TaskHandle_t s_pwm1_test_handle = NULL;
-static TaskHandle_t s_pwm2_test_handle = NULL;
-static TaskHandle_t s_ioexp_test_handle = NULL;
+// Common HTML elements
+static const char *HTML_NAV = "<nav><a href='/'>🏠 Home</a><a href='/config'>⚙️ Config</a><a href='/stats'>📈 Stats</a><a href='/tasks'>📋 Tasks</a><a href='/test'>🔧 Test</a><a href='/ota'>🔄 OTA</a></nav>";
+
+static const char *HTML_STYLE_NAV = 
+    "nav{background:#34495e;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
+    "nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}"
+    "nav a:hover{background:#3498db}";
+
+static esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style, bool show_nav) {
+    char *buf = malloc(4096);
+    if (!buf) return ESP_ERR_NO_MEM;
+    snprintf(buf, 4096, 
+        "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>%s</title><style>"
+        "body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
+        ".container{max-width:1000px;margin:20px auto;padding:0 20px}"
+        "%s %s"
+        "</style></head><body>"
+        "<header><div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s</h1></div></header>"
+        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, show_nav?HTML_NAV:"");
+    httpd_resp_sendstr_chunk(req, buf);
+    free(buf);
+    return ESP_OK;
+}
+
+// Test tasks handles for Serial Blink Test
 static TaskHandle_t s_rs232_test_handle = NULL;
 static TaskHandle_t s_rs485_test_handle = NULL;
-static TaskHandle_t s_mdb_test_handle = NULL;
 
-// --- LOGICA TEST HARDWARE ---
-
-// LED TEST: Cambio colori RGB (20s) -> Running LED (20s)
-static void led_test_task(void *arg) {
-    ESP_LOGI(TAG, "LED Test: Avvio (40s totali)");
-    // 1. RGB Cycle (20s)
-    for (int i=0; i<20; i++) {
-        led_fill_color(255, 0, 0); vTaskDelay(pdMS_TO_TICKS(333));
-        led_fill_color(0, 255, 0); vTaskDelay(pdMS_TO_TICKS(333));
-        led_fill_color(0, 0, 255); vTaskDelay(pdMS_TO_TICKS(333));
-    }
-    // 2. Running LED (20s)
-    led_clear();
-    for (int i=0; i<40; i++) {
-        for (int j=0; j<8; j++) { // Assumiamo 8 LED
-             led_set_pixel(j, 255, 255, 255);
-             vTaskDelay(pdMS_TO_TICKS(60));
-             led_set_pixel(j, 0, 0, 0);
-        }
-    }
-    led_clear();
-    ESP_LOGI(TAG, "LED Test: Completato");
-    s_led_test_handle = NULL;
-    vTaskDelete(NULL);
-}
-
-// PWM TEST: Duty 50->0->100 in 10s @ 100, 1k, 10k Hz
-static void pwm_test_task(void *arg) {
-    int channel_num = (int)arg;
-    ledc_channel_t ch = (channel_num == 1) ? LEDC_CHANNEL_0 : LEDC_CHANNEL_1;
-    int freqs[] = {100, 1000, 10000};
-    ESP_LOGI(TAG, "PWM%d Test: Avvio", channel_num);
-    
-    for (int f=0; f<3; f++) {
-        ESP_LOGI(TAG, "PWM%d - Frequenza: %d Hz", channel_num, freqs[f]);
-        ledc_set_freq(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0, freqs[f]);
-        // Duty cycle loop (10s total: 5s down, 5s up)
-        for (int i=50; i>=0; i--) { 
-            ledc_set_duty(LEDC_LOW_SPEED_MODE, ch, (i*255)/100); 
-            ledc_update_duty(LEDC_LOW_SPEED_MODE, ch); 
-            vTaskDelay(pdMS_TO_TICKS(100)); 
-        }
-        for (int i=0; i<=100; i++) { 
-            ledc_set_duty(LEDC_LOW_SPEED_MODE, ch, (i*255)/100); 
-            ledc_update_duty(LEDC_LOW_SPEED_MODE, ch); 
-            vTaskDelay(pdMS_TO_TICKS(100)); 
-        }
-    }
-    ESP_LOGI(TAG, "PWM%d Test: Completato", channel_num);
-    if (channel_num == 1) s_pwm1_test_handle = NULL; else s_pwm2_test_handle = NULL;
-    vTaskDelete(NULL);
-}
-
-// IO EXPANDER TEST: ON/OFF all ports at 1Hz
-static void ioexp_test_task(void *arg) {
-    ESP_LOGI(TAG, "I/O Expander Test: Avvio");
-    while(1) {
-        uint8_t data_on[] = {0x02, 0xFF, 0xFF}; // Register 0x02 (output port 0), 2 bytes
-        i2c_master_write_to_device(CONFIG_APP_I2C_PORT, 0x20, data_on, 3, pdMS_TO_TICKS(100));
-        vTaskDelay(pdMS_TO_TICKS(500));
-        uint8_t data_off[] = {0x02, 0x00, 0x00};
-        i2c_master_write_to_device(CONFIG_APP_I2C_PORT, 0x20, data_off, 3, pdMS_TO_TICKS(100));
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-}
-
-// UART TEST: 0x55, 0xAA, 0x01, 0x07 (1s each)
+// UART TEST: 0x55, 0xAA, 0x01, 0x07 (periodico)
 static void uart_test_task(void *arg) {
     uart_port_t port = (uart_port_t)arg;
     uint8_t seq[] = {0x55, 0xAA, 0x01, 0x07};
@@ -114,34 +67,6 @@ static void uart_test_task(void *arg) {
                 vTaskDelay(pdMS_TO_TICKS(20)); 
             }
         }
-    }
-}
-
-// MDB TEST: Poll gettoniera (0x08)
-static void mdb_test_task(void *arg) {
-    ESP_LOGI(TAG, "MDB Test: Avvio (Polling 0x08)");
-    uint8_t poll_cmd = 0x08; // VMC 0x08 = Coin Acceptor Poll
-    uint8_t rx_buf[36];
-    size_t rx_len;
-
-    while(1) {
-        ESP_LOGD(TAG, "MDB Sending POLL 0x08...");
-        mdb_send_packet(poll_cmd, NULL, 0);
-        
-        esp_err_t ret = mdb_receive_packet(rx_buf, sizeof(rx_buf), &rx_len, 20);
-        if (ret == ESP_OK) {
-            if (rx_len == 1 && rx_buf[0] == 0x00) {
-                ESP_LOGI(TAG, "MDB Recv: ACK (0x00)");
-            } else {
-                ESP_LOG_BUFFER_HEX_LEVEL(TAG, rx_buf, rx_len, ESP_LOG_INFO);
-            }
-        } else if (ret == ESP_ERR_TIMEOUT) {
-            ESP_LOGD(TAG, "MDB Timeout (Nessuna risposta)");
-        } else {
-            ESP_LOGW(TAG, "MDB Recv Error: %s", esp_err_to_name(ret));
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -176,35 +101,49 @@ static esp_err_t perform_ota(const char *url)
 // Handler Homepage
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
-    const char *html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Factory Server</title><style>"
-        "body{font-family:Arial;background:#f5f5f5;margin:0}header{background:#2c3e50;color:white;padding:15px 30px;display:flex;align-items:center;justify-content:center;gap:20px}"
-        ".container{max-width:900px;margin:30px auto;padding:0 20px}.card{background:white;padding:25px;margin:20px 0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}"
-        "h1{margin:0;font-size:24px}h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px;margin-top:0}"
-        ".endpoint{display:flex;align-items:center;padding:12px;margin:8px 0;background:#ecf0f1;border-radius:4px}"
-        ".method{font-weight:bold;color:white;padding:4px 12px;border-radius:4px;margin-right:15px;min-width:60px;text-align:center}"
-        ".get{background:#27ae60}.post{background:#e67e22}"
-        ".uri{font-family:monospace;color:#2c3e50;flex:1}.desc{color:#7f8c8d;margin-left:10px}"
-        "a{color:#3498db;text-decoration:none}a:hover{text-decoration:underline}"
-        "</style></head><body><header><img src='/logo.jpg' alt='Logo' style='max-height:50px;'><div><h1>🏭 ESP32-P4 Factory Server</h1><p style='margin:5px 0 0 0;opacity:0.8'>Recovery, Test & Flash</p></div></header>"
-        "<div class='container'>"
-        "<div class='card'><h2>📡 API Endpoints</h2>"
-        "<div class='endpoint'><span class='method get'>GET</span><span class='uri'>/</span><span class='desc'>Homepage</span></div>"
-        "<div class='endpoint'><span class='method get'>GET</span><span class='uri'>/status</span><span class='desc'>Stato JSON</span></div>"
-        "<div class='endpoint'><span class='method get'>GET</span><span class='uri'>/config</span><span class='desc'>Configurazione WEB</span></div>"
-        "<div class='endpoint'><span class='method get'>GET</span><span class='uri'>/stats</span><span class='desc'>Statistiche</span></div>"
-        "<div class='endpoint'><span class='method get'>GET</span><span class='uri'>/test</span><span class='desc'>Test Hardware</span></div>"
-        "<div class='endpoint'><span class='method get'>GET</span><span class='uri'>/tasks</span><span class='desc'>Editor CSV</span></div>"
-        "<div class='endpoint'><span class='method post'>POST</span><span class='uri'>/ota/upload</span><span class='desc'>Upload Firmware</span></div>"
-        "</div>"
-        "<div class='card'><h2>🔗 Collegamenti Rapidi</h2>"
-        "<p><a href='/config'>⚙️ Configurazione</a></p>"
-        "<p><a href='/stats'>📈 Statistiche</a></p>"
-        "<p><a href='/tasks'>📋 Editor Tasks</a></p>"
-        "<p><a href='/test'>🔧 Test Hardware</a></p>"
-        "<p><a href='/ota'>🔄 Aggiornamento Firmware</a></p>"
-        "</div></div></body></html>";
+    const char *extra_style = 
+        ".card{background:white;padding:25px;margin:20px 0;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:.3s}"
+        ".card:hover{transform:translateY(-5px)}h2{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;margin-top:0}"
+        ".grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}@media(max-width:600px){.grid{grid-template-columns:1fr}}"
+        ".btn-link{display:flex;align-items:center;padding:20px;background:#3498db;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:18px;transition:.3s;gap:15px}"
+        ".btn-link:hover{background:#2980b9;box-shadow:0 4px 8px rgba(0,0,0,0.2)}"
+        ".btn-config{background:#27ae60}.btn-config:hover{background:#219150}"
+        ".btn-test{background:#e67e22}.btn-test:hover{background:#d35400}"
+        ".btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}";
+
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    return httpd_resp_send(req, html, strlen(html));
+    send_head(req, "Factory Console", extra_style, false);
+
+    const char *body = 
+        "<div class='container'><div class='grid'>"
+        "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
+        "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
+        "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
+        "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
+        "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
+        "</div>"
+        "<div class='card'><h2>ℹ️ Informazioni</h2>"
+        "<p>Questa interfaccia permette di configurare, testare e aggiornare la scheda <b>ESP32-P4</b>.</p>"
+        "<p>Utilizzare il menu <b>Configurazione</b> per abilitare i driver hardware necessari prima di eseguire i test.</p>"
+        "</div>"
+        "<div class='card'><h2>🔗 API Endpoints</h2>"
+        "<div style='overflow-x:auto;'>"
+        "<table style='width:100%;border-collapse:collapse;'>"
+        "<tr style='background:#ecf0f1;'><th style='text-align:left;padding:8px;border:1px solid #ddd;'>Metodo</th><th style='text-align:left;padding:8px;border:1px solid #ddd;'>Endpoint</th><th style='text-align:left;padding:8px;border:1px solid #ddd;'>Descrizione</th></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>GET</td><td style='padding:8px;border:1px solid #ddd;'>/status</td><td style='padding:8px;border:1px solid #ddd;'>Info stato sistema (JSON)</td></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>GET</td><td style='padding:8px;border:1px solid #ddd;'>/api/config</td><td style='padding:8px;border:1px solid #ddd;'>Configurazione attuale</td></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/config/save</td><td style='padding:8px;border:1px solid #ddd;'>Salva configurazione</td></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/config/reset</td><td style='padding:8px;border:1px solid #ddd;'>Reset alle impostazioni di fabbrica</td></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>GET</td><td style='padding:8px;border:1px solid #ddd;'>/api/tasks</td><td style='padding:8px;border:1px solid #ddd;'>Lista dei task pianificati</td></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/tasks/save</td><td style='padding:8px;border:1px solid #ddd;'>Salva lista task</td></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/test/*</td><td style='padding:8px;border:1px solid #ddd;'>Endpoint per i test hardware</td></tr>"
+        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/ota/upload</td><td style='padding:8px;border:1px solid #ddd;'>Upload firmware (multipart)</td></tr>"
+        "</table></div></div>"
+        "</div></body></html>";
+    
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
 }
 
 // Handler Logo
@@ -246,14 +185,18 @@ static esp_err_t status_get_handler(httpd_req_t *req)
 // Handler OTA Page
 static esp_err_t ota_get_handler(httpd_req_t *req)
 {
-    const char *html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>OTA</title><style>"
-        "body{font-family:Arial;background:#f5f5f5;margin:0}header{background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
+    const char *extra_style = 
         ".card{background:white;padding:25px;margin:20px auto;max-width:600px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}"
         "input,button{width:100%;padding:10px;margin:10px 0;border-radius:4px;border:1px solid #ddd;box-sizing:border-box}"
-        "button{background:#e67e22;color:white;font-weight:bold;cursor:pointer}button:hover{background:#d35400}"
-        "</style></head><body><header><div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>🔄 OTA Update</h1></div><a href='/' style='color:white;text-decoration:none;font-weight:bold;background:#34495e;padding:8px 15px;border-radius:4px;'>🏠 Home</a></header><div class='card'>"
+        "button{background:#e67e22;color:white;font-weight:bold;cursor:pointer}button:hover{background:#d35400}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "OTA Update", extra_style, true);
+
+    const char *body = 
+        "<div class='container'><div class='card'>"
         "<form id='f' enctype='multipart/form-data'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Upload</button></form>"
-        "<div id='s'></div></div><script>"
+        "<div id='s'></div></div></div><script>"
         "document.getElementById('f').onsubmit=async function(e){e.preventDefault();"
         "const fd=new FormData();fd.append('f',document.getElementById('i').files[0]);"
         "document.getElementById('s').innerText='Upload in corso...';"
@@ -261,8 +204,10 @@ static esp_err_t ota_get_handler(httpd_req_t *req)
         "if(r.ok) document.getElementById('s').innerText='✅ Successo! Riavvio...';"
         "else document.getElementById('s').innerText='❌ Errore';}catch(e){document.getElementById('s').innerText='❌ Error: '+e;}};"
         "</script></body></html>";
-    httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, html, strlen(html));
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
 }
 
 // Handler OTA Upload (POST)
@@ -306,43 +251,62 @@ static esp_err_t config_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /config");
     
-    const char *html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Config</title><style>"
-        "body{font-family:Arial;background:#f5f5f5;margin:0}header{background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
-        ".container{max-width:1000px;margin:20px auto;padding:0 20px}.section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
+    const char *extra_style = 
+        ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
         "h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px}.form-group{margin:15px 0}"
-        "label{display:block;margin:5px 0;font-weight:bold}input{padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin:5px 0}"
+        "label{display:block;margin:5px 0;font-weight:bold;color:#34495e}input[type=text],input[type=password]{padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin:5px 0;box-sizing:border-box;color:#333}"
         "button{padding:10px 20px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;margin:5px}"
-        "button:hover{background:#229954}nav{display:flex;gap:10px;margin:20px 0}nav a{padding:10px 20px;background:#3498db;color:white;text-decoration:none;border-radius:4px}"
-        ".indent{margin-left:30px}.checkbox-group{display:flex;align-items:center;gap:10px}"
-        "</style></head><body><header><div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>⚙️ Configurazione Device</h1></div><a href='/' style='color:white;text-decoration:none;font-weight:bold;background:#34495e;padding:8px 15px;border-radius:4px;'>🏠 Home</a></header>"
+        "button:hover{background:#229954}.indent{margin-left:30px;padding-left:15px;border-left:2px solid #ecf0f1}"
+        ".sw-row{display:flex;align-items:center;gap:15px;padding:12px 0;border-bottom:1px solid #f9f9f9}"
+        ".sw-row:last-child{border-bottom:none}"
+        ".switch{position:relative;display:inline-block;width:46px;height:24px}"
+        ".switch input{opacity:0;width:0;height:0}"
+        ".slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.3s;border-radius:24px}"
+        ".slider:before{position:absolute;content:\"\";height:18px;width:18px;left:3px;bottom:3px;background-color:white;transition:.3s;border-radius:50%}"
+        "input:checked + .slider{background-color:#27ae60}"
+        "input:checked + .slider:before{transform:translateX(22px)}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Configurazione Device", extra_style, true);
+
+    const char *body = 
         "<div class='container'>"
-        "<nav><a href='/'>Home</a><a href='/config'>Configurazione</a><a href='/stats'>Statistiche</a><a href='/ota'>OTA</a></nav>"
         "<div id='alert'></div>"
         "<form id='configForm'>"
+        
         "<div class='section'><h2>🌐 Ethernet</h2>"
-        "<div class='form-group'><div class='checkbox-group'><input type='checkbox' id='eth_en' name='eth_en'><label for='eth_en'>Abilitato</label></div></div>"
-        "<div class='indent'><div class='form-group'><div class='checkbox-group'><input type='checkbox' id='eth_dhcp' name='eth_dhcp' checked><label for='eth_dhcp'>DHCP</label></div></div>"
-        "<div class='form-group'><label>IP: <input type='text' id='eth_ip' name='eth_ip' placeholder='192.168.1.100'></label></div>"
-        "<div class='form-group'><label>Subnet: <input type='text' id='eth_subnet' name='eth_subnet' placeholder='255.255.255.0'></label></div>"
-        "<div class='form-group'><label>Gateway: <input type='text' id='eth_gateway' name='eth_gateway' placeholder='192.168.1.1'></label></div></div>"
-        "</div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='eth_en' name='eth_en'><span class='slider'></span></label><span>Abilitato</span></div>"
+        "<div class='indent'>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='eth_dhcp' name='eth_dhcp'><span class='slider'></span></label><span>DHCP</span></div>"
+        "<div class='form-group'><label>Indirizzo IP</label><input type='text' id='eth_ip' name='eth_ip' placeholder='192.168.1.100'></div>"
+        "<div class='form-group'><label>Subnet Mask</label><input type='text' id='eth_subnet' name='eth_subnet' placeholder='255.255.255.0'></div>"
+        "<div class='form-group'><label>Gateway</label><input type='text' id='eth_gateway' name='eth_gateway' placeholder='192.168.1.1'></div>"
+        "</div></div>"
+
         "<div class='section'><h2>📡 WiFi STA</h2>"
-        "<div class='form-group'><div class='checkbox-group'><input type='checkbox' id='wifi_en' name='wifi_en'><label for='wifi_en'>Abilitato</label></div></div>"
-        "<div class='indent'><div class='form-group'><label>SSID: <input type='text' id='wifi_ssid' name='wifi_ssid'></label></div>"
-        "<div class='form-group'><label>Password: <input type='text' id='wifi_pwd' name='wifi_pwd'></label></div>"
-        "<div class='form-group'><div class='checkbox-group'><input type='checkbox' id='wifi_dhcp' name='wifi_dhcp' checked><label for='wifi_dhcp'>DHCP</label></div></div></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='wifi_en' name='wifi_en'><span class='slider'></span></label><span>WiFi Abilitato</span></div>"
+        "<div class='indent'>"
+        "<div class='form-group'><label>SSID</label><input type='text' id='wifi_ssid' name='wifi_ssid'></div>"
+        "<div class='form-group'><label>Password</label><input type='password' id='wifi_pwd' name='wifi_pwd'></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='wifi_dhcp' name='wifi_dhcp'><span class='slider'></span></label><span>DHCP</span></div>"
+        "</div></div>"
+
+        "<div class='section'><h2>🔌 Periferiche Hardware</h2>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='io_exp' name='io_exp'><span class='slider'></span></label><span>I/O Expander</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='temp' name='temp'><span class='slider'></span></label><span>Sensore Temperatura</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='led' name='led'><span class='slider'></span></label><span>LED Strip (WS2812)</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs232' name='rs232'><span class='slider'></span></label><span>UART RS232</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs485' name='rs485'><span class='slider'></span></label><span>UART RS485</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='mdb' name='mdb'><span class='slider'></span></label><span>MDB Engine</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm1' name='pwm1'><span class='slider'></span></label><span>PWM Canale 1</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm2' name='pwm2'><span class='slider'></span></label><span>PWM Canale 2</span></div>"
         "</div>"
-        "<div class='section'><h2>🔌 Sensori</h2>"
-        "<div class='form-group'><input type='checkbox' id='io_exp' name='io_exp' checked><label for='io_exp'>I/O Expander</label></div>"
-        "<div class='form-group'><input type='checkbox' id='temp' name='temp' checked><label for='temp'>Temperatura</label></div>"
-        "<div class='form-group'><input type='checkbox' id='led' name='led' checked><label for='led'>LED</label></div>"
-        "<div class='form-group'><input type='checkbox' id='rs232' name='rs232' checked><label for='rs232'>RS232</label></div>"
-        "<div class='form-group'><input type='checkbox' id='rs485' name='rs485' checked><label for='rs485'>RS485</label></div>"
-        "<div class='form-group'><input type='checkbox' id='mdb' name='mdb' checked><label for='mdb'>MDB</label></div>"
-        "<div class='form-group'><input type='checkbox' id='pwm1' name='pwm1' checked><label for='pwm1'>PWM1</label></div>"
-        "<div class='form-group'><input type='checkbox' id='pwm2' name='pwm2' checked><label for='pwm2'>PWM2</label></div>"
+
+        "<div class='section' style='display:flex; justify-content:center; gap:20px;'>"
+        "<button type='submit' style='flex:1; max-width:200px;'>💾 Salva Configurazione</button>"
+        "<button type='button' onclick='loadConfig()' style='background:#3498db; flex:1; max-width:200px;'>🔄 Aggiorna Dati</button>"
+        "<button type='button' onclick='resetConfig()' style='background:#7f8c8d; flex:1; max-width:200px;'>⚠️ Reset Fabbrica</button>"
         "</div>"
-        "<div class='section'><button type='submit'>💾 Salva</button><button type='button' onclick='resetConfig()'>🔄 Reset</button></div>"
         "</form></div>"
         "<script>"
         "async function resetConfig(){if(confirm(\"Resettare ai valori di fabbrica?\")){await fetch(\"/api/config/reset\",{method:\"POST\"});location.reload();}}"
@@ -367,23 +331,26 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('mdb').checked=c.sensors.mdb_enabled;"
         "document.getElementById('pwm1').checked=c.sensors.pwm1_enabled;"
         "document.getElementById('pwm2').checked=c.sensors.pwm2_enabled;"
+        "}catch(e){console.error(e);}"
         "}"
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
         "const cfg={eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked}};"
         "const r=await fetch('/api/config/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});"
-        "if(r.ok) alert('Configurazione salvata!'); else alert('Errore!');"
+        "if(r.ok) alert('✅ Configurazione salvata!'); else alert('❌ Errore durante il salvataggio!');"
         "}"
         "</script></body></html>";
     
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    return httpd_resp_send(req, html, strlen(html));
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
 }
 
 // Handler API GET /api/config
 static esp_err_t api_config_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/config");
+    ESP_LOGI(TAG, "[C] GET /api/config (Forcing NVS reload)");
     device_config_t *cfg = device_config_get();
+    device_config_load(cfg); // Forza rilettura da NVS
     
     cJSON *root = cJSON_CreateObject();
     
@@ -430,7 +397,7 @@ static esp_err_t api_config_save(httpd_req_t *req)
     ESP_LOGI(TAG, "[C] POST /api/config/save");
     
     char buf[2048] = {0};
-    int len = httpd_req_recv(req, buf, sizeof(buf)-1);
+    httpd_req_recv(req, buf, sizeof(buf)-1);
     
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
@@ -447,13 +414,20 @@ static esp_err_t api_config_save(httpd_req_t *req)
         cfg->eth.dhcp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "dhcp_enabled"));
         cJSON *ip = cJSON_GetObjectItem(eth_obj, "ip");
         if (ip && ip->valuestring) strncpy(cfg->eth.ip, ip->valuestring, sizeof(cfg->eth.ip)-1);
+        cJSON *subnet = cJSON_GetObjectItem(eth_obj, "subnet");
+        if (subnet && subnet->valuestring) strncpy(cfg->eth.subnet, subnet->valuestring, sizeof(cfg->eth.subnet)-1);
+        cJSON *gateway = cJSON_GetObjectItem(eth_obj, "gateway");
+        if (gateway && gateway->valuestring) strncpy(cfg->eth.gateway, gateway->valuestring, sizeof(cfg->eth.gateway)-1);
     }
     
     cJSON *wifi_obj = cJSON_GetObjectItem(root, "wifi");
     if (wifi_obj) {
         cfg->wifi.sta_enabled = cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "sta_enabled"));
+        cfg->wifi.dhcp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "dhcp_enabled"));
         cJSON *ssid = cJSON_GetObjectItem(wifi_obj, "ssid");
         if (ssid && ssid->valuestring) strncpy(cfg->wifi.ssid, ssid->valuestring, sizeof(cfg->wifi.ssid)-1);
+        cJSON *password = cJSON_GetObjectItem(wifi_obj, "password");
+        if (password && password->valuestring) strncpy(cfg->wifi.password, password->valuestring, sizeof(cfg->wifi.password)-1);
     }
     
     cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
@@ -481,22 +455,23 @@ static esp_err_t api_config_save(httpd_req_t *req)
 static esp_err_t stats_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /stats");
-    
-    const char *html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Statistiche</title><style>"
-        "body{font-family:Arial;background:#f5f5f5;margin:0}header{background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
-        ".container{max-width:1000px;margin:20px auto;padding:0 20px}.section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
-        "h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px}.stat-row{display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid #ecf0f1}"
-        ".stat-label{font-weight:bold;color:#34495e}.stat-value{color:#27ae60;font-family:monospace}"
-        "nav{display:flex;gap:10px;margin:20px 0}nav a{padding:10px 20px;background:#3498db;color:white;text-decoration:none;border-radius:4px}"
-        ".badge{padding:3px 8px;border-radius:3px;font-size:12px;font-weight:bold}.badge-on{background:#27ae60;color:white}.badge-off{background:#95a5a6;color:white}"
-        "</style></head><body><header><div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>📊 Statistiche Device</h1></div><a href='/' style='color:white;text-decoration:none;font-weight:bold;background:#34495e;padding:8px 15px;border-radius:4px;'>🏠 Home</a></header>"
+    const char *extra_style = 
+        ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
+        "h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px}.stat-row{display:flex;justify-content:space-between;padding:12px;border-bottom:1px solid #ecf0f1}"
+        ".stat-row:last-child{border-bottom:none}.stat-label{font-weight:bold;color:#34495e}.stat-value{color:#27ae60;font-family:monospace;font-weight:bold}"
+        ".badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:bold;text-transform:uppercase}"
+        ".badge-on{background:#d4edda;color:#155724;border:1px solid #c3e6cb}"
+        ".badge-off{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Statistiche Device", extra_style, true);
+
+    const char *body = 
         "<div class='container'>"
-        "<nav><a href='/'>Home</a><a href='/config'>Configurazione</a><a href='/stats'>Statistiche</a><a href='/ota'>OTA</a></nav>"
         "<div class='section'><h2>🌐 Rete</h2><div id='network'>Caricamento...</div></div>"
-        "<div class='section'><h2>💾 Partizioni</h2><div id='partitions'>Caricamento...</div></div>"
-        "<div class='section'><h2>🔌 Sensori Abilitati</h2><div id='sensors'>Caricamento...</div></div>"
+        "<div class='section'><h2>💾 Firmware</h2><div id='partitions'>Caricamento...</div></div>"
+        "<div class='section'><h2>🔌 Stato Driver</h2><div id='sensors'>Caricamento...</div></div>"
         "<div class='section'><h2>🎰 MDB Status</h2><div id='mdb_info'>Caricamento...</div></div>"
-        "<div class='section'><h2>⏱️ Sistema</h2><div id='system'>Caricamento...</div></div>"
         "</div>"
         "<script>"
         "async function loadStats(){"
@@ -504,39 +479,35 @@ static esp_err_t stats_page_handler(httpd_req_t *req)
         "const r=await fetch('/status');if(!r.ok)throw new Error('Status Error');const status=await r.json();"
         "const rc=await fetch('/api/config');if(!rc.ok)throw new Error('Config Error');const config=await rc.json();"
         "document.getElementById('network').innerHTML="
-        "`<div class='stat-row'><span class='stat-label'>IP Ethernet:</span><span class='stat-value'>${status.ip_eth||'Non connesso'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>IP WiFi AP:</span><span class='stat-value'>${status.ip_ap||'Non attivo'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>IP WiFi STA:</span><span class='stat-value'>${status.ip_sta||'Non connesso'}</span></div>`;"
+        "`<div class='stat-row'><span class='stat-label'>Indirizzo IP Ethernet</span><span class='stat-value'>${status.ip_eth||'---'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Indirizzo IP WiFi STA</span><span class='stat-value'>${status.ip_sta||'---'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Indirizzo IP WiFi AP</span><span class='stat-value'>${status.ip_ap||'---'}</span></div>`;"
         "document.getElementById('partitions').innerHTML="
-        "`<div class='stat-row'><span class='stat-label'>Partizione Running:</span><span class='stat-value'>${status.partition_running||'?'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>Partizione Boot:</span><span class='stat-value'>${status.partition_boot||'?'}</span></div>`;"
+        "`<div class='stat-row'><span class='stat-label'>Partizione Corrente</span><span class='stat-value'>${status.partition_running||'?'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Partizione al Boot</span><span class='stat-value'>${status.partition_boot||'?'}</span></div>`;"
         "const s=config.sensors;"
         "document.getElementById('sensors').innerHTML="
-        "`<div class='stat-row'><span class='stat-label'>I/O Expander:</span><span class='badge ${s.io_expander_enabled?'badge-on':'badge-off'}'>${s.io_expander_enabled?'ON':'OFF'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>Temperatura:</span><span class='badge ${s.temperature_enabled?'badge-on':'badge-off'}'>${s.temperature_enabled?'ON':'OFF'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>LED:</span><span class='badge ${s.led_enabled?'badge-on':'badge-off'}'>${s.led_enabled?'ON':'OFF'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>RS232:</span><span class='badge ${s.rs232_enabled?'badge-on':'badge-off'}'>${s.rs232_enabled?'ON':'OFF'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>RS485:</span><span class='badge ${s.rs485_enabled?'badge-on':'badge-off'}'>${s.rs485_enabled?'ON':'OFF'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>MDB:</span><span class='badge ${s.mdb_enabled?'badge-on':'badge-off'}'>${s.mdb_enabled?'ON':'OFF'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>PWM1:</span><span class='badge ${s.pwm1_enabled?'badge-on':'badge-off'}'>${s.pwm1_enabled?'ON':'OFF'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>PWM2:</span><span class='badge ${s.pwm2_enabled?'badge-on':'badge-off'}'>${s.pwm2_enabled?'ON':'OFF'}</span></div>`;"
+        "`<div class='stat-row'><span class='stat-label'>I/O Expander</span><span class='badge ${s.io_expander_enabled?'badge-on':'badge-off'}'>${s.io_expander_enabled?'Attivo':'Disabilitato'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Sensore Temperatura</span><span class='badge ${s.temperature_enabled?'badge-on':'badge-off'}'>${s.temperature_enabled?'Attivo':'Disabilitato'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>LED WS2812</span><span class='badge ${s.led_enabled?'badge-on':'badge-off'}'>${s.led_enabled?'Attivo':'Disabilitato'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>UART RS232</span><span class='badge ${s.rs232_enabled?'badge-on':'badge-off'}'>${s.rs232_enabled?'Attivo':'Disabilitato'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>UART RS485</span><span class='badge ${s.rs485_enabled?'badge-on':'badge-off'}'>${s.rs485_enabled?'Attivo':'Disabilitato'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>MDB Engine</span><span class='badge ${s.mdb_enabled?'badge-on':'badge-off'}'>${s.mdb_enabled?'Attivo':'Disabilitato'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>PWM Channel 1/2</span><span class='badge ${(s.pwm1_enabled||s.pwm2_enabled)?'badge-on':'badge-off'}'>${(s.pwm1_enabled||s.pwm2_enabled)?'Attivi':'Disabilitati'}</span></div>`;"
         "const m=status.mdb;"
         "document.getElementById('mdb_info').innerHTML="
-        "`<div class='stat-row'><span class='stat-label'>Gettoniera:</span><span class='badge ${m.coin_online?'badge-on':'badge-off'}'>${m.coin_online?'ONLINE':'OFFLINE'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>Credito:</span><span class='stat-value'>€ ${(m.credit/100).toFixed(2)}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>Stato SM:</span><span class='stat-value'>${m.coin_state}</span></div>`;"
-        "const uptime=Math.floor(Date.now()/1000);"
-        "document.getElementById('system').innerHTML="
-        "`<div class='stat-row'><span class='stat-label'>Free Heap:</span><span class='stat-value'>Calcolo...</span></div>"
-        "<div class='stat-row'><span class='stat-label'>Uptime (browser):</span><span class='stat-value'>${Math.floor(uptime/3600)}h ${Math.floor((uptime%3600)/60)}m</span></div>`;"
+        "`<div class='stat-row'><span class='stat-label'>Gettoniera</span><span class='badge ${m.coin_online?'badge-on':'badge-off'}'>${m.coin_online?'ONLINE':'OFFLINE'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Credito Accumulato</span><span class='stat-value'>€ ${(m.credit/100).toFixed(2)}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Stato Logico (SM)</span><span class='stat-value'>${m.coin_state}</span></div>`;"
         "}catch(e){console.error(e);}"
         "}"
         "window.addEventListener('load',loadStats);"
         "setInterval(loadStats,5000);"
         "</script></body></html>";
-    
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    return httpd_resp_send(req, html, strlen(html));
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
 }
 
 // Handler pagina tasks
@@ -544,27 +515,31 @@ static esp_err_t tasks_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /tasks");
     
-    const char *html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Tasks Editor</title><style>"
-        "body{font-family:Arial;background:#f5f5f5;margin:0}header{background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
-        ".container{max-width:1200px;margin:20px auto;padding:0 20px}.section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
-        "h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px}nav{display:flex;gap:10px;margin:20px 0}nav a{padding:10px 20px;background:#3498db;color:white;text-decoration:none;border-radius:4px}"
-        "table{width:100%;border-collapse:collapse;margin:20px 0}th,td{padding:10px;border:1px solid #ddd;text-align:left}"
-        "th{background:#34495e;color:white}input,select{width:100%;padding:5px;border:1px solid #ddd;border-radius:3px;box-sizing:border-box}"
+    const char *extra_style = 
+        ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
+        "h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px}"
+        "table{width:100%;border-collapse:collapse;margin:20px 0}th,td{padding:10px;border:1px solid #ddd;text-align:left;color:#333}"
+        "th{background:#34495e;color:white}input,select{width:100%;padding:5px;border:1px solid #ddd;border-radius:3px;box-sizing:border-box;color:#333}"
         "button{padding:10px 20px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;margin:5px}"
         "button:hover{background:#229954}.btn-add{background:#3498db}.btn-add:hover{background:#2980b9}"
         "#status{margin:15px 0;padding:10px;border-radius:4px}.success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}"
-        ".error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}.warning{background:#fff3cd;color:#856404;border:1px solid #ffeeba}"
-        "</style></head><body><header><div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>⚙️ Editor Tasks</h1></div><a href='/' style='color:white;text-decoration:none;font-weight:bold;background:#34495e;padding:8px 15px;border-radius:4px;'>🏠 Home</a></header>"
+        ".error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Editor Tasks", extra_style, true);
+
+    const char *body = 
         "<div class='container'>"
-        "<nav><a href='/'>Home</a><a href='/config'>Configurazione</a><a href='/stats'>Statistiche</a><a href='/tasks'>Tasks</a><a href='/ota'>OTA</a></nav>"
         "<div class='section'><h2>📋 Tasks Configuration</h2>"
         "<div id='status'></div>"
         "<table id='tasksTable'><thead><tr>"
         "<th>Name</th><th>State</th><th>Priority</th><th>Core</th><th>Period (ms)</th><th>Stack Words</th>"
         "</tr></thead><tbody id='tasksBody'>Caricamento...</tbody></table>"
+        "<div style='display:flex; gap:10px;'>"
         "<button type='button' class='btn-add' onclick='addRow()'>➕ Aggiungi Task</button>"
         "<button type='button' onclick='saveTasks()'>💾 Salva</button>"
-        "<button type='button' onclick='location.reload()'>🔄 Ricarica</button>"
+        "<button type='button' onclick='loadTasks()' style='background:#3498db'>🔄 Aggiorna Dati</button>"
+        "</div>"
         "</div></div>"
         "<script>"
         "let tasks=[];"
@@ -591,15 +566,16 @@ static esp_err_t tasks_page_handler(httpd_req_t *req)
         "function showStatus(msg,type){const s=document.getElementById('status');s.textContent=msg;s.className=type;setTimeout(()=>s.className='',3000);}"
         "window.addEventListener('load',loadTasks);"
         "</script></body></html>";
-    
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    return httpd_resp_send(req, html, strlen(html));
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
 }
 
 // Handler API GET /api/tasks
 static esp_err_t api_tasks_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/tasks");
+    ESP_LOGI(TAG, "[C] GET /api/tasks (Reading SPIFFS)");
     
     FILE *f = fopen("/spiffs/tasks.csv", "r");
     if (!f) {
@@ -723,20 +699,22 @@ static esp_err_t test_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /test");
     
-    const char *html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Test Hardware</title><style>"
-        "body{font-family:Arial;background:#f5f5f5;margin:0}header{background:#2c3e50;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
-        ".container{max-width:1000px;margin:20px auto;padding:0 20px}.section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
-        "h2{color:#2c3e50;border-bottom:2px solid #e67e22;padding-bottom:10px}nav{display:flex;gap:10px;margin:20px 0}nav a{padding:10px 20px;background:#3498db;color:white;text-decoration:none;border-radius:4px}"
+    const char *extra_style = 
         ".test-item{display:flex;align-items:center;justify-content:space-between;padding:15px;margin:10px 0;background:#ecf0f1;border-radius:6px}"
         ".test-label{font-weight:bold;color:#2c3e50;flex:1}.test-controls{display:flex;gap:10px;align-items:center}"
         "button{padding:8px 16px;background:#e67e22;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold}"
         "button:hover{background:#d35400}.btn-stop{background:#e74c3c}.btn-stop:hover{background:#c0392b}"
-        "input[type=text],input[type=number]{padding:6px;border:1px solid #bdc3c7;border-radius:4px;width:120px}"
+        "input[type=text],input[type=number]{padding:6px;border:1px solid #bdc3c7;border-radius:4px;width:120px;color:#333}"
         ".status-box{padding:10px;margin:10px 0;border-radius:4px;font-family:monospace;font-size:13px;background:#34495e;color:#ecf0f1;min-height:60px;overflow-y:auto;max-height:200px}"
         ".result{margin:5px 0;padding:5px;border-left:3px solid #3498db}"
-        "</style></head><body><header><div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>🔧 Test Hardware</h1></div><a href='/' style='color:white;text-decoration:none;font-weight:bold;background:#34495e;padding:8px 15px;border-radius:4px;'>🏠 Home</a></header>"
+        ".refresh-btn{background:#3498db;margin-bottom:10px}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Test Hardware", extra_style, true);
+
+    const char *body = 
         "<div class='container'>"
-        "<nav><a href='/'>Home</a><a href='/config'>Configurazione</a><a href='/stats'>Statistiche</a><a href='/tasks'>Tasks</a><a href='/test'>Test</a><a href='/ota'>OTA</a></nav>"
+        "<div style='text-align:right;'><button class='refresh-btn' onclick='location.reload()'>🔄 Aggiorna Pagina</button></div>"
         
         "<div class='section'><h2>💡 LED Stripe (WS2812)</h2>"
         "<div class='test-item'><span class='test-label'>Full RGB Pattern (40s)</span>"
@@ -756,11 +734,15 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div id='pwm_status' class='status-box'>Pronto per test PWM</div></div>"
         
         "<div class='section'><h2>📡 Seriale RS232</h2>"
+        "<div class='test-item'><span class='test-label'>Loopback Test: 0x55, 0xAA, 0x01, 0x07</span>"
+        "<div class='test-controls'><button onclick=\"runTest('rs232_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('rs232_stop')\">⏹️ Stop</button></div></div>"
         "<div class='test-item'><span>Invia Stringa (es: \\0x55\\0xAA\\r\\n)</span>"
         "<div class='test-controls'><input type='text' id='rs232_input' placeholder='\\0x55 Test...'><button onclick=\"sendSerial('rs232')\">🚀 Invia</button></div></div>"
         "<div id='rs232_status' class='status-box'>Monitor:</div></div>"
         
         "<div class='section'><h2>📡 Seriale RS485</h2>"
+        "<div class='test-item'><span class='test-label'>Loopback Test: 0x55, 0xAA, 0x01, 0x07</span>"
+        "<div class='test-controls'><button onclick=\"runTest('rs485_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('rs485_stop')\">⏹️ Stop</button></div></div>"
         "<div class='test-item'><span>Invia Stringa</span>"
         "<div class='test-controls'><input type='text' id='rs485_input' placeholder='Richiesta...'><button onclick=\"sendSerial('rs485')\">🚀 Invia</button></div></div>"
         "<div id='rs485_status' class='status-box'>Monitor:</div></div>"
@@ -768,6 +750,8 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div class='section'><h2>🎰 MDB (Multi-Drop Bus)</h2>"
         "<div class='test-item'><span class='test-label'>Test Loopback/Echo</span>"
         "<div class='test-controls'><button onclick=\"runTest('mdb_start')\">▶️ Start</button><button class='btn-stop' onclick=\"runTest('mdb_stop')\">⏹️ Stop</button></div></div>"
+        "<div class='test-item'><span>Invia Stringa (Hex, es: 08 00)</span>"
+        "<div class='test-controls'><input type='text' id='mdb_input' placeholder='08 00...'><button onclick=\"sendSerial('mdb')\">🚀 Invia</button></div></div>"
         "<div id='mdb_status' class='status-box'>Pronto per test MDB</div></div>"
         
         "</div>"
@@ -794,16 +778,15 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "const r=await fetch('/api/test/serial_monitor',{method:'POST'});"
         "const res=await r.json();"
         "if(res.log){"
-        "const logLines = res.log.split(' ');" // Semplificato
         "document.getElementById('rs232_status').innerText = res.log;"
-        "document.getElementById('rs485_status').innerText = res.log;"
-        "}"
+        "document.getElementById('rs485_status').innerText = res.log;"        "document.getElementById('mdb_status').innerText = res.log;"        "}"
         "}"
         "setInterval(updateMonitors, 1000);"
         "</script></body></html>";
-    
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    return httpd_resp_send(req, html, strlen(html));
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
 }
 
 // Handler API POST /api/test/*
@@ -882,18 +865,36 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test MDB fermato\"}");
     }
     
-    // --- SERIAL SEND TEST (RS232/RS485) ---
+    // --- SERIAL SEND TEST (RS232/RS485/MDB) ---
     else if (strcmp(test_name, "serial_send") == 0) {
         char buf[512] = {0};
-        int len_req = httpd_req_recv(req, buf, sizeof(buf)-1);
+        httpd_req_recv(req, buf, sizeof(buf)-1);
         cJSON *root = cJSON_Parse(buf);
         if (root) {
             const char *port_raw = cJSON_GetStringValue(cJSON_GetObjectItem(root, "port"));
             const char *data_str = cJSON_GetStringValue(cJSON_GetObjectItem(root, "data"));
-            int port = (port_raw && strcmp(port_raw, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT : CONFIG_APP_RS232_UART_PORT;
-            if (data_str) {
-                serial_test_send_uart(port, data_str);
-                snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Inviato su %s\"}", port_raw);
+            
+            if (port_raw && strcmp(port_raw, "mdb") == 0) {
+                // MDB Send Logic
+                if (data_str) {
+                    uint8_t mdb_packet[32];
+                    int mdb_len = 0;
+                    char *p = (char*)data_str;
+                    while(*p && mdb_len < 32) {
+                        if(*p == ' ') { p++; continue; }
+                        mdb_packet[mdb_len++] = (uint8_t)strtol(p, &p, 16);
+                    }
+                    if (mdb_len > 0) {
+                        mdb_send_packet(mdb_packet[0], mdb_packet + 1, mdb_len - 1);
+                        snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Pacchetto MDB inviato (Addr: 0x%02X)\"}", mdb_packet[0]);
+                    }
+                }
+            } else {
+                int port = (port_raw && strcmp(port_raw, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT : CONFIG_APP_RS232_UART_PORT;
+                if (data_str) {
+                    serial_test_send_uart(port, data_str);
+                    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Inviato su %s\"}", port_raw);
+                }
             }
             cJSON_Delete(root);
         } else snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
@@ -933,6 +934,7 @@ esp_err_t web_ui_init(void)
     config.max_uri_handlers = 20;
     config.stack_size = 8192;
     config.lru_purge_enable = true;
+    config.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_LOGI(TAG, "[C] Avvio server HTTP sulla porta %d", config.server_port);
     esp_err_t ret = httpd_start(&s_server, &config);

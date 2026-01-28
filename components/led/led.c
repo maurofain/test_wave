@@ -4,7 +4,7 @@
 #include "esp_log.h"
 #include "esp_check.h"
 #include "led_strip.h"
-#include "led_control.h"
+#include "led.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "LED_CTRL";
@@ -12,7 +12,7 @@ static const char *TAG = "LED_CTRL";
 static led_strip_handle_t s_led_strip = NULL;
 static uint32_t s_led_count = 0;
 
-esp_err_t led_control_init(void)
+esp_err_t led_init(void)
 {
     // Crea la configurazione della striscia LED
     led_strip_config_t strip_config = {
@@ -35,12 +35,12 @@ esp_err_t led_control_init(void)
     return ESP_OK;
 }
 
-led_strip_handle_t led_control_get_handle(void)
+led_strip_handle_t led_get_handle(void)
 {
     return s_led_strip;
 }
 
-esp_err_t led_control_clear(void)
+esp_err_t led_clear(void)
 {
     if (!s_led_strip) {
         ESP_LOGE(TAG, "[C] LED strip non inizializzato");
@@ -51,7 +51,13 @@ esp_err_t led_control_clear(void)
     return ESP_OK;
 }
 
-esp_err_t led_control_fill_color(uint8_t red, uint8_t green, uint8_t blue)
+esp_err_t led_refresh(void)
+{
+    if (!s_led_strip) return ESP_ERR_INVALID_STATE;
+    return led_strip_refresh(s_led_strip);
+}
+
+esp_err_t led_fill_color(uint8_t red, uint8_t green, uint8_t blue)
 {
     if (!s_led_strip) {
         ESP_LOGE(TAG, "[C] LED strip non inizializzato");
@@ -67,7 +73,7 @@ esp_err_t led_control_fill_color(uint8_t red, uint8_t green, uint8_t blue)
     return ESP_OK;
 }
 
-esp_err_t led_control_set_pixel(uint32_t index, uint8_t red, uint8_t green, uint8_t blue)
+esp_err_t led_set_pixel(uint32_t index, uint8_t red, uint8_t green, uint8_t blue)
 {
     if (!s_led_strip) {
         ESP_LOGE(TAG, "[C] LED strip non inizializzato");
@@ -80,11 +86,37 @@ esp_err_t led_control_set_pixel(uint32_t index, uint8_t red, uint8_t green, uint
     }
     
     ESP_RETURN_ON_ERROR(led_strip_set_pixel(s_led_strip, index, red, green, blue), TAG, "Errore set pixel");
-    ESP_RETURN_ON_ERROR(led_strip_refresh(s_led_strip), TAG, "Errore refresh");
     return ESP_OK;
 }
 
-esp_err_t led_control_breathe(uint8_t red, uint8_t green, uint8_t blue, uint32_t duration_ms)
+// Helper per generare colore HSV
+static void hsv_to_rgb(uint16_t hue, uint8_t sat, uint8_t val, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+    uint16_t h = (hue / 60) % 6;
+    uint16_t f = (hue % 60);
+    
+    uint8_t p = val * (255 - sat) / 255;
+    uint8_t q = val * (255 - (sat * f) / 60) / 255;
+    uint8_t t = val * (255 - (sat * (60 - f)) / 60) / 255;
+    
+    switch (h) {
+        case 0: *r = val; *g = t; *b = p; break;
+        case 1: *r = q; *g = val; *b = p; break;
+        case 2: *r = p; *g = val; *b = t; break;
+        case 3: *r = p; *g = q; *b = val; break;
+        case 4: *r = t; *g = p; *b = val; break;
+        default: *r = val; *g = p; *b = q; break;
+    }
+}
+
+esp_err_t led_set_pixel_hsv(uint32_t index, uint16_t hue, uint8_t sat, uint8_t val)
+{
+    uint8_t r, g, b;
+    hsv_to_rgb(hue, sat, val, &r, &g, &b);
+    return led_set_pixel(index, r, g, b);
+}
+
+esp_err_t led_breathe(uint8_t red, uint8_t green, uint8_t blue, uint32_t duration_ms)
 {
     if (!s_led_strip) {
         ESP_LOGE(TAG, "[C] LED strip non inizializzato");
@@ -125,27 +157,7 @@ esp_err_t led_control_breathe(uint8_t red, uint8_t green, uint8_t blue, uint32_t
     return ESP_OK;
 }
 
-// Helper per generare colore HSV
-static void hsv_to_rgb(uint16_t hue, uint8_t sat, uint8_t val, uint8_t *r, uint8_t *g, uint8_t *b)
-{
-    uint16_t h = (hue / 60) % 6;
-    uint16_t f = (hue % 60);
-    
-    uint8_t p = val * (255 - sat) / 255;
-    uint8_t q = val * (255 - (sat * f) / 60) / 255;
-    uint8_t t = val * (255 - (sat * (60 - f)) / 60) / 255;
-    
-    switch (h) {
-        case 0: *r = val; *g = t; *b = p; break;
-        case 1: *r = q; *g = val; *b = p; break;
-        case 2: *r = p; *g = val; *b = t; break;
-        case 3: *r = p; *g = q; *b = val; break;
-        case 4: *r = t; *g = p; *b = val; break;
-        default: *r = val; *g = p; *b = q; break;
-    }
-}
-
-esp_err_t led_control_rainbow(uint32_t duration_ms)
+esp_err_t led_rainbow(uint32_t duration_ms)
 {
     if (!s_led_strip) {
         ESP_LOGE(TAG, "[C] LED strip non inizializzato");
@@ -171,7 +183,7 @@ esp_err_t led_control_rainbow(uint32_t duration_ms)
     return ESP_OK;
 }
 
-esp_err_t led_control_fade_in(uint8_t red, uint8_t green, uint8_t blue, uint32_t steps, uint32_t step_duration_ms)
+esp_err_t led_fade_in(uint8_t red, uint8_t green, uint8_t blue, uint32_t steps, uint32_t step_duration_ms)
 {
     if (!s_led_strip) {
         ESP_LOGE(TAG, "[C] LED strip non inizializzato");
@@ -197,7 +209,7 @@ esp_err_t led_control_fade_in(uint8_t red, uint8_t green, uint8_t blue, uint32_t
     return ESP_OK;
 }
 
-esp_err_t led_control_fade_out(uint32_t steps, uint32_t step_duration_ms)
+esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms)
 {
     if (!s_led_strip) {
         ESP_LOGE(TAG, "[C] LED strip non inizializzato");

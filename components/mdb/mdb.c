@@ -20,11 +20,19 @@ const mdb_status_t* mdb_get_status(void) {
     return &s_mdb_status;
 }
 
+// Helper per calcolare la parità di un byte (ritorna true se dispari)
+static bool get_byte_parity(uint8_t data) {
+    return __builtin_parity(data);
+}
+
 // Helper: Invia ACK
 static void mdb_send_ack(void) {
     uint8_t ack = MDB_ACK;
-    uart_set_parity(MDB_UART_PORT, UART_PARITY_SPACE); // 9th bit = 0
+    // ACK è un data byte, quindi 9° bit = 0
+    // Per avere 9° bit = 0 con dato 0x00 (parità pari): usiamo EVEN
+    uart_set_parity(MDB_UART_PORT, UART_PARITY_EVEN);
     uart_write_bytes(MDB_UART_PORT, &ack, 1);
+    uart_wait_tx_done(MDB_UART_PORT, pdMS_TO_TICKS(10));
 }
 
 // Logic for Coin Acceptor State Machine
@@ -48,11 +56,39 @@ static void mdb_coin_sm(void) {
         case MDB_STATE_INIT_SETUP:
             ESP_LOGI(TAG, "MDB Coin: Sending SETUP...");
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_SETUP, NULL, 0);
-            if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 50) == ESP_OK) {
-                ESP_LOGI(TAG, "MDB Coin: Setup response received (%d bytes)", rx_len);
-                mdb_send_ack();
+            if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 100) == ESP_OK) {
+                if (rx_len >= 23) {
+                    s_mdb_status.coin.feature_level = rx[0];
+                    s_mdb_status.coin.currency_code = (rx[1] << 8) | rx[2];
+                    s_mdb_status.coin.scaling_factor = rx[3];
+                    s_mdb_status.coin.decimal_places = rx[4];
+                    s_mdb_status.coin.coin_routing = (rx[5] << 8) | rx[6];
+                    for (int i = 0; i < 16; i++) {
+                        s_mdb_status.coin.coin_values[i] = rx[7 + i];
+                    }
+                    
+                    ESP_LOGI(TAG, "MDB Coin Setup: Level %d, Currency %04X, Scaling %d, Decimal %d", 
+                             s_mdb_status.coin.feature_level, s_mdb_status.coin.currency_code,
+                             s_mdb_status.coin.scaling_factor, s_mdb_status.coin.decimal_places);
+                    
+                    mdb_send_ack();
+                    s_mdb_status.coin.state = MDB_STATE_INIT_ENABLE; // Passa alla fase di abilitazione
+                    s_mdb_status.coin.is_online = true;
+                } else {
+                    ESP_LOGW(TAG, "MDB Coin: Setup response too short (%d)", rx_len);
+                }
+            }
+            break;
+
+        case MDB_STATE_INIT_ENABLE:
+            ESP_LOGI(TAG, "MDB Coin: Enabling all coin types...");
+            {
+                uint8_t enable_data[4] = {0xFF, 0xFF, 0xFF, 0xFF}; // Abilita tutto (Accept & Dispense)
+                mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_COIN_CMD_COIN_TYPE, enable_data, 4);
+            }
+            if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 50) == ESP_OK && rx[0] == MDB_ACK) {
+                ESP_LOGI(TAG, "MDB Coin: Enabled!");
                 s_mdb_status.coin.state = MDB_STATE_IDLE_POLLING;
-                s_mdb_status.coin.is_online = true;
             }
             break;
 
@@ -71,11 +107,11 @@ static void mdb_coin_sm(void) {
                     for (int i=0; i < rx_len-1; i++) { // L'ultimo è il checksum
                         uint8_t b = rx[i];
                         if ((b & 0x80) == 0) { // Moneta accettata
-                            uint8_t routing = (b >> 4) & 0x03; // 00: Cash box, 01: Tubes
+                            uint8_t routing = (b >> 4) & 0x03; // 00: Cash box, 01: Tubes, 02: Not Used, 03: Reject
                             uint8_t type = b & 0x0F;
-                            uint16_t val = (type + 1) * 10; // Placeholder per valore reale moneta
-                            s_mdb_status.coin.credit_cents += val;
-                            ESP_LOGI(TAG, "MDB Coin: Moneta tipo %d accreditata (+%d cents), Routing: %d", type, val, routing);
+                            uint16_t real_val = s_mdb_status.coin.coin_values[type] * s_mdb_status.coin.scaling_factor;
+                            s_mdb_status.coin.credit_cents += real_val;
+                            ESP_LOGI(TAG, "MDB Coin: Moneta tipo %d accreditata (+%d units), Routing: %d", type, real_val, routing);
                         } else if (b == 0x0B) { // Changer Reset
                             ESP_LOGW(TAG, "MDB Coin: Reset rilevato, ri-inizializzazione...");
                             s_mdb_status.coin.state = MDB_STATE_INIT_SETUP;
@@ -124,25 +160,30 @@ esp_err_t mdb_init(void)
     ESP_ERROR_CHECK(uart_param_config(MDB_UART_PORT, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     
-    // MDB usa logica invertita rispetto ad alcuni standard, ma solitamente è TTL standard.
-    // Usiamo la modalità RS485_9BIT se vogliamo il supporto hardware al 9° bit
-    ESP_ERROR_CHECK(uart_set_mode(MDB_UART_PORT, UART_MODE_RS485_9BIT));
+    // Usiamo modalità RS485 Half Duplex per controllo RTS se necessario, 
+    // ma MDB è solitamente TTL. Usiamo UART_MODE_UART o RS485_APP_CTRL.
+    ESP_ERROR_CHECK(uart_set_mode(MDB_UART_PORT, UART_MODE_UART));
 
     return ESP_OK;
 }
 
 static esp_err_t mdb_send_byte(uint8_t data, bool mode_bit)
 {
-    // Per inviare il 9° bit (Mode Bit) in modalità RS485_9BIT:
-    // ESP-IDF usa uart_write_bytes dove l'array deve contenere il 9° bit se configurato?
-    // In realtà, il modo più pulito su ESP32 è manipolare la parità.
+    // Simulazione 9° bit tramite parità
+    bool data_parity = get_byte_parity(data);
     
     if (mode_bit) {
-        // Indirizzo: 9° bit = 1 (MARK)
-        uart_set_parity(MDB_UART_PORT, UART_PARITY_MARK);
+        // Vogliamo 9° bit = 1
+        // Se data_parity è even (0), impostiamo ODD per avere parity bit = 1
+        // Se data_parity è odd (1), impostiamo EVEN per avere parity bit = 1
+        if (!data_parity) uart_set_parity(MDB_UART_PORT, UART_PARITY_ODD);
+        else uart_set_parity(MDB_UART_PORT, UART_PARITY_EVEN);
     } else {
-        // Dati: 9° bit = 0 (SPACE)
-        uart_set_parity(MDB_UART_PORT, UART_PARITY_SPACE);
+        // Vogliamo 9° bit = 0
+        // Se data_parity è even (0), impostiamo EVEN per avere parity bit = 0
+        // Se data_parity è odd (1), impostiamo ODD per avere parity bit = 0
+        if (!data_parity) uart_set_parity(MDB_UART_PORT, UART_PARITY_EVEN);
+        else uart_set_parity(MDB_UART_PORT, UART_PARITY_ODD);
     }
     
     uart_write_bytes(MDB_UART_PORT, &data, 1);
@@ -157,7 +198,7 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
     uint8_t checksum = address;
     
-    ESP_LOGD(TAG, "Sending MDB packet: Addr 0x%02X, Len %d", address, len);
+    ESP_LOGD(TAG, "Sending MDB packet: Addr 0x%02X, Len %zu", address, len);
 
     // Svuota buffer RX prima di inviare
     uart_flush_input(MDB_UART_PORT);
@@ -186,19 +227,15 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
     uint8_t checksum = 0;
     TickType_t start_tick = xTaskGetTickCount();
     
-    // MDB Timing: la risposta deve arrivare entro 5ms.
-    // Usiamo un timeout inter-byte per rilevare la fine del pacchetto.
-    
     while ((xTaskGetTickCount() - start_tick) < pdMS_TO_TICKS(timeout_ms)) {
         if (uart_read_bytes(MDB_UART_PORT, &byte, 1, pdMS_TO_TICKS(timeout_ms)) > 0) {
             out_data[received++] = byte;
             
-            // Continua a leggere finché ci sono dati con un breve timeout inter-byte (MDB < 1ms)
             while (received < max_len) {
                 if (uart_read_bytes(MDB_UART_PORT, &byte, 1, pdMS_TO_TICKS(5)) > 0) {
                     out_data[received++] = byte;
                 } else {
-                    break; // Silenzio = Fine pacchetto
+                    break; 
                 }
             }
             break; 
@@ -208,10 +245,8 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
     if (received == 0) return ESP_ERR_TIMEOUT;
     *out_len = received;
 
-    // Se abbiamo ricevuto un solo byte (ACK=00, NAK=FF, RET=AA), non c'è checksum
     if (received == 1) return ESP_OK;
 
-    // Calcola e verifica checksum per risposte multi-byte
     for (size_t i = 0; i < received - 1; i++) checksum += out_data[i];
     
     if (checksum != out_data[received - 1]) {

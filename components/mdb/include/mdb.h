@@ -33,6 +33,7 @@ typedef enum {
     MDB_STATE_INIT_RESET,
     MDB_STATE_INIT_SETUP,
     MDB_STATE_INIT_EXPANSION,
+    MDB_STATE_INIT_ENABLE,
     MDB_STATE_IDLE_POLLING,
     MDB_STATE_ERROR
 } mdb_device_state_t;
@@ -46,6 +47,14 @@ typedef struct {
         uint32_t last_poll_ms;
         uint32_t credit_cents;
         bool is_online;
+        
+        // Setup data
+        uint8_t feature_level;
+        uint16_t currency_code;
+        uint8_t scaling_factor;
+        uint8_t decimal_places;
+        uint16_t coin_routing;
+        uint8_t coin_values[16];
     } coin;
     struct {
         mdb_device_state_t state;

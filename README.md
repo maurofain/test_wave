@@ -53,3 +53,19 @@ HTTP endpoints:
 
 ## Documentazione Hardware
 Per note specifiche su limitazioni hardware e pinout, vedi [docs/NOTES_HW.md](docs/NOTES_HW.md).
+
+## Documentazione Tecnica
+
+Il progetto utilizza **Doxygen** con **Graphviz** per la generazione automatica della documentazione tecnica e dei grafi delle chiamate (Call Graphs).
+
+### Generazione
+Per aggiornare la documentazione:
+```bash
+doxygen Doxyfile
+```
+
+La documentazione generata è disponibile qui: [Doxygen Index](docs/doxygen/html/index.html).
+
+### Requisiti
+- Doxygen (v1.9+)
+- Graphviz (per i grafi)

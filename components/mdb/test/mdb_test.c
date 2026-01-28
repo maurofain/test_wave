@@ -1,5 +1,5 @@
 #include "mdb_test.h"
-#include "mdb_bus.h"
+#include "mdb.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -12,11 +12,11 @@ static void mdb_test_task(void *arg) {
     ESP_LOGI(TAG, "MDB Test: Invio sequenziale RESET/POLL...");
     while(s_run) {
         // Test di basso livello: invio pacchetto RESET alla gettoniera (0x08)
-        mdb_bus_send_packet(0x08 | 0x00, NULL, 0); 
+        mdb_send_packet(0x08 | 0x00, NULL, 0); 
         vTaskDelay(pdMS_TO_TICKS(1000));
         
         // Test POLL
-        mdb_bus_send_packet(0x08 | 0x03, NULL, 0);
+        mdb_send_packet(0x08 | 0x03, NULL, 0);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
     s_mdb_test_handle = NULL;

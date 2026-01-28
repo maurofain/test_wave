@@ -41,6 +41,22 @@ esp_err_t led_fill_color(uint8_t red, uint8_t green, uint8_t blue);
 esp_err_t led_set_pixel(uint32_t index, uint8_t red, uint8_t green, uint8_t blue);
 
 /**
+ * @brief Imposta il colore di un LED specifico (HSV)
+ * @param index Indice del LED (0-based)
+ * @param hue Tonalità (0-359)
+ * @param sat Saturazione (0-255)
+ * @param val Valore/Luminosità (0-255)
+ * @return ESP_OK se riuscito
+ */
+esp_err_t led_set_pixel_hsv(uint32_t index, uint16_t hue, uint8_t sat, uint8_t val);
+
+/**
+ * @brief Applica i cambiamenti alla striscia LED
+ * @return ESP_OK se riuscito
+ */
+esp_err_t led_refresh(void);
+
+/**
  * @brief Esegui animazione di respirazione (pulsazione)
  * @param red Valore rosso (0-255)
  * @param green Valore verde (0-255)
