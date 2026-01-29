@@ -41,10 +41,13 @@
           3. 3. alla modifica dei parametri (tasto save in configurazione) salviamo i dati nella EEProm e sempre nella eeprom  settiamo flag di modificato 
           4. al successivo riavvio salviamo i dati (se validi) in NVS - se non validi li riprendiamo da NVS e settiamo il flag di modificato
 12. Driver PWM
-13. 
+13. Duplicazione codice main in cartella app per sviluppo produzione
+14. Driver RS485 e ricezione dati (timeout hardware 10ms)
+15. Test EEprom: tasto "Leggi JSON" e visualizzazione CRC/Updated nell'interfaccia web
+16. Implementata la scheda SD
 
 
-  
+
 
 # ⏸️ RITARDATI
 
@@ -55,9 +58,9 @@
 # 📋 DA FARE
 
 - Factory 
-    1. Duplicare tutto il codice di main in una cartella app dove svilupperemo il firmaware di produzione.
-    2.  Driver RS485
-
+    1.  aggiungi nel test PWM il settaggio manuale di frequenza e duty
+    2.  aggiungi nel test Led il settaggio manuale di colore (codice HTML)  e luminosità per tutti i led
+    
 - App
   1. Configurazione monitor/touch e integrazione LVGL 
   2. Creazione Slideshow iniziale

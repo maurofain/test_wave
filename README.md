@@ -6,6 +6,8 @@ This project targets the Waveshare ESP32-P4 Module Dev Kit and an expansion boar
 
 [RULES](docs/RULES.md)
 
+[TODO](docs/TODO.md)
+
 ## Hardware summary (per HARDWARE_SETUP)
 - I2C bus (SDA GPIO27, SCL GPIO26) for 26LC16 EEPROM, two FXL6408 IO expanders, SHT40 sensor.
 - WS2812 RGB strip on GPIO5.

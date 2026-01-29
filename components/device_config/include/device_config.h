@@ -39,6 +39,7 @@ typedef struct {
     bool mdb_enabled;           ///< UART MDB
     bool pwm1_enabled;          ///< PWM1
     bool pwm2_enabled;          ///< PWM2
+    bool sd_card_enabled;       ///< SD Card
 } device_sensors_config_t;
 
 /**
@@ -58,6 +59,18 @@ typedef struct {
 } device_display_config_t;
 
 /**
+ * @brief Struttura di configurazione UART (RS232/RS485/MDB)
+ */
+typedef struct {
+    int baud_rate;
+    int data_bits;      ///< UART_DATA_8_BITS, etc.
+    int parity;         ///< 0: None, 1: Odd, 2: Even
+    int stop_bits;      ///< 1, 2, 3 (1.5)
+    int rx_buf_size;    ///< Consigliato > 128 (es. 1024 o 2048)
+    int tx_buf_size;    ///< 0: Modalità bloccante (consigliato per RS485); > 0: Modalità asincrona in RAM
+} device_serial_config_t;
+
+/**
  * @brief Configurazione generale device
  */
 typedef struct {
@@ -68,6 +81,9 @@ typedef struct {
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;
     device_display_config_t display;
+    device_serial_config_t rs232;       ///< Configurazione RS232
+    device_serial_config_t rs485;       ///< Configurazione RS485
+    device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB
 } device_config_t;
 
 /**
@@ -91,11 +107,28 @@ esp_err_t device_config_load(device_config_t *config);
 esp_err_t device_config_save(const device_config_t *config);
 
 /**
+ * @brief Converte la configurazione in JSON
+ * @param config Puntatore alla configurazione
+ * @return Stringa JSON allocata (da liberare con free())
+ */
+char* device_config_to_json(const device_config_t *config);
+
+/**
  * @brief Ottiene la configurazione corrente
  * @return Puntatore alla configurazione (globale)
  */
 device_config_t* device_config_get(void);
+/**
+ * @brief Ottiene il CRC32 della configurazione corrente
+ * @return Valore CRC32
+ */
+uint32_t device_config_get_crc(void);
 
+/**
+ * @brief Verifica se la configurazione è stata aggiornata
+ * @return true se aggiornata
+ */
+bool device_config_is_updated(void);
 /**
  * @brief Reset configurazione ai valori di default
  * @return ESP_OK se riuscito

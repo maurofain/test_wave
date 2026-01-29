@@ -36,3 +36,21 @@ esp_err_t pwm_test_stop(int channel) {
     ledc_update_duty(LEDC_LOW_SPEED_MODE, (channel==1)?LEDC_CHANNEL_0:LEDC_CHANNEL_1);
     return ESP_OK;
 }
+
+esp_err_t pwm_test_set_param(int channel, uint32_t freq, uint32_t duty_percent) {
+    // Ferma i test automatici se attivi
+    pwm_test_stop(channel);
+    
+    if (duty_percent > 100) duty_percent = 100;
+    
+    ledc_set_freq(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0, freq);
+    
+    ledc_channel_t ch = (channel == 1) ? LEDC_CHANNEL_0 : LEDC_CHANNEL_1;
+    uint32_t duty_val = (duty_percent * 1023) / 100;
+    
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, ch, duty_val);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, ch);
+    
+    ESP_LOGI(TAG, "PWM manuale canale %d: Freq=%luHz, Duty=%lu%%", channel, freq, duty_percent);
+    return ESP_OK;
+}

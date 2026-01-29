@@ -115,7 +115,7 @@ config APP_ETH_PHY_ADDR
 
 config APP_ETH_PHY_RST_GPIO
     int "Ethernet PHY reset GPIO (-1 to disable)"
-    default 51 if IDF_TARGET_ESP32P4
+    default 32 if IDF_TARGET_ESP32P4
     default -1
 
 config APP_ETH_MDC_GPIO

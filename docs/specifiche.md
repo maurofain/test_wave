@@ -90,3 +90,13 @@ gli I/O expander usano 2 chip FXL6408UMX :
   Dobbiamo verificare se esiste una libreria espressif ufficiale, se manca creare una libreria per i comandi I2C
 
   Vanno creare due variabili di tipo uint_8t per lo stato delle le porte con possibilità di settare e leggere le singole porte e funzioni tipo void io_set_pin(port_n, value), void io_set_port(uint_8t val),  bool io_get_pin(port_n), uint_8t io_get()
+
+## Integrazione Monitor e Touchscreen (Strategia Ibrida)
+
+Per l'implementazione futura del monitor e del touchscreen si adotterà un approccio **ibrido**:
+
+1.  **Framework BSP / Driver Ufficiali**: Si utilizzeranno i driver specifici del framework BSP o la libreria `esp_lcd` di ESP-IDF per la gestione del controller LCD e del controller Touch (es. via MIPI-DSI e I2C).
+2.  **Mantenimento Codice Custom**: Tutte le periferiche già implementate (Ethernet RMII, SD 4-bit, Seriali, MDB, I2C Expander) continueranno a utilizzare il codice custom attuale per garantire il massimo controllo e la compatibilità con la mappatura GPIO specifica della scheda MicroHard.
+3.  **Bus I2C Condiviso**: Il touchscreen verrà integrato sul bus I2C principale (GPIO 26/27) insieme agli expander e ai sensori esistenti.
+4.  **Interfaccia Grafica**: Si utilizzerà la libreria LVGL per lo sviluppo della UI, che girerà in un task dedicato coordinandosi con gli altri task di sistema tramite le strutture `task_param` e code di messaggi.
+5.  **Risorse GPIO**: L'uso dell'interfaccia MIPI-DSI nativa dell'ESP32-P4 permetterà di pilotare il display senza sottrarre GPIO alle periferiche critiche già configurate.

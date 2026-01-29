@@ -64,6 +64,7 @@ static void _set_defaults(device_config_t *config)
     config->sensors.mdb_enabled = true;
     config->sensors.pwm1_enabled = true;
     config->sensors.pwm2_enabled = true;
+    config->sensors.sd_card_enabled = true;
 
     // Default MDB
     config->mdb.coin_acceptor_en = true;
@@ -72,6 +73,30 @@ static void _set_defaults(device_config_t *config)
 
     // Default Display
     config->display.lcd_brightness = 80;
+
+    // Default RS232
+    config->rs232.baud_rate = 9600;
+    config->rs232.data_bits = 8;
+    config->rs232.parity = 0;
+    config->rs232.stop_bits = 1;
+    config->rs232.rx_buf_size = 2048;
+    config->rs232.tx_buf_size = 0;
+
+    // Default RS485
+    config->rs485.baud_rate = 9600;
+    config->rs485.data_bits = 8;
+    config->rs485.parity = 0;
+    config->rs485.stop_bits = 1;
+    config->rs485.rx_buf_size = 2048;
+    config->rs485.tx_buf_size = 0;
+
+    // Default MDB Serial
+    config->mdb_serial.baud_rate = 9600;
+    config->mdb_serial.data_bits = 8;
+    config->mdb_serial.parity = 0;
+    config->mdb_serial.stop_bits = 1;
+    config->mdb_serial.rx_buf_size = 1024;
+    config->mdb_serial.tx_buf_size = 1024;
 }
 
 static uint32_t _calculate_crc(const char *json_str)
@@ -322,6 +347,7 @@ esp_err_t device_config_load(device_config_t *config)
                     config->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
                     config->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled"));
                     config->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
+                    config->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled"));
                 }
 
                 // Analisi config MDB
@@ -339,6 +365,35 @@ esp_err_t device_config_load(device_config_t *config)
                     if (bright) config->display.lcd_brightness = (uint8_t)bright->valueint;
                 }
 
+                // Analisi config Seriali (RS232, RS485, MDB)
+                cJSON *rs232_obj = cJSON_GetObjectItem(root, "rs232");
+                if (rs232_obj) {
+                    config->rs232.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "baud"));
+                    config->rs232.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "data_bits"));
+                    config->rs232.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "parity"));
+                    config->rs232.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "stop_bits"));
+                    config->rs232.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "rx_buf"));
+                    config->rs232.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "tx_buf"));
+                }
+                cJSON *rs485_obj = cJSON_GetObjectItem(root, "rs485");
+                if (rs485_obj) {
+                    config->rs485.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "baud"));
+                    config->rs485.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "data_bits"));
+                    config->rs485.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "parity"));
+                    config->rs485.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "stop_bits"));
+                    config->rs485.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "rx_buf"));
+                    config->rs485.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "tx_buf"));
+                }
+                cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial");
+                if (mdb_s_obj) {
+                    config->mdb_serial.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "baud"));
+                    config->mdb_serial.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "data_bits"));
+                    config->mdb_serial.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "parity"));
+                    config->mdb_serial.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "stop_bits"));
+                    config->mdb_serial.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "rx_buf"));
+                    config->mdb_serial.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "tx_buf"));
+                }
+
             cJSON_Delete(root);
             ESP_LOGI(TAG, "[C] Configurazione caricata correttamente da %s", source_is_eeprom ? "EEPROM" : "NVS");
         } else {
@@ -350,13 +405,10 @@ esp_err_t device_config_load(device_config_t *config)
     return ESP_OK;
 }
 
-esp_err_t device_config_save(const device_config_t *config)
+char* device_config_to_json(const device_config_t *config)
 {
-    if (!config) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    if (!config) return NULL;
 
-    // Crea JSON
     cJSON *root = cJSON_CreateObject();
 
     // Updated flag
@@ -395,6 +447,7 @@ esp_err_t device_config_save(const device_config_t *config)
     cJSON_AddBoolToObject(sensors_obj, "mdb_enabled", config->sensors.mdb_enabled);
     cJSON_AddBoolToObject(sensors_obj, "pwm1_enabled", config->sensors.pwm1_enabled);
     cJSON_AddBoolToObject(sensors_obj, "pwm2_enabled", config->sensors.pwm2_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "sd_card_enabled", config->sensors.sd_card_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors_obj);
 
     // MDB
@@ -409,31 +462,69 @@ esp_err_t device_config_save(const device_config_t *config)
     cJSON_AddNumberToObject(disp_obj, "lcd_brightness", config->display.lcd_brightness);
     cJSON_AddItemToObject(root, "display", disp_obj);
 
-    char *json_str = cJSON_PrintUnformatted(root);
-    if (json_str) {
-        ESP_LOGI(TAG, "[C] Salvataggio configurazione completa: %s", json_str);
-        esp_err_t err = ESP_ERR_INVALID_STATE;
-        
-        if (eeprom_24lc16_is_available()) {
-            // Alla modifica (tasto save), salviamo in EEPROM con flag 'modified' (Specifica 3)
-            err = _write_to_eeprom(json_str, true);
-        }
+    // Seriale RS232
+    cJSON *rs232_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(rs232_obj, "baud", config->rs232.baud_rate);
+    cJSON_AddNumberToObject(rs232_obj, "data_bits", config->rs232.data_bits);
+    cJSON_AddNumberToObject(rs232_obj, "parity", config->rs232.parity);
+    cJSON_AddNumberToObject(rs232_obj, "stop_bits", config->rs232.stop_bits);
+    cJSON_AddNumberToObject(rs232_obj, "rx_buf", config->rs232.rx_buf_size);
+    cJSON_AddNumberToObject(rs232_obj, "tx_buf", config->rs232.tx_buf_size);
+    cJSON_AddItemToObject(root, "rs232", rs232_obj);
 
-        if (err != ESP_OK) {
-            // Se EEPROM non disponibile o salvataggio fallito, scriviamo direttamente in NVS (Specifica User)
-            _write_to_nvs(json_str);
-            if (err == ESP_ERR_INVALID_STATE) {
-                ESP_LOGW(TAG, "[C] EEPROM non disponibile, salvataggio diretto su NVS");
-            } else {
-                ESP_LOGE(TAG, "[C] Salvataggio EEPROM fallito (0x%x), ripiego su NVS", err);
-            }
-        } else {
-            ESP_LOGI(TAG, "[C] Config salvato in EEPROM (flag modified settato)");
-        }
-        free(json_str);
+    // Seriale RS485
+    cJSON *rs485_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(rs485_obj, "baud", config->rs485.baud_rate);
+    cJSON_AddNumberToObject(rs485_obj, "data_bits", config->rs485.data_bits);
+    cJSON_AddNumberToObject(rs485_obj, "parity", config->rs485.parity);
+    cJSON_AddNumberToObject(rs485_obj, "stop_bits", config->rs485.stop_bits);
+    cJSON_AddNumberToObject(rs485_obj, "rx_buf", config->rs485.rx_buf_size);
+    cJSON_AddNumberToObject(rs485_obj, "tx_buf", config->rs485.tx_buf_size);
+    cJSON_AddItemToObject(root, "rs485", rs485_obj);
+
+    // Seriale MDB
+    cJSON *mdb_s_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(mdb_s_obj, "baud", config->mdb_serial.baud_rate);
+    cJSON_AddNumberToObject(mdb_s_obj, "data_bits", config->mdb_serial.data_bits);
+    cJSON_AddNumberToObject(mdb_s_obj, "parity", config->mdb_serial.parity);
+    cJSON_AddNumberToObject(mdb_s_obj, "stop_bits", config->mdb_serial.stop_bits);
+    cJSON_AddNumberToObject(mdb_s_obj, "rx_buf", config->mdb_serial.rx_buf_size);
+    cJSON_AddNumberToObject(mdb_s_obj, "tx_buf", config->mdb_serial.tx_buf_size);
+    cJSON_AddItemToObject(root, "mdb_serial", mdb_s_obj);
+
+    char *json_str = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return json_str;
+}
+
+esp_err_t device_config_save(const device_config_t *config)
+{
+    if (!config) return ESP_ERR_INVALID_ARG;
+
+    char *json_str = device_config_to_json(config);
+    if (!json_str) return ESP_ERR_NO_MEM;
+
+    ESP_LOGI(TAG, "[C] Salvataggio configurazione completa: %s", json_str);
+    esp_err_t err = ESP_ERR_INVALID_STATE;
+    
+    if (eeprom_24lc16_is_available()) {
+        // Alla modifica (tasto save), salviamo in EEPROM con flag 'modified' (Specifica 3)
+        err = _write_to_eeprom(json_str, true);
     }
 
-    cJSON_Delete(root);
+    if (err != ESP_OK) {
+        // Se EEPROM non disponibile o salvataggio fallito, scriviamo direttamente in NVS (Specifica User)
+        _write_to_nvs(json_str);
+        if (err == ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "[C] EEPROM non disponibile, salvataggio diretto su NVS");
+        } else {
+            ESP_LOGE(TAG, "[C] Salvataggio EEPROM fallito (0x%x), ripiego su NVS", err);
+        }
+    } else {
+        ESP_LOGI(TAG, "[C] Config salvato in EEPROM (flag modified settato)");
+    }
+    
+    free(json_str);
     return ESP_OK;
 }
 
@@ -441,7 +532,19 @@ device_config_t* device_config_get(void)
 {
     return &s_config;
 }
+uint32_t device_config_get_crc(void)
+{
+    char *json = device_config_to_json(&s_config);
+    if (!json) return 0;
+    uint32_t crc = _calculate_crc(json);
+    free(json);
+    return crc;
+}
 
+bool device_config_is_updated(void)
+{
+    return s_config.updated;
+}
 esp_err_t device_config_reset_defaults(void)
 {
     _set_defaults(&s_config);

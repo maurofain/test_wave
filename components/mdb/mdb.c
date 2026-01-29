@@ -145,18 +145,19 @@ esp_err_t mdb_start_engine(void) {
 
 esp_err_t mdb_init(void)
 {
+    device_config_t *d_cfg = device_config_get();
     ESP_LOGI(TAG, "Inizializzazione MDB su UART %d (TX:%d RX:%d)", MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO);
 
     uart_config_t uart_config = {
-        .baud_rate = 9600,
+        .baud_rate = d_cfg->mdb_serial.baud_rate,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE, // Gestito manualmente per il 9° bit
-        .stop_bits = UART_STOP_BITS_1,
+        .stop_bits = (d_cfg->mdb_serial.stop_bits == 2) ? UART_STOP_BITS_2 : UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    ESP_ERROR_CHECK(uart_driver_install(MDB_UART_PORT, 1024, 1024, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_driver_install(MDB_UART_PORT, d_cfg->mdb_serial.rx_buf_size, d_cfg->mdb_serial.tx_buf_size, 0, NULL, 0));
     ESP_ERROR_CHECK(uart_param_config(MDB_UART_PORT, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     

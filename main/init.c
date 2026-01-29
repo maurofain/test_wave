@@ -37,6 +37,7 @@
 #include "rs232.h"
 #include "rs485.h"
 #include "serial_test.h"
+#include "sd_card.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -542,6 +543,15 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.temperature_enabled) {
         ESP_LOGI(TAG, "TODO: Inizializzare ADC per sensore temperatura");
+    }
+
+    if (cfg->sensors.sd_card_enabled) {
+        esp_err_t sd_ret = sd_card_mount();
+        if (sd_ret != ESP_OK) {
+            ESP_LOGW(TAG, "[M] Montaggio SD Card salvato, continuo senza");
+        }
+    } else {
+        ESP_LOGI(TAG, "[M] SD Card disabilitata da config");
     }
 
     return ESP_OK;

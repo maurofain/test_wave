@@ -1,5 +1,6 @@
 #include "eeprom_test.h"
 #include "eeprom_24lc16.h"
+#include "device_config.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
@@ -29,8 +30,10 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
     cJSON *resp = cJSON_CreateObject();
     
     if (strcmp(op->valuestring, "read") == 0) {
-        int addr = cJSON_GetObjectItem(root, "addr")->valueint;
-        int len = cJSON_GetObjectItem(root, "len")->valueint;
+        cJSON *addr_obj = cJSON_GetObjectItem(root, "addr");
+        cJSON *len_obj = cJSON_GetObjectItem(root, "len");
+        int addr = addr_obj ? addr_obj->valueint : 0;
+        int len = len_obj ? len_obj->valueint : 16;
         if (len > 256) len = 256;
 
         uint8_t *data = malloc(len);
@@ -46,6 +49,21 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
         }
         free(data);
     } 
+    else if (strcmp(op->valuestring, "read_json") == 0) {
+        char *json = device_config_to_json(device_config_get());
+        if (json) {
+            cJSON_AddStringToObject(resp, "json", json);
+            cJSON_AddStringToObject(resp, "status", "ok");
+            free(json);
+        } else {
+            cJSON_AddStringToObject(resp, "status", "error");
+        }
+    }
+    else if (strcmp(op->valuestring, "status") == 0) {
+        cJSON_AddNumberToObject(resp, "crc", device_config_get_crc());
+        cJSON_AddBoolToObject(resp, "updated", device_config_is_updated());
+        cJSON_AddStringToObject(resp, "status", "ok");
+    }
     else if (strcmp(op->valuestring, "write") == 0) {
         int addr = cJSON_GetObjectItem(root, "addr")->valueint;
         cJSON *data_arr = cJSON_GetObjectItem(root, "data");

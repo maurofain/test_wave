@@ -36,3 +36,12 @@ esp_err_t led_test_stop(void) {
     s_run = false;
     return ESP_OK;
 }
+
+esp_err_t led_test_set_color(uint8_t r, uint8_t g, uint8_t b) {
+    led_test_stop(); // Ferma il test automatico
+    // Attendi un attimo se il task era attivo
+    vTaskDelay(pdMS_TO_TICKS(100)); 
+    
+    led_fill_color(r, g, b);
+    return led_refresh();
+}
