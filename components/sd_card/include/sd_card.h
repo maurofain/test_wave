@@ -32,6 +32,12 @@ esp_err_t sd_card_unmount(void);
 bool sd_card_is_mounted(void);
 
 /**
+ * @brief Ritorna true se la scheda SD è fisicamente presente
+ * @return true se inserita
+ */
+bool sd_card_is_present(void);
+
+/**
  * @brief Ritorna lo spazio totale in KB
  * @return Spazio totale
  */

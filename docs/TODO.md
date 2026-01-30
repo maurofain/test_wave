@@ -48,30 +48,37 @@
 17. Aggiunto settaggio manuale Frequenza/Duty per test PWM
 18. Aggiunto controllo colore e luminosità per tutti i LED nel test LED
 19. Rafforzato driver SD con log dettagliati, power cycle hardware e monitor hot-plug (GPIO 0)
-20. Aggiunto tasto "Init" manuale nel pannello test SD per tentativi di ripristino
-
-
+21. Driver per il sensore temperatura SHT40-BDIB-R2 con lettura background e visualizzazione Web UI
+22. Gestione GPIO 32 (ex BOOT) e 33 configurabili in Config e Test (IN/OUT, Pull, State)
 
 
 # ⏸️ RITARDATI
 
 1. abilitazione WiFi
 
-   
-
 # 📋 DA FARE
 
 - Factory 
-  
-- App
-  1. Configurazione monitor/touch e integrazione LVGL 
-  2. Creazione Slideshow iniziale
-  3. Creazione Pagina di test delle operazioni
+  - Implementare la data e ora da ntp sui server `2.it.pool.ntp.org`e 2.europe.pool.ntp.org, questi server vanno aggiunti al config dopo il WiFI. L'ora va acquisita solo se c'è connessione di rete e accesso a Internet (testare con un ping su server google)
+    Una volta acquisita l'ora il timestamp va aggiunto nei log dopo il timing CPU e mostrata nel titolo delle pagine web
 
-# TESTATI
+  - Chiedere : 
+    - problema alimentazione doppia (scheda e espansione)
+
+    - Porte USB sul p4?
+
+    - Alimentazione display
+
+- App
+  1. Aggiungere un task App per l'esecuzione delle funzioni operative della macchina controllata 
+  2. Configurazione monitor/touch e integrazione LVGL 
+  3. Creazione Slideshow iniziale
+  4. Creazione Pagina di test delle operazioni
+
+# 🖥️ TESTATI
 
 1. Led Stripe
 2. PWM1 e PWM2
-3. RS232 (tx)
+3. RS232 (tx rx)
 4. RS485 (tx)
 5. MDB (tx)

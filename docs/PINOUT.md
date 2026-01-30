@@ -21,20 +21,19 @@ Questo documento riassume l'assegnazione di tutti i GPIO utilizzati nel progetto
 
 ## 🌐 Connettività Ethernet (RMII - Waveshare)
 
-### Tabella Connessione porta ethernet
-| Pin ESP32-P4 | Segnale Ethernet / RMII | Descrizione |
-|:---:|:---|:---|
-| **GPIO 49** | TXEN | Abilitazione Trasmissione |
-| **GPIO 35** | TXD1 | Dati Trasmissione 1 |
-| **GPIO 34** | TXD0 | Dati Trasmissione 0 |
-| **GPIO 50** | 50M_CLK / TXCLK | Clock di riferimento (50MHz) |
-| **GPIO 30** | RXD1 | Dati Ricezione 1 |
-| **GPIO 29** | RXD0 | Dati Ricezione 0 |
-| **GPIO 28** | CRS_DV / RXDV | Carrier Sense / Data Valid |
-| **GPIO 52** | MDIO | Management Data Input/Output |
-| **GPIO 31** | MDC | Management Data Clock |
-| **GPIO 32** | RESET | Reset del chip PHY |
-| **GPIO 51** | INTR_32 | Interrupt (opzionale) |
+| Segnale | GPIO | Descrizione |
+|:---|:---:|:---|
+| **TX_EN** | **49** | Abilitazione Trasmissione |
+| **TXD0** | **34** | Dati Trasmissione 0 |
+| **TXD1** | **35** | Dati Trasmissione 1 |
+| **REF_CLK** | **50** | Reference Clock (50MHz) |
+| **RXD0** | **29** | Dati Ricezione 0 |
+| **RXD1** | **30** | Dati Ricezione 1 |
+| **CRS_DV** | **28** | Carrier Sense / Data Valid |
+| **MDC** | **31** | Management Data Clock |
+| **MDIO** | **52** | Management Data Input/Output |
+| **PHY_RST** | **32** | Reset del chip PHY |
+| **PHY_INT** | **51** | Interrupt (opzionale) |
 
 ## 📟 Comunicazione Seriale
 | Periferica | Pin TX | Pin RX | Altri Pin | Note |
@@ -60,21 +59,6 @@ Questo documento riassume l'assegnazione di tutti i GPIO utilizzati nel progetto
 1. **Conflitto Pin 35**: GPIO 35 è mappato come `TXD1` per Ethernet. Poiché questo pin è collegato al pulsante di boot sulla Waveshare, il pulsante NON DEVE ESSERE USATO per evitare disturbi alla trasmissione Ethernet.
 2. **SD Mode**: Configurato in **4-bit mode** (GPIO 39-42) per massime prestazioni. La nuova mappatura Ethernet RMII libera questi pin rispetto alle versioni precedenti del progetto.
 3. **GPIO 36**: Usato per **RS232 TX** come da schema finale.
-
-## Tabella Segnali Ethernet RMII (Waveshare Schema)
-| Segnale | Pin | Note |
-|---|---|---|
-| **TXD0** | GPIO 34 | |
-| **TXD1** | GPIO 35 | Conflitto Boot Button |
-| **TX_EN** | GPIO 49 | |
-| **RXD0** | GPIO 29 | |
-| **RXD1** | GPIO 30 | |
-| **CRS_DV** | GPIO 28 | |
-| **REF_CLK**| GPIO 50 | 50MHz Reference Clock |
-| **MDC** | GPIO 31 | |
-| **MDIO** | GPIO 52 | |
-| **PHY_RST**| GPIO 32 | |
-| **PHY_INT**| GPIO 51 | Opzionale |
 
 ## 🟢 Mappatura Completa GPIO ESP32P4 ed Expansion Header (40-pin)
 *La seguente tabella elenca tutti i GPIO del SoC ESP32-P4, il loro utilizzo sulla scheda Waveshare e il corrispondente pin sul connettore di espansione 40-pin.*
@@ -114,7 +98,7 @@ Questo documento riassume l'assegnazione di tutti i GPIO utilizzati nel progetto
 | **30** | - | **ETH RXD1** | Dati Ricezione Ethernet 1 | **USATO** |
 | **31** | - | **ETH MDC** | Management Data Clock | **USATO** |
 | **32** | **25** | **ETH RESET** | Reset Hardware PHY Ethernet | **USATO** |
-| **33** | **30** | GPIO 33 | Digital I/O | LIBERO |
+| **33** | **30** | **GPIO 33** | Digital Configurable I/O | **CONFIG** |
 | **34** | - | **ETH TXD0** | Dati Trasmissione Ethernet 0 | **USATO** |
 | **35** | - | **ETH TXD1** | Dati Trasmissione Ethernet 1 | **USATO** |
 | **36** | **23** | **RS232 TX** | Trasmissione dati RS232 | **USATO** |

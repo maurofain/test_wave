@@ -16,7 +16,7 @@ static const char *TAG = "SD_CARD";
 static bool s_mounted = false;
 static sdmmc_card_t *s_card = NULL;
 static sd_pwr_ctrl_handle_t s_pwr_ctrl_handle = NULL;
-static char s_last_error[64] = "Nessuno";
+static char s_last_error[128] = "Nessuno";
 static bool s_is_formatting = false;
 
 #define MOUNT_POINT "/sdcard"
@@ -120,6 +120,9 @@ esp_err_t sd_card_mount(void) {
         esp_err_t pwr_ret = sd_pwr_ctrl_new_on_chip_ldo(&ldo_config, &s_pwr_ctrl_handle);
         if (pwr_ret != ESP_OK) {
             ESP_LOGE(TAG, "Errore inizializzazione LDO SD: %s", esp_err_to_name(pwr_ret));
+        } else {
+            // Impostiamo il voltaggio a 3.3V (3300 mV) per la SD
+            sd_pwr_ctrl_set_io_voltage(s_pwr_ctrl_handle, 3300);
         }
     }
     host.pwr_ctrl_handle = s_pwr_ctrl_handle;
@@ -191,6 +194,10 @@ bool sd_card_is_mounted(void) {
     return s_mounted;
 }
 
+bool sd_card_is_present(void) {
+    return (gpio_get_level(SD_CD_GPIO) == 0);
+}
+
 uint64_t sd_card_get_total_size(void) {
     if (!s_mounted || !s_card) return 0;
     return (uint64_t)s_card->csd.capacity * s_card->csd.sector_size / 1024;
@@ -211,7 +218,7 @@ static void sd_format_timer_task(void *pvParameters) {
     int elapsed = 0;
     while (s_is_formatting) {
         if (elapsed > 120) break; // Timeout sicurezza 2 min
-        snprintf(s_last_error, sizeof(s_last_error), "Formattazione... [%ds]", elapsed);
+        snprintf(s_last_error, sizeof(s_last_error), "Formattazione in corso... (%ds) : attendi il messaggio di completamento", elapsed);
         vTaskDelay(pdMS_TO_TICKS(1000));
         elapsed++;
     }

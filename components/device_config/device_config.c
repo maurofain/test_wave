@@ -98,6 +98,10 @@ static void _set_defaults(device_config_t *config)
     config->mdb_serial.stop_bits = 1;
     config->mdb_serial.rx_buf_size = 1024;
     config->mdb_serial.tx_buf_size = 1024;
+
+    // Default GPIOs Configurable
+    config->gpios.gpio33.mode = GPIO_CFG_MODE_INPUT_PULLUP;
+    config->gpios.gpio33.initial_state = false;
 }
 
 static uint32_t _calculate_crc(const char *json_str)
@@ -156,7 +160,7 @@ static char* _read_from_eeprom(bool *out_modified)
         return NULL;
     }
     json_str[header.length] = '\0';
-    ESP_LOGI(TAG, "[C] EEPROM JSON caricato: %s", json_str);
+    ESP_LOGD(TAG, "[C] EEPROM JSON caricato: %s", json_str);
 
     uint32_t c_crc = _calculate_crc(json_str);
     if (c_crc != header.crc) {
@@ -166,7 +170,7 @@ static char* _read_from_eeprom(bool *out_modified)
     }
 
     if (out_modified) *out_modified = (header.modified == 1);
-    ESP_LOGI(TAG, "[C] Config caricata da EEPROM (modified=%d)", header.modified);
+    ESP_LOGD(TAG, "[C] Config caricata da EEPROM (modified=%d)", header.modified);
     return json_str;
 }
 
@@ -392,8 +396,18 @@ esp_err_t device_config_load(device_config_t *config)
                     config->mdb_serial.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "tx_buf"));
                 }
 
+                // Analisi GPIOs configurabili
+                cJSON *gpios_obj = cJSON_GetObjectItem(root, "gpios");
+                if (gpios_obj) {
+                    cJSON *g33 = cJSON_GetObjectItem(gpios_obj, "gpio33");
+                    if (g33) {
+                        config->gpios.gpio33.mode = (device_gpio_cfg_mode_t)cJSON_GetNumberValue(cJSON_GetObjectItem(g33, "mode"));
+                        config->gpios.gpio33.initial_state = cJSON_IsTrue(cJSON_GetObjectItem(g33, "state"));
+                    }
+                }
+
             cJSON_Delete(root);
-            ESP_LOGI(TAG, "[C] Configurazione caricata correttamente da %s", source_is_eeprom ? "EEPROM" : "NVS");
+            ESP_LOGD(TAG, "[C] Configurazione caricata correttamente da %s", source_is_eeprom ? "EEPROM" : "NVS");
         } else {
             ESP_LOGE(TAG, "[C] Errore parsing JSON!");
         }
@@ -490,6 +504,14 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(mdb_s_obj, "rx_buf", config->mdb_serial.rx_buf_size);
     cJSON_AddNumberToObject(mdb_s_obj, "tx_buf", config->mdb_serial.tx_buf_size);
     cJSON_AddItemToObject(root, "mdb_serial", mdb_s_obj);
+
+    // GPIOs configurabili
+    cJSON *gpios_obj = cJSON_CreateObject();
+    cJSON *g33_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(g33_obj, "mode", config->gpios.gpio33.mode);
+    cJSON_AddBoolToObject(g33_obj, "state", config->gpios.gpio33.initial_state);
+    cJSON_AddItemToObject(gpios_obj, "gpio33", g33_obj);
+    cJSON_AddItemToObject(root, "gpios", gpios_obj);
 
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);

@@ -21,11 +21,13 @@
 #include "esp_eth_mac_esp.h"
 #include "esp_spiffs.h"
 #include "driver/i2c.h"
+#include "driver/gpio.h"
 #include "led_strip.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/etharp.h"
 #include "lwip/netif.h"
 #include "init.h"
+#include "aux_gpio.h"
 #include "led.h"
 #include "device_config.h"
 #include "mdb.h"
@@ -38,6 +40,7 @@
 #include "rs485.h"
 #include "serial_test.h"
 #include "sd_card.h"
+#include "sht40.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -481,6 +484,10 @@ esp_err_t init_run_factory(void)
     
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
+    
+    // Inizializza GPIO ausiliari
+    aux_gpio_init();
+    
     device_config_t *cfg = device_config_get();
 
     // Ethernet - continua anche se fallisce
@@ -542,7 +549,10 @@ esp_err_t init_run_factory(void)
     }
 
     if (cfg->sensors.temperature_enabled) {
-        ESP_LOGI(TAG, "TODO: Inizializzare ADC per sensore temperatura");
+        esp_err_t sht_ret = sht40_init();
+        if (sht_ret != ESP_OK) {
+            ESP_LOGE(TAG, "[M] Inizializzazione SHT40 fallita!");
+        }
     }
 
     // Inizializza sempre il monitor hot-plug SD per rilevare inserimenti

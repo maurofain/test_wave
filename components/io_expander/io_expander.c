@@ -14,6 +14,8 @@ static const char *TAG = "IO_EXP";
 #define REG_DIRECTION       0x03
 #define REG_OUTPUT_DATA     0x05
 #define REG_OUTPUT_TRISTATE 0x07
+#define REG_PULL_ENABLE     0x0B
+#define REG_PULL_SELECT     0x0D
 #define REG_INPUT_DATA      0x0F
 
 uint8_t io_output_state = 0x00;
@@ -46,6 +48,10 @@ esp_err_t io_expander_init(void) {
         ESP_LOGE(TAG, "[C] Errore comunicazione chip INPUT (0x%02X)", FXL6408_ADDR_IN);
         return ret;
     }
+    
+    // Abilita Pull-up su tutti i pin di input per stabilizzare bit flottanti (come il bit 4)
+    write_reg(FXL6408_ADDR_IN, REG_PULL_SELECT, 0xFF); // 1 = Pull-up
+    write_reg(FXL6408_ADDR_IN, REG_PULL_ENABLE, 0xFF); // 1 = Abilitato
 
     ESP_LOGI(TAG, "[C] Inizializzati FXL6408 ad indirizzi 0x%02X (OUT) e 0x%02X (IN)", FXL6408_ADDR_OUT, FXL6408_ADDR_IN);
     return ESP_OK;

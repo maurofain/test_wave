@@ -14,7 +14,7 @@ static const char *TAG = "EEPROM";
 #define EEPROM_TOTAL_SIZE   2048
 #define EEPROM_WRITE_DELAY_MS 5
 
-#define EEPROM_WRITE_TIMEOUT_MS 10
+#define EEPROM_WRITE_TIMEOUT_MS 50
 
 static bool s_eeprom_available = false;
 
@@ -35,11 +35,14 @@ static uint8_t get_mem_addr(uint16_t address) {
  */
 static esp_err_t wait_until_ready(uint8_t dev_addr) {
     uint8_t dummy;
-    for (int i = 0; i < EEPROM_WRITE_TIMEOUT_MS; i++) {
+    // Attendiamo fino a 50ms (il ciclo di scrittura interno è max 5ms)
+    for (int i = 0; i < 10; i++) {
         // Usiamo una lettura di 1 byte invece di una scrittura a 0 byte per evitare "i2c null address error" su alcuni driver
         esp_err_t ret = i2c_master_read_from_device(I2C_PORT, dev_addr, &dummy, 1, pdMS_TO_TICKS(10));
         if (ret == ESP_OK) return ESP_OK;
-        vTaskDelay(pdMS_TO_TICKS(1));
+        
+        // Se NACK o Errore, attendiamo almeno 5-10ms prima del prossimo tentativo
+        vTaskDelay(pdMS_TO_TICKS(5) > 0 ? pdMS_TO_TICKS(5) : 1);
     }
     return ESP_ERR_TIMEOUT;
 }

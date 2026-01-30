@@ -16,6 +16,7 @@
 #include "driver/ledc.h"
 #include "driver/uart.h"
 #include "driver/i2c.h"
+#include "driver/gpio.h"
 #include "app_version.h"
 
 #include "serial_test.h"
@@ -27,8 +28,11 @@
 #include "pwm.h"
 #include "pwm_test.h"
 #include "sd_card.h"
+#include "aux_gpio.h"
+#include "sht40.h"
 #include "rs232.h"
 #include "rs485.h"
+#include "tasks.h"
 
 static const char *TAG = "WEB_UI";
 static httpd_handle_t s_server = NULL;
@@ -67,14 +71,25 @@ static TaskHandle_t s_rs485_test_handle = NULL;
 // TEST UART: 0x55, 0xAA, 0x01, 0x07 (periodico)
 static void uart_test_task(void *arg) {
     uart_port_t port = (uart_port_t)arg;
-    uint8_t seq[] = {0x55, 0xAA, 0x01, 0x07};
-    ESP_LOGI(TAG, "Test Porta UART %d: Avvio", port);
+    const char* seq_hex[] = {"\\0x55", "\\0xAA", "\\0x01", "\\0x07"};
+    uint8_t rx_buf[128];
+    size_t rx_len;
+    ESP_LOGI(TAG, "Test Porta UART %d: Avvio (TX + RX Monitor HEX)", port);
+    
+    serial_test_init();
+    
     while(1) {
         for (int i=0; i<4; i++) {
-            ESP_LOGD(TAG, "UART %d invio 0x%02X", port, seq[i]);
-            for (int j=0; j<50; j++) { // Circa 1s (50 * 20ms)
-                uart_write_bytes(port, &seq[i], 1);
-                vTaskDelay(pdMS_TO_TICKS(20)); 
+            // Invio tramite componente serial_test per avere visibilità anche del TX nel monitor
+            serial_test_send_uart(port, seq_hex[i]);
+            
+            // Monitoraggio ricezione per circa 1 secondo tra un invio e l'altro
+            for (int j=0; j<10; j++) { 
+                // serial_test_read_uart ha un timeout interno di 50ms e logga automaticamente in HEX (prefix RX<)
+                if (serial_test_read_uart(port, rx_buf, sizeof(rx_buf), &rx_len) == ESP_OK) {
+                    ESP_LOGD(TAG, "UART %d ricevuti %d bytes", port, (int)rx_len);
+                }
+                vTaskDelay(pdMS_TO_TICKS(50)); 
             }
         }
     }
@@ -150,27 +165,12 @@ static esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
-        "<p>Questa interfaccia permette di configurare, testare e aggiornare la scheda <b>ESP32-P4</b>.</p>"
-        "<p>Utilizzare il menu <b>Configurazione</b> per abilitare i driver hardware necessari prima di eseguire i test.</p>"
+        "<p>Benvenuti nell'interfaccia di configurazione e test.</p>"
         "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
-        "<strong>Azioni Rapide:</strong><br>"
         "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>Reboot in Factory</a> "
         "<a href='/reboot/app' class='btn-reboot' style='background:#27ae60;'>Reboot in App</a>"
         "</div>"
         "</div>"
-        "<div class='card'><h2>🔗 API Endpoints</h2>"
-        "<div style='overflow-x:auto;'>"
-        "<table style='width:100%;border-collapse:collapse;'>"
-        "<tr style='background:#ecf0f1;'><th style='text-align:left;padding:8px;border:1px solid #ddd;'>Metodo</th><th style='text-align:left;padding:8px;border:1px solid #ddd;'>Endpoint</th><th style='text-align:left;padding:8px;border:1px solid #ddd;'>Descrizione</th></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>GET</td><td style='padding:8px;border:1px solid #ddd;'>/status</td><td style='padding:8px;border:1px solid #ddd;'>Info stato sistema (JSON)</td></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>GET</td><td style='padding:8px;border:1px solid #ddd;'>/api/config</td><td style='padding:8px;border:1px solid #ddd;'>Configurazione attuale</td></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/config/save</td><td style='padding:8px;border:1px solid #ddd;'>Salva configurazione</td></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/config/reset</td><td style='padding:8px;border:1px solid #ddd;'>Reset alle impostazioni di fabbrica</td></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>GET</td><td style='padding:8px;border:1px solid #ddd;'>/api/tasks</td><td style='padding:8px;border:1px solid #ddd;'>Lista dei task pianificati</td></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/tasks/save</td><td style='padding:8px;border:1px solid #ddd;'>Salva lista task</td></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/api/test/*</td><td style='padding:8px;border:1px solid #ddd;'>Endpoint per i test hardware</td></tr>"
-        "<tr><td style='padding:8px;border:1px solid #ddd;'>POST</td><td style='padding:8px;border:1px solid #ddd;'>/ota/upload</td><td style='padding:8px;border:1px solid #ddd;'>Upload firmware (multipart)</td></tr>"
-        "</table></div></div>"
         "</div></body></html>";
     
     httpd_resp_sendstr_chunk(req, body);
@@ -203,18 +203,35 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     const esp_partition_t *boot = esp_ota_get_boot_partition();
     const mdb_status_t *mdb = mdb_get_status();
 
-    char resp[1280];
-    snprintf(resp, sizeof(resp), 
+    char *config_json = device_config_to_json(device_config_get());
+
+    char *resp = malloc(4096);
+    if (!resp) {
+        if (config_json) free(config_json);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    snprintf(resp, 4096, 
              "{\"partition_running\":\"%s\",\"partition_boot\":\"%s\",\"ip_ap\":\"%s\",\"ip_sta\":\"%s\",\"ip_eth\":\"%s\","
              "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%lu},"
-             "\"sd\":{\"mounted\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"}}",
+             "\"sd\":{\"mounted\":%s,\"present\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"},"
+             "\"env\":{\"temp\":%.1f,\"hum\":%.1f},"
+             "\"config\":%s}",
              running?running->label:"?", boot?boot->label:"?", ap_ip, sta_ip, eth_ip,
              mdb->coin.is_online?"true":"false", mdb->coin.state, mdb->coin.credit_cents,
-             sd_card_is_mounted()?"true":"false", sd_card_get_total_size(), sd_card_get_used_size(),
-             sd_card_get_last_error());
+             sd_card_is_mounted()?"true":"false", sd_card_is_present()?"true":"false",
+             sd_card_get_total_size(), sd_card_get_used_size(),
+             sd_card_get_last_error(),
+             tasks_get_temperature(), tasks_get_humidity(),
+             config_json ? config_json : "{}");
+             
+    if (config_json) free(config_json);
              
     httpd_resp_set_type(req, "application/json");
-    return httpd_resp_send(req, resp, strlen(resp));
+    esp_err_t ret = httpd_resp_send(req, resp, strlen(resp));
+    free(resp);
+    return ret;
 }
 
 // Handler per la pagina OTA
@@ -350,7 +367,15 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<input type='range' id='lcd_bright' name='lcd_bright' min='0' max='100' style='width:100%' oninput='document.getElementById(\"bright_val\").innerText=this.value'></div>"
         "</div>"
 
-        "<div class='section'><h2>📟 Porte Seriali</h2>"
+        "<div class='section'><h2>🔘 GPIO Ausiliario (GPIO33)</h2>"
+        "<div class='indent'>"
+        "<b>GPIO 33</b>"
+        "<div class='form-group'><label>Modalità</label>"
+        "<select id='g33_mode' style='width:100%; padding:8px;'><option value='0'>Input (Float)</option><option value='1'>Input (Pull-up)</option><option value='2'>Input (Pull-down)</option><option value='3'>Output</option></select></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='g33_state'><span class='slider'></span></label><span>Stato Iniziale (Solo Out)</span></div>"
+        "</div></div>"
+
+        "<div class='section'><h2>�📟 Porte Seriali</h2>"
         "<details><summary><b>RS232 Configuration</b></summary>"
         "<div class='form-group'><label>Baudrate</label><input type='text' id='rs232_baud'></div>"
         "<div class='form-group'><label>Data Bits</label><input type='text' id='rs232_bits'></div>"
@@ -429,6 +454,8 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('mdb_baud').value=c.mdb_serial.baud;"
         "document.getElementById('mdb_rx').value=c.mdb_serial.rx_buf;"
         "document.getElementById('mdb_tx').value=c.mdb_serial.tx_buf;"
+        "document.getElementById('g33_mode').value=c.gpios.gpio33.mode;"
+        "document.getElementById('g33_state').checked=c.gpios.gpio33.state;"
         "}catch(e){console.error(e);}"
         "}"
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
@@ -440,7 +467,9 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "display:{lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
         "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
         "rs485:{baud:parseInt(document.getElementById('rs485_baud').value),data_bits:parseInt(document.getElementById('rs485_bits').value),parity:parseInt(document.getElementById('rs485_par').value),stop_bits:parseInt(document.getElementById('rs485_stop').value),rx_buf:parseInt(document.getElementById('rs485_rx').value),tx_buf:parseInt(document.getElementById('rs485_tx').value)},"
-        "mdb_serial:{baud:parseInt(document.getElementById('mdb_baud').value),data_bits:8,parity:0,stop_bits:1,rx_buf:parseInt(document.getElementById('mdb_rx').value),tx_buf:parseInt(document.getElementById('mdb_tx').value)}"
+        "mdb_serial:{baud:parseInt(document.getElementById('mdb_baud').value),data_bits:8,parity:0,stop_bits:1,rx_buf:parseInt(document.getElementById('mdb_rx').value),tx_buf:parseInt(document.getElementById('mdb_tx').value)},"
+        "gpios:{"
+        "gpio33:{mode:parseInt(document.getElementById('g33_mode').value),state:document.getElementById('g33_state').checked}}"
         "};"
         "const r=await fetch('/api/config/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});"
         "if(r.ok) alert('✅ Configurazione salvata!'); else alert('❌ Errore durante il salvataggio!');"
@@ -455,9 +484,8 @@ static esp_err_t config_page_handler(httpd_req_t *req)
 // Handler API GET /api/config
 static esp_err_t api_config_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/config (Forzo ricaricamento NVS)");
+    ESP_LOGD(TAG, "[C] GET /api/config");
     device_config_t *cfg = device_config_get();
-    device_config_load(cfg); // Forza rilettura da NVS
     
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "device_name", cfg->device_name);
@@ -526,6 +554,14 @@ static esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(mdb_s, "rx_buf", cfg->mdb_serial.rx_buf_size);
     cJSON_AddNumberToObject(mdb_s, "tx_buf", cfg->mdb_serial.tx_buf_size);
     cJSON_AddItemToObject(root, "mdb_serial", mdb_s);
+
+    // GPIOs
+    cJSON *gpios = cJSON_CreateObject();
+    cJSON *g33 = cJSON_CreateObject();
+    cJSON_AddNumberToObject(g33, "mode", cfg->gpios.gpio33.mode);
+    cJSON_AddBoolToObject(g33, "state", cfg->gpios.gpio33.initial_state);
+    cJSON_AddItemToObject(gpios, "gpio33", g33);
+    cJSON_AddItemToObject(root, "gpios", gpios);
     
     char *json = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -713,6 +749,15 @@ static esp_err_t api_config_save(httpd_req_t *req)
         }
     }
 
+    cJSON *gpios_obj = cJSON_GetObjectItem(root, "gpios");
+    if (gpios_obj) {
+        cJSON *g33 = cJSON_GetObjectItem(gpios_obj, "gpio33");
+        if (g33) {
+            cfg->gpios.gpio33.mode = (device_gpio_cfg_mode_t)cJSON_GetNumberValue(cJSON_GetObjectItem(g33, "mode"));
+            cfg->gpios.gpio33.initial_state = cJSON_IsTrue(cJSON_GetObjectItem(g33, "state"));
+        }
+    }
+
     // RS232 cfg
     cJSON *rs232_obj = cJSON_GetObjectItem(root, "rs232");
     if (rs232_obj) {
@@ -775,13 +820,14 @@ static esp_err_t stats_page_handler(httpd_req_t *req)
         "<div class='section'><h2>💾 Firmware</h2><div id='partitions'>Caricamento...</div></div>"
         "<div class='section'><h2>� SD Card</h2><div id='sd_card'>Caricamento...</div></div>"
         "<div class='section'><h2>�🔌 Stato Driver</h2><div id='sensors'>Caricamento...</div></div>"
-        "<div class='section'><h2>🎰 MDB Status</h2><div id='mdb_info'>Caricamento...</div></div>"
+        "<div class='section'><h2>�️ Ambiente</h2><div id='env_info'>Caricamento...</div></div>"
+        "<div class='section'><h2>�🎰 MDB Status</h2><div id='mdb_info'>Caricamento...</div></div>"
         "</div>"
         "<script>"
         "async function loadStats(){"
         "try{"
         "const r=await fetch('/status');if(!r.ok)throw new Error('Status Error');const status=await r.json();"
-        "const rc=await fetch('/api/config');if(!rc.ok)throw new Error('Config Error');const config=await rc.json();"
+        "const config=status.config;"
         "document.getElementById('network').innerHTML="
         "`<div class='stat-row'><span class='stat-label'>Indirizzo IP Ethernet</span><span class='stat-value'>${status.ip_eth||'---'}</span></div>"
         "<div class='stat-row'><span class='stat-label'>Indirizzo IP WiFi STA</span><span class='stat-value'>${status.ip_sta||'---'}</span></div>"
@@ -790,10 +836,17 @@ static esp_err_t stats_page_handler(httpd_req_t *req)
         "`<div class='stat-row'><span class='stat-label'>Partizione Corrente</span><span class='stat-value'>${status.partition_running||'?'}</span></div>"
         "<div class='stat-row'><span class='stat-label'>Partizione al Boot</span><span class='stat-value'>${status.partition_boot||'?'}</span></div>`;"
         "const sd=status.sd;"
+        "let sd_status_text='Non Trovata'; let sd_badge='badge-off';"
+        "if(sd.mounted){sd_status_text='Montata'; sd_badge='badge-on';}"
+        "else if(sd.present){sd_status_text='Presente (Non Montata)'; sd_badge='badge-on';}"
         "document.getElementById('sd_card').innerHTML="
-        "`<div class='stat-row'><span class='stat-label'>Stato</span><span class='badge ${sd.mounted==='true'?'badge-on':'badge-off'}'>${sd.mounted==='true'?'Montata':'Non Trovata'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>Spazio Totale</span><span class='stat-value'>${sd.mounted==='true'?(sd.total_kb/1024).toFixed(1)+' MB':'---'}</span></div>"
-        "<div class='stat-row'><span class='stat-label'>Spazio Usato</span><span class='stat-value'>${sd.mounted==='true'?(sd.used_kb/1024).toFixed(1)+' MB ('+((sd.used_kb/sd.total_kb)*100).toFixed(1)+'%)':'---'}</span></div>`;"
+        "`<div class='stat-row'><span class='stat-label'>Stato</span><span class='badge ${sd_badge}'>${sd_status_text}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Spazio Totale</span><span class='stat-value'>${sd.mounted?(sd.total_kb/1024).toFixed(1)+' MB':'---'}</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Spazio Usato</span><span class='stat-value'>${sd.mounted?(sd.used_kb/1024).toFixed(1)+' MB ('+((sd.used_kb/sd.total_kb)*100).toFixed(1)+'%)':'---'}</span></div>`;"
+        "const env=status.env;"
+        "document.getElementById('env_info').innerHTML="
+        "`<div class='stat-row'><span class='stat-label'>Temperatura</span><span class='stat-value'>${env.temp.toFixed(1)} °C</span></div>"
+        "<div class='stat-row'><span class='stat-label'>Umidità</span><span class='stat-value'>${env.hum.toFixed(1)} %</span></div>`;"
         "const s=config.sensors;"
         "document.getElementById('sensors').innerHTML="
         "`<div class='stat-row'><span class='stat-label'>I/O Expander</span><span class='badge ${s.io_expander_enabled?'badge-on':'badge-off'}'>${s.io_expander_enabled?'Attivo':'Disabilitato'}</span></div>"
@@ -848,6 +901,7 @@ static esp_err_t tasks_page_handler(httpd_req_t *req)
         "<div style='display:flex; gap:10px;'>"
         "<button type='button' class='btn-add' onclick='addRow()'>➕ Aggiungi Task</button>"
         "<button type='button' onclick='saveTasks()'>💾 Salva</button>"
+        "<button type='button' onclick='applyTasks()' style='background:#e67e22'>🚀 Applica</button>"
         "<button type='button' onclick='loadTasks()' style='background:#3498db'>🔄 Aggiorna Dati</button>"
         "</div>"
         "</div></div>"
@@ -873,6 +927,12 @@ static esp_err_t tasks_page_handler(httpd_req_t *req)
         "async function saveTasks(){"
         "try{const r=await fetch('/api/tasks/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(tasks)});"
         "if(r.ok){showStatus('✅ Tasks salvate con successo!','success');}else{showStatus('❌ Errore durante il salvataggio','error');}}catch(e){showStatus('❌ Errore: '+e,'error');}}"
+        "async function applyTasks(){"
+        "try{if(!confirm('Salvare e applicare le modifiche ai task attivi?')) return;"
+        "const rs=await fetch('/api/tasks/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(tasks)});"
+        "if(!rs.ok) throw new Error('Salvataggio fallito');"
+        "const ra=await fetch('/api/tasks/apply',{method:'POST'});"
+        "if(ra.ok){showStatus('🚀 Tasks applicati con successo!','success');}else{showStatus('❌ Errore durante l\\'applicazione','error');}}catch(e){showStatus('❌ Errore: '+e,'error');}}"
         "function showStatus(msg,type){const s=document.getElementById('status');s.textContent=msg;s.className=type;setTimeout(()=>s.className='',3000);}"
         "window.addEventListener('load',loadTasks);"
         "</script></body></html>";
@@ -1004,6 +1064,23 @@ static esp_err_t api_tasks_save(httpd_req_t *req)
     return ESP_OK;
 }
 
+// Handler API POST /api/tasks/apply
+static esp_err_t api_tasks_apply(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] POST /api/tasks/apply");
+    
+    // Ricarica la configurazione dal file CSV salvato su SPIFFS
+    tasks_load_config("/spiffs/tasks.csv");
+    
+    // Applica i cambiamenti ai task FreeRTOS
+    tasks_apply_n_run();
+    
+    httpd_resp_set_type(req, "application/json");
+    const char *ok_resp = "{\"status\":\"ok\",\"message\":\"Task applicati con successo\"}";
+    httpd_resp_send(req, ok_resp, strlen(ok_resp));
+    return ESP_OK;
+}
+
 // Handler pagina test
 static esp_err_t test_page_handler(httpd_req_t *req)
 {
@@ -1074,6 +1151,13 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div class='test-controls'><button id='btn_rs232' onclick=\"toggleSimpleTest('rs232', 'btn_rs232', 'Test RS232')\">▶️ Inizia Test</button></div></div>"
         "<div class='test-item'><span>Invia Stringa (es: \\0x55\\0xAA\\r\\n)</span>"
         "<div class='test-controls'><input type='text' id='rs232_input' placeholder='\\0x55 Test...'><button onclick=\"sendSerial('rs232')\">🚀 Invia</button></div></div>"
+        "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;'>"
+        "  <span style='font-weight:bold;'>Monitor:</span>"
+        "  <div class='test-controls'>"
+        "    <select id='rs232_mode' onchange=\"clearSerial('rs232')\"><option value='HEX'>HEX</option><option value='TEXT'>TEXT</option></select>"
+        "    <button onclick=\"clearSerial('rs232')\" style='background:#95a5a6; padding:4px 8px; font-size:12px;'>🗑️ Clear</button>"
+        "  </div>"
+        "</div>"
         "<div id='rs232_status' class='status-box'>Monitor:</div></div>"
         
         "<div class='section'><h2>📡 Seriale RS485 <span style='font-size:14px; color:#bdc3c7'>(PIN 12 A, 17 B)</span></h2>"
@@ -1081,6 +1165,13 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div class='test-controls'><button id='btn_rs485' onclick=\"toggleSimpleTest('rs485', 'btn_rs485', 'Test RS485')\">▶️ Inizia Test</button></div></div>"
         "<div class='test-item'><span>Invia Stringa</span>"
         "<div class='test-controls'><input type='text' id='rs485_input' placeholder='Richiesta...'><button onclick=\"sendSerial('rs485')\">🚀 Invia</button></div></div>"
+        "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;'>"
+        "  <span style='font-weight:bold;'>Monitor:</span>"
+        "  <div class='test-controls'>"
+        "    <select id='rs485_mode' onchange=\"clearSerial('rs485')\"><option value='HEX'>HEX</option><option value='TEXT'>TEXT</option></select>"
+        "    <button onclick=\"clearSerial('rs485')\" style='background:#95a5a6; padding:4px 8px; font-size:12px;'>🗑️ Clear</button>"
+        "  </div>"
+        "</div>"
         "<div id='rs485_status' class='status-box'>Monitor:</div></div>"
         
         "<div class='section'><h2>💾 EEPROM 24LC16 <span style='font-size:14px; color:#bdc3c7'>(PIN 32, 37 / I2C)</span> <span id='eeprom_header_info' style='font-size:14px; font-weight:normal; margin-left:15px; color:#666;'></span></h2>"
@@ -1099,7 +1190,26 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div class='test-controls'><button id='btn_mdb' onclick=\"toggleSimpleTest('mdb', 'btn_mdb', 'Test MDB')\">▶️ Inizia Test</button></div></div>"
         "<div class='test-item'><span>Invia Stringa (Hex, es: 08 00)</span>"
         "<div class='test-controls'><input type='text' id='mdb_input' placeholder='08 00...'><button onclick=\"sendSerial('mdb')\">🚀 Invia</button></div></div>"
+        "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;'>"
+        "  <span style='font-weight:bold;'>Monitor:</span>"
+        "  <div class='test-controls'>"
+        "    <select id='mdb_mode' onchange=\"clearSerial('mdb')\"><option value='HEX'>HEX</option><option value='TEXT'>TEXT</option></select>"
+        "    <button onclick=\"clearSerial('mdb')\" style='background:#95a5a6; padding:4px 8px; font-size:12px;'>🗑️ Clear</button>"
+        "  </div>"
+        "</div>"
         "<div id='mdb_status' class='status-box'>Pronto per test MDB</div></div>"
+
+        "<div class='section'><h2>🔘 GPIO Ausiliari (GPIO33)</h2>"
+        "<div id='gpios_test_grid'>Caricamento...</div>"
+        "<div id='gpios_status' class='status-box'>Stato GPIO in lettura...</div></div>"
+
+        "<div class='section'><h2>🌡️ Sensore SHT40 <span style='font-size:14px; color:#bdc3c7'>(I2C 0x45)</span></h2>"
+        "<div class='test-item'><span>Valori Correnti:</span>"
+        "<div class='test-controls'><span id='sht_vals' style='font-family:monospace; font-weight:bold; color:#2ecc71'>-- °C / -- %</span></div></div>"
+        "<div class='test-controls' style='justify-content:center;'>"
+        "  <button onclick=\"runTest('sht_read')\" style='background:#f39c12'>🔄 FORZA TEST LETTURA</button>"
+        "</div>"
+        "<div id='sht_status' class='status-box'>Pronto per test SHT40</div></div>"
 
         "<div class='section'><h2>💾 Scheda MicroSD <span style='font-size:14px; color:#bdc3c7'>(PIN 39)</span></h2>"
         "<div class='test-item'><span class='test-label'>Stato Montaggio:</span>"
@@ -1218,6 +1328,9 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "  if(isSd && sdLog){"
         "    sdLog.innerHTML += '<div style=\"color:#fff\">['+time+'] ✅ '+(result.message||'OK')+'</div>';"
         "    refreshSDStatus();"
+        "  } else if(test==='sht_read') {"
+        "    document.getElementById('sht_vals').innerText = result.temperature.toFixed(1)+' °C / '+result.humidity.toFixed(1)+' %';"
+        "    if(statusBox) statusBox.innerHTML+='<div class=\"result\">✅ Lettura OK</div>';"
         "  } else if(statusBox) statusBox.innerHTML+='<div class=\"result\">✅ '+(result.message||'OK')+'</div>';"
         "}else{"
         "  if(isSd && sdLog){"
@@ -1239,11 +1352,23 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "try{"
         "const r=await fetch('/api/test/serial_monitor',{method:'POST'});"
         "const res=await r.json();"
-        "if(res.log){"
-        "const s2=document.getElementById('rs232_status'); if(s2)s2.innerText=res.log;"
-        "const s4=document.getElementById('rs485_status'); if(s4)s4.innerText=res.log;"
-        "const sm=document.getElementById('mdb_status'); if(sm)sm.innerText=res.log;"
-        "}"
+        "const processLog = (log, modeId) => {"
+        "  if(!log || !document.getElementById(modeId)) return '';"
+        "  const mode = document.getElementById(modeId).value;"
+        "  const parts = log.split('|');"
+        "  let out = '';"
+        "  for(let i=0; i<parts.length-2; i+=3) {"
+        "    const prefix = parts[i]; const hex = parts[i+1]; const text = parts[i+2];"
+        "    const isRx = prefix.startsWith('RX');"
+        "    const color = isRx ? '#f1c40f' : '#ff4d4d';"
+        "    if(mode === 'HEX') out += '<span style=\"color:'+color+'\">' + prefix + ' ' + hex + ' </span>';"
+        "    else out += '<span style=\"color:'+color+'\">' + prefix + ' ' + text + ' </span>';"
+        "  }"
+        "  return out;"
+        "};"
+        "if(res.rs232) { const el=document.getElementById('rs232_status'); el.innerHTML=processLog(res.rs232, 'rs232_mode'); el.scrollTop=el.scrollHeight; }"
+        "if(res.rs485) { const el=document.getElementById('rs485_status'); el.innerHTML=processLog(res.rs485, 'rs485_mode'); el.scrollTop=el.scrollHeight; }"
+        "if(res.mdb) { const el=document.getElementById('mdb_status'); el.innerHTML=processLog(res.mdb, 'mdb_mode'); el.scrollTop=el.scrollHeight; }"
         "const rio=await fetch('/api/test/io_get',{method:'POST'});"
         "const io=await rio.json();"
         "if(io){"
@@ -1319,6 +1444,12 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "  else statusBox.innerHTML+='<div class=\"result\">❌ '+r.status+'</div>';"
         "}catch(e){}}"
         
+        "async function clearSerial(port){"
+        "try{"
+        "await fetch('/api/test/serial_clear',{method:'POST', body:JSON.stringify({port})});"
+        "updateMonitors();"
+        "}catch(e){}}"
+        
         "async function refreshEEPROMStatus(){"
         "try{"
         "  const r=await fetch('/api/test/eeprom',{method:'POST',body:JSON.stringify({op:'status'})});"
@@ -1331,7 +1462,11 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "  const r=await fetch('/status');"
         "  const res=await r.json();"
         "  const el=document.getElementById('sd_mounted_status');"
-        "  if(el) el.innerText = res.sd.mounted ? '✅ MONTATA' : '❌ NO';"
+        "  if(el) {"
+        "    if(res.sd.mounted) el.innerText = '✅ MONTATA';"
+        "    else if(res.sd.present) el.innerText = '⚠️ PRESENTE (NON MONTATA)';"
+        "    else el.innerText = '❌ ASSENTE';"
+        "  }"
         "  const errEl=document.getElementById('sd_error_status');"
         "  if(errEl) {"
         "    if(errEl.innerText !== res.sd.last_error && res.sd.last_error !== 'Nessuno') {"
@@ -1348,10 +1483,36 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "    clearInterval(window.sdFmtInterval); window.sdFmtInterval=null;"
         "  }"
         "}catch(e){}}"
+
+        "async function updateGPIOs(){"
+        "try{"
+        "  const r=await fetch('/status');"
+        "  const s=await r.json();"
+        "  const res=await fetch('/api/test/gpio_get',{method:'POST'});"
+        "  const gpios=await res.json();"
+        "  let h='';"
+        "  [33].forEach(pin=>{"
+        "    const cfg = gpios[pin];"
+        "    const isOut = cfg.mode === 3;"
+        "    const val = cfg.level;"
+        "    h+='<div class=\"test-item\"><span class=\"test-label\">GPIO '+pin+' ('+(isOut?'OUT':'IN')+')</span>';"
+        "    h+='<div class=\"test-controls\"><span style=\"background:'+(val?'#2ecc71':'#34495e')+';color:white;padding:4px 8px;border-radius:4px;\">'+(val?'HIGH':'LOW')+'</span>';"
+        "    if(isOut) h+='<button onclick=\"setAuxGPIO('+pin+',1)\">ON</button><button onclick=\"setAuxGPIO('+pin+',0)\" style=\"background:#95a5a6\">OFF</button>';"
+        "    h+='</div></div>';"
+        "  });"
+        "  document.getElementById('gpios_test_grid').innerHTML=h;"
+        "  const el=document.getElementById('sht_vals');"
+        "  if(el) el.innerText=s.env.temp.toFixed(1)+' °C / '+s.env.hum.toFixed(1)+' %';"
+        "}catch(e){}}"
+
+        "async function setAuxGPIO(pin,val){"
+        "try{ await fetch('/api/test/gpio_set',{method:'POST',body:JSON.stringify({pin,val})}); updateGPIOs();"
+        "}catch(e){}}"
         
         "refreshEEPROMStatus();"
         "refreshSDStatus();"
         "setInterval(updateMonitors, 1000);"
+        "setInterval(updateGPIOs, 1000);"
         "</script></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);
@@ -1516,6 +1677,17 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test MDB fermato\"}");
     }
     
+    // --- TEST SHT40 ---
+    else if (strcmp(test_name, "sht_read") == 0) {
+        float t, h;
+        esp_err_t err = sht40_read(&t, &h);
+        if (err == ESP_OK) {
+            snprintf(response, sizeof(response), "{\"status\":\"ok\",\"temperature\":%.1f,\"humidity\":%.1f,\"message\":\"Lettura SHT40 OK\"}", t, h);
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Lettura fallita: %s\"}", esp_err_to_name(err));
+        }
+    }
+    
     // --- TEST SD CARD ---
     else if (strcmp(test_name, "sd_init") == 0) {
         // Se è già montata, la smontiamo prima per forzare un re-init pulito
@@ -1598,9 +1770,59 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         } else snprintf(response, sizeof(response), "{\"error\":\"JSON non valido\"}");
     }
     
+    // --- TEST GPIO AUSILIARI ---
+    else if (strcmp(test_name, "gpio_get") == 0) {
+        char json_buf[128];
+        if (aux_gpio_get_all_json(json_buf, sizeof(json_buf)) == ESP_OK) {
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, json_buf);
+        } else {
+            httpd_resp_send_500(req);
+        }
+        return ESP_OK;
+    } 
+    else if (strcmp(test_name, "gpio_set") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            int pin = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(root, "pin"));
+            int val = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(root, "val"));
+            aux_gpio_set_level(pin, val);
+            snprintf(response, sizeof(response), "{\"status\":\"ok\"}");
+            cJSON_Delete(root);
+        }
+    }
+
     // --- MONITOR SERIALE ---
     else if (strcmp(test_name, "serial_monitor") == 0) {
-        snprintf(response, sizeof(response), "{\"log\":\"%s\"}", serial_test_get_monitor());
+        cJSON *root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "rs232", serial_test_get_monitor(CONFIG_APP_RS232_UART_PORT));
+        cJSON_AddStringToObject(root, "rs485", serial_test_get_monitor(CONFIG_APP_RS485_UART_PORT));
+        cJSON_AddStringToObject(root, "mdb", serial_test_get_monitor(CONFIG_APP_MDB_UART_PORT));
+        char *json_out = cJSON_PrintUnformatted(root);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, json_out, strlen(json_out));
+        free(json_out);
+        cJSON_Delete(root);
+        return ESP_OK;
+    }
+    
+    // --- CLEAR MONITOR ---
+    else if (strcmp(test_name, "serial_clear") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *port_obj = cJSON_GetObjectItem(root, "port");
+            if (port_obj) {
+                int port = (strcmp(port_obj->valuestring, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT : 
+                           (strcmp(port_obj->valuestring, "mdb") == 0) ? CONFIG_APP_MDB_UART_PORT : CONFIG_APP_RS232_UART_PORT;
+                serial_test_clear_monitor(port);
+            }
+            cJSON_Delete(root);
+        }
+        snprintf(response, sizeof(response), "{\"status\":\"ok\"}");
     }
 
     else {
@@ -1688,6 +1910,9 @@ esp_err_t web_ui_init(void)
     
     httpd_uri_t uri_api_tasks_save = {.uri = "/api/tasks/save", .method = HTTP_POST, .handler = api_tasks_save};
     httpd_register_uri_handler(s_server, &uri_api_tasks_save);
+
+    httpd_uri_t uri_api_tasks_apply = {.uri = "/api/tasks/apply", .method = HTTP_POST, .handler = api_tasks_apply};
+    httpd_register_uri_handler(s_server, &uri_api_tasks_apply);
     
     httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
     httpd_register_uri_handler(s_server, &uri_api_test);

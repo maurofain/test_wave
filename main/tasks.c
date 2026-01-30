@@ -3,11 +3,17 @@
 #include "esp_log.h"
 #include "led_strip.h"
 #include "device_config.h"
+#include "sht40.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 
 static const char *TAG = "TASKS";
+static float s_temperature = 0.0f;
+static float s_humidity = 0.0f;
+
+float tasks_get_temperature(void) { return s_temperature; }
+float tasks_get_humidity(void) { return s_humidity; }
 
 static void ws2812_blink_task(void *arg)
 {
@@ -61,6 +67,14 @@ static void sht40_task(void *arg)
     task_param_t *param = (task_param_t *)arg;
     TickType_t last_wake = xTaskGetTickCount();
     while (true) {
+        if (device_config_get()->sensors.temperature_enabled) {
+            float t, h;
+            if (sht40_read(&t, &h) == ESP_OK) {
+                s_temperature = t;
+                s_humidity = h;
+                ESP_LOGD(TAG, "SHT40: T=%.1f C, RH=%.1f %%", t, h);
+            }
+        }
         vTaskDelayUntil(&last_wake, param->period_ticks);
     }
 }
@@ -127,7 +141,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(500),
         .task_fn = ws2812_blink_task,
-        .stack_words = 2048,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -138,29 +152,29 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(1000),
         .task_fn = eeprom_task,
-        .stack_words = 2048,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
     {
         .name = "io_expander",
-        .state = TASK_STATE_IDLE,
+        .state = TASK_STATE_RUN,
         .priority = 4,
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(500),
         .task_fn = io_expander_task,
-        .stack_words = 2048,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
     {
         .name = "sht40",
-        .state = TASK_STATE_IDLE,
+        .state = TASK_STATE_RUN,
         .priority = 4,
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(2000),
         .task_fn = sht40_task,
-        .stack_words = 2048,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -171,7 +185,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = rs232_task,
-        .stack_words = 4096,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -182,7 +196,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = rs485_task,
-        .stack_words = 4096,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -193,7 +207,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = mdb_task,
-        .stack_words = 4096,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -204,7 +218,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(20),
         .task_fn = pwm_task,
-        .stack_words = 2048,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -215,7 +229,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(20),
         .task_fn = touchscreen_task,
-        .stack_words = 4096,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -226,7 +240,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(16),
         .task_fn = lvgl_task,
-        .stack_words = 4096,
+        .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,
     },
@@ -291,7 +305,11 @@ void tasks_load_config(const char *path)
         if (prio) t->priority = (UBaseType_t)atoi(prio);
         if (core) t->core_id = (BaseType_t)atoi(core);
         if (period) t->period_ticks = pdMS_TO_TICKS(atoi(period));
-        if (stack) t->stack_words = (uint32_t)atoi(stack);
+        if (stack) {
+            uint32_t val = (uint32_t)atoi(stack);
+            if (val < 8192) val = 8192; // Forza minimo 8192 words (32KB) per sicurezza
+            t->stack_words = val;
+        }
     }
     fclose(f);
 }
@@ -304,10 +322,38 @@ void tasks_start_all(void)
             ESP_LOGI(TAG, "[M] Task saltato %s (stato=%d)", t->name, (int)t->state);
             continue;
         }
+        ESP_LOGI(TAG, "[M] Avvio task %s (stack=%lu words)...", t->name, (unsigned long)t->stack_words);
         t->arg = t;
         BaseType_t res = xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
         if (res != pdPASS) {
             ESP_LOGE(TAG, "[M] Fallimento avvio task %s", t->name);
+        }
+    }
+}
+
+void tasks_apply_n_run(void)
+{
+    ESP_LOGI(TAG, "Applicazione nuovi stati task...");
+    for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
+        task_param_t *t = &s_tasks[i];
+        
+        if (t->state == TASK_STATE_RUN) {
+            if (t->handle == NULL) {
+                ESP_LOGI(TAG, "Avvio task %s (stack=%lu words)...", t->name, (unsigned long)t->stack_words);
+                t->arg = t;
+                xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
+            } else {
+                vTaskResume(t->handle);
+            }
+        } else if (t->state == TASK_STATE_PAUSE) {
+            if (t->handle != NULL) {
+                vTaskSuspend(t->handle);
+            }
+        } else if (t->state == TASK_STATE_IDLE) {
+            if (t->handle != NULL) {
+                vTaskDelete(t->handle);
+                t->handle = NULL;
+            }
         }
     }
 }

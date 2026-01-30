@@ -72,6 +72,25 @@ typedef struct {
 } device_serial_config_t;
 
 /**
+ * @brief Configurazione GPIO configurabili (GPIO33)
+ */
+typedef enum {
+    GPIO_CFG_MODE_INPUT_FLOAT = 0,
+    GPIO_CFG_MODE_INPUT_PULLUP = 1,
+    GPIO_CFG_MODE_INPUT_PULLDOWN = 2,
+    GPIO_CFG_MODE_OUTPUT = 3
+} device_gpio_cfg_mode_t;
+
+typedef struct {
+    device_gpio_cfg_mode_t mode;    ///< Modalità (IN/OUT/Pull)
+    bool initial_state;             ///< Stato iniziale se OUTPUT
+} device_gpio_pin_config_t;
+
+typedef struct {
+    device_gpio_pin_config_t gpio33; ///< GPIO 33
+} device_gpios_config_t;
+
+/**
  * @brief Configurazione generale device
  */
 typedef struct {
@@ -85,6 +104,7 @@ typedef struct {
     device_serial_config_t rs232;       ///< Configurazione RS232
     device_serial_config_t rs485;       ///< Configurazione RS485
     device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB
+    device_gpios_config_t gpios;        ///< Configurazione GPIO extra
 } device_config_t;
 
 /**
