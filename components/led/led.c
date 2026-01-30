@@ -41,8 +41,11 @@ esp_err_t led_init(void)
     // Se il conteggio è cambiato o è la prima init, procediamo
     if (s_led_strip != NULL) {
         ESP_LOGI(TAG, "[C] Cambio led_count rilevato (da %lu a %lu): re-inizializzazione stripe", s_led_count, current_cfg_count);
+        led_strip_clear(s_led_strip);
+        vTaskDelay(pdMS_TO_TICKS(10));
         led_strip_del(s_led_strip);
         s_led_strip = NULL;
+        vTaskDelay(pdMS_TO_TICKS(10));
     } else {
         ESP_LOGI(TAG, "[C] Inizializzazione driver LED WS2812 (count: %lu)", current_cfg_count);
     }
@@ -105,6 +108,9 @@ esp_err_t led_refresh(void)
         return ESP_ERR_INVALID_STATE;
     }
     esp_err_t err = led_strip_refresh(s_led_strip);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Refresh LED fallito: 0x%x", err);
+    }
     LED_UNLOCK();
     return err;
 }

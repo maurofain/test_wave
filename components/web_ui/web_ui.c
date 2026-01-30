@@ -617,11 +617,11 @@ static esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddItemToObject(root, "mdb_serial", mdb_s);
 
     char *json = cJSON_Print(root);
-    esp_err_t err = sd_card_write_file("/sdcard/config_backup.json", json);
+    esp_err_t err = sd_card_write_file("/sdcard/config.jsn", json);
     
     char response[128];
     if (err == ESP_OK) {
-        snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Backup salvato in /sdcard/config_backup.json\"}");
+        snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Backup salvato in /sdcard/config.jsn\"}");
     } else {
         snprintf(response, sizeof(response), "{\"error\":\"Errore scrittura file\"}");
     }
@@ -1122,22 +1122,26 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div id='sd_status' class='status-box' style='display:none'></div></div>"
         "</div>"
         "<script>"
-        "let ledUpdateLock = false;"
+        "let ledUpdateLock = false; let ledPendingUpdate = false;"
         "async function updateLedRealtime(){"
-        "  if(ledUpdateLock) return;"
+        "  if(ledUpdateLock) { ledPendingUpdate = true; return; }"
         "  const isRainbow = document.getElementById('btn_led_rainbow').innerText.includes('FERMA');"
         "  const isManual = document.getElementById('btn_led_manual').innerText.includes('FERMA');"
         "  if(!isRainbow && !isManual) return;"
         "  ledUpdateLock = true;"
-        "  try {"
-        "    const bright = document.getElementById('led_bright').value;"
-        "    if(isRainbow) {"
-        "      await fetch('/api/test/led_bright', {method:'POST', body: JSON.stringify({bright: parseInt(bright)})});"
-        "    } else {"
-        "      const color = document.getElementById('led_color').value;"
-        "      await fetch('/api/test/led_set', {method:'POST', body: JSON.stringify({r: parseInt(color.substr(1,2),16), g: parseInt(color.substr(3,2),16), b: parseInt(color.substr(5,2),16), bright: parseInt(bright)})});"
-        "    }"
-        "  } catch(e){} finally { ledUpdateLock = false; }"
+        "  do {"
+        "    ledPendingUpdate = false;"
+        "    try {"
+        "      const bright = document.getElementById('led_bright').value;"
+        "      if(isRainbow) {"
+        "        await fetch('/api/test/led_bright', {method:'POST', body: JSON.stringify({bright: parseInt(bright)})});"
+        "      } else {"
+        "        const color = document.getElementById('led_color').value;"
+        "        await fetch('/api/test/led_set', {method:'POST', body: JSON.stringify({r: parseInt(color.substr(1,2),16), g: parseInt(color.substr(3,2),16), b: parseInt(color.substr(5,2),16), bright: parseInt(bright)})});"
+        "      }"
+        "    } catch(e){}"
+        "  } while(ledPendingUpdate);"
+        "  ledUpdateLock = false;"
         "}"
         
         "async function toggleLedRainbow(){"
@@ -1328,6 +1332,21 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "  const res=await r.json();"
         "  const el=document.getElementById('sd_mounted_status');"
         "  if(el) el.innerText = res.sd.mounted ? '✅ MONTATA' : '❌ NO';"
+        "  const errEl=document.getElementById('sd_error_status');"
+        "  if(errEl) {"
+        "    if(errEl.innerText !== res.sd.last_error && res.sd.last_error !== 'Nessuno') {"
+        "       const sdLog=document.getElementById('sd_op_log');"
+        "       if(sdLog) {"
+        "         const time = new Date().toLocaleTimeString();"
+        "         sdLog.innerHTML += '<div>['+time+'] STATO: '+res.sd.last_error+'</div>';"
+        "         sdLog.scrollTop = sdLog.scrollHeight;"
+        "       }"
+        "    }"
+        "    errEl.innerText = res.sd.last_error;"
+        "  }"
+        "  if(window.sdFmtInterval && (res.sd.last_error.includes('OK') || res.sd.last_error.includes('Errore'))){"
+        "    clearInterval(window.sdFmtInterval); window.sdFmtInterval=null;"
+        "  }"
         "}catch(e){}}"
         
         "refreshEEPROMStatus();"

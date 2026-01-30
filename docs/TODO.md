@@ -72,3 +72,6 @@
 
 1. Led Stripe
 2. PWM1 e PWM2
+3. RS232 (tx)
+4. RS485 (tx)
+5. MDB (tx)

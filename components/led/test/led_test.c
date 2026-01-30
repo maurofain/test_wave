@@ -22,7 +22,7 @@ static void led_test_task(void *arg) {
         }
         led_refresh();
         hue = (hue + 5) % 360;
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
     led_clear();
     s_led_test_handle = NULL;
@@ -49,7 +49,7 @@ esp_err_t led_test_set_brightness(uint8_t brightness) {
 esp_err_t led_test_set_color(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness) {
     if (s_run) {
         s_run = false;
-        vTaskDelay(pdMS_TO_TICKS(20)); // Attendi che il task rainbow si chiuda
+        vTaskDelay(pdMS_TO_TICKS(50)); // Attendi che il task rainbow si chiuda
     }
     
     s_test_brightness = (brightness > 100) ? 100 : brightness;
@@ -60,5 +60,5 @@ esp_err_t led_test_set_color(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness
     uint8_t final_b = (b * s_test_brightness) / 100;
 
     led_fill_color(final_r, final_g, final_b);
-    return led_refresh();
+    return ESP_OK;
 }

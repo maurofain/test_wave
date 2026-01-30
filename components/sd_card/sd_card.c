@@ -156,13 +156,13 @@ esp_err_t sd_card_mount(void) {
     }
 
     s_mounted = true;
-    snprintf(s_last_error, sizeof(s_last_error), "Nessuno");
+    snprintf(s_last_error, sizeof(s_last_error), "SD Montata");
     ESP_LOGI(TAG, "SUCCESSO: SD Card montata correttamente in %s", MOUNT_POINT);
     sdmmc_card_print_info(stdout, s_card);
     
     // Test di scrittura rapido subito dopo il mount
     ESP_LOGI(TAG, "Esecuzione test di scrittura post-mount...");
-    sd_card_write_file(MOUNT_POINT "/mount_test.txt", "Test di montaggio OK");
+    sd_card_write_file(MOUNT_POINT "/test.txt", "Test di montaggio OK");
 
     return ESP_OK;
 }
@@ -228,7 +228,7 @@ static void sd_format_worker_task(void *pvParameters) {
     if (err == ESP_OK) {
         snprintf(s_last_error, sizeof(s_last_error), "Formattazione OK");
         ESP_LOGI(TAG, "Formattazione completata con successo.");
-        sd_card_write_file(MOUNT_POINT "/format_ok.txt", "Scheda pulita e formattata");
+        sd_card_write_file(MOUNT_POINT "/form_ok.txt", "Scheda pulita e formattata");
     } else {
         snprintf(s_last_error, sizeof(s_last_error), "Errore: 0x%x", err);
         ESP_LOGE(TAG, "Formattazione fallita: 0x%x", err);
@@ -286,6 +286,7 @@ esp_err_t sd_card_write_file(const char *path, const char *data) {
     }
     fprintf(f, "%s", data);
     fclose(f);
+    snprintf(s_last_error, sizeof(s_last_error), "Scrittura OK");
     ESP_LOGI(TAG, "File scritto con successo: %s", path);
     return ESP_OK;
 }
