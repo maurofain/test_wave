@@ -72,6 +72,7 @@ esp_err_t mdb_init(void);
  * @brief Avvia il Polling Engine MDB in un task FreeRTOS
  * @return ESP_OK se avviato
  */
+esp_err_t mdb_init(void);
 esp_err_t mdb_start_engine(void);
 
 /**

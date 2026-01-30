@@ -27,6 +27,8 @@
 #include "pwm.h"
 #include "pwm_test.h"
 #include "sd_card.h"
+#include "rs232.h"
+#include "rs485.h"
 
 static const char *TAG = "WEB_UI";
 static httpd_handle_t s_server = NULL;
@@ -205,10 +207,11 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     snprintf(resp, sizeof(resp), 
              "{\"partition_running\":\"%s\",\"partition_boot\":\"%s\",\"ip_ap\":\"%s\",\"ip_sta\":\"%s\",\"ip_eth\":\"%s\","
              "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%lu},"
-             "\"sd\":{\"mounted\":%s,\"total_kb\":%llu,\"used_kb\":%llu}}",
+             "\"sd\":{\"mounted\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"}}",
              running?running->label:"?", boot?boot->label:"?", ap_ip, sta_ip, eth_ip,
              mdb->coin.is_online?"true":"false", mdb->coin.state, mdb->coin.credit_cents,
-             sd_card_is_mounted()?"true":"false", sd_card_get_total_size(), sd_card_get_used_size());
+             sd_card_is_mounted()?"true":"false", sd_card_get_total_size(), sd_card_get_used_size(),
+             sd_card_get_last_error());
              
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, resp, strlen(resp));
@@ -333,6 +336,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='io_exp' name='io_exp'><span class='slider'></span></label><span>I/O Expander</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='temp' name='temp'><span class='slider'></span></label><span>Sensore Temperatura</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='led' name='led'><span class='slider'></span></label><span>LED Strip (WS2812)</span></div>"
+        "<div class='form-group indent'><label>Numero di LED</label><input type='number' id='led_count' name='led_count' min='1' max='512' style='width:120px; padding:6px; border:1px solid #ddd; border-radius:4px;'></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs232' name='rs232'><span class='slider'></span></label><span>UART RS232</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs485' name='rs485'><span class='slider'></span></label><span>UART RS485</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='mdb' name='mdb'><span class='slider'></span></label><span>MDB Engine</span></div>"
@@ -401,6 +405,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('io_exp').checked=c.sensors.io_expander_enabled;"
         "document.getElementById('temp').checked=c.sensors.temperature_enabled;"
         "document.getElementById('led').checked=c.sensors.led_enabled;"
+        "document.getElementById('led_count').value=c.sensors.led_count || 16;"
         "document.getElementById('rs232').checked=c.sensors.rs232_enabled;"
         "document.getElementById('rs485').checked=c.sensors.rs485_enabled;"
         "document.getElementById('mdb').checked=c.sensors.mdb_enabled;"
@@ -431,7 +436,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "device_name:document.getElementById('dev_name').value,"
         "eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},"
         "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
-        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
+        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
         "display:{lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
         "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
         "rs485:{baud:parseInt(document.getElementById('rs485_baud').value),data_bits:parseInt(document.getElementById('rs485_bits').value),parity:parseInt(document.getElementById('rs485_par').value),stop_bits:parseInt(document.getElementById('rs485_stop').value),rx_buf:parseInt(document.getElementById('rs485_rx').value),tx_buf:parseInt(document.getElementById('rs485_tx').value)},"
@@ -479,6 +484,7 @@ static esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "io_expander_enabled", cfg->sensors.io_expander_enabled);
     cJSON_AddBoolToObject(sensors, "temperature_enabled", cfg->sensors.temperature_enabled);
     cJSON_AddBoolToObject(sensors, "led_enabled", cfg->sensors.led_enabled);
+    cJSON_AddNumberToObject(sensors, "led_count", cfg->sensors.led_count);
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
@@ -567,6 +573,7 @@ static esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "io_expander_enabled", cfg->sensors.io_expander_enabled);
     cJSON_AddBoolToObject(sensors, "temperature_enabled", cfg->sensors.temperature_enabled);
     cJSON_AddBoolToObject(sensors, "led_enabled", cfg->sensors.led_enabled);
+    cJSON_AddNumberToObject(sensors, "led_count", cfg->sensors.led_count);
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
@@ -629,15 +636,15 @@ static esp_err_t api_config_backup(httpd_req_t *req)
 // Handler API POST /api/config/save
 static esp_err_t api_config_save(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST /api/config/save");
+    ESP_LOGI(TAG, "[C] Ricevuta richiesta salvataggio configurazione");
     
-    char buf[2048] = {0};
+    char buf[4096] = {0};
     httpd_req_recv(req, buf, sizeof(buf)-1);
     
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
         const char *resp_str = "{\"error\":\"Invalid JSON\"}";
-    httpd_resp_send(req, resp_str, strlen(resp_str));
+        httpd_resp_send(req, resp_str, strlen(resp_str));
         return ESP_OK;
     }
     
@@ -672,13 +679,26 @@ static esp_err_t api_config_save(httpd_req_t *req)
     if (sensors_obj) {
         cfg->sensors.io_expander_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "io_expander_enabled"));
         cfg->sensors.temperature_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "temperature_enabled"));
+        
+        bool old_led_enabled = cfg->sensors.led_enabled;
+        uint32_t old_led_count = cfg->sensors.led_count;
+        
         cfg->sensors.led_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "led_enabled"));
+        cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_count");
+        if (lc) cfg->sensors.led_count = (uint32_t)lc->valueint;
+        
         cfg->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled"));
         cfg->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled"));
         cfg->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
         cfg->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled"));
         cfg->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
         cfg->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled"));
+
+        // Se i LED sono abilitati e il numero è cambiato, re-inizializziamo la stripe
+        if (cfg->sensors.led_enabled && (cfg->sensors.led_count != old_led_count || !old_led_enabled)) {
+            ESP_LOGI(TAG, "[C] Cambio configurazione LED rilevato: re-inizializzo driver");
+            led_init();
+        }
     }
 
     cJSON *display_obj = cJSON_GetObjectItem(root, "display");
@@ -1006,22 +1026,23 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "<div class='container'>"
         "<div style='text-align:right;'><button class='refresh-btn' onclick='location.reload()'>🔄 Aggiorna Pagina</button></div>"
         
-        "<div class='section'><h2>💡 Striscia LED (WS2812)</h2>"
-        "<div class='test-item'><span class='test-label'>Pattern RGB Completo (40s)</span>"
-        "<div class='test-controls'><button onclick=\"runTest('led_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('led_stop')\">⏹️ Ferma</button></div></div>"
+        "<div class='section'><h2>💡 Striscia LED (WS2812) <span style='font-size:14px; color:#bdc3c7'>(PIN 15 / GPIO 5)</span></h2>"
+        "<div class='test-item'><span class='test-label'>Pattern Rainbow</span>"
+        "<div class='test-controls'><button id='btn_led_rainbow' onclick=\"toggleLedRainbow()\">▶️ Inizia Rainbow</button></div></div>"
         
         "<h3>Controllo Manuale</h3>"
         "<div class='test-item'><span>Seleziona Colore:</span>"
         "<div class='test-controls'>"
-        "  <input type='color' id='led_color' value='#ff0000' style='width:60px; height:35px; border:none; padding:0; cursor:pointer'>"
-        "  <button onclick=\"setLED()\" style='background:#2ecc71'>🚀 Applica</button>"
+        "  <input type='color' id='led_color' value='#ff0000' oninput='updateLedRealtime()' style='width:60px; height:35px; border:none; padding:0; cursor:pointer'>"
+        "  <span>Luminosità:</span><input type='range' id='led_bright' min='0' max='100' value='50' oninput='updateLedRealtime()' style='width:100px'>"
+        "  <button id='btn_led_manual' onclick=\"toggleLedManual()\" style='background:#2ecc71'>🚀 Inizia Manuale</button>"
         "</div></div>"
         
         "<div id='led_status' class='status-box'>Pronto per test LED</div></div>"
 
-        "<div class='section'><h2>🔌 I/O Expander</h2>"
-        "<div class='test-item'><span class='test-label'>Blink Tutte le Porte (1Hz)</span>"
-        "<div class='test-controls'><button onclick=\"runTest('ioexp_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('ioexp_stop')\">⏹️ Ferma</button></div></div>"
+        "<div class='section'><h2>🔌 I/O Expander <span style='font-size:14px; color:#bdc3c7'>(PIN 32, 37 / I2C)</span></h2>"
+        "<div class='test-item'><span class='test-label'>Blink Tutte le Uscite (1Hz)</span>"
+        "<div class='test-controls'><button id='btn_ioexp' onclick=\"toggleSimpleTest('ioexp', 'btn_ioexp', 'Blink')\">▶️ Inizia Blink</button></div></div>"
         
         "<h3>Controllo Manuale</h3>"
         "<div id='io_manual_control' style='display:grid; grid-template-columns: 1fr 1fr; gap: 20px;'>"
@@ -1031,11 +1052,11 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         
         "<div id='ioexp_status' class='status-box'>Pronto per test I/O Expander</div></div>"
         
-        "<div class='section'><h2>⚡ PWM</h2>"
+        "<div class='section'><h2>⚡ PWM <span style='font-size:14px; color:#bdc3c7'>(PIN 34, 38)</span></h2>"
         "<div class='test-item'><span class='test-label'>PWM1 Duty Cycle Sweep</span>"
-        "<div class='test-controls'><button onclick=\"runTest('pwm1_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('pwm1_stop')\">⏹️ Ferma</button></div></div>"
+        "<div class='test-controls'><button id='btn_pwm1' onclick=\"toggleSimpleTest('pwm1', 'btn_pwm1', 'Sweep PWM1')\">▶️ Inizia Sweep</button></div></div>"
         "<div class='test-item'><span class='test-label'>PWM2 Duty Cycle Sweep</span>"
-        "<div class='test-controls'><button onclick=\"runTest('pwm2_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('pwm2_stop')\">⏹️ Ferma</button></div></div>"
+        "<div class='test-controls'><button id='btn_pwm2' onclick=\"toggleSimpleTest('pwm2', 'btn_pwm2', 'Sweep PWM2')\">▶️ Inizia Sweep</button></div></div>"
         
         "<h3>Controllo Manuale PWM</h3>"
         "<div class='test-item'>"
@@ -1048,21 +1069,21 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         
         "<div id='pwm_status' class='status-box'>Pronto per test PWM</div></div>"
         
-        "<div class='section'><h2>📡 Seriale RS232</h2>"
+        "<div class='section'><h2>📡 Seriale RS232 <span style='font-size:14px; color:#bdc3c7'>(PIN 23 TX, 35 RX)</span></h2>"
         "<div class='test-item'><span class='test-label'>Test Loopback: 0x55, 0xAA, 0x01, 0x07</span>"
-        "<div class='test-controls'><button onclick=\"runTest('rs232_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('rs232_stop')\">⏹️ Ferma</button></div></div>"
+        "<div class='test-controls'><button id='btn_rs232' onclick=\"toggleSimpleTest('rs232', 'btn_rs232', 'Test RS232')\">▶️ Inizia Test</button></div></div>"
         "<div class='test-item'><span>Invia Stringa (es: \\0x55\\0xAA\\r\\n)</span>"
         "<div class='test-controls'><input type='text' id='rs232_input' placeholder='\\0x55 Test...'><button onclick=\"sendSerial('rs232')\">🚀 Invia</button></div></div>"
         "<div id='rs232_status' class='status-box'>Monitor:</div></div>"
         
-        "<div class='section'><h2>📡 Seriale RS485</h2>"
+        "<div class='section'><h2>📡 Seriale RS485 <span style='font-size:14px; color:#bdc3c7'>(PIN 12 A, 17 B)</span></h2>"
         "<div class='test-item'><span class='test-label'>Test Loopback: 0x55, 0xAA, 0x01, 0x07</span>"
-        "<div class='test-controls'><button onclick=\"runTest('rs485_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('rs485_stop')\">⏹️ Ferma</button></div></div>"
+        "<div class='test-controls'><button id='btn_rs485' onclick=\"toggleSimpleTest('rs485', 'btn_rs485', 'Test RS485')\">▶️ Inizia Test</button></div></div>"
         "<div class='test-item'><span>Invia Stringa</span>"
         "<div class='test-controls'><input type='text' id='rs485_input' placeholder='Richiesta...'><button onclick=\"sendSerial('rs485')\">🚀 Invia</button></div></div>"
         "<div id='rs485_status' class='status-box'>Monitor:</div></div>"
         
-        "<div class='section'><h2>💾 EEPROM 24LC16 <span id='eeprom_header_info' style='font-size:14px; font-weight:normal; margin-left:15px; color:#666;'></span></h2>"
+        "<div class='section'><h2>💾 EEPROM 24LC16 <span style='font-size:14px; color:#bdc3c7'>(PIN 32, 37 / I2C)</span> <span id='eeprom_header_info' style='font-size:14px; font-weight:normal; margin-left:15px; color:#666;'></span></h2>"
         "<div class='test-item'><span>Indirizzo (0-2047)</span>"
         "<div class='test-controls'><input type='number' id='eeprom_addr' value='0' min='0' max='2047' style='width:80px'></div></div>"
         "<div class='test-item'><span>Dato Byte (0-255)</span>"
@@ -1073,53 +1094,152 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "</div></div>"
         "<div id='eeprom_status' class='status-box'>Pronto per test EEPROM</div></div>"
 
-        "<div class='section'><h2>🎰 MDB (Multi-Drop Bus)</h2>"
+        "<div class='section'><h2>🎰 MDB (Multi-Drop Bus) <span style='font-size:14px; color:#bdc3c7'>(PIN 8, 11)</span></h2>"
         "<div class='test-item'><span class='test-label'>Test Loopback/Echo</span>"
-        "<div class='test-controls'><button onclick=\"runTest('mdb_start')\">▶️ Avvia</button><button class='btn-stop' onclick=\"runTest('mdb_stop')\">⏹️ Ferma</button></div></div>"
+        "<div class='test-controls'><button id='btn_mdb' onclick=\"toggleSimpleTest('mdb', 'btn_mdb', 'Test MDB')\">▶️ Inizia Test</button></div></div>"
         "<div class='test-item'><span>Invia Stringa (Hex, es: 08 00)</span>"
         "<div class='test-controls'><input type='text' id='mdb_input' placeholder='08 00...'><button onclick=\"sendSerial('mdb')\">🚀 Invia</button></div></div>"
         "<div id='mdb_status' class='status-box'>Pronto per test MDB</div></div>"
 
-        "<div class='section'><h2>💾 Scheda MicroSD</h2>"
+        "<div class='section'><h2>💾 Scheda MicroSD <span style='font-size:14px; color:#bdc3c7'>(PIN 39)</span></h2>"
         "<div class='test-item'><span class='test-label'>Stato Montaggio:</span>"
-        "<span id='sd_mounted_status' style='margin-right:10px'>--</span>"
-        "<button onclick='refreshSDStatus()' style='background:#3498db; padding:4px 8px; font-size:12px;'>🔄 Aggiorna</button></div>"
+        "<span id='sd_mounted_status' style='font-weight:bold'>--</span></div>"
+        "<div class='test-item'><span class='test-label'>Ultimo Errore:</span>"
+        "<span id='sd_error_status' style='color:#c0392b; font-family:monospace'>--</span></div>"
+        "<div class='test-item'>"
+        "<div class='test-controls'>"
+        "  <button onclick=\"runTest('sd_init')\" style='background:#27ae60'>⚡ Init</button>"
+        "  <button onclick='refreshSDStatus()' style='background:#3498db'>🔄 Aggiorna</button>"
+        "</div></div>"
         "<div class='test-item'><span>Elenco File (Root)</span>"
         "<div class='test-controls'><button onclick=\"runTest('sd_list')\">📂 Elenca</button></div></div>"
         "<div class='test-item'><span>Backup JSON Config</span>"
         "<div class='test-controls'><button onclick=\"runConfigBackup()\" style='background:#9b59b6'>📥 Backup</button></div></div>"
         "<div class='test-item'><span style='color:#c0392b; font-weight:bold;'>⚠️ Formattazione FAT32</span>"
-        "<div class='test-controls'><button onclick=\"if(confirm('Cancellare TUTTI i dati?'))runTest('sd_format')\" style='background:#c0392b'>🧨 Formatta</button></div></div>"
-        "<div id='sd_status' class='status-box'>Pronto per test SD</div></div>"
+        "<div class='test-controls'><button onclick=\"if(confirm('Cancellare TUTTI i dati per pulire la scheda?'))runTest('sd_format')\" style='background:#c0392b'>🧨 Pulisci/Formatta</button></div>"
+        "</div>"
+        "<div id='sd_op_log' style='background:#000; color:#2ecc71; padding:10px; font-family:monospace; font-size:12px; height:100px; overflow-y:auto; border-radius:4px; margin-top:10px;'>Log operazioni SD...</div>"
+        "<div id='sd_status' class='status-box' style='display:none'></div></div>"
         "</div>"
         "<script>"
+        "let ledUpdateLock = false;"
+        "async function updateLedRealtime(){"
+        "  if(ledUpdateLock) return;"
+        "  const isRainbow = document.getElementById('btn_led_rainbow').innerText.includes('FERMA');"
+        "  const isManual = document.getElementById('btn_led_manual').innerText.includes('FERMA');"
+        "  if(!isRainbow && !isManual) return;"
+        "  ledUpdateLock = true;"
+        "  try {"
+        "    const bright = document.getElementById('led_bright').value;"
+        "    if(isRainbow) {"
+        "      await fetch('/api/test/led_bright', {method:'POST', body: JSON.stringify({bright: parseInt(bright)})});"
+        "    } else {"
+        "      const color = document.getElementById('led_color').value;"
+        "      await fetch('/api/test/led_set', {method:'POST', body: JSON.stringify({r: parseInt(color.substr(1,2),16), g: parseInt(color.substr(3,2),16), b: parseInt(color.substr(5,2),16), bright: parseInt(bright)})});"
+        "    }"
+        "  } catch(e){} finally { ledUpdateLock = false; }"
+        "}"
+        
+        "async function toggleLedRainbow(){"
+        "  const btn = document.getElementById('btn_led_rainbow');"
+        "  const isRunning = btn.innerText.includes('FERMA');"
+        "  "
+        "  if(isRunning){"
+        "    btn.innerText = '▶️ Inizia Rainbow'; btn.style.background = '';"
+        "    await runTest('led_stop');"
+        "  } else {"
+        "    document.getElementById('btn_led_manual').innerText = '🚀 Inizia Manuale';"
+        "    document.getElementById('btn_led_manual').style.background = '#2ecc71';"
+        "    btn.innerText = '⏹️ FERMA Rainbow'; btn.style.background = '#e74c3c';"
+        "    const bright = document.getElementById('led_bright').value;"
+        "    await fetch('/api/test/led_bright', {method:'POST', body: JSON.stringify({bright: parseInt(bright)})});"
+        "    await runTest('led_start');"
+        "  }"
+        "}"
+        
+        "async function toggleLedManual(){"
+        "  const btn = document.getElementById('btn_led_manual');"
+        "  const isRunning = btn.innerText.includes('FERMA');"
+        "  "
+        "  if(isRunning){"
+        "    btn.innerText = '🚀 Inizia Manuale'; btn.style.background = '#2ecc71';"
+        "    await runTest('led_stop');"
+        "  } else {"
+        "    document.getElementById('btn_led_rainbow').innerText = '▶️ Inizia Rainbow';"
+        "    document.getElementById('btn_led_rainbow').style.background = '';"
+        "    btn.innerText = '⏹️ FERMA Manuale'; btn.style.background = '#e74c3c';"
+        "    const color = document.getElementById('led_color').value;"
+        "    const bright = document.getElementById('led_bright').value;"
+        "    await runTest('led_set', {r: parseInt(color.substr(1,2),16), g: parseInt(color.substr(3,2),16), b: parseInt(color.substr(5,2),16), bright: parseInt(bright)});"
+        "  }"
+        "}"
+        
+        "async function toggleSimpleTest(prefix, btnId, label){"
+        "  const btn = document.getElementById(btnId);"
+        "  const isRunning = btn.innerText.includes('FERMA');"
+        "  "
+        "  if(isRunning){"
+        "    btn.innerText = '▶️ Inizia ' + label; btn.style.background = '';"
+        "    await runTest(prefix + '_stop');"
+        "  } else {"
+        "    btn.innerText = '⏹️ FERMA ' + label; btn.style.background = '#e74c3c';"
+        "    await runTest(prefix + '_start');"
+        "  }"
+        "}"
+        
         "async function runTest(test,params={}){"
+        "try{"
+        "const isSd = test.startsWith('sd_');"
         "const url='/api/test/'+test;const statusId=test.split('_')[0]+'_status';"
-        "const statusBox=document.getElementById(statusId);if(!statusBox)return;"
-        "statusBox.innerHTML+='<div class=\"result\">➡️ Esecuzione: '+test+'...</div>';"
-        "try{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)});"
-        "const result=await r.json().catch(()=>({error:'Risposta non valida dal server'}));"
-        "if(r.ok){statusBox.innerHTML+='<div class=\"result\">✅ '+(result.message||'OK')+'</div>';}"
-        "else{statusBox.innerHTML+='<div class=\"result\">❌ Errore: '+(result.error||r.status)+'</div>';}}"
-        "catch(e){statusBox.innerHTML+='<div class=\"result\">❌ Errore: '+e+'</div>';}"
-        "statusBox.scrollTop=statusBox.scrollHeight;}"
+        "const statusBox=document.getElementById(statusId);"
+        "const sdLog=document.getElementById('sd_op_log');"
+        
+        "if(isSd && sdLog){"
+        "  const time = new Date().toLocaleTimeString();"
+        "  sdLog.innerHTML += '<div>['+time+'] INVIO: '+test+'...</div>';"
+        "  sdLog.scrollTop = sdLog.scrollHeight;"
+        "  if(test==='sd_format') window.sdFmtInterval = setInterval(refreshSDStatus, 1000);"
+        "}"
+        
+        "if(!isSd && statusBox){"
+        "  statusBox.innerHTML+='<div class=\"result\">➡️ Esecuzione: '+test+'...</div>';"
+        "  statusBox.scrollTop=statusBox.scrollHeight;"
+        "}"
+        
+        "const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)});"
+        "const result=await r.json().catch(()=>({error:'Risposta JSON non valida'}));"
+        "const time = new Date().toLocaleTimeString();"
+        
+        "if(r.ok){"
+        "  if(isSd && sdLog){"
+        "    sdLog.innerHTML += '<div style=\"color:#fff\">['+time+'] ✅ '+(result.message||'OK')+'</div>';"
+        "    refreshSDStatus();"
+        "  } else if(statusBox) statusBox.innerHTML+='<div class=\"result\">✅ '+(result.message||'OK')+'</div>';"
+        "}else{"
+        "  if(isSd && sdLog){"
+        "    sdLog.innerHTML += '<div style=\"color:#e74c3c\">['+time+'] ❌ Errore: '+(result.error||r.status)+'</div>';"
+        "  } else if(statusBox) statusBox.innerHTML+='<div class=\"result\">❌ Errore: '+(result.error||r.status)+'</div>';"
+        "}"
+        "if(statusBox) statusBox.scrollTop=statusBox.scrollHeight;"
+        "if(sdLog) sdLog.scrollTop=sdLog.scrollHeight;"
+        "}catch(e){console.error(e);}}"
         
         "async function sendSerial(port){"
+        "try{"
         "const data=document.getElementById(port+'_input').value;"
-        "const r=await fetch('/api/test/serial_send',{method:'POST',body:JSON.stringify({port,data})});"
-        "const res=await r.json();"
-        "if(!r.ok)alert(res.error);"
+        "await fetch('/api/test/serial_send',{method:'POST',body:JSON.stringify({port,data})});"
+        "}catch(e){console.error(e);}"
         "}"
         
         "async function updateMonitors(){"
+        "try{"
         "const r=await fetch('/api/test/serial_monitor',{method:'POST'});"
         "const res=await r.json();"
         "if(res.log){"
-        "document.getElementById('rs232_status').innerText = res.log;"
-        "document.getElementById('rs485_status').innerText = res.log;"
-        "document.getElementById('mdb_status').innerText = res.log;"
+        "const s2=document.getElementById('rs232_status'); if(s2)s2.innerText=res.log;"
+        "const s4=document.getElementById('rs485_status'); if(s4)s4.innerText=res.log;"
+        "const sm=document.getElementById('mdb_status'); if(sm)sm.innerText=res.log;"
         "}"
-        
         "const rio=await fetch('/api/test/io_get',{method:'POST'});"
         "const io=await rio.json();"
         "if(io){"
@@ -1141,52 +1261,40 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "  }"
         "  for(let i=0;i<8;i++){"
         "    const b = document.getElementById('out_btn_'+i);"
-        "    if(b){"
-        "      const is_on = (io.output >> i) & 1;"
-        "      b.style.background = is_on ? '#2ecc71' : '#95a5a6';"
-        "    }"
+        "    if(b) b.style.background = ((io.output >> i) & 1) ? '#2ecc71' : '#95a5a6';"
         "    const s = document.getElementById('in_val_'+i);"
         "    if(s){"
-        "      const is_on = (io.input >> i) & 1;"
-        "      s.style.background = is_on ? '#2ecc71' : '#34495e';"
-        "      s.style.color = is_on ? '#fff' : '#bdc3c7';"
+        "      const on = (io.input >> i) & 1;"
+        "      s.style.background = on ? '#2ecc71' : '#34495e';"
+        "      s.style.color = on ? '#fff' : '#bdc3c7';"
         "    }"
         "  }"
         "}"
-        "}"
+        "}catch(e){}}"
         
         "async function toggleIO(pin){"
+        "try{"
         "const rio=await fetch('/api/test/io_get',{method:'POST'});"
         "const io=await rio.json();"
         "const cur = (io.output >> pin) & 1;"
         "await fetch('/api/test/io_set',{method:'POST',body:JSON.stringify({pin:pin, val:cur?0:1})});"
-        "}"
-        
-        "async function setLED(){"
-        "const color=document.getElementById('led_color').value;"
-        "const r=parseInt(color.substr(1,2),16);"
-        "const g=parseInt(color.substr(3,2),16);"
-        "const b=parseInt(color.substr(5,2),16);"
-        "const res=await fetch('/api/test/led_set',{method:'POST',body:JSON.stringify({r,g,b})});"
-        "if(res.ok) document.getElementById('led_status').innerHTML+='<div class=\"result\">✅ Colore impostato: '+color+'</div>';"
-        "}"
+        "}catch(e){}}"
         
         "async function setPWM(){"
+        "try{"
         "const ch=parseInt(document.getElementById('pwm_ch').value);"
         "const freq=parseInt(document.getElementById('pwm_freq').value);"
         "const duty=parseInt(document.getElementById('pwm_duty').value);"
-        "const r=await fetch('/api/test/pwm_set',{method:'POST',body:JSON.stringify({ch,freq,duty})});"
-        "const res=await r.json();"
-        "if(res.status==='ok') document.getElementById('pwm_status').innerHTML+='<div class=\"result\">✅ PWM'+ch+' impostato: '+freq+'Hz, '+duty+'%</div>';"
-        "}"
+        "await fetch('/api/test/pwm_set',{method:'POST',body:JSON.stringify({ch,freq,duty})});"
+        "}catch(e){}}"
         
         "async function testEEPROM(op){"
+        "try{"
         "const addr=parseInt(document.getElementById('eeprom_addr').value);"
         "const val=parseInt(document.getElementById('eeprom_val').value);"
         "const statusBox=document.getElementById('eeprom_status');"
         "let body={op:op, addr:addr};"
         "if(op==='write') body.data=[val]; else body.len=1;"
-        "try{"
         "const r=await fetch('/api/test/eeprom',{method:'POST',body:JSON.stringify(body)});"
         "const res=await r.json();"
         "if(res.status==='ok'){"
@@ -1194,38 +1302,33 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "  else if(op==='read_json') statusBox.innerHTML='<div class=\"result\">📄 Config JSON:<br><pre style=\"background:#002244;color:#00ff00;padding:10px;border-radius:4px;overflow-x:auto;margin:5px 0;font-size:11px\">'+JSON.stringify(JSON.parse(res.json),null,2)+'</pre></div>';"
         "  else statusBox.innerHTML='<div class=\"result\">✅ Scritto '+val+' a '+addr+'</div>';"
         "  refreshEEPROMStatus();"
-        "}else statusBox.innerHTML='<div class=\"result\">❌ Errore operazione</div>';"
-        "}catch(e){statusBox.innerHTML='<div class=\"result\">❌ Errore: '+e+'</div>';}"
-        "}"
+        "}else statusBox.innerHTML='<div class=\"result\">❌ Errore</div>';"
+        "}catch(e){console.error(e);}}"
         
         "async function runConfigBackup(){"
+        "try{"
         "  const statusBox=document.getElementById('sd_status');"
-        "  statusBox.innerHTML+='<div class=\"result\">➡️ Esecuzione Backup Config...</div>';"
-        "  try {"
-        "    const r=await fetch('/api/config/backup',{method:'POST'});"
-        "    const res=await r.json();"
-        "    if(r.ok) statusBox.innerHTML+='<div class=\"result\">✅ '+res.message+'</div>';"
-        "    else statusBox.innerHTML+='<div class=\"result\">❌ '+res.error+'</div>';"
-        "  } catch(e) { statusBox.innerHTML+='<div class=\"result\">❌ Errore: '+e+'</div>'; }"
-        "  statusBox.scrollTop=statusBox.scrollHeight;"
-        "}"
+        "  statusBox.innerHTML+='<div class=\"result\">➡️ Invio Backup...</div>';"
+        "  const r=await fetch('/api/config/backup',{method:'POST'});"
+        "  const res=await r.json();"
+        "  if(r.ok) statusBox.innerHTML+='<div class=\"result\">✅ OK</div>';"
+        "  else statusBox.innerHTML+='<div class=\"result\">❌ '+r.status+'</div>';"
+        "}catch(e){}}"
         
         "async function refreshEEPROMStatus(){"
         "try{"
         "  const r=await fetch('/api/test/eeprom',{method:'POST',body:JSON.stringify({op:'status'})});"
         "  const res=await r.json();"
-        "  if(res.status==='ok') document.getElementById('eeprom_header_info').innerText='CRC: 0x'+res.crc.toString(16).toUpperCase()+' | Updated: '+(res.updated?'SÌ':'NO');"
-        "}catch(e){}"
-        "}"
+        "  if(res.status==='ok') document.getElementById('eeprom_header_info').innerText='CRC: 0x'+res.crc.toString(16).toUpperCase();"
+        "}catch(e){}}"
         
         "async function refreshSDStatus(){"
-        "  try {"
-        "    const r=await fetch('/status');"
-        "    const res=await r.json();"
-        "    const el=document.getElementById('sd_mounted_status');"
-        "    if(el) el.innerText = res.sd.mounted ? '✅ MONTATA ('+(res.sd.total_kb/1024).toFixed(1)+' MB)' : '❌ NON MONTATA';"
-        "  } catch(e){}"
-        "}"
+        "try{"
+        "  const r=await fetch('/status');"
+        "  const res=await r.json();"
+        "  const el=document.getElementById('sd_mounted_status');"
+        "  if(el) el.innerText = res.sd.mounted ? '✅ MONTATA' : '❌ NO';"
+        "}catch(e){}}"
         
         "refreshEEPROMStatus();"
         "refreshSDStatus();"
@@ -1254,6 +1357,21 @@ static esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test LED fermato\"}");
     }
 
+    // --- CONTROLLO AGGIORNAMENTO LUMINOSITÀ ---
+    else if (strcmp(test_name, "led_bright") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *br_obj = cJSON_GetObjectItem(root, "bright");
+            if (br_obj) {
+                led_test_set_brightness(br_obj->valueint);
+                snprintf(response, sizeof(response), "{\"status\":\"ok\"}");
+            }
+            cJSON_Delete(root);
+        }
+    }
+
     // --- CONTROLLO MANUALE LED ---
     else if (strcmp(test_name, "led_set") == 0) {
         char buf[128] = {0};
@@ -1264,8 +1382,9 @@ static esp_err_t api_test_handler(httpd_req_t *req)
                 cJSON *r_obj = cJSON_GetObjectItem(root, "r");
                 cJSON *g_obj = cJSON_GetObjectItem(root, "g");
                 cJSON *b_obj = cJSON_GetObjectItem(root, "b");
-                if (r_obj && g_obj && b_obj) {
-                    led_test_set_color(r_obj->valueint, g_obj->valueint, b_obj->valueint);
+                cJSON *br_obj = cJSON_GetObjectItem(root, "bright");
+                if (r_obj && g_obj && b_obj && br_obj) {
+                    led_test_set_color(r_obj->valueint, g_obj->valueint, b_obj->valueint, br_obj->valueint);
                     snprintf(response, sizeof(response), "{\"status\":\"ok\"}");
                 }
                 cJSON_Delete(root);
@@ -1342,6 +1461,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
     // --- TEST RS232 ---
     else if (strcmp(test_name, "rs232_start") == 0) {
         if (!s_rs232_test_handle) {
+            rs232_init(); // Assicura che il driver sia installato
             xTaskCreate(uart_test_task, "rs232_test", 2048, (void*)CONFIG_APP_RS232_UART_PORT, 5, &s_rs232_test_handle);
             snprintf(response, sizeof(response), "{\"message\":\"Test RS232 avviato (caratteri 55,AA,01,07)\"}");
         } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
@@ -1353,6 +1473,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
     // --- TEST RS485 ---
     else if (strcmp(test_name, "rs485_start") == 0) {
         if (!s_rs485_test_handle) {
+            rs485_init(); // Assicura che il driver sia installato
             xTaskCreate(uart_test_task, "rs485_test", 2048, (void*)CONFIG_APP_RS485_UART_PORT, 5, &s_rs485_test_handle);
             snprintf(response, sizeof(response), "{\"message\":\"Test RS485 avviato (caratteri 55,AA,01,07)\"}");
         } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
@@ -1367,7 +1488,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
     }
 
     // --- TEST MDB ---
-    if (strcmp(test_name, "mdb_start") == 0) {
+    else if (strcmp(test_name, "mdb_start") == 0) {
         if (mdb_test_start() == ESP_OK) {
             snprintf(response, sizeof(response), "{\"message\":\"Test MDB avviato\"}");
         } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
@@ -1377,6 +1498,18 @@ static esp_err_t api_test_handler(httpd_req_t *req)
     }
     
     // --- TEST SD CARD ---
+    else if (strcmp(test_name, "sd_init") == 0) {
+        // Se è già montata, la smontiamo prima per forzare un re-init pulito
+        if (sd_card_is_mounted()) {
+            sd_card_unmount();
+        }
+        esp_err_t err = sd_card_mount();
+        if (err == ESP_OK) {
+            snprintf(response, sizeof(response), "{\"message\":\"SD Inizializzata con successo\"}");
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Inizializzazione fallita: %s\"}", esp_err_to_name(err));
+        }
+    }
     else if (strcmp(test_name, "sd_format") == 0) {
         esp_err_t err = sd_card_format();
         if (err == ESP_OK) {
@@ -1437,6 +1570,7 @@ static esp_err_t api_test_handler(httpd_req_t *req)
             } else {
                 int port = (port_raw && strcmp(port_raw, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT : CONFIG_APP_RS232_UART_PORT;
                 if (data_str) {
+                    if (port_raw && strcmp(port_raw, "rs485") == 0) rs485_init(); else rs232_init();
                     serial_test_send_uart(port, data_str);
                     snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Inviato su %s\"}", port_raw);
                 }

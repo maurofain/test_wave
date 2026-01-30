@@ -545,6 +545,9 @@ esp_err_t init_run_factory(void)
         ESP_LOGI(TAG, "TODO: Inizializzare ADC per sensore temperatura");
     }
 
+    // Inizializza sempre il monitor hot-plug SD per rilevare inserimenti
+    sd_card_init_monitor();
+
     if (cfg->sensors.sd_card_enabled) {
         esp_err_t sd_ret = sd_card_mount();
         if (sd_ret != ESP_OK) {

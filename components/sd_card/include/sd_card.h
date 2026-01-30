@@ -10,6 +10,16 @@
 esp_err_t sd_card_mount(void);
 
 /**
+ * @brief Restituisce l'ultimo errore registrato
+ */
+const char* sd_card_get_last_error(void);
+
+/**
+ * @brief Inizializza il monitor hot-plug della SD
+ */
+void sd_card_init_monitor(void);
+
+/**
  * @brief Smonta la scheda SD
  * @return ESP_OK se riuscito
  */

@@ -157,7 +157,9 @@ esp_err_t mdb_init(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    ESP_ERROR_CHECK(uart_driver_install(MDB_UART_PORT, d_cfg->mdb_serial.rx_buf_size, d_cfg->mdb_serial.tx_buf_size, 0, NULL, 0));
+    esp_err_t ret = uart_driver_install(MDB_UART_PORT, d_cfg->mdb_serial.rx_buf_size, d_cfg->mdb_serial.tx_buf_size, 0, NULL, 0);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) return ret;
+    
     ESP_ERROR_CHECK(uart_param_config(MDB_UART_PORT, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     

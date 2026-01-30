@@ -59,6 +59,7 @@ static void _set_defaults(device_config_t *config)
     config->sensors.io_expander_enabled = true;
     config->sensors.temperature_enabled = true;
     config->sensors.led_enabled = true;
+    config->sensors.led_count = CONFIG_APP_WS2812_LEDS;
     config->sensors.rs232_enabled = true;
     config->sensors.rs485_enabled = true;
     config->sensors.mdb_enabled = true;
@@ -284,17 +285,12 @@ esp_err_t device_config_load(device_config_t *config)
         } else {
             // Niente né in EEPROM né in NVS: Defaults
             ESP_LOGI(TAG, "[C] Nessun config trovato: inizializzo Defaults su NVS e EEPROM");
-            cJSON *def_root = cJSON_CreateObject();
-            // (Qui potremmo creare il JSON dai defaults, ma per semplicità salviamo al primo save()
-            // o usiamo una stringa vuota per ora, ma meglio creare un JSON minimo)
-            cJSON_AddStringToObject(def_root, "device_name", config->device_name);
-            char *def_json = cJSON_PrintUnformatted(def_root);
+            char *def_json = device_config_to_json(config);
             if (def_json) {
                 _write_to_nvs(def_json);
                 _write_to_eeprom(def_json, false);
                 free(def_json);
             }
-            cJSON_Delete(def_root);
             return ESP_OK; // Caricati i defaults in s_config via _set_defaults
         }
     }
@@ -342,6 +338,8 @@ esp_err_t device_config_load(device_config_t *config)
                     config->sensors.io_expander_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "io_expander_enabled"));
                     config->sensors.temperature_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "temperature_enabled"));
                     config->sensors.led_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "led_enabled"));
+                    cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_count");
+                    if (lc) config->sensors.led_count = (uint32_t)lc->valueint;
                     config->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled"));
                     config->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled"));
                     config->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
@@ -442,6 +440,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddBoolToObject(sensors_obj, "io_expander_enabled", config->sensors.io_expander_enabled);
     cJSON_AddBoolToObject(sensors_obj, "temperature_enabled", config->sensors.temperature_enabled);
     cJSON_AddBoolToObject(sensors_obj, "led_enabled", config->sensors.led_enabled);
+    cJSON_AddNumberToObject(sensors_obj, "led_count", config->sensors.led_count);
     cJSON_AddBoolToObject(sensors_obj, "rs232_enabled", config->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors_obj, "rs485_enabled", config->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors_obj, "mdb_enabled", config->sensors.mdb_enabled);
@@ -501,10 +500,13 @@ esp_err_t device_config_save(const device_config_t *config)
 {
     if (!config) return ESP_ERR_INVALID_ARG;
 
+    ESP_LOGI(TAG, "[C] Salvataggio configurazione: LED count = %lu, LCD bright = %d", 
+             config->sensors.led_count, config->display.lcd_brightness);
+
     char *json_str = device_config_to_json(config);
     if (!json_str) return ESP_ERR_NO_MEM;
 
-    ESP_LOGI(TAG, "[C] Salvataggio configurazione completa: %s", json_str);
+    ESP_LOGD(TAG, "[C] JSON da salvare: %s", json_str);
     esp_err_t err = ESP_ERR_INVALID_STATE;
     
     if (eeprom_24lc16_is_available()) {

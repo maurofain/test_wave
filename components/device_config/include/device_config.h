@@ -34,6 +34,7 @@ typedef struct {
     bool io_expander_enabled;   ///< I/O Expander
     bool temperature_enabled;   ///< Sensore temperatura
     bool led_enabled;           ///< LED strip
+    uint32_t led_count;         ///< Numero di LED nella striscia
     bool rs232_enabled;         ///< UART RS232
     bool rs485_enabled;         ///< UART RS485
     bool mdb_enabled;           ///< UART MDB

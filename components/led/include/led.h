@@ -10,6 +10,12 @@
 esp_err_t led_init(void);
 
 /**
+ * @brief Ottiene il numero di LED configurati
+ * @return Numero di LED
+ */
+uint32_t led_get_count(void);
+
+/**
  * @brief Ottiene l'handle della LED strip
  * @return Handle della LED strip, NULL se non inizializzato
  */

@@ -45,6 +45,10 @@
 14. Driver RS485 e ricezione dati (timeout hardware 10ms)
 15. Test EEprom: tasto "Leggi JSON" e visualizzazione CRC/Updated nell'interfaccia web
 16. Implementata la scheda SD
+17. Aggiunto settaggio manuale Frequenza/Duty per test PWM
+18. Aggiunto controllo colore e luminosità per tutti i LED nel test LED
+19. Rafforzato driver SD con log dettagliati, power cycle hardware e monitor hot-plug (GPIO 0)
+20. Aggiunto tasto "Init" manuale nel pannello test SD per tentativi di ripristino
 
 
 
@@ -58,10 +62,13 @@
 # 📋 DA FARE
 
 - Factory 
-    1.  aggiungi nel test PWM il settaggio manuale di frequenza e duty
-    2.  aggiungi nel test Led il settaggio manuale di colore (codice HTML)  e luminosità per tutti i led
-    
+  
 - App
   1. Configurazione monitor/touch e integrazione LVGL 
   2. Creazione Slideshow iniziale
   3. Creazione Pagina di test delle operazioni
+
+# TESTATI
+
+1. Led Stripe
+2. PWM1 e PWM2

@@ -25,6 +25,7 @@ static void mdb_test_task(void *arg) {
 
 esp_err_t mdb_test_start(void) {
     if (s_mdb_test_handle) return ESP_ERR_INVALID_STATE;
+    mdb_init(); // Assicura che il driver UART sia installato
     s_run = true;
     xTaskCreate(mdb_test_task, "mdb_test", 4096, NULL, 5, &s_mdb_test_handle);
     return ESP_OK;

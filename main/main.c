@@ -20,10 +20,15 @@ void app_main(void)
     tasks_load_config("/spiffs/tasks.csv");
     tasks_start_all();
     ESP_LOGI(TAG, "[M] App factory pronta: endpoint HTTP /status e /ota disponibili");
-    
+
     // Loop principale: segnala attività periodicamente
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(5000)); // Attesa
+    if (false)
+    {
+
+        while (1)
+        {
+            vTaskDelay(pdMS_TO_TICKS(5000)); // Attesa
+        }
         ESP_LOGI(TAG, "[M] Device in funzione ✓");
     }
 }
