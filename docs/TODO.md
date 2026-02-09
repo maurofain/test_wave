@@ -62,13 +62,65 @@
   - Implementare la data e ora da ntp sui server `2.it.pool.ntp.org`e 2.europe.pool.ntp.org, questi server vanno aggiunti al config dopo il WiFI. L'ora va acquisita solo se c'è connessione di rete e accesso a Internet (testare con un ping su server google)
     Una volta acquisita l'ora il timestamp va aggiunto nei log dopo il timing CPU e mostrata nel titolo delle pagine web
 
+  - il tasto CLEAR dei monitor non pulisce le aree di testo, togliere le indicazioni TX e RX>, c'è già il colore. Non inserire spazi tra i caratteri in modo TEXT. In modo HEX mettere un . prima del codice esadecimale
+
+  - Implementare il log su ethernet da visualizzare su una apposita pagina HTML  : valutare se utilizzare UDP sia il protocollo validoper l'invio dei dati
+  
+  - Scanner QR : 
+  
+  - Case Ciclo_Imager_Setup
+  
+      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNMOD3;RRDENA1;CIDENA1;SCNENA0;RRDDUR3000;" & ChrW(3)
+  
+      wIsCommand = True
+  
+    Case Ciclo_Imager_State
+  
+      ' richiesta di stato
+  
+      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA*;" & ChrW(3)
+  
+      wIsCommand = True
+  
+    Case Ciclo_Imager_On
+  
+      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA1;" & ChrW(3)
+  
+      wIsCommand = True
+  
+    Case Ciclo_Imager_Off
+  
+      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA0;" & ChrW(3)
+  
+      wIsCommand = True
+  
+     
+  
+  - IP Server API 195.231.69.227:5556/api/login
+    
+  - Seriale Terminale 
+    
+    | Wash 3 | CF-55-DDD-222 |
+    | ------ | ------------- |
+  
+     
+    
+    
+    
+  - Display 1.44 
+    
   - Chiedere : 
-    - problema alimentazione doppia (scheda e espansione)
-
+    
+    - problema alimentazione doppia (scheda e espansione) 
+    
     - Porte USB sul p4?
-
+    
     - Alimentazione display
-
+    
+    - tasto SERVICE su GPIO per boot + reset P4
+    
+    - Interrupt su cambio stato I/O Expander
+  
 - App
   1. Aggiungere un task App per l'esecuzione delle funzioni operative della macchina controllata 
   2. Configurazione monitor/touch e integrazione LVGL 
