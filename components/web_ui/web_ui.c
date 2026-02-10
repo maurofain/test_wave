@@ -11,6 +11,21 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include "usb_cdc_scanner.h"
+#include "app_version.h"
+#include "serial_test.h"
+#include "mdb.h"
+#include "led_test.h"
+#include "pwm_test.h"
+#include "io_expander.h"
+#include "io_expander_test.h"
+#include "rs232.h"
+#include "rs485.h"
+#include "tasks.h"
+#include "sd_card.h"
+#include "aux_gpio.h"
+#include "eeprom_test.h"
+#include "sht40.h"
 
 #define TAG "WEB_UI"
 #define MAX_STORED_LOGS 100
@@ -26,31 +41,25 @@ typedef struct {
 static stored_log_t stored_logs[MAX_STORED_LOGS];
 static int log_count = 0;
 static int log_index = 0;
-#include <time.h>
-#include "sdkconfig.h"
-#include "init.h"
-#include "led.h"
-#include "mdb.h"
-#include "driver/ledc.h"
-#include "driver/uart.h"
-#include "driver/i2c.h"
-#include "driver/gpio.h"
-#include "app_version.h"
 
-#include "serial_test.h"
-#include "led_test.h"
-#include "mdb_test.h"
-#include "io_expander.h"
-#include "io_expander_test.h"
-#include "eeprom_test.h"
-#include "pwm.h"
-#include "pwm_test.h"
-#include "sd_card.h"
-#include "aux_gpio.h"
-#include "sht40.h"
-#include "rs232.h"
-#include "rs485.h"
-#include "tasks.h"
+static char s_last_barcode[128] = "";
+
+static void on_barcode_cb(const char *barcode) {
+    strncpy(s_last_barcode, barcode, sizeof(s_last_barcode)-1);
+    s_last_barcode[sizeof(s_last_barcode)-1] = 0;
+    ESP_LOGI(TAG, "Barcode letto: %s", s_last_barcode);
+}
+
+static void usb_scanner_task(void *param) {
+    usb_cdc_scanner_config_t cfg = {.on_barcode = on_barcode_cb};
+    usb_cdc_scanner_init(&cfg);
+    usb_cdc_scanner_task(NULL);
+}
+
+// Avvio task scanner all'avvio Web UI
+__attribute__((constructor)) static void start_usb_scanner_task(void) {
+    xTaskCreate(usb_scanner_task, "usb_scanner_task", 4096, NULL, 5, NULL);
+}
 
 static httpd_handle_t s_server = NULL;
 
@@ -376,7 +385,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='wifi_dhcp' name='wifi_dhcp'><span class='slider'></span></label><span>DHCP</span></div>"
         "</div></div>"
 
-        "<div class='section'><h2>� NTP</h2>"
+        "<div class='section'><h2> NTP</h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='ntp_en' name='ntp_en'><span class='slider'></span></label><span>NTP Abilitato</span><button type='button' onclick='syncNTP()' style='margin-left:10px; background:#f39c12; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;'>Aggiorna</button><span id='current_time' style='margin-left:15px; font-weight:bold; color:#27ae60;'></span></div>"
         "<div class='indent'>"
         "<div class='form-group'><label>Server NTP 1</label><input type='text' id='ntp_server1' name='ntp_server1' placeholder='time.google.com'></div>"
@@ -389,7 +398,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='form-group indent'><label>Porta UDP</label><input type='number' id='remote_log_port' name='remote_log_port' min='1024' max='65535' placeholder='9514' style='width:120px; padding:6px; border:1px solid #ddd; border-radius:4px;'></div>"
         "</div>"
 
-        "<div class='section'><h2>�🔌 Periferiche Hardware</h2>"
+        "<div class='section'><h2>🔌 Periferiche Hardware</h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='io_exp' name='io_exp'><span class='slider'></span></label><span>I/O Expander</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='temp' name='temp'><span class='slider'></span></label><span>Sensore Temperatura</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='led' name='led'><span class='slider'></span></label><span>LED Strip (WS2812)</span></div>"
@@ -415,7 +424,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='g33_state'><span class='slider'></span></label><span>Stato Iniziale (Solo Out)</span></div>"
         "</div></div>"
 
-        "<div class='section'><h2>�📟 Porte Seriali</h2>"
+        "<div class='section'><h2>(TAG) Porte Seriali</h2>"
         "<details><summary><b>RS232 Configuration</b></summary>"
         "<div class='form-group'><label>Baudrate</label><input type='text' id='rs232_baud'></div>"
         "<div class='form-group'><label>Data Bits</label><input type='text' id='rs232_bits'></div>"
@@ -1095,10 +1104,10 @@ static esp_err_t stats_page_handler(httpd_req_t *req)
         "<div class='container'>"
         "<div class='section'><h2>🌐 Rete</h2><div id='network'>Caricamento...</div></div>"
         "<div class='section'><h2>💾 Firmware</h2><div id='partitions'>Caricamento...</div></div>"
-        "<div class='section'><h2>� SD Card</h2><div id='sd_card'>Caricamento...</div></div>"
-        "<div class='section'><h2>�🔌 Stato Driver</h2><div id='sensors'>Caricamento...</div></div>"
-        "<div class='section'><h2>�️ Ambiente</h2><div id='env_info'>Caricamento...</div></div>"
-        "<div class='section'><h2>�🎰 MDB Status</h2><div id='mdb_info'>Caricamento...</div></div>"
+        "<div class='section'><h2> SD Card</h2><div id='sd_card'>Caricamento...</div></div>"
+        "<div class='section'><h2>🔌 Stato Driver</h2><div id='sensors'>Caricamento...</div></div>"
+        "<div class='section'><h2>️ Ambiente</h2><div id='env_info'>Caricamento...</div></div>"
+        "<div class='section'><h2>🎰 MDB Status</h2><div id='mdb_info'>Caricamento...</div></div>"
         "</div>"
         "<script>"
         "async function loadStats(){"

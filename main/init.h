@@ -24,3 +24,5 @@ led_strip_handle_t init_get_ws2812_handle(void);
  * @return ESP_OK se la sincronizzazione è riuscita, ESP_FAIL altrimenti
  */
 esp_err_t init_sync_ntp(void);
+
+void init_i2c_and_io_expander(void); // Inizializza I2C e I/O Expander e controlla GPIO3

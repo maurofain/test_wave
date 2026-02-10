@@ -542,6 +542,12 @@ static void update_time_display(lv_timer_t *timer)
     char time_str[64];
     strftime(time_str, sizeof(time_str), "%d/%m/%Y %H:%M:%S", &timeinfo);
     lv_label_set_text(time_label, time_str);
+
+    // Rotazione del widget per layout orizzontale senza ruotare il display
+    lv_obj_set_style_transform_angle(time_label, 900, LV_PART_MAIN);
+    lv_obj_set_style_transform_pivot_x(time_label, lv_obj_get_width(time_label) / 2, LV_PART_MAIN);
+    lv_obj_set_style_transform_pivot_y(time_label, lv_obj_get_height(time_label) / 2, LV_PART_MAIN);
+    lv_obj_center(time_label);
 }
 
 static void lvgl_show_minimal_screen(void)
@@ -580,13 +586,14 @@ static esp_err_t init_display_lvgl_minimal(void)
     bsp_display_cfg_t cfg = {
         .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
         .buffer_size = BSP_LCD_DRAW_BUFF_SIZE,
-        .double_buffer = BSP_LCD_DRAW_BUFF_DOUBLE,
+        .double_buffer = false,
         .flags = {
             .buff_dma = true,
-            .buff_spiram = false, // RAM interna
-            .sw_rotate = false, // Torna a rotazione hardware per ridurre memoria
+            .buff_spiram = false,
+            .sw_rotate = false,
         },
     };
+
 
     lv_display_t *disp = bsp_display_start_with_config(&cfg);
     if (!disp)
@@ -594,10 +601,13 @@ static esp_err_t init_display_lvgl_minimal(void)
         return ESP_FAIL;
     }
 
+    ESP_LOGI(TAG, "Heap after LVGL init:");
+    ESP_LOGI(TAG, "  INTERNAL free: %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL));
+    ESP_LOGI(TAG, "  DMA free: %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA));
+    ESP_LOGI(TAG, "  PSRAM free: %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    ESP_LOGI(TAG, "  SPIRAM caps alloc free (8bit): %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+
     ESP_RETURN_ON_ERROR(bsp_display_brightness_init(), TAG, "brightness init failed");
-    
-    // Applica la rotazione dello schermo PRIMA di creare gli oggetti UI
-    // bsp_display_rotate(disp, LV_DISP_ROTATION_270);
     
     // Log delle dimensioni dopo rotazione
     lv_coord_t hor_res = lv_display_get_horizontal_resolution(disp);
@@ -697,10 +707,19 @@ esp_err_t init_run_factory(void)
         ESP_LOGW(TAG, "[M] I/O Expander skipped (legacy I2C disabled with BSP)");
 #else
         // La porta I2C è già inizializzata sopra, io_expander_init la riutilizzerà
-        esp_err_t io_ret = io_expander_init();
-        if (io_ret != ESP_OK)
-        {
-            ESP_LOGE(TAG, "[M] Inizializzazione I/O Expander fallita!");
+        esp_err_t exp_ret = io_expander_init();
+        if (exp_ret != ESP_OK) {
+            ESP_LOGW(TAG, "I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
+            return;
+        }
+        // Controllo GPIO3 solo se expander disponibile
+        while (true) {
+            int gpio3_value = io_get_pin(3) ? 1 : 0;
+            ESP_LOGI(TAG, "Valore GPIO3: %d", gpio3_value);
+            if (gpio3_value == 1) {
+                break;
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
         }
 #endif
     }
@@ -796,4 +815,24 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
         *sta = s_netif_sta;
     if (eth)
         *eth = s_netif_eth;
+}
+
+void init_i2c_and_io_expander(void) {
+#if defined(CONFIG_BSP_I2C_NUM)
+    bsp_i2c_init();
+#endif
+    esp_err_t exp_ret = io_expander_init();
+    if (exp_ret != ESP_OK) {
+        ESP_LOGW(TAG, "I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
+        return;
+    }
+    // Controllo GPIO3 solo se expander disponibile
+    while (true) {
+        int gpio3_value = io_get_pin(3) ? 1 : 0;
+        ESP_LOGI(TAG, "Valore GPIO3: %d", gpio3_value);
+        if (gpio3_value == 1) {
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
