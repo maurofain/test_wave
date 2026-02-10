@@ -103,11 +103,8 @@ typedef struct {
  * @brief Struttura di configurazione Logging Remoto
  */
 typedef struct {
-    bool enabled;           ///< Logging remoto abilitato
-    char server_ip[16];     ///< IP del server di log (o "broadcast")
-    uint16_t server_port;   ///< Porta del server di log
-    bool use_udp;           ///< Usa UDP invece di TCP
-    bool use_broadcast;     ///< Invia in broadcast invece che a IP specifico
+    uint16_t server_port;   ///< Porta UDP per broadcast
+    bool use_broadcast;     ///< Invia in broadcast UDP
 } device_remote_log_config_t;
 
 /**

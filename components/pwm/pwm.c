@@ -26,8 +26,6 @@ int pwm_get_duty(int channel) {
 }
 
 esp_err_t pwm_init(void) {
-    device_config_t *cfg = device_config_get();
-
     ledc_timer_config_t timer_cfg = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_10_BIT,
@@ -57,9 +55,6 @@ esp_err_t pwm_init(void) {
     };
     ledc_channel_config(&ch1);
     
-    // Applica luminosità LCD (assumiamo canale 0)
-    pwm_set_duty(0, cfg->display.lcd_brightness);
-    
-    ESP_LOGI(TAG, "[C] PWM inizializzato (Canale 0 set a %d%%)", cfg->display.lcd_brightness);
+    ESP_LOGI(TAG, "[C] PWM inizializzato");
     return ESP_OK;
 }

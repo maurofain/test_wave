@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script per il flash della sola partizione OTA_0 (Test OTA localmente)
+# Script per il flash della sola partizione OTA_0 (5MB - Test OTA localmente)
 # Utilizzo: ./scripts/flash_ota0.sh [-p /dev/ttyPORT] [-b BAUD] [-m]
 
 PORT="/dev/ttyACM0"
@@ -17,7 +17,7 @@ done
 
 CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash 0x310000 build/test_wave.bin"
 
-echo "🚀 Avvio flash partizione OTA_0 su $PORT a $BAUD baud..."
+echo "🚀 Avvio flash partizione OTA_0 (5MB) su $PORT a $BAUD baud..."
 echo "📝 Comando: $CMD"
 echo ""
 

@@ -63,11 +63,8 @@ static void _set_defaults(device_config_t *config)
     strncpy(config->ntp.server2, "pool.ntp.org", sizeof(config->ntp.server2) - 1);
     config->ntp.timezone_offset = 1;  // Default to CET (Central European Time)
 
-    // Default Remote Logging (enabled by default for local logging)
-    config->remote_log.enabled = true;
-    strncpy(config->remote_log.server_ip, "", sizeof(config->remote_log.server_ip) - 1);  // Empty = local only
-    config->remote_log.server_port = 514;  // Default syslog port
-    config->remote_log.use_udp = true;     // UDP by default for logs
+    // Default Remote Logging (broadcast disabled by default)
+    config->remote_log.server_port = 9514;  // Default port for broadcast
     config->remote_log.use_broadcast = false; // No broadcast by default
 
     // Default Sensori (tutti abilitati per impostazione predefinita)
@@ -368,12 +365,8 @@ esp_err_t device_config_load(device_config_t *config)
                 // Analisi config Remote Logging
                 cJSON *remote_log_obj = cJSON_GetObjectItem(root, "remote_log");
                 if (remote_log_obj) {
-                    config->remote_log.enabled = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "enabled"));
-                    cJSON *server_ip = cJSON_GetObjectItem(remote_log_obj, "server_ip");
-                    if (server_ip && server_ip->valuestring) strncpy(config->remote_log.server_ip, server_ip->valuestring, sizeof(config->remote_log.server_ip) - 1);
                     cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
                     if (server_port) config->remote_log.server_port = (uint16_t)server_port->valueint;
-                    config->remote_log.use_udp = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_udp"));
                     config->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
                 }
 
@@ -500,10 +493,7 @@ char* device_config_to_json(const device_config_t *config)
 
     // Remote Logging
     cJSON *remote_log_obj = cJSON_CreateObject();
-    cJSON_AddBoolToObject(remote_log_obj, "enabled", config->remote_log.enabled);
-    cJSON_AddStringToObject(remote_log_obj, "server_ip", config->remote_log.server_ip);
     cJSON_AddNumberToObject(remote_log_obj, "server_port", config->remote_log.server_port);
-    cJSON_AddBoolToObject(remote_log_obj, "use_udp", config->remote_log.use_udp);
     cJSON_AddBoolToObject(remote_log_obj, "use_broadcast", config->remote_log.use_broadcast);
     cJSON_AddItemToObject(root, "remote_log", remote_log_obj);
 

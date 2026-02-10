@@ -1,5 +1,5 @@
 #include "sht40.h"
-#include "driver/i2c.h"
+#include "bsp/esp-bsp.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
@@ -7,9 +7,10 @@
 
 static const char *TAG = "SHT40";
 
-#define I2C_PORT            CONFIG_APP_I2C_PORT
 #define SHT40_ADDR          0x45  // 7-bit addr (8-bit: 0x8A W, 0x8B R)
 #define SHT40_CMD_MEAS      0xFD  // High precision measurement
+
+static i2c_master_dev_handle_t sht_dev;
 
 static uint8_t crc8(const uint8_t *data, size_t len) {
     uint8_t crc = 0xFF;
@@ -27,14 +28,23 @@ static uint8_t crc8(const uint8_t *data, size_t len) {
 }
 
 esp_err_t sht40_init(void) {
-    // SHT40 non richiede una inizializzazione particolare via registro, 
-    // Proviamo un Soft Reset (0x94) prima di iniziare
-    uint8_t cmd_reset = 0x94;
-    ESP_LOGI(TAG, "Inizializzazione SHT40: invio Soft Reset (0x94)...");
-    esp_err_t ret = i2c_master_write_to_device(I2C_PORT, SHT40_ADDR, &cmd_reset, 1, pdMS_TO_TICKS(100));
-    
+    i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
+    i2c_device_config_t cfg = {
+        .device_address = SHT40_ADDR,
+        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+    };
+    esp_err_t ret = i2c_master_bus_add_device(bus, &cfg, &sht_dev);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[C] Sensore SHT40 non risponde a 0x%02X: %s", SHT40_ADDR, esp_err_to_name(ret));
+        return ret;
+    }
+    
+    // Soft Reset
+    uint8_t cmd_reset = 0x94;
+    ESP_LOGI(TAG, "Inizializzazione SHT40: invio Soft Reset (0x94)...");
+    ret = i2c_master_transmit(sht_dev, &cmd_reset, 1, pdMS_TO_TICKS(100));
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Errore invio Soft Reset: %s", esp_err_to_name(ret));
         return ret;
     }
     
@@ -50,8 +60,8 @@ esp_err_t sht40_read(float *temp, float *hum) {
     uint8_t data[6] = {0};
 
     // Invia comando di misura
-    ESP_LOGI(TAG, "Lettura SHT40: invio comando 0x%02X a addr 0x%02X", cmd, SHT40_ADDR);
-    esp_err_t ret = i2c_master_write_to_device(I2C_PORT, SHT40_ADDR, &cmd, 1, pdMS_TO_TICKS(100));
+    ESP_LOGI(TAG, "Lettura SHT40: invio comando 0x%02X", cmd);
+    esp_err_t ret = i2c_master_transmit(sht_dev, &cmd, 1, pdMS_TO_TICKS(100));
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Errore invio comando: %s", esp_err_to_name(ret));
         return ret;
@@ -61,7 +71,7 @@ esp_err_t sht40_read(float *temp, float *hum) {
     vTaskDelay(pdMS_TO_TICKS(20));
 
     // Legge i 6 byte (Temp MSB, Temp LSB, Temp CRC, Hum MSB, Hum LSB, Hum CRC)
-    ret = i2c_master_read_from_device(I2C_PORT, SHT40_ADDR, data, 6, pdMS_TO_TICKS(100));
+    ret = i2c_master_receive(sht_dev, data, 6, pdMS_TO_TICKS(100));
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Errore ricezione dati: %s", esp_err_to_name(ret));
         return ret;

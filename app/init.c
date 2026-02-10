@@ -166,36 +166,6 @@ static void log_partitions(void)
     ESP_LOGI(TAG, "[M] Partizione boot      : %s (tipo %d, sottotipo %d)", boot ? boot->label : "?", boot ? boot->type : -1, boot ? boot->subtype : -1);
 }
 
-static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    (void)arg;
-    switch (event_id) {
-    case WIFI_EVENT_AP_START:
-        ESP_LOGI(TAG, "[M] Access Point Wi-Fi avviato (SSID: %s)", CONFIG_APP_WIFI_AP_SSID);
-        break;
-    case WIFI_EVENT_AP_STACONNECTED: {
-        wifi_event_ap_staconnected_t *e = (wifi_event_ap_staconnected_t *)event_data;
-        ESP_LOGI(TAG, "[M] Client connesso ad AP: AID=%d", e->aid);
-        break;
-    }
-    case WIFI_EVENT_AP_STADISCONNECTED: {
-        wifi_event_ap_stadisconnected_t *e = (wifi_event_ap_stadisconnected_t *)event_data;
-        ESP_LOGI(TAG, "[M] Client disconnesso da AP: AID=%d", e->aid);
-        break;
-    }
-    case WIFI_EVENT_STA_START:
-        ESP_LOGI(TAG, "[M] Avvio STA Wi-Fi");
-        esp_wifi_connect();
-        break;
-    case WIFI_EVENT_STA_DISCONNECTED:
-        ESP_LOGW(TAG, "Wi-Fi STA disconnesso, riprovo...");
-        esp_wifi_connect();
-        break;
-    default:
-        break;
-    }
-}
-
 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     (void)arg;
@@ -257,65 +227,6 @@ static esp_err_t init_event_loop(void)
     // Nota: esp_netif_init() e esp_event_loop_create_default() vengono chiamati in start_ethernet()
     // DOPO aver inizializzato il driver Ethernet, come nell'esempio funzionante
     // Questa funzione ora è vuota perché tutto viene fatto in start_ethernet()
-    return ESP_OK;
-}
-
-static esp_err_t start_wifi(void)
-{
-    // Usa inizializzatore vuoto per ottenere i valori di default per tutti i campi
-    wifi_init_config_t cfg = { 0 };
-    // Sovrascrivi solo quelli essenziali che sarebbero impostati da WIFI_INIT_CONFIG_DEFAULT()
-    cfg.static_rx_buf_num = 16;
-    cfg.dynamic_rx_buf_num = 32;
-    cfg.tx_buf_type = 0;
-    cfg.static_tx_buf_num = 16;
-    cfg.dynamic_tx_buf_num = 32;
-    cfg.rx_mgmt_buf_type = 1;
-    cfg.rx_mgmt_buf_num = 10;
-    cfg.espnow_max_encrypt_num = 2;
-    cfg.magic = WIFI_INIT_CONFIG_MAGIC;
-    
-    ESP_RETURN_ON_ERROR(esp_wifi_init(&cfg), TAG, "Inizializzazione Wi-Fi fallita");
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-
-    s_netif_ap = esp_netif_create_default_wifi_ap();
-#if CONFIG_APP_WIFI_STA_ENABLE
-    s_netif_sta = esp_netif_create_default_wifi_sta();
-#endif
-
-    wifi_config_t ap_cfg = { 0 };
-    snprintf((char *)ap_cfg.ap.ssid, sizeof(ap_cfg.ap.ssid), "%s", CONFIG_APP_WIFI_AP_SSID);
-    ap_cfg.ap.ssid_len = strlen(CONFIG_APP_WIFI_AP_SSID);
-    snprintf((char *)ap_cfg.ap.password, sizeof(ap_cfg.ap.password), "%s", CONFIG_APP_WIFI_AP_PASSWORD);
-    ap_cfg.ap.channel = CONFIG_APP_WIFI_AP_CHANNEL;
-    ap_cfg.ap.max_connection = 4;
-    ap_cfg.ap.authmode = strlen(CONFIG_APP_WIFI_AP_PASSWORD) >= 8 ? WIFI_AUTH_WPA2_PSK : WIFI_AUTH_OPEN;
-    if (ap_cfg.ap.authmode == WIFI_AUTH_OPEN) {
-        ap_cfg.ap.password[0] = '\0';
-    }
-
-#if CONFIG_APP_WIFI_STA_ENABLE
-    wifi_config_t sta_cfg = { 0 };
-    snprintf((char *)sta_cfg.sta.ssid, sizeof(sta_cfg.sta.ssid), "%s", CONFIG_APP_WIFI_STA_SSID);
-    snprintf((char *)sta_cfg.sta.password, sizeof(sta_cfg.sta.password), "%s", CONFIG_APP_WIFI_STA_PASSWORD);
-    sta_cfg.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    wifi_mode_t mode = WIFI_MODE_APSTA;
-#else
-    wifi_mode_t mode = WIFI_MODE_AP;
-#endif
-
-    ESP_RETURN_ON_ERROR(esp_wifi_set_mode(mode), TAG, "Wi-Fi set mode failed");
-    ESP_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_AP, &ap_cfg), TAG, "Wi-Fi AP config failed");
-
-#if CONFIG_APP_WIFI_STA_ENABLE
-    if (strlen(CONFIG_APP_WIFI_STA_SSID) > 0) {
-        ESP_RETURN_ON_ERROR(esp_wifi_set_config(WIFI_IF_STA, &sta_cfg), TAG, "Wi-Fi STA config failed");
-    }
-#endif
-
-    ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "Wi-Fi start failed");
-    ESP_LOGI(TAG, "[M] Wi-Fi avviato: AP SSID=%s, canale=%d", CONFIG_APP_WIFI_AP_SSID, CONFIG_APP_WIFI_AP_CHANNEL);
-
     return ESP_OK;
 }
 
@@ -448,25 +359,6 @@ static esp_err_t start_ethernet(void)
 // Public API
 // -----------------------------------------------------------------------------
 
-static esp_err_t init_i2c_bus(void)
-{
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = CONFIG_APP_I2C_SDA_GPIO,
-        .scl_io_num = CONFIG_APP_I2C_SCL_GPIO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = CONFIG_APP_I2C_CLOCK_HZ,
-    };
-    esp_err_t ret = i2c_param_config(CONFIG_APP_I2C_PORT, &conf);
-    if (ret != ESP_OK) return ret;
-    
-    ret = i2c_driver_install(CONFIG_APP_I2C_PORT, conf.mode, 0, 0, 0);
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) return ret;
-    
-    return ESP_OK;
-}
-
 esp_err_t init_run_factory(void)
 {
     ESP_ERROR_CHECK(init_nvs());
@@ -474,9 +366,17 @@ esp_err_t init_run_factory(void)
     log_partitions();
     ESP_ERROR_CHECK(init_event_loop());
 
+#if defined(CONFIG_BSP_I2C_NUM)
+    bsp_i2c_init();
+#endif
+
     // Inizializza I2C e EEPROM prima della configurazione (essenziale per il boot)
+#if defined(CONFIG_BSP_I2C_NUM)
+    ESP_LOGW(TAG, "[M] Legacy I2C init skipped (BSP uses i2c_master)");
+#else
     ESP_ERROR_CHECK(init_i2c_bus());
     ESP_ERROR_CHECK(eeprom_24lc16_init());
+#endif
     
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
@@ -500,11 +400,15 @@ esp_err_t init_run_factory(void)
 
     // Inizializzazioni condizionali basate su NVS
     if (cfg->sensors.io_expander_enabled) {
+#if defined(CONFIG_BSP_I2C_NUM)
+        ESP_LOGW(TAG, "[M] I/O Expander skipped (legacy I2C disabled with BSP)");
+#else
         // La porta I2C è già inizializzata sopra, io_expander_init la riutilizzerà
         esp_err_t io_ret = io_expander_init();
         if (io_ret != ESP_OK) {
             ESP_LOGE(TAG, "[M] Inizializzazione I/O Expander fallita!");
         }
+#endif
     } else {
         ESP_LOGI(TAG, "I/O Expander disabilitato da config");
     }

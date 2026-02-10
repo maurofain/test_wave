@@ -7,5 +7,6 @@ rs232,idle,5,0,10,8192
 rs485,idle,5,0,10,8192
 mdb,idle,5,0,10,8192
 pwm,idle,4,0,20,8192
-touchscreen,idle,4,0,20,8192
+touchscreen,run,4,0,20,8192
 lvgl,idle,5,0,16,8192
+ntp,run,3,0,600000,8192

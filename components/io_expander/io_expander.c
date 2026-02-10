@@ -1,11 +1,10 @@
 #include "io_expander.h"
-#include "driver/i2c.h"
+#include "bsp/esp-bsp.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "IO_EXP";
 
-#define I2C_PORT            CONFIG_APP_I2C_PORT
 #define FXL6408_ADDR_OUT    (0x86 >> 1)  // 0x43
 #define FXL6408_ADDR_IN     (0x88 >> 1)  // 0x44
 
@@ -21,37 +20,57 @@ static const char *TAG = "IO_EXP";
 uint8_t io_output_state = 0x00;
 uint8_t io_input_state = 0x00;
 
-static esp_err_t write_reg(uint8_t addr, uint8_t reg, uint8_t val) {
+static i2c_master_dev_handle_t io_out_dev, io_in_dev;
+
+static esp_err_t write_reg(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t val) {
     uint8_t data[] = {reg, val};
-    return i2c_master_write_to_device(I2C_PORT, addr, data, 2, pdMS_TO_TICKS(100));
+    return i2c_master_transmit(dev, data, 2, pdMS_TO_TICKS(100));
 }
 
-static esp_err_t read_reg(uint8_t addr, uint8_t reg, uint8_t *val) {
-    return i2c_master_write_read_device(I2C_PORT, addr, &reg, 1, val, 1, pdMS_TO_TICKS(100));
+static esp_err_t read_reg(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *val) {
+    return i2c_master_transmit_receive(dev, &reg, 1, val, 1, pdMS_TO_TICKS(100));
 }
 
 esp_err_t io_expander_init(void) {
-    // La porta I2C deve essere già inizializzata dal sistema (init.c -> init_i2c_bus)
+    i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
     
     // Inizializzazione chip OUTPUT
-    esp_err_t ret = write_reg(FXL6408_ADDR_OUT, REG_DIRECTION, 0xFF);       // Tutti i pin come output
+    i2c_device_config_t out_cfg = {
+        .device_address = FXL6408_ADDR_OUT,
+        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+    };
+    esp_err_t ret = i2c_master_bus_add_device(bus, &out_cfg, &io_out_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Errore aggiunta device OUTPUT (0x%02X): %s", FXL6408_ADDR_OUT, esp_err_to_name(ret));
+        return ret;
+    }
+    ret = write_reg(io_out_dev, REG_DIRECTION, 0xFF);       // Tutti i pin come output
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[C] Errore comunicazione chip OUTPUT (0x%02X)", FXL6408_ADDR_OUT);
         return ret;
     }
-    write_reg(FXL6408_ADDR_OUT, REG_OUTPUT_TRISTATE, 0x00); // Disabilita High-Z (attiva driver)
-    write_reg(FXL6408_ADDR_OUT, REG_OUTPUT_DATA, io_output_state);
+    write_reg(io_out_dev, REG_OUTPUT_TRISTATE, 0x00); // Disabilita High-Z (attiva driver)
+    write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
 
     // Inizializzazione chip INPUT
-    ret = write_reg(FXL6408_ADDR_IN, REG_DIRECTION, 0x00);        // Tutti i pin come input
+    i2c_device_config_t in_cfg = {
+        .device_address = FXL6408_ADDR_IN,
+        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+    };
+    ret = i2c_master_bus_add_device(bus, &in_cfg, &io_in_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Errore aggiunta device INPUT (0x%02X): %s", FXL6408_ADDR_IN, esp_err_to_name(ret));
+        return ret;
+    }
+    ret = write_reg(io_in_dev, REG_DIRECTION, 0x00);        // Tutti i pin come input
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[C] Errore comunicazione chip INPUT (0x%02X)", FXL6408_ADDR_IN);
         return ret;
     }
     
     // Abilita Pull-up su tutti i pin di input per stabilizzare bit flottanti (come il bit 4)
-    write_reg(FXL6408_ADDR_IN, REG_PULL_SELECT, 0xFF); // 1 = Pull-up
-    write_reg(FXL6408_ADDR_IN, REG_PULL_ENABLE, 0xFF); // 1 = Abilitato
+    write_reg(io_in_dev, REG_PULL_SELECT, 0xFF); // 1 = Pull-up
+    write_reg(io_in_dev, REG_PULL_ENABLE, 0xFF); // 1 = Abilitato
 
     ESP_LOGI(TAG, "[C] Inizializzati FXL6408 ad indirizzi 0x%02X (OUT) e 0x%02X (IN)", FXL6408_ADDR_OUT, FXL6408_ADDR_IN);
     return ESP_OK;
@@ -64,12 +83,12 @@ void io_set_pin(int pin, int value) {
     } else {
         io_output_state &= ~(1 << pin);
     }
-    write_reg(FXL6408_ADDR_OUT, REG_OUTPUT_DATA, io_output_state);
+    write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
 }
 
 void io_set_port(uint8_t val) {
     io_output_state = val;
-    write_reg(FXL6408_ADDR_OUT, REG_OUTPUT_DATA, io_output_state);
+    write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
 }
 
 bool io_get_pin(int pin) {
@@ -80,7 +99,7 @@ bool io_get_pin(int pin) {
 
 uint8_t io_get(void) {
     uint8_t val = 0;
-    if (read_reg(FXL6408_ADDR_IN, REG_INPUT_DATA, &val) == ESP_OK) {
+    if (read_reg(io_in_dev, REG_INPUT_DATA, &val) == ESP_OK) {
         io_input_state = val;
     }
     return io_input_state;

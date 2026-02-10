@@ -1,10 +1,11 @@
 # Name,   Type, SubType, Offset,  Size, Flags
-# Partition table per 16MB flash ottimizzata
-# factory: 3MB, ota_0: 10MB, storage: ~3MB (nvs+phy+otadata: ~52KB)
+# Partition table per 16MB flash ottimizzata con OTA dual
+# factory: 3MB, ota_0: 5MB, ota_1: 5MB, storage: ~3MB (nvs+phy+otadata: ~52KB)
 nvs,      data, nvs,     0x9000,  0x6000,
 phy_init, data, phy,     0xf000,  0x1000,
 factory,  app,  factory, 0x10000, 0x300000,
-ota_0,    app,  ota_0,   0x310000,0xA00000,
+ota_0,    app,  ota_0,   0x310000,0x500000,
+ota_1,    app,  ota_1,   0x810000,0x500000,
 otadata,  data, ota,     0xD10000,0x2000,
 storage,  data, spiffs,  0xD12000,0x2EE000,
 

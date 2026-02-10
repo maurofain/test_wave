@@ -583,8 +583,8 @@ static esp_err_t init_display_lvgl_minimal(void)
         .double_buffer = BSP_LCD_DRAW_BUFF_DOUBLE,
         .flags = {
             .buff_dma = true,
-            .buff_spiram = false, // Come nell'esempio
-            .sw_rotate = false,
+            .buff_spiram = false, // RAM interna
+            .sw_rotate = false, // Torna a rotazione hardware per ridurre memoria
         },
     };
 
@@ -595,13 +595,31 @@ static esp_err_t init_display_lvgl_minimal(void)
     }
 
     ESP_RETURN_ON_ERROR(bsp_display_brightness_init(), TAG, "brightness init failed");
-    ESP_RETURN_ON_ERROR(bsp_display_backlight_on(), TAG, "backlight on failed");
+    
+    // Applica la rotazione dello schermo PRIMA di creare gli oggetti UI
+    // bsp_display_rotate(disp, LV_DISP_ROTATION_270);
+    
+    // Log delle dimensioni dopo rotazione
+    lv_coord_t hor_res = lv_display_get_horizontal_resolution(disp);
+    lv_coord_t ver_res = lv_display_get_vertical_resolution(disp);
+    ESP_LOGI(TAG, "[M] Dimensioni display dopo rotazione: %dx%d", hor_res, ver_res);
+    
+    // Applica la luminosità dal config invece di accendere sempre al 100%
+    device_config_t *device_cfg = device_config_get();
+    ESP_RETURN_ON_ERROR(bsp_display_brightness_set(device_cfg->display.lcd_brightness), TAG, "brightness set failed");
 
     // Initialize touch
     bsp_touch_config_t touch_cfg = {
         .dummy = NULL,
     };
     ESP_RETURN_ON_ERROR(bsp_touch_new(&touch_cfg, &s_touch_handle), TAG, "touch init failed");
+    
+    // Verifica che il touch sia inizializzato correttamente
+    if (s_touch_handle) {
+        ESP_LOGI(TAG, "[M] Touch handle inizializzato: %p", s_touch_handle);
+    } else {
+        ESP_LOGE(TAG, "[M] Touch handle è NULL!");
+    }
     
     // Pass touch handle to touchscreen task
     if (s_touch_handle) {

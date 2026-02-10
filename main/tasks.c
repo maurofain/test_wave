@@ -4,6 +4,7 @@
 #include "led_strip.h"
 #include "device_config.h"
 #include "sht40.h"
+#include "esp_lcd_touch.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -117,10 +118,33 @@ static void pwm_task(void *arg)
 
 static void touchscreen_task(void *arg)
 {
-    task_param_t *param = (task_param_t *)arg;
+    esp_lcd_touch_handle_t touch_handle = (esp_lcd_touch_handle_t)arg;
     TickType_t last_wake = xTaskGetTickCount();
+    
+    if (!touch_handle) {
+        ESP_LOGE("TOUCH", "Touch handle is NULL, task terminating");
+        vTaskDelete(NULL);
+        return;
+    }
+    
+    ESP_LOGI("TOUCH", "Touch task started with valid handle");
+    
     while (true) {
-        vTaskDelayUntil(&last_wake, param->period_ticks);
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(50)); // 50ms polling
+        
+        // Read touch data
+        esp_lcd_touch_read_data(touch_handle);
+        
+        // Get touch points using new API
+        esp_lcd_touch_point_data_t touch_data[1];
+        uint8_t touch_points = 0;
+        
+        esp_lcd_touch_get_data(touch_handle, touch_data, &touch_points, 1);
+        
+        if (touch_points > 0) {
+            ESP_LOGI("TOUCH", "Touch detected: x=%d, y=%d, strength=%d, track_id=%d", 
+                     touch_data[0].x, touch_data[0].y, touch_data[0].strength, touch_data[0].track_id);
+        }
     }
 }
 
@@ -129,6 +153,33 @@ static void lvgl_task(void *arg)
     task_param_t *param = (task_param_t *)arg;
     TickType_t last_wake = xTaskGetTickCount();
     while (true) {
+        vTaskDelayUntil(&last_wake, param->period_ticks);
+    }
+}
+
+static void ntp_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    
+    ESP_LOGI(TAG, "[NTP] NTP task started, period: %d seconds", 600);
+    
+    while (true) {
+        device_config_t *cfg = device_config_get();
+        
+        if (cfg->ntp_enabled) {
+            ESP_LOGI(TAG, "[NTP] Checking NTP sync...");
+            // Try to sync NTP
+            esp_err_t ret = init_sync_ntp();
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "[NTP] NTP sync successful");
+            } else {
+                ESP_LOGW(TAG, "[NTP] NTP sync failed");
+            }
+        } else {
+            ESP_LOGD(TAG, "[NTP] NTP disabled in configuration");
+        }
+        
         vTaskDelayUntil(&last_wake, param->period_ticks);
     }
 }
@@ -244,6 +295,17 @@ static task_param_t s_tasks[] = {
         .arg = NULL,
         .handle = NULL,
     },
+    {
+        .name = "ntp",
+        .state = TASK_STATE_RUN,
+        .priority = 3,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(600000), // 600 secondi = 10 minuti
+        .task_fn = ntp_task,
+        .stack_words = 8192,
+        .arg = NULL,
+        .handle = NULL,
+    },
 };
 
 // -----------------------------------------------------------------------------
@@ -267,6 +329,14 @@ static task_state_t parse_state(const char *s, task_state_t def)
     if (strcasecmp(s, "idle") == 0) return TASK_STATE_IDLE;
     if (strcasecmp(s, "pause") == 0) return TASK_STATE_PAUSE;
     return def;
+}
+
+void tasks_set_touchscreen_handle(void *handle)
+{
+    task_param_t *t = find_task_by_name("touchscreen");
+    if (t) {
+        t->arg = handle;
+    }
 }
 
 void tasks_load_config(const char *path)
@@ -323,7 +393,10 @@ void tasks_start_all(void)
             continue;
         }
         ESP_LOGI(TAG, "[M] Avvio task %s (stack=%lu words)...", t->name, (unsigned long)t->stack_words);
-        t->arg = t;
+        // Non sovrascrivere arg se già impostato (es. touchscreen handle)
+        if (t->arg == NULL) {
+            t->arg = t;
+        }
         BaseType_t res = xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
         if (res != pdPASS) {
             ESP_LOGE(TAG, "[M] Fallimento avvio task %s", t->name);
@@ -340,7 +413,10 @@ void tasks_apply_n_run(void)
         if (t->state == TASK_STATE_RUN) {
             if (t->handle == NULL) {
                 ESP_LOGI(TAG, "Avvio task %s (stack=%lu words)...", t->name, (unsigned long)t->stack_words);
-                t->arg = t;
+                // Non sovrascrivere arg se già impostato (es. touchscreen handle)
+                if (t->arg == NULL) {
+                    t->arg = t;
+                }
                 xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
             } else {
                 vTaskResume(t->handle);

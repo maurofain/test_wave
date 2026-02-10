@@ -7,6 +7,7 @@
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
 #include "esp_netif.h"
+#include "bsp/display.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -377,15 +378,16 @@ static esp_err_t config_page_handler(httpd_req_t *req)
 
         "<div class='section'><h2>� NTP</h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='ntp_en' name='ntp_en'><span class='slider'></span></label><span>NTP Abilitato</span><button type='button' onclick='syncNTP()' style='margin-left:10px; background:#f39c12; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;'>Aggiorna</button><span id='current_time' style='margin-left:15px; font-weight:bold; color:#27ae60;'></span></div>"
-        "</div>"
+        "<div class='indent'>"
+        "<div class='form-group'><label>Server NTP 1</label><input type='text' id='ntp_server1' name='ntp_server1' placeholder='time.google.com'></div>"
+        "<div class='form-group'><label>Server NTP 2</label><input type='text' id='ntp_server2' name='ntp_server2' placeholder='pool.ntp.org'></div>"
+        "<div class='form-group'><label>Offset Fuso Orario (ore)</label><input type='number' id='ntp_timezone_offset' name='ntp_timezone_offset' min='-12' max='12' placeholder='1'></div>"
+        "</div></div>"
 
         "<div class='section'><h2>📊 Logging Remoto</h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_en' name='remote_log_en'><span class='slider'></span></label><span>Logging Remoto Abilitato</span></div>"
-        "<div class='indent'>"
-        "<div class='form-group'><label>IP Server</label><input type='text' id='remote_log_ip' name='remote_log_ip' placeholder='192.168.1.100'></div>"
-        "<div class='form-group'><label>Porta Server</label><input type='number' id='remote_log_port' name='remote_log_port' min='1' max='65535' placeholder='514'></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_udp' name='remote_log_udp'><span class='slider'></span></label><span>Usa UDP (raccomandato)</span></div>"
-        "</div></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_broadcast' name='remote_log_broadcast'><span class='slider'></span></label><span>Usa broadcast UDP</span></div>"
+        "<div class='form-group indent'><label>Porta UDP</label><input type='number' id='remote_log_port' name='remote_log_port' min='1024' max='65535' placeholder='9514' style='width:120px; padding:6px; border:1px solid #ddd; border-radius:4px;'></div>"
+        "</div>"
 
         "<div class='section'><h2>�🔌 Periferiche Hardware</h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='io_exp' name='io_exp'><span class='slider'></span></label><span>I/O Expander</span></div>"
@@ -458,6 +460,11 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "}catch(e){alert('❌ Errore: '+e);}}"
         "function updateCurrentTime(){const now=new Date();document.getElementById('current_time').innerText=now.toLocaleString('it-IT');}"
         "document.getElementById('ntp_en').addEventListener('change',function(){if(this.checked){syncNTP();}});"
+        "document.getElementById('remote_log_broadcast').addEventListener('change',function(){"
+        "const ipField=document.getElementById('remote_log_ip');"
+        "ipField.disabled=this.checked;"
+        "if(this.checked){ipField.value='255.255.255.255';}else{ipField.value='';}"
+        "});"
         "setInterval(updateCurrentTime,1000);"
         "window.addEventListener('load',loadConfig);"
         "async function loadConfig(){"
@@ -474,10 +481,11 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('wifi_ssid').value=c.wifi.ssid;"
         "document.getElementById('wifi_pwd').value=c.wifi.password;"
         "document.getElementById('ntp_en').checked=c.ntp_enabled;"
-        "document.getElementById('remote_log_en').checked=c.remote_log.enabled;"
-        "document.getElementById('remote_log_ip').value=c.remote_log.server_ip;"
+        "document.getElementById('ntp_server1').value=c.ntp.server1;"
+        "document.getElementById('ntp_server2').value=c.ntp.server2;"
+        "document.getElementById('ntp_timezone_offset').value=c.ntp.timezone_offset;"
         "document.getElementById('remote_log_port').value=c.remote_log.server_port;"
-        "document.getElementById('remote_log_udp').checked=c.remote_log.use_udp;"
+        "document.getElementById('remote_log_broadcast').checked=c.remote_log.use_broadcast;"
         "document.getElementById('io_exp').checked=c.sensors.io_expander_enabled;"
         "document.getElementById('temp').checked=c.sensors.temperature_enabled;"
         "document.getElementById('led').checked=c.sensors.led_enabled;"
@@ -507,6 +515,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('mdb_tx').value=c.mdb_serial.tx_buf;"
         "document.getElementById('g33_mode').value=c.gpios.gpio33.mode;"
         "document.getElementById('g33_state').checked=c.gpios.gpio33.state;"
+        "if(c.remote_log.use_broadcast){document.getElementById('remote_log_ip').disabled=true;document.getElementById('remote_log_ip').value='255.255.255.255';}"
         "updateCurrentTime();"
         "}catch(e){console.error(e);}"
         "}"
@@ -516,7 +525,8 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},"
         "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
         "ntp_enabled:document.getElementById('ntp_en').checked,"
-        "remote_log:{enabled:document.getElementById('remote_log_en').checked,server_ip:document.getElementById('remote_log_ip').value,server_port:parseInt(document.getElementById('remote_log_port').value),use_udp:document.getElementById('remote_log_udp').checked},"
+        "ntp:{server1:document.getElementById('ntp_server1').value,server2:document.getElementById('ntp_server2').value,timezone_offset:parseInt(document.getElementById('ntp_timezone_offset').value)},"
+        "remote_log:{server_port:parseInt(document.getElementById('remote_log_port').value),use_broadcast:document.getElementById('remote_log_broadcast').checked},"
         "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
         "display:{lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
         "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
@@ -628,10 +638,7 @@ static esp_err_t api_config_get(httpd_req_t *req)
 
     // Remote logging configuration
     cJSON *remote_log = cJSON_CreateObject();
-    cJSON_AddBoolToObject(remote_log, "enabled", cfg->remote_log.enabled);
-    cJSON_AddStringToObject(remote_log, "server_ip", cfg->remote_log.server_ip);
     cJSON_AddNumberToObject(remote_log, "server_port", cfg->remote_log.server_port);
-    cJSON_AddBoolToObject(remote_log, "use_udp", cfg->remote_log.use_udp);
     cJSON_AddBoolToObject(remote_log, "use_broadcast", cfg->remote_log.use_broadcast);
     cJSON_AddItemToObject(root, "remote_log", remote_log);
     
@@ -829,10 +836,8 @@ static esp_err_t api_config_save(httpd_req_t *req)
         cJSON *bright = cJSON_GetObjectItem(display_obj, "lcd_brightness");
         if (bright) {
             cfg->display.lcd_brightness = (uint8_t)bright->valueint;
-            // Applica immediatamente la luminosità se il PWM è abilitato
-            if (cfg->sensors.pwm1_enabled) {
-                pwm_set_duty(0, cfg->display.lcd_brightness);
-            }
+            // Applica immediatamente la luminosità del display
+            bsp_display_brightness_set(cfg->display.lcd_brightness);
         }
     }
 
@@ -879,20 +884,13 @@ static esp_err_t api_config_save(httpd_req_t *req)
     // Remote logging configuration
     cJSON *remote_log_obj = cJSON_GetObjectItem(root, "remote_log");
     if (remote_log_obj) {
-        cfg->remote_log.enabled = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "enabled"));
-        cJSON *server_ip = cJSON_GetObjectItem(remote_log_obj, "server_ip");
-        if (server_ip && server_ip->valuestring) {
-            strncpy(cfg->remote_log.server_ip, server_ip->valuestring, sizeof(cfg->remote_log.server_ip) - 1);
-        }
         cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
         if (server_port) {
             cfg->remote_log.server_port = (uint16_t)server_port->valueint;
         }
-        cfg->remote_log.use_udp = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_udp"));
         cfg->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
-        ESP_LOGI(TAG, "[C] Remote logging config: enabled=%d, ip=%s, port=%d, udp=%d, broadcast=%d",
-                cfg->remote_log.enabled, cfg->remote_log.server_ip,
-                cfg->remote_log.server_port, cfg->remote_log.use_udp, cfg->remote_log.use_broadcast);
+        ESP_LOGI(TAG, "[C] Remote logging config: port=%d, broadcast=%d",
+                cfg->remote_log.server_port, cfg->remote_log.use_broadcast);
     }
     
     cfg->updated = true;
@@ -1640,8 +1638,8 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         "    const prefix = parts[i]; const hex = parts[i+1]; const text = parts[i+2];"
         "    const isRx = prefix.startsWith('RX');"
         "    const color = isRx ? '#f1c40f' : '#ff4d4d';"
-        "    if(mode === 'HEX') out += '<span style=\"color:'+color+'\">' + prefix + ' ' + hex + ' </span>';"
-        "    else out += '<span style=\"color:'+color+'\">' + prefix + ' ' + text + ' </span>';"
+        "    if(mode === 'HEX') out += '<span style=\"color:'+color+'\">.' + hex + '</span>';"
+        "    else out += '<span style=\"color:'+color+'\">' + text + '</span>';"
         "  }"
         "  return out;"
         "};"
@@ -1725,8 +1723,12 @@ static esp_err_t test_page_handler(httpd_req_t *req)
         
         "async function clearSerial(port){"
         "try{"
+        "// Pulisce immediatamente l'area di testo lato client"
+        "const elId = port + '_status';"
+        "const el = document.getElementById(elId);"
+        "if(el) el.innerHTML = '';"
+        "// Poi pulisce lato server"
         "await fetch('/api/test/serial_clear',{method:'POST', body:JSON.stringify({port})});"
-        "updateMonitors();"
         "}catch(e){}}"
         
         "async function refreshEEPROMStatus(){"

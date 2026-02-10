@@ -34,10 +34,14 @@ static int sock_fd = -1;
 static bool initialized = false;
 static vprintf_like_t original_vprintf = NULL; // Per salvare la funzione originale
 
+// Per limitare i log di errore UDP
+static int udp_error_count = 0;
+static TickType_t last_udp_error_time = 0;
+
 /**
  * @brief Converte il livello ESP_LOG in stringa
  */
-static const char* esp_log_level_to_string(esp_log_level_t level)
+__attribute__((unused)) static const char* esp_log_level_to_string(esp_log_level_t level)
 {
     switch (level) {
         case ESP_LOG_NONE:    return "NONE";
@@ -92,18 +96,14 @@ static void log_sender_task(void *pvParameters)
             continue;
         }
 
-        // Verifica se il logging remoto è ancora abilitato
+        // Verifica configurazione
         cfg = device_config_get();
-        if (!cfg->remote_log.enabled) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            continue;
-        }
 
         // Salva sempre localmente nel web UI per visualizzazione diretta
         web_ui_add_log(log_msg.level, log_msg.tag, log_msg.message);
 
-        // Invia anche remotamente se configurato (IP non vuoto)
-        if (cfg->remote_log.enabled && strlen(cfg->remote_log.server_ip) > 0 && strcmp(cfg->remote_log.server_ip, "localhost") != 0 && strcmp(cfg->remote_log.server_ip, "127.0.0.1") != 0) {
+        // Invia in broadcast UDP se abilitato
+        if (cfg->remote_log.use_broadcast) {
         
         // Crea il messaggio formattato per l'invio remoto
         char formatted_msg[LOG_MESSAGE_MAX_LEN + 128];
@@ -118,38 +118,36 @@ static void log_sender_task(void *pvParameters)
         snprintf(formatted_msg + len, sizeof(formatted_msg) - len,
                 "%s %s: %s\n", log_msg.level, log_msg.tag, log_msg.message);
         
-        if (cfg->remote_log.use_udp) {
-            // UDP
+        // Invia in broadcast UDP se abilitato
+        if (cfg->remote_log.use_broadcast) {
             struct sockaddr_in server_addr;
             memset(&server_addr, 0, sizeof(server_addr));
             server_addr.sin_family = AF_INET;
             server_addr.sin_port = htons(cfg->remote_log.server_port);
+            server_addr.sin_addr.s_addr = INADDR_BROADCAST;
             
-            // Usa broadcast o IP specifico
-            if (cfg->remote_log.use_broadcast) {
-                server_addr.sin_addr.s_addr = INADDR_BROADCAST;
-                ESP_LOGD(TAG, "Invio in broadcast UDP alla porta %d", cfg->remote_log.server_port);
+            ESP_LOGD(TAG, "Invio in broadcast UDP alla porta %d", cfg->remote_log.server_port);
+
+            if (sendto(sock_fd, formatted_msg, strlen(formatted_msg), 0,
+                      (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+                // Limita i log di errore per evitare spam
+                udp_error_count++;
+                TickType_t now = xTaskGetTickCount();
+                
+                // Logga solo ogni 10 errori o ogni 30 secondi
+                if (udp_error_count >= 10 || 
+                    (now - last_udp_error_time) > pdMS_TO_TICKS(30000)) {
+                    ESP_LOGW(TAG, "Errore invio UDP (%d errori totali): %s", 
+                            udp_error_count, strerror(errno));
+                    udp_error_count = 0; // Reset contatore
+                    last_udp_error_time = now;
+                }
             } else {
-                inet_pton(AF_INET, cfg->remote_log.server_ip, &server_addr.sin_addr);
-                ESP_LOGD(TAG, "Invio UDP a %s:%d", cfg->remote_log.server_ip, cfg->remote_log.server_port);
-            }
-
-            if (sendto(sock_fd, formatted_msg, strlen(formatted_msg), 0,
-                      (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-                ESP_LOGW(TAG, "Errore invio UDP: %s", strerror(errno));
-            }
-        } else {
-            // TCP - per ora non implementato, usa UDP
-            ESP_LOGW(TAG, "TCP non ancora implementato, usando UDP");
-            struct sockaddr_in server_addr;
-            memset(&server_addr, 0, sizeof(server_addr));
-            server_addr.sin_family = AF_INET;
-            server_addr.sin_port = htons(cfg->remote_log.server_port);
-            inet_pton(AF_INET, cfg->remote_log.server_ip, &server_addr.sin_addr);
-
-            if (sendto(sock_fd, formatted_msg, strlen(formatted_msg), 0,
-                      (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-                ESP_LOGW(TAG, "Errore invio TCP: %s", strerror(errno));
+                // Reset contatore se invio riuscito
+                if (udp_error_count > 0) {
+                    ESP_LOGI(TAG, "Invio UDP riuscito dopo %d errori precedenti", udp_error_count);
+                    udp_error_count = 0;
+                }
             }
         }
         } // Fine blocco invio remoto
@@ -163,37 +161,31 @@ static esp_err_t init_socket(void)
 {
     device_config_t *cfg = device_config_get();
 
-    if (cfg->remote_log.use_udp) {
-        // Socket UDP
-        sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (sock_fd < 0) {
-            ESP_LOGE(TAG, "Errore creazione socket UDP: %s", strerror(errno));
-            return ESP_FAIL;
-        }
+    // Reset del contatore errori UDP quando si reinizializza il socket
+    udp_error_count = 0;
+    last_udp_error_time = 0;
 
-        // Abilita broadcast se necessario
-        int broadcast = 1;
-        if (setsockopt(sock_fd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0) {
-            ESP_LOGW(TAG, "Impossibile abilitare broadcast sul socket: %s", strerror(errno));
-        }
-
-        // Imposta timeout per non bloccare
-        struct timeval tv;
-        tv.tv_sec = 0;
-        tv.tv_usec = 100000; // 100ms timeout
-        setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
-        ESP_LOGI(TAG, "Socket UDP inizializzato per %s:%d",
-                cfg->remote_log.server_ip, cfg->remote_log.server_port);
-    } else {
-        // TCP - per ora usa UDP
-        ESP_LOGW(TAG, "TCP non implementato, usando UDP");
-        sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (sock_fd < 0) {
-            ESP_LOGE(TAG, "Errore creazione socket TCP: %s", strerror(errno));
-            return ESP_FAIL;
-        }
+    // Crea sempre socket UDP per broadcast
+    sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock_fd < 0) {
+        ESP_LOGE(TAG, "Errore creazione socket UDP: %s", strerror(errno));
+        return ESP_FAIL;
     }
+
+    // Abilita broadcast
+    int broadcast = 1;
+    if (setsockopt(sock_fd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0) {
+        ESP_LOGW(TAG, "Impossibile abilitare broadcast sul socket: %s", strerror(errno));
+    }
+
+    // Imposta timeout per non bloccare
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000; // 100ms timeout
+    setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    ESP_LOGI(TAG, "Socket UDP inizializzato per broadcast alla porta %d",
+            cfg->remote_log.server_port);
 
     return ESP_OK;
 }
@@ -204,13 +196,7 @@ esp_err_t remote_logging_init(void)
         return ESP_OK;
     }
 
-    device_config_t *cfg = device_config_get();
-    if (!cfg->remote_log.enabled) {
-        ESP_LOGI(TAG, "Logging remoto disabilitato");
-        return ESP_OK;
-    }
-
-    // Crea la coda per i messaggi
+    // Crea sempre la coda per i messaggi (logging locale sempre attivo)
     log_queue = xQueueCreate(LOG_QUEUE_SIZE, sizeof(log_message_t));
     if (log_queue == NULL) {
         ESP_LOGE(TAG, "Errore creazione coda log");
@@ -241,8 +227,8 @@ esp_err_t remote_logging_init(void)
 
 esp_err_t remote_logging_send(const char *level, const char *tag, const char *message)
 {
-    if (!initialized || !remote_logging_is_enabled()) {
-        return ESP_OK; // Non è un errore se disabilitato
+    if (!initialized) {
+        return ESP_OK; // Non è un errore se non inizializzato
     }
 
     log_message_t log_msg;
@@ -261,8 +247,8 @@ esp_err_t remote_logging_send(const char *level, const char *tag, const char *me
 
 bool remote_logging_is_enabled(void)
 {
-    device_config_t *cfg = device_config_get();
-    return cfg && cfg->remote_log.enabled && initialized;
+    // Il logging locale è sempre attivo quando il componente è inizializzato
+    return initialized;
 }
 
 void remote_logging_stop(void)

@@ -1,6 +1,7 @@
 #include "eeprom_24lc16.h"
-#include "driver/i2c.h"
+#include "bsp/esp-bsp.h"
 #include "esp_log.h"
+#include "esp_check.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
@@ -8,58 +9,48 @@
 
 static const char *TAG = "EEPROM";
 
-#define I2C_PORT            CONFIG_APP_I2C_PORT
 #define EEPROM_BASE_ADDR    0x50
 #define EEPROM_PAGE_SIZE    16
 #define EEPROM_TOTAL_SIZE   2048
 #define EEPROM_WRITE_DELAY_MS 5
 
-#define EEPROM_WRITE_TIMEOUT_MS 50
+static i2c_master_dev_handle_t eeprom_dev_handles[8];
 
 static bool s_eeprom_available = false;
-
-static uint8_t get_device_addr(uint16_t address) {
-    // L'indirizzo I2C include i 3 bit più significativi dell'indirizzo di memoria (0-2047)
-    // Per chip 24LC16BT: 1010 B2 B1 B0
-    return EEPROM_BASE_ADDR | ((address >> 8) & 0x07);
-}
 
 static uint8_t get_mem_addr(uint16_t address) {
     // L'indirizzo interno è di 8 bit (0-255) per blocco
     return (uint8_t)(address & 0xFF);
 }
 
-/**
- * @brief Acknowledge Polling
- * Il chip non risponde all'indirizzo I2C finché il ciclo di scrittura interno (max 5ms) non è terminato.
- */
-static esp_err_t wait_until_ready(uint8_t dev_addr) {
-    uint8_t dummy;
-    // Attendiamo fino a 50ms (il ciclo di scrittura interno è max 5ms)
-    for (int i = 0; i < 10; i++) {
-        // Usiamo una lettura di 1 byte invece di una scrittura a 0 byte per evitare "i2c null address error" su alcuni driver
-        esp_err_t ret = i2c_master_read_from_device(I2C_PORT, dev_addr, &dummy, 1, pdMS_TO_TICKS(10));
-        if (ret == ESP_OK) return ESP_OK;
-        
-        // Se NACK o Errore, attendiamo almeno 5-10ms prima del prossimo tentativo
-        vTaskDelay(pdMS_TO_TICKS(5) > 0 ? pdMS_TO_TICKS(5) : 1);
-    }
-    return ESP_ERR_TIMEOUT;
-}
-
 esp_err_t eeprom_24lc16_init(void) {
-    // Nota: L'I2C driver dovrebbe essere già installato da io_expander_init o init.c
-    // Verifichiamo se risponde ad almeno uno degli 8 indirizzi del blocco
-    esp_err_t ret = wait_until_ready(EEPROM_BASE_ADDR);
-    
+    i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
+    ESP_RETURN_ON_FALSE(bus, ESP_ERR_INVALID_STATE, TAG, "BSP I2C bus not initialized");
+
+    for (int i = 0; i < 8; i++) {
+        i2c_device_config_t dev_cfg = {
+            .device_address = EEPROM_BASE_ADDR | i,
+            .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+        };
+        esp_err_t ret = i2c_master_bus_add_device(bus, &dev_cfg, &eeprom_dev_handles[i]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to add EEPROM device 0x%02X: %s", EEPROM_BASE_ADDR | i, esp_err_to_name(ret));
+            s_eeprom_available = false;
+            return ret;
+        }
+    }
+
+    // Test one device
+    uint8_t dummy;
+    esp_err_t ret = i2c_master_receive(eeprom_dev_handles[0], &dummy, 1, pdMS_TO_TICKS(100));
     if (ret == ESP_OK) {
         s_eeprom_available = true;
-        ESP_LOGI(TAG, "[C] EEPROM 24LC16BT trovata e pronta (I2C port %d)", I2C_PORT);
+        ESP_LOGI(TAG, "[C] EEPROM 24LC16BT found and ready");
     } else {
         s_eeprom_available = false;
-        ESP_LOGW(TAG, "[C] EEPROM 24LC16BT non risponde (check I2C pins o indirizzo 0x50)");
+        ESP_LOGW(TAG, "[C] EEPROM 24LC16BT not responding: %s", esp_err_to_name(ret));
     }
-    return ESP_OK; // Restituiamo sempre OK per permettere il boot con fallback su NVS
+    return ESP_OK;
 }
 
 bool eeprom_24lc16_is_available(void) {
@@ -75,14 +66,15 @@ esp_err_t eeprom_24lc16_read(uint16_t address, uint8_t *buffer, size_t length) {
     uint8_t *ptr = buffer;
 
     while (left > 0) {
-        uint8_t dev_addr = get_device_addr(cur_addr);
+        uint8_t dev_idx = (cur_addr >> 8) & 0x07;
+        i2c_master_dev_handle_t dev = eeprom_dev_handles[dev_idx];
         uint8_t mem_addr = get_mem_addr(cur_addr);
         
         // Possiamo leggere solo fino alla fine del blocco corrente (256 byte)
         size_t can_read = 256 - mem_addr;
         size_t to_read = (left < can_read) ? left : can_read;
 
-        esp_err_t ret = i2c_master_write_read_device(I2C_PORT, dev_addr, &mem_addr, 1, ptr, to_read, pdMS_TO_TICKS(200));
+        esp_err_t ret = i2c_master_transmit_receive(dev, &mem_addr, 1, ptr, to_read, pdMS_TO_TICKS(200));
         if (ret != ESP_OK) return ret;
 
         left -= to_read;
@@ -102,7 +94,8 @@ esp_err_t eeprom_24lc16_write(uint16_t address, const uint8_t *buffer, size_t le
     const uint8_t *ptr = buffer;
 
     while (left > 0) {
-        uint8_t dev_addr = get_device_addr(cur_addr);
+        uint8_t dev_idx = (cur_addr >> 8) & 0x07;
+        i2c_master_dev_handle_t dev = eeprom_dev_handles[dev_idx];
         uint8_t mem_addr = get_mem_addr(cur_addr);
         
         // Gestione page write (16 byte max)
@@ -113,15 +106,11 @@ esp_err_t eeprom_24lc16_write(uint16_t address, const uint8_t *buffer, size_t le
         write_buf[0] = mem_addr;
         memcpy(&write_buf[1], ptr, to_write);
 
-        esp_err_t ret = i2c_master_write_to_device(I2C_PORT, dev_addr, write_buf, to_write + 1, pdMS_TO_TICKS(100));
+        esp_err_t ret = i2c_master_transmit(dev, write_buf, to_write + 1, pdMS_TO_TICKS(100));
         if (ret != ESP_OK) return ret;
 
-        // Attesa completamento scrittura tramite polling (molto più robusto per 24LC16BT)
-        ret = wait_until_ready(dev_addr);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "[C] Timeout scrittura EEPROM all'indirizzo 0x%03X", cur_addr);
-            return ret;
-        }
+        // Attesa completamento scrittura (5ms tipico per 24LC16BT)
+        vTaskDelay(pdMS_TO_TICKS(EEPROM_WRITE_DELAY_MS));
 
         left -= to_write;
         cur_addr += to_write;
