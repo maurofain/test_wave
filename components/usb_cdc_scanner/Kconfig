@@ -1,0 +1,24 @@
+menu "USB CDC Scanner"
+
+config USB_CDC_SCANNER_ENABLE
+    bool "Enable USB CDC Scanner component"
+    default y
+
+config USB_CDC_SCANNER_USE_CDC_ACM_HOST
+    bool "Use CDC-ACM Host driver for real device access"
+    default n
+    depends on USB_OTG_SUPPORTED
+
+config USB_CDC_SCANNER_VID
+    hex "Vendor ID (VID) of the scanner"
+    default 0x303A
+
+config USB_CDC_SCANNER_PID
+    hex "Product ID (PID) of the scanner"
+    default 0x4001
+
+config USB_CDC_SCANNER_DUAL_PID
+    hex "Optional dual PID variant"
+    default 0x4002
+
+endmenu

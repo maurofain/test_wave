@@ -11,7 +11,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
 #include "usb_cdc_scanner.h"
+#include "driver/uart.h"
+#include "init.h"
+#include "led.h"
+#include "mdb_test.h"
 #include "app_version.h"
 #include "serial_test.h"
 #include "mdb.h"
@@ -106,7 +111,7 @@ static TaskHandle_t s_rs485_test_handle = NULL;
 
 // TEST UART: 0x55, 0xAA, 0x01, 0x07 (periodico)
 static void uart_test_task(void *arg) {
-    uart_port_t port = (uart_port_t)arg;
+    uart_port_t port = (uart_port_t)(intptr_t)arg;
     const char* seq_hex[] = {"\\0x55", "\\0xAA", "\\0x01", "\\0x07"};
     uint8_t rx_buf[128];
     size_t rx_len;

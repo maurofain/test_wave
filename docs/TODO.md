@@ -67,36 +67,39 @@
 
  1. il tasto CLEAR dei monitor non pulisce le aree di testo, togliere le indicazioni TX e RX>, c'è già il colore. Non inserire spazi tra i caratteri in modo TEXT. In modo HEX mettere un . prima del codice esadecimale.
  2. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate
-  
+
   # Scanner QR : 
+
+
+  - ```
+  Case Ciclo_Imager_Setup
+      
+  commandToSend = ChrW(126) & ChrW(1) & "0000#SCNMOD3;RRDENA1;CIDENA1;SCNENA0;RRDDUR3000;" & ChrW(3)
+      
+  wIsCommand = True
+    
+  Case Ciclo_Imager_State
+    
+    ' richiesta di stato
+    
+    commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA*;" & ChrW(3)
+    
+    wIsCommand = True
+    
+  Case Ciclo_Imager_On
+    
+    commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA1;" & ChrW(3)
+    
+    wIsCommand = True
+    
+  Case Ciclo_Imager_Off
+    
+    commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA0;" & ChrW(3)
+    
+    wIsCommand = True
+    ```
   
-  - Case Ciclo_Imager_Setup
-  
-      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNMOD3;RRDENA1;CIDENA1;SCNENA0;RRDDUR3000;" & ChrW(3)
-  
-      wIsCommand = True
-  
-    Case Ciclo_Imager_State
-  
-      ' richiesta di stato
-  
-      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA*;" & ChrW(3)
-  
-      wIsCommand = True
-  
-    Case Ciclo_Imager_On
-  
-      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA1;" & ChrW(3)
-  
-      wIsCommand = True
-  
-    Case Ciclo_Imager_Off
-  
-      commandToSend = ChrW(126) & ChrW(1) & "0000#SCNENA0;" & ChrW(3)
-  
-      wIsCommand = True
-  
-     
+   
   
   - IP Server API 195.231.69.227:5556/api/login
     
