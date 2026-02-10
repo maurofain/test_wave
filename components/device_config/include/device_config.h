@@ -91,13 +91,36 @@ typedef struct {
 } device_gpios_config_t;
 
 /**
- * @brief Configurazione generale device
+ * @brief Struttura di configurazione NTP
+ */
+typedef struct {
+    char server1[64];       ///< Server NTP primario
+    char server2[64];       ///< Server NTP secondario
+    int timezone_offset;    ///< Offset timezone in ore (-12 a +12)
+} device_ntp_config_t;
+
+/**
+ * @brief Struttura di configurazione Logging Remoto
+ */
+typedef struct {
+    bool enabled;           ///< Logging remoto abilitato
+    char server_ip[16];     ///< IP del server di log (o "broadcast")
+    uint16_t server_port;   ///< Porta del server di log
+    bool use_udp;           ///< Usa UDP invece di TCP
+    bool use_broadcast;     ///< Invia in broadcast invece che a IP specifico
+} device_remote_log_config_t;
+
+/**
+ * @brief Struttura di configurazione generale device
  */
 typedef struct {
     char device_name[32];       ///< Nome del dispositivo
     bool updated;               ///< Indica se la configurazione è stata aggiornata
     device_eth_config_t eth;
     device_wifi_config_t wifi;
+    bool ntp_enabled;           ///< NTP abilitato
+    device_ntp_config_t ntp;
+    device_remote_log_config_t remote_log;  ///< Configurazione logging remoto
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;
     device_display_config_t display;

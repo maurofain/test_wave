@@ -9,6 +9,23 @@
 #include "esp_netif.h"
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+
+#define TAG "WEB_UI"
+#define MAX_STORED_LOGS 100
+
+// Struttura per memorizzare i log ricevuti
+typedef struct {
+    char timestamp[20];
+    char level[8];
+    char tag[32];
+    char message[256];
+} stored_log_t;
+
+static stored_log_t stored_logs[MAX_STORED_LOGS];
+static int log_count = 0;
+static int log_index = 0;
+#include <time.h>
 #include "sdkconfig.h"
 #include "init.h"
 #include "led.h"
@@ -34,11 +51,10 @@
 #include "rs485.h"
 #include "tasks.h"
 
-static const char *TAG = "WEB_UI";
 static httpd_handle_t s_server = NULL;
 
 // Elementi HTML comuni
-static const char *HTML_NAV = "<nav><a href='/'>🏠 Home</a><a href='/config'>⚙️ Config</a><a href='/stats'>📈 Statistiche</a><a href='/tasks'>📋 Task</a><a href='/test'>🔧 Test</a><a href='/ota'>🔄 OTA</a></nav>";
+static const char *HTML_NAV = "<nav><a href='/'>🏠 Home</a><a href='/config'>⚙️ Config</a><a href='/stats'>📈 Statistiche</a><a href='/tasks'>📋 Task</a><a href='/logs'>📋 Log</a><a href='/test'>🔧 Test</a><a href='/ota'>🔄 OTA</a></nav>";
 
 static const char *HTML_STYLE_NAV = 
     "nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
@@ -48,6 +64,16 @@ static const char *HTML_STYLE_NAV =
 static esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style, bool show_nav) {
     char *buf = malloc(4096);
     if (!buf) return ESP_ERR_NO_MEM;
+
+    // Get current time
+    time_t now = time(NULL);
+    struct tm timeinfo;
+    char time_str[20] = "Time not set";
+    if (now != (time_t)-1) {
+        localtime_r(&now, &timeinfo);
+        strftime(time_str, sizeof(time_str), "%H:%M:%S", &timeinfo);
+    }
+
     snprintf(buf, 4096, 
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>%s</title><style>"
         "body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
@@ -55,10 +81,10 @@ static esp_err_t send_head(httpd_req_t *req, const char *title, const char *extr
         "%s %s"
         "</style></head><body>"
         "<header>"
-        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s [%s]</h1></div>"
+        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s [%s] - %s</h1></div>"
         "<div style='text-align:right;font-size:12px;opacity:0.8;'>v%s (%s)</div>"
         "</header>"
-        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
+        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
     httpd_resp_sendstr_chunk(req, buf);
     free(buf);
     return ESP_OK;
@@ -349,7 +375,19 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='wifi_dhcp' name='wifi_dhcp'><span class='slider'></span></label><span>DHCP</span></div>"
         "</div></div>"
 
-        "<div class='section'><h2>🔌 Periferiche Hardware</h2>"
+        "<div class='section'><h2>� NTP</h2>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='ntp_en' name='ntp_en'><span class='slider'></span></label><span>NTP Abilitato</span><button type='button' onclick='syncNTP()' style='margin-left:10px; background:#f39c12; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;'>Aggiorna</button><span id='current_time' style='margin-left:15px; font-weight:bold; color:#27ae60;'></span></div>"
+        "</div>"
+
+        "<div class='section'><h2>📊 Logging Remoto</h2>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_en' name='remote_log_en'><span class='slider'></span></label><span>Logging Remoto Abilitato</span></div>"
+        "<div class='indent'>"
+        "<div class='form-group'><label>IP Server</label><input type='text' id='remote_log_ip' name='remote_log_ip' placeholder='192.168.1.100'></div>"
+        "<div class='form-group'><label>Porta Server</label><input type='number' id='remote_log_port' name='remote_log_port' min='1' max='65535' placeholder='514'></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_udp' name='remote_log_udp'><span class='slider'></span></label><span>Usa UDP (raccomandato)</span></div>"
+        "</div></div>"
+
+        "<div class='section'><h2>�🔌 Periferiche Hardware</h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='io_exp' name='io_exp'><span class='slider'></span></label><span>I/O Expander</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='temp' name='temp'><span class='slider'></span></label><span>Sensore Temperatura</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='led' name='led'><span class='slider'></span></label><span>LED Strip (WS2812)</span></div>"
@@ -413,6 +451,14 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "if(r.ok) alert('✅ '+res.message); else alert('❌ '+res.error);"
         "}catch(e){alert('❌ Errore: '+e);}}"
         "async function resetConfig(){if(confirm(\"Resettare ai valori di fabbrica?\")){await fetch(\"/api/config/reset\",{method:\"POST\"});location.reload();}}"
+        "async function syncNTP(){"
+        "try{const r=await fetch('/api/ntp/sync',{method:'POST'});"
+        "const res=await r.json();"
+        "if(r.ok) alert('✅ '+res.message); else alert('❌ '+res.message);"
+        "}catch(e){alert('❌ Errore: '+e);}}"
+        "function updateCurrentTime(){const now=new Date();document.getElementById('current_time').innerText=now.toLocaleString('it-IT');}"
+        "document.getElementById('ntp_en').addEventListener('change',function(){if(this.checked){syncNTP();}});"
+        "setInterval(updateCurrentTime,1000);"
         "window.addEventListener('load',loadConfig);"
         "async function loadConfig(){"
         "try{const r=await fetch('/api/config');if(!r.ok)throw new Error('HTTP '+r.status);"
@@ -427,6 +473,11 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('wifi_dhcp').checked=c.wifi.dhcp_enabled;"
         "document.getElementById('wifi_ssid').value=c.wifi.ssid;"
         "document.getElementById('wifi_pwd').value=c.wifi.password;"
+        "document.getElementById('ntp_en').checked=c.ntp_enabled;"
+        "document.getElementById('remote_log_en').checked=c.remote_log.enabled;"
+        "document.getElementById('remote_log_ip').value=c.remote_log.server_ip;"
+        "document.getElementById('remote_log_port').value=c.remote_log.server_port;"
+        "document.getElementById('remote_log_udp').checked=c.remote_log.use_udp;"
         "document.getElementById('io_exp').checked=c.sensors.io_expander_enabled;"
         "document.getElementById('temp').checked=c.sensors.temperature_enabled;"
         "document.getElementById('led').checked=c.sensors.led_enabled;"
@@ -456,6 +507,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('mdb_tx').value=c.mdb_serial.tx_buf;"
         "document.getElementById('g33_mode').value=c.gpios.gpio33.mode;"
         "document.getElementById('g33_state').checked=c.gpios.gpio33.state;"
+        "updateCurrentTime();"
         "}catch(e){console.error(e);}"
         "}"
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
@@ -463,6 +515,8 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "device_name:document.getElementById('dev_name').value,"
         "eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},"
         "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
+        "ntp_enabled:document.getElementById('ntp_en').checked,"
+        "remote_log:{enabled:document.getElementById('remote_log_en').checked,server_ip:document.getElementById('remote_log_ip').value,server_port:parseInt(document.getElementById('remote_log_port').value),use_udp:document.getElementById('remote_log_udp').checked},"
         "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
         "display:{lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
         "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
@@ -507,6 +561,15 @@ static esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddStringToObject(wifi, "subnet", cfg->wifi.subnet);
     cJSON_AddStringToObject(wifi, "gateway", cfg->wifi.gateway);
     cJSON_AddItemToObject(root, "wifi", wifi);
+    
+    cJSON_AddBoolToObject(root, "ntp_enabled", cfg->ntp_enabled);
+    
+    // NTP configuration
+    cJSON *ntp = cJSON_CreateObject();
+    cJSON_AddStringToObject(ntp, "server1", cfg->ntp.server1);
+    cJSON_AddStringToObject(ntp, "server2", cfg->ntp.server2);
+    cJSON_AddNumberToObject(ntp, "timezone_offset", cfg->ntp.timezone_offset);
+    cJSON_AddItemToObject(root, "ntp", ntp);
     
     cJSON *sensors = cJSON_CreateObject();
     cJSON_AddBoolToObject(sensors, "io_expander_enabled", cfg->sensors.io_expander_enabled);
@@ -562,6 +625,15 @@ static esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(g33, "state", cfg->gpios.gpio33.initial_state);
     cJSON_AddItemToObject(gpios, "gpio33", g33);
     cJSON_AddItemToObject(root, "gpios", gpios);
+
+    // Remote logging configuration
+    cJSON *remote_log = cJSON_CreateObject();
+    cJSON_AddBoolToObject(remote_log, "enabled", cfg->remote_log.enabled);
+    cJSON_AddStringToObject(remote_log, "server_ip", cfg->remote_log.server_ip);
+    cJSON_AddNumberToObject(remote_log, "server_port", cfg->remote_log.server_port);
+    cJSON_AddBoolToObject(remote_log, "use_udp", cfg->remote_log.use_udp);
+    cJSON_AddBoolToObject(remote_log, "use_broadcast", cfg->remote_log.use_broadcast);
+    cJSON_AddItemToObject(root, "remote_log", remote_log);
     
     char *json = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -677,6 +749,9 @@ static esp_err_t api_config_save(httpd_req_t *req)
     char buf[4096] = {0};
     httpd_req_recv(req, buf, sizeof(buf)-1);
     
+    // Log del JSON ricevuto per debugging
+    ESP_LOGI(TAG, "[C] JSON configurazione ricevuto: %s", buf);
+    
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
         const char *resp_str = "{\"error\":\"Invalid JSON\"}";
@@ -709,6 +784,18 @@ static esp_err_t api_config_save(httpd_req_t *req)
         if (ssid && ssid->valuestring) strncpy(cfg->wifi.ssid, ssid->valuestring, sizeof(cfg->wifi.ssid)-1);
         cJSON *password = cJSON_GetObjectItem(wifi_obj, "password");
         if (password && password->valuestring) strncpy(cfg->wifi.password, password->valuestring, sizeof(cfg->wifi.password)-1);
+    }
+    
+    // NTP configuration
+    cfg->ntp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(root, "ntp_enabled"));
+    cJSON *ntp_obj = cJSON_GetObjectItem(root, "ntp");
+    if (ntp_obj) {
+        cJSON *server1 = cJSON_GetObjectItem(ntp_obj, "server1");
+        if (server1 && server1->valuestring) strncpy(cfg->ntp.server1, server1->valuestring, sizeof(cfg->ntp.server1)-1);
+        cJSON *server2 = cJSON_GetObjectItem(ntp_obj, "server2");
+        if (server2 && server2->valuestring) strncpy(cfg->ntp.server2, server2->valuestring, sizeof(cfg->ntp.server2)-1);
+        cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset");
+        if (tz_offset && cJSON_IsNumber(tz_offset)) cfg->ntp.timezone_offset = tz_offset->valueint;
     }
     
     cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
@@ -788,6 +875,25 @@ static esp_err_t api_config_save(httpd_req_t *req)
         cfg->mdb_serial.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "rx_buf"));
         cfg->mdb_serial.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "tx_buf"));
     }
+
+    // Remote logging configuration
+    cJSON *remote_log_obj = cJSON_GetObjectItem(root, "remote_log");
+    if (remote_log_obj) {
+        cfg->remote_log.enabled = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "enabled"));
+        cJSON *server_ip = cJSON_GetObjectItem(remote_log_obj, "server_ip");
+        if (server_ip && server_ip->valuestring) {
+            strncpy(cfg->remote_log.server_ip, server_ip->valuestring, sizeof(cfg->remote_log.server_ip) - 1);
+        }
+        cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
+        if (server_port) {
+            cfg->remote_log.server_port = (uint16_t)server_port->valueint;
+        }
+        cfg->remote_log.use_udp = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_udp"));
+        cfg->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
+        ESP_LOGI(TAG, "[C] Remote logging config: enabled=%d, ip=%s, port=%d, udp=%d, broadcast=%d",
+                cfg->remote_log.enabled, cfg->remote_log.server_ip,
+                cfg->remote_log.server_port, cfg->remote_log.use_udp, cfg->remote_log.use_broadcast);
+    }
     
     cfg->updated = true;
     device_config_save(cfg);
@@ -799,7 +905,180 @@ static esp_err_t api_config_save(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler pagina statistiche
+// Handler API POST /api/logs (riceve log dal server remoto)
+static esp_err_t api_logs_receive(httpd_req_t *req)
+{
+    ESP_LOGD(TAG, "[C] POST /api/logs");
+
+    // Headers CORS per permettere richieste dal browser
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+
+    char buf[512] = {0};
+    httpd_req_recv(req, buf, sizeof(buf)-1);
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        const char *resp_str = "{\"error\":\"Invalid JSON\"}";
+        httpd_resp_send(req, resp_str, strlen(resp_str));
+        return ESP_OK;
+    }
+
+    cJSON *level = cJSON_GetObjectItem(root, "level");
+    cJSON *tag = cJSON_GetObjectItem(root, "tag");
+    cJSON *message = cJSON_GetObjectItem(root, "message");
+    cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp");
+
+    if (level && tag && message && timestamp) {
+        // Memorizza il log
+        stored_log_t *log = &stored_logs[log_index];
+        strncpy(log->level, level->valuestring, sizeof(log->level) - 1);
+        strncpy(log->tag, tag->valuestring, sizeof(log->tag) - 1);
+        strncpy(log->message, message->valuestring, sizeof(log->message) - 1);
+        strncpy(log->timestamp, timestamp->valuestring, sizeof(log->timestamp) - 1);
+
+        log_index = (log_index + 1) % MAX_STORED_LOGS;
+        if (log_count < MAX_STORED_LOGS) {
+            log_count++;
+        }
+    }
+
+    cJSON_Delete(root);
+    const char *resp_str = "{\"status\":\"ok\"}";
+    httpd_resp_send(req, resp_str, strlen(resp_str));
+    return ESP_OK;
+}
+
+/**
+ * @brief Aggiunge un log internamente (per uso da altri componenti)
+ */
+void web_ui_add_log(const char *level, const char *tag, const char *message)
+{
+    // Ottieni timestamp corrente
+    time_t now = time(NULL);
+    struct tm timeinfo;
+    char timestamp[20];
+    
+    if (now != (time_t)-1) {
+        localtime_r(&now, &timeinfo);
+        strftime(timestamp, sizeof(timestamp), "%H:%M:%S", &timeinfo);
+    } else {
+        strncpy(timestamp, "??:??:??", sizeof(timestamp));
+    }
+
+    // Memorizza il log
+    stored_log_t *log = &stored_logs[log_index];
+    strncpy(log->level, level, sizeof(log->level) - 1);
+    strncpy(log->tag, tag, sizeof(log->tag) - 1);
+    strncpy(log->message, message, sizeof(log->message) - 1);
+    strncpy(log->timestamp, timestamp, sizeof(log->timestamp) - 1);
+
+    log_index = (log_index + 1) % MAX_STORED_LOGS;
+    if (log_count < MAX_STORED_LOGS) {
+        log_count++;
+    }
+}
+
+// Handler API GET /api/logs (restituisce i log memorizzati)
+static esp_err_t api_logs_get(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] GET /api/logs - Processing request");
+
+    // Headers CORS per permettere richieste dal browser
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+
+    cJSON *root = cJSON_CreateArray();
+
+    int start_idx = (log_count < MAX_STORED_LOGS) ? 0 : log_index;
+    int count = log_count;
+
+    for (int i = 0; i < count; i++) {
+        int idx = (start_idx + i) % MAX_STORED_LOGS;
+        stored_log_t *log = &stored_logs[idx];
+
+        cJSON *log_obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(log_obj, "timestamp", log->timestamp);
+        cJSON_AddStringToObject(log_obj, "level", log->level);
+        cJSON_AddStringToObject(log_obj, "tag", log->tag);
+        cJSON_AddStringToObject(log_obj, "message", log->message);
+        cJSON_AddItemToArray(root, log_obj);
+    }
+
+    char *json_str = cJSON_Print(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json_str, strlen(json_str));
+
+    free(json_str);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+// Handler API OPTIONS /api/logs (per CORS preflight)
+static esp_err_t api_logs_options(httpd_req_t *req)
+{
+    ESP_LOGD(TAG, "[C] OPTIONS /api/logs");
+
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Max-Age", "86400");
+
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
+// Handler pagina logs
+static esp_err_t logs_page_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] GET /logs");
+    const char *extra_style = 
+        ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
+        "h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px}.log-container{font-family:monospace;font-size:12px;background:#f8f9fa;border:1px solid #dee2e6;border-radius:4px;padding:15px;max-height:600px;overflow-y:auto;white-space:pre-wrap}"
+        ".log-entry{margin:2px 0;padding:2px;border-radius:3px}"
+        ".log-error{background:#f8d7da;color:#721c24}.log-warn{background:#fff3cd;color:#856404}.log-info{background:#d1ecf1;color:#0c5460}.log-debug{background:#e2e3e5;color:#383d41}"
+        ".log-timestamp{color:#6c757d;font-weight:bold}.log-level{font-weight:bold;margin:0 8px}.log-tag{color:#495057;margin-right:8px}.log-message{color:#212529}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Log Remoto", extra_style, true);
+
+    const char *body = 
+        "<div class='container'>"
+        "<div class='section'><h2>📋 Log Remoto Ricevuti</h2>"
+        "<p>I log vengono ricevuti via UDP dal server configurato. Aggiorna la pagina per vedere i nuovi log.</p>"
+        "<div class='log-container' id='logContainer'>"
+        "In attesa di log...<br>"
+        "Configura il logging remoto nella pagina <a href='/config'>Configurazione</a> per iniziare a ricevere log."
+        "</div></div>"
+        "</div>"
+        "<script>"
+        "async function loadLogs(){"
+        "try{"
+        "const r=await fetch('/api/logs');if(!r.ok)throw new Error('Logs Error');"
+        "const logs=await r.json();"
+        "const container=document.getElementById('logContainer');"
+        "if(logs.length===0){container.innerHTML='Nessun log ricevuto ancora.';return;}"
+        "container.innerHTML='';"
+        "logs.forEach(log=>{"
+        "const entry=document.createElement('div');"
+        "entry.className='log-entry log-'+log.level.toLowerCase();"
+        "entry.innerHTML=`<span class='log-timestamp'>${log.timestamp}</span><span class='log-level'>[${log.level}]</span><span class='log-tag'>${log.tag}:</span><span class='log-message'>${log.message}</span>`;"
+        "container.appendChild(entry);"
+        "});"
+        "container.scrollTop=container.scrollHeight;"
+        "}catch(e){console.error(e);document.getElementById('logContainer').innerHTML='Errore caricamento log: '+e;}"
+        "}"
+        "window.addEventListener('load',loadLogs);"
+        "setInterval(loadLogs,5000);" // Aggiorna ogni 5 secondi
+        "</script></body></html>";
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
 static esp_err_t stats_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /stats");
@@ -1845,13 +2124,30 @@ static esp_err_t api_config_reset(httpd_req_t *req)
     return ESP_OK;
 }
 
+// Handler API POST /api/ntp/sync
+static esp_err_t api_ntp_sync(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] POST /api/ntp/sync");
+    httpd_resp_set_type(req, "application/json");
+    
+    esp_err_t ret = init_sync_ntp();
+    if (ret == ESP_OK) {
+        const char *ok_resp = "{\"status\":\"ok\",\"message\":\"NTP synchronization completed successfully\"}";
+        httpd_resp_send(req, ok_resp, strlen(ok_resp));
+    } else {
+        const char *err_resp = "{\"status\":\"error\",\"message\":\"NTP synchronization failed\"}";
+        httpd_resp_send(req, err_resp, strlen(err_resp));
+    }
+    return ESP_OK;
+}
+
 esp_err_t web_ui_init(void)
 {
     if (s_server != NULL) return ESP_OK;
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = CONFIG_APP_HTTP_PORT;
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 30;  // Aumentato da 20 a 30 per supportare tutti gli endpoint
     config.stack_size = 8192;
     config.lru_purge_enable = true;
     config.uri_match_fn = httpd_uri_match_wildcard;
@@ -1891,6 +2187,9 @@ esp_err_t web_ui_init(void)
     
     httpd_uri_t uri_test = {.uri = "/test", .method = HTTP_GET, .handler = test_page_handler};
     httpd_register_uri_handler(s_server, &uri_test);
+    
+    httpd_uri_t uri_logs = {.uri = "/logs", .method = HTTP_GET, .handler = logs_page_handler};
+    httpd_register_uri_handler(s_server, &uri_logs);
 
     // API
     httpd_uri_t uri_api_get = {.uri = "/api/config", .method = HTTP_GET, .handler = api_config_get};
@@ -1905,6 +2204,9 @@ esp_err_t web_ui_init(void)
     httpd_uri_t uri_api_reset = {.uri = "/api/config/reset", .method = HTTP_POST, .handler = api_config_reset};
     httpd_register_uri_handler(s_server, &uri_api_reset);
 
+    httpd_uri_t uri_api_ntp_sync = {.uri = "/api/ntp/sync", .method = HTTP_POST, .handler = api_ntp_sync};
+    httpd_register_uri_handler(s_server, &uri_api_ntp_sync);
+
     httpd_uri_t uri_api_tasks = {.uri = "/api/tasks", .method = HTTP_GET, .handler = api_tasks_get};
     httpd_register_uri_handler(s_server, &uri_api_tasks);
     
@@ -1916,6 +2218,18 @@ esp_err_t web_ui_init(void)
     
     httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
     httpd_register_uri_handler(s_server, &uri_api_test);
+    
+    httpd_uri_t uri_api_logs_get = {.uri = "/api/logs", .method = HTTP_GET, .handler = api_logs_get};
+    httpd_register_uri_handler(s_server, &uri_api_logs_get);
+    ESP_LOGI(TAG, "Registered GET /api/logs handler");
+    
+    httpd_uri_t uri_api_logs_receive = {.uri = "/api/logs/receive", .method = HTTP_POST, .handler = api_logs_receive};
+    httpd_register_uri_handler(s_server, &uri_api_logs_receive);
+    ESP_LOGI(TAG, "Registered POST /api/logs/receive handler");
+
+    httpd_uri_t uri_api_logs_options = {.uri = "/api/logs/*", .method = HTTP_OPTIONS, .handler = api_logs_options};
+    httpd_register_uri_handler(s_server, &uri_api_logs_options);
+    ESP_LOGI(TAG, "Registered OPTIONS /api/logs/* handler");
 
     // Reboot Handlers
     httpd_uri_t uri_reboot_factory = {.uri = "/reboot/factory", .method = HTTP_GET, .handler = reboot_factory_handler};

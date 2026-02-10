@@ -55,6 +55,21 @@ static void _set_defaults(device_config_t *config)
     strncpy(config->wifi.subnet, "255.255.255.0", sizeof(config->wifi.subnet) - 1);
     strncpy(config->wifi.gateway, "192.168.1.1", sizeof(config->wifi.gateway) - 1);
 
+    // NTP enabled by default
+    config->ntp_enabled = true;
+
+    // Default NTP
+    strncpy(config->ntp.server1, "time.google.com", sizeof(config->ntp.server1) - 1);
+    strncpy(config->ntp.server2, "pool.ntp.org", sizeof(config->ntp.server2) - 1);
+    config->ntp.timezone_offset = 1;  // Default to CET (Central European Time)
+
+    // Default Remote Logging (enabled by default for local logging)
+    config->remote_log.enabled = true;
+    strncpy(config->remote_log.server_ip, "", sizeof(config->remote_log.server_ip) - 1);  // Empty = local only
+    config->remote_log.server_port = 514;  // Default syslog port
+    config->remote_log.use_udp = true;     // UDP by default for logs
+    config->remote_log.use_broadcast = false; // No broadcast by default
+
     // Default Sensori (tutti abilitati per impostazione predefinita)
     config->sensors.io_expander_enabled = true;
     config->sensors.temperature_enabled = true;
@@ -336,6 +351,32 @@ esp_err_t device_config_load(device_config_t *config)
                     if (gateway && gateway->valuestring) strncpy(config->wifi.gateway, gateway->valuestring, sizeof(config->wifi.gateway) - 1);
                 }
 
+                // NTP enabled
+                config->ntp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(root, "ntp_enabled"));
+
+                // Analisi config NTP
+                cJSON *ntp_obj = cJSON_GetObjectItem(root, "ntp");
+                if (ntp_obj) {
+                    cJSON *server1 = cJSON_GetObjectItem(ntp_obj, "server1");
+                    if (server1 && server1->valuestring) strncpy(config->ntp.server1, server1->valuestring, sizeof(config->ntp.server1) - 1);
+                    cJSON *server2 = cJSON_GetObjectItem(ntp_obj, "server2");
+                    if (server2 && server2->valuestring) strncpy(config->ntp.server2, server2->valuestring, sizeof(config->ntp.server2) - 1);
+                    cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset");
+                    if (tz_offset && cJSON_IsNumber(tz_offset)) config->ntp.timezone_offset = tz_offset->valueint;
+                }
+
+                // Analisi config Remote Logging
+                cJSON *remote_log_obj = cJSON_GetObjectItem(root, "remote_log");
+                if (remote_log_obj) {
+                    config->remote_log.enabled = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "enabled"));
+                    cJSON *server_ip = cJSON_GetObjectItem(remote_log_obj, "server_ip");
+                    if (server_ip && server_ip->valuestring) strncpy(config->remote_log.server_ip, server_ip->valuestring, sizeof(config->remote_log.server_ip) - 1);
+                    cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
+                    if (server_port) config->remote_log.server_port = (uint16_t)server_port->valueint;
+                    config->remote_log.use_udp = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_udp"));
+                    config->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
+                }
+
                 // Analisi config Sensori
                 cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
                 if (sensors_obj) {
@@ -448,6 +489,23 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddStringToObject(wifi_obj, "subnet", config->wifi.subnet);
     cJSON_AddStringToObject(wifi_obj, "gateway", config->wifi.gateway);
     cJSON_AddItemToObject(root, "wifi", wifi_obj);
+
+    // NTP
+    cJSON_AddBoolToObject(root, "ntp_enabled", config->ntp_enabled);
+    cJSON *ntp_obj = cJSON_CreateObject();
+    cJSON_AddStringToObject(ntp_obj, "server1", config->ntp.server1);
+    cJSON_AddStringToObject(ntp_obj, "server2", config->ntp.server2);
+    cJSON_AddNumberToObject(ntp_obj, "timezone_offset", config->ntp.timezone_offset);
+    cJSON_AddItemToObject(root, "ntp", ntp_obj);
+
+    // Remote Logging
+    cJSON *remote_log_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(remote_log_obj, "enabled", config->remote_log.enabled);
+    cJSON_AddStringToObject(remote_log_obj, "server_ip", config->remote_log.server_ip);
+    cJSON_AddNumberToObject(remote_log_obj, "server_port", config->remote_log.server_port);
+    cJSON_AddBoolToObject(remote_log_obj, "use_udp", config->remote_log.use_udp);
+    cJSON_AddBoolToObject(remote_log_obj, "use_broadcast", config->remote_log.use_broadcast);
+    cJSON_AddItemToObject(root, "remote_log", remote_log_obj);
 
     // Sensors
     cJSON *sensors_obj = cJSON_CreateObject();

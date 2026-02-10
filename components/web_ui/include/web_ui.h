@@ -12,3 +12,11 @@ esp_err_t web_ui_init(void);
  * @brief Ferma il server HTTP
  */
 void web_ui_stop(void);
+
+/**
+ * @brief Aggiunge un log internamente (per uso da altri componenti)
+ * @param level Livello del log (INFO, ERROR, etc.)
+ * @param tag Tag del componente che genera il log
+ * @param message Messaggio del log
+ */
+void web_ui_add_log(const char *level, const char *tag, const char *message);
