@@ -1,0 +1,1176 @@
+[0;33m--- esp-idf-monitor 1.9.0 on /dev/ttyACM0 115200[0m
+[0;33m--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H[0m
+Executing action: monitor
+Running idf_monitor in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave
+Executing "/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.2/esp-idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.elf /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.elf --no-reset -m '/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python' '/home/mauro/esp/v5.5.2/esp-idf/tools/idf.py' '-p' '/dev/ttyACM0'"...
+APP: [M] Device in funzione ✓
+[0;32mI (195165) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (195165) USB_CDC_SCANNER: USB host reports 0 devinzione ✓[0m
+[0;32mI (340295) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (341165) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (342165) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (343165) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (343165) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (343165) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (345115) APP: [M] Device in funzione ✓[0m
+[0;32mI (345165) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (345295) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (346165) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (347165) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (347165) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (347165) USB_CDC_SCANNER: Retrying in 2s[0m
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x1 (POWERON),boot:0x30f (SPI_FAST_FLASH_BOOT)
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x164c
+load:0x4ff29ed0,len:0xe08
+[0m--- 0x4ff29ed0: [0;33mesp_bootloader_get_description[0m[0m at [0;32m/home/mauro/esp/v5.5.2/esp-idf/components/esp_bootloader_format/esp_bootloader_desc.c[0m[0m:[1;31m39[0m
+load:0x4ff2cbd0,len:0x3588
+[0m--- 0x4ff2cbd0: [0;33mesp_flash_encryption_enabled[0m[0m at [0;32m/home/mauro/esp/v5.5.2/esp-idf/components/bootloader_support/src/flash_encrypt.c[0m[0m:[1;31m89[0m
+entry 0x4ff29eda
+[0m--- 0x4ff29eda: [0;33mcall_start_cpu0[0m[0m at [0;32m/home/mauro/esp/v5.5.2/esp-idf/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m25[0m
+[0;32mI (25) boot: ESP-IDF v5.5.2-dirty 2nd stage bootloader[0m
+[0;32mI (26) boot: compile time Feb 10 2026 11:35:57[0m
+[0;32mI (26) boot: Multicore bootloader[0m
+[0;32mI (28) boot: chip revision: v1.0[0m
+[0;32mI (29) boot: efuse block revision: v0.3[0m
+[0;32mI (33) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (37) boot.esp32p4: SPI Mode       : DIO[0m
+[0;32mI (40) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (44) boot: Enabling RNG early entropy source...[0m
+[0;32mI (49) boot: Partition Table:[0m
+[0;32mI (51) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (58) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (64) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (71) boot:  2 factory          factory app      00 00 00010000 00300000[0m
+[0;32mI (77) boot:  3 ota_0            OTA app          00 10 00310000 00500000[0m
+[0;32mI (84) boot:  4 ota_1            OTA app          00 11 00810000 00500000[0m
+[0;32mI (90) boot:  5 otadata          OTA data         01 00 00d10000 00002000[0m
+[0;32mI (97) boot:  6 storage          Unknown data     01 82 00d12000 002ee000[0m
+[0;32mI (104) boot: End of partition table[0m
+[0;32mI (108) boot: Defaulting to factory image[0m
+[0;32mI (110) esp_image: segment 0: paddr=00010020 vaddr=40100020 size=46cc8h (289992) map[0m
+[0;32mI (162) esp_image: segment 1: paddr=00056cf0 vaddr=30100000 size=00088h (   136) load[0m
+[0;32mI (164) esp_image: segment 2: paddr=00056d80 vaddr=4ff00000 size=09298h ( 37528) load[0m
+[0;32mI (173) esp_image: segment 3: paddr=00060020 vaddr=40000020 size=fb944h (1030468) map[0m
+[0;32mI (327) esp_image: segment 4: paddr=0015b96c vaddr=4ff09298 size=184c0h ( 99520) load[0m
+[0;32mI (346) esp_image: segment 5: paddr=00173e34 vaddr=4ff21780 size=0362ch ( 13868) load[0m
+[0;32mI (350) esp_image: segment 6: paddr=00177468 vaddr=50108080 size=00020h (    32) load[0m
+[0;32mI (358) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (358) boot: Disabling RNG early entropy source...[0m
+[0;32mI (374) hex_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (374) hex_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (374) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
+[0;32mI (375) hex_psram: dev id       : 0x03 (generation 4)[0m
+[0;32mI (380) hex_psram: density      : 0x07 (256 Mbit)[0m
+[0;32mI (384) hex_psram: good-die     : 0x06 (Pass)[0m
+[0;32mI (388) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
+[0;32mI (393) hex_psram: BurstType    : 0x00 ( Wrap)[0m
+[0;32mI (397) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
+[0;32mI (401) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
+[0;32mI (406) hex_psram: Readlatency  : 0x04 (14 cycles@Fixed)[0m
+[0;32mI (411) hex_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (415) MSPI Timing: Enter psram timing tuning[0m
+[0;32mI (592) esp_psram: Found 32MB PSRAM device[0m
+[0;32mI (592) esp_psram: Speed: 200MHz[0m
+[0;32mI (593) hex_psram: psram CS IO is dedicated[0m
+[0;32mI (593) cpu_start: Multicore app[0m
+[0;32mI (1106) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (1114) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (1115) cpu_start: Pro cpu start user code[0m
+[0;32mI (1115) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (1117) app_init: Application information:[0m
+[0;32mI (1121) app_init: Project name:     test_wave[0m
+[0;32mI (1125) app_init: App version:      d3d0a53-dirty[0m
+[0;32mI (1130) app_init: Compile time:     Feb 11 2026 12:48:58[0m
+[0;32mI (1135) app_init: ELF file SHA256:  ad76bff67...[0m
+[0;32mI (1139) app_init: ESP-IDF:          v5.5.2-dirty[0m
+[0;32mI (1144) efuse_init: Min chip rev:     v0.1[0m
+[0;32mI (1148) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (1152) efuse_init: Chip rev:         v1.0[0m
+[0;32mI (1156) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (1162) heap_init: At 4FF25F10 len 000150B0 (84 KiB): RETENT_RAM[0m
+[0;32mI (1168) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (1173) heap_init: At 4FF4A340 len 00035CC0 (215 KiB): RAM[0m
+[0;32mI (1178) heap_init: At 501080A0 len 00007F60 (31 KiB): RTCRAM[0m
+[0;32mI (1184) heap_init: At 30100088 len 00001F78 (7 KiB): TCM[0m
+[0;32mI (1189) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;32mI (1196) spi_flash: detected chip: gd[0m
+[0;32mI (1199) spi_flash: flash io: dio[0m
+[0;32mI (1202) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (1208) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (1215) main_task: Started on CPU0[0m
+[0;32mI (1245) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (1245) main_task: Calling app_main()[0m
+[0;32mI (1245) APP: ==========================================[0m
+[0;32mI (1255) APP:   MODO: FACTORY (Test)[0m
+[0;32mI (1255) APP:   App Test Wave - Versione: 1.1.0[0m
+[0;32mI (1255) APP:   Data Compilazione: 2026-02-10[0m
+[0;32mI (1265) APP: ==========================================[0m
+[0;32mI (1265) APP: Inizializzazione I2C e I/O Expander[0m
+[0;33mW (1275) i2c.master: Please check pull-up resistances whether be connected properly. Otherwise unexpected behavior would happen. For more detailed information, please read docs[0m
+[1;31mE (1285) IO_EXP: [C] Errore comunicazione chip INPUT (0x44)[0m
+[0;33mW (1295) INIT: I/O Expander non disponibile o errore (ESP_ERR_NOT_FOUND): proseguo senza bloccare l'esecuzione[0m
+[0;33mW (1305) INIT: Avviso lettura NVS: ESP_ERR_INVALID_ARG (verranno usate le defaults)[0m
+[0;32mI (1435) INIT: [M] SPIFFS montato: totale=2816471, usato=1233163[0m
+[0;32mI (1435) INIT: [M] === Elenco file SPIFFS ===[0m
+[0;32mI (1435) INIT: [M]   [1] image06.jpg (231971 bytes)[0m
+[0;32mI (1455) INIT: [M]   [2] .gitkeep (77 bytes)[0m
+[0;32mI (1455) INIT: [M]   [3] image03.jpg (209399 bytes)[0m
+[0;32mI (1465) INIT: [M]   [4] image07.jpg (205753 bytes)[0m
+[0;32mI (1475) INIT: [M]   [5] logo.jpg (12183 bytes)[0m
+[0;32mI (1475) INIT: [M]   [6] image18.jpg (86918 bytes)[0m
+[0;32mI (1475) INIT: [M]   [7] image05.jpg (192796 bytes)[0m
+[0;32mI (1485) INIT: [M]   [8] image12.jpg (166631 bytes)[0m
+[0;32mI (1495) INIT: [M]   [9] image01.jpg (113724 bytes)[0m
+[0;32mI (1505) INIT: [M]   [10] .comments/image01.jpg.xml (152 bytes)[0m
+[0;32mI (1505) INIT: [M]   [11] tasks.csv (348 bytes)[0m
+[0;32mI (1535) INIT: [M] === Totale file: 11 ===[0m
+[0;32mI (1535) INIT: [M] === Contenuto tasks.csv ===[0m
+[0;32mI (1535) INIT: [M]   [1] name,state,priority,core,period_ms,stack_words[0m
+[0;32mI (1535) INIT: [M]   [2] ws2812_blink,run,5,0,500,8192[0m
+[0;32mI (1545) INIT: [M]   [3] eeprom,idle,4,0,1000,8192[0m
+[0;32mI (1545) INIT: [M]   [4] io_expander,run,4,0,500,8192[0m
+[0;32mI (1555) INIT: [M]   [5] sht40,run,4,0,2000,8192[0m
+[0;32mI (1555) INIT: [M]   [6] rs232,idle,5,0,10,8192[0m
+[0;32mI (1565) INIT: [M]   [7] rs485,idle,5,0,10,8192[0m
+[0;32mI (1565) INIT: [M]   [8] mdb,idle,5,0,10,8192[0m
+[0;32mI (1565) INIT: [M]   [9] pwm,idle,4,0,20,8192[0m
+[0;32mI (1575) INIT: [M]   [10] touchscreen,run,4,0,20,8192[0m
+[0;32mI (1575) INIT: [M]   [11] lvgl,idle,5,0,16,8192[0m
+[0;32mI (1585) INIT: [M]   [12] ntp,run,3,0,600000,8192[0m
+[0;32mI (1585) INIT: [M]   [13] usb_scanner,run,4,0,1000,8192[0m
+[0;32mI (1595) INIT: [M] ================================[0m
+[0;32mI (1595) INIT: [M] Partizione in esecuzione: factory (tipo 0, sottotipo 0)[0m
+[0;32mI (1605) INIT: [M] Partizione boot      : factory (tipo 0, sottotipo 0)[0m
+[0;33mW (1605) INIT: [M] Legacy I2C init skipped (BSP uses i2c_master)[0m
+[0;32mI (1615) DEVICE_CFG: [C] Inizializzazione sistema configurazione[0m
+[0;32mI (1625) DEVICE_CFG: [C] EEPROM non valida, provo NVS...[0m
+[0;32mI (1625) DEVICE_CFG: [C] NVS Meta caricato: {"crc":2318272237,"len":1266}[0m
+[0;32mI (1635) DEVICE_CFG: [C] NVS JSON caricato: {"updated":true,"device_name":"TestWave-Device","eth":{"enabled":true,"dhcp_enabled":true,"ip":"192.168.1.100","subnet":"255.255.255.0","gateway":"192.168.1.1"},"wifi":{"sta_enabled":false,"dhcp_enabled":true,"ssid":"","password":"","ip":"192.168.1.101","subnet":"255.255.255.0","gateway":"192.168.1.1"},"ntp_enabled":true,"ntp":{"server1":"time.google.com","server2":"pool.ntp.org","timezone_offset":1},"remote_log":{"server_port":9514,"use_broadcast":true},"sensors":{"io_expander_enabled":false,"temperature_enabled":false,"led_enabled":false,"led_count":16,"rs232_enabled":false,"rs485_enabled":false,"mdb_enabled":false,"pwm1_enabled":false,"pwm2_enabled":false,"sd_card_enabled":false},"scanner":{"enabled":true,"vid":7851,"pid":6,"dual_pid":0},"mdb":{"coin_en":true,"bill_en":false,"cashless_en":false},"display":{"lcd_brightness":50},"rs232":{"baud":2147483647,"data_bits":2147483647,"parity":2147483647,"stop_bits":2147483647,"rx_buf":2147483647,"tx_buf":2147483647},"rs485":{"baud":2147483647,"data_bits":2147483647,"parity":2147483647,"stop_bits":2147483647,"rx_buf":2147483647,"tx_buf":2147483647},"mdb_serial":{"baud":2147483647,"data_bits":8,"parity":0,"stop_bits":1,"rx_buf":2147483647,"tx_buf":2147483647},"gpios":{"gpio33":{"mode":0,"state":false}}}[0m
+[0;32mI (1745) DEVICE_CFG: [C] Configurazione valida in NVS[0m
+[0;32mI (1755) AUX_GPIO: Configured GPIO33 (mode 0)[0m
+[0;32mI (1755) INIT: Heap before display init:[0m
+[0;32mI (1755) INIT:   INTERNAL free: 337743[0m
+[0;32mI (1765) INIT:   DMA free: 298195[0m
+[0;32mI (1765) INIT:   PSRAM free: 33550516[0m
+[0;32mI (1765) INIT:   SPIRAM caps alloc free (8bit): 33550516[0m
+[0;32mI (1775) LVGL: Starting LVGL task[0m
+[0;32mI (1775) ESP32_P4_EV: MIPI DSI PHY Powered on[0m
+[0;32mI (1785) ESP32_P4_EV: Install MIPI DSI LCD control panel[0m
+[0;32mI (1785) ESP32_P4_EV: Install Waveshare 7-DSI-TOUCH-A LCD control panel[0m
+[0;32mI (1795) i2c_bus: I2C Bus V2 uses the externally initialized bus handle[0m
+[0;32mI (2925) ili9881c: ID1: 0x98, ID2: 0x81, ID3: 0x5c[0m
+[0;33mW (3045) ili9881c: The 3Ah command has been used and will be overwritten by external initialization sequence[0m
+[0;33mW (3045) ili9881c: The 36h command has been used and will be overwritten by external initialization sequence[0m
+[0;32mI (3215) ESP32_P4_EV: Display initialized[0m
+[0;32mI (3215) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (3215) GT911: TouchPad_ID:0x39,0x32,0x37[0m
+[0;32mI (3215) GT911: TouchPad_Config_Version:99[0m
+[0;32mI (3225) INIT: Heap after LVGL init:[0m
+[0;32mI (3225) INIT:   INTERNAL free: 176435[0m
+[0;32mI (3225) INIT:   DMA free: 136887[0m
+[0;32mI (3225) INIT:   PSRAM free: 31706728[0m
+[0;32mI (3235) INIT:   SPIRAM caps alloc free (8bit): 31706728[0m
+[0;32mI (3235) INIT: [M] Dimensioni display dopo rotazione: 720x1280[0m
+[0;32mI (3245) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (3255) GT911: TouchPad_ID:0x39,0x32,0x37[0m
+[0;32mI (3255) GT911: TouchPad_Config_Version:99[0m
+[0;32mI (3255) INIT: [M] Touch handle inizializzato: 0x481c31c0[0m
+[0;32mI (3265) INIT: Touch handle initialized successfully: 0x481c31c0[0m
+[0;32mI (3275) INIT: [M] Inizializzazione Ethernet: MDC=31, MDIO=52, PHY_ADDR=1, RST_GPIO=51[0m
+[0;32mI (3315) esp_eth.netif.netif_glue: 30:ed:a0:e1:f4:87[0m
+[0;32mI (3315) esp_eth.netif.netif_glue: ethernet attached to netif[0m
+[0;32mI (3315) INIT: [M] Netif MAC impostato a 30:ed:a0:e1:f4:87[0m
+[0;32mI (4915) INIT: [M] Driver Ethernet avviato[0m
+[0;32mI (4915) INIT: [M] Ethernet avviato (indirizzo PHY 1, DHCP abilitato)[0m
+[0;32mI (4915) WEB_UI: [C] Avvio server HTTP sulla porta 80[0m
+[0;32mI (4915) INIT: [M] Collegamento Ethernet attivo[0m
+[0;32mI (4915) INIT: [M] Ethernet HW Addr 30:ed:a0:e1:f4:87[0m
+[0;32mI (4925) WEB_UI: Registered GET /api/logs handler[0m
+[0;32mI (4925) WEB_UI: Registered POST /api/logs/receive handler[0m
+[0;32mI (4935) WEB_UI: Registered OPTIONS /api/logs/* handler[0m
+[0;32mI (4935) REMOTE_LOG: Socket UDP inizializzato per broadcast alla porta 9514[0m
+[0;32mI (4945) REMOTE_LOG: Task di invio log avviato[0m
+[0;32mI (4945) REMOTE_LOG: Logging remoto inizializzato - intercettazione log ESP-IDF attiva[0m
+[0;32mI (4955) INIT: I/O Expander disabilitato da config[0m
+[0;32mI (4965) INIT: LED Strip disabilitato da config[0m
+[0;32mI (4965) INIT: UART RS232 disabilitato da config[0m
+[0;32mI (4965) INIT: UART RS485 disabilitato da config[0m
+[0;32mI (4975) INIT: MDB Engine disabilitato da config[0m
+[0;32mI (4975) INIT: PWM Hardware disabilitato da config[0m
+[0;32mI (4985) SD_CARD: Avvio monitor hot-plug SD (GPIO 0)...[0m
+[0;32mI (4985) INIT: [M] SD Card disabilitata da config[0m
+[0;32mI (4995) TASKS: [M] Avvio task ws2812_blink (stack=8192 words)...[0m
+[0;33mW (4995) REMOTE_LOG: Errore invio UDP (10 errori totali): Host is unreachable[0m
+[0;32mI (5005) TASKS: [M] Task saltato eeprom (stato=1)[0m
+[0;32mI (5005) TASKS: [M] Avvio task io_expander (stack=8192 words)...[0m
+[0;32mI (5015) TASKS: [M] Avvio task sht40 (stack=8192 words)...[0m
+[0;32mI (5025) TASKS: [M] Task saltato rs232 (stato=1)[0m
+[0;32mI (5025) TASKS: [M] Task saltato rs485 (stato=1)[0m
+[0;32mI (5025) TASKS: [M] Task saltato mdb (stato=1)[0m
+[0;32mI (5035) TASKS: [M] Task saltato pwm (stato=1)[0m
+[0;32mI (5035) TASKS: [M] Avvio task touchscreen (stack=8192 words)...[0m
+[0;32mI (5045) TOUCH: Touch task started with valid handle[0m
+[0;33mW (5045) REMOTE_LOG: Errore invio UDP (10 errori totali): Host is unreachable[0m
+[0;32mI (5055) TASKS: [M] Task saltato lvgl (stato=1)[0m
+[0;32mI (5055) TASKS: [M] Avvio task ntp (stack=8192 words)...[0m
+[0;32mI (5065) TASKS: [NTP] NTP task started, period: 600 seconds[0m
+[0;32mI (5065) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (5075) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (5085) TASKS: [M] Avvio task usb_scanner (stack=8192 words)...[0m
+[0;32mI (5095) APP: [M] App factory pronta: endpoint HTTP /status e /ota disponibili[0m
+[0;32mI (5125) USB_CDC_SCANNER: USB Host installato[0m
+[0;32mI (5125) USB_CDC_SCANNER: CDC-ACM host enabled by config: installing CDC-ACM host component (if available)[0m
+[0;33mW (5125) REMOTE_LOG: Errore invio UDP (10 errori totali): Host is unreachable[0m
+[0;32mI (5135) USB_CDC_SCANNER: Configured scanner VID:PID 1EAB:0006 (dual 0000), runtime enabled=1[0m
+[0;32mI (5135) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (5195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;33mW (5495) REMOTE_LOG: Errore invio UDP (10 errori totali): Host is unreachable[0m
+[0;32mI (5545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5915) esp_netif_handlers: eth ip: 192.168.2.23, mask: 255.255.255.0, gw: 192.168.2.209[0m
+[0;32mI (5915) INIT: [M] Ethernet ha ottenuto l'indirizzo IP[0m
+[0;32mI (5915) REMOTE_LOG: Invio UDP riuscito dopo 9 errori precedenti[0m
+[0;32mI (5915) INIT: [M] ~~~~~~~~~~~[0m
+[0;32mI (5925) INIT: [M] ETH IP:192.168.2.23[0m
+[0;32mI (5925) INIT: [M] ETH MASCHERA:255.255.255.0[0m
+[0;32mI (5925) INIT: [M] ETH GATEWAY:192.168.2.209[0m
+[0;32mI (5935) INIT: [M] ~~~~~~~~~~~[0m
+[0;32mI (5935) INIT: [M] Gratuitous ARP inviato[0m
+[0;32mI (5935) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (5945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (5985) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (5995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6055) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (6145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6275) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (6275) INIT: [NTP] Initializing SNTP with servers: time.google.com, pool.ntp.org[0m
+[0;32mI (6275) INIT: [NTP] SNTP initialized - synchronization will happen in background[0m
+[0;32mI (6295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6295) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (6295) INIT: [NTP] Forcing NTP synchronization...[0m
+[0;32mI (6295) INIT: [NTP] NTP sync request sent - will complete in background[0m
+[0;32mI (6305) TASKS: [NTP] NTP sync successful[0m
+[0;32mI (6345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (6995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (7145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (7145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (7145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7235) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (7285) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (7995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (8995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (9145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9875) INIT: [NTP] Applied timezone offset: +1 hours[0m
+[0;32mI (9875) INIT: [NTP] Time synchronized: 2026-02-11 16:20:57 (UTC+1)[0m
+[0;32mI (9875) INIT: [NTP] Sync interval changed to 1 hour (time is synchronized)[0m
+[0;32mI (9895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (9995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10095) APP: [M] Device in funzione ✓[0m
+[0;32mI (10095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (10145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (10995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (11145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (11145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (11155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (11995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12235) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (12285) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (12995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (13145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (13995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (14145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (14995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15095) APP: [M] Device in funzione ✓[0m
+[0;32mI (15095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (15145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (15145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (15155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (15995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (16995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (17145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17235) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (17285) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (17995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (18145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (18995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (19145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (19145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (19155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (19995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20095) APP: [M] Device in funzione ✓[0m
+[0;32mI (20095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (20995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (21145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (21995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (22145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22235) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (22245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (22995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (23145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (23145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (23155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (23995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (24995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25095) APP: [M] Device in funzione ✓[0m
+[0;32mI (25095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (25145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (25995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (26145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (26995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (27145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (27145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (27155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27225) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (27245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (27995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (28995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (29145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (29995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30095) APP: [M] Device in funzione ✓[0m
+[0;32mI (30095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (30145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (30995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (31145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (31145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (31155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (31995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32225) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (32245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32305) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (32995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (33145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (33995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (34145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (34995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35095) APP: [M] Device in funzione ✓[0m
+[0;32mI (35095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (35145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (35145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (35155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (35995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (36995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (37145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37235) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (37245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (37995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (38145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (38995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (39145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (39145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (39155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (39995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40095) APP: [M] Device in funzione ✓[0m
+[0;32mI (40095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (40995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (41145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (41995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (42145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42225) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (42245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42305) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (42995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (43145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (43145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (43155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (43995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (44995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45095) APP: [M] Device in funzione ✓[0m
+[0;32mI (45095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45145) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (45145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (45995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46145) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (46145) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46295) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46945) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (46995) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47045) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47095) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47145) USB_CDC_SCANNER: CDC device not found (err=ESP_ERR_NOT_FOUND), enumerating connected devices...[0m
+[0;32mI (47145) USB_CDC_SCANNER: USB host reports 0 device(s) connected[0m
+[0;32mI (47145) USB_CDC_SCANNER: Retrying in 2s[0m
+[0;32mI (47155) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47195) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47225) WEB_UI: [C] GET /api/logs - Processing request[0m
+[0;32mI (47245) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47305) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47345) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47395) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47445) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47495) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47545) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47595) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47645) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47695) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47745) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47795) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47845) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
+[0;32mI (47895) TOUCH: Touch detected: x=500, y=58, strength=13, track_id=0[0m
