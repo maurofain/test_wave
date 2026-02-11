@@ -67,6 +67,9 @@
 
  1. il tasto CLEAR dei monitor non pulisce le aree di testo, togliere le indicazioni TX e RX>, c'è già il colore. Non inserire spazi tra i caratteri in modo TEXT. In modo HEX mettere un . prima del codice esadecimale.
  2. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate
+ 3. Controllo luminosità schermo: implementarla e collagarla nella pagina web /config
+ 4. interfaccia web: implementare in /config l'abilitazione e la configurazione dello scanner. Nella pagina /test aggiungere la visualizzazione delle letture e i tastoi 'Scanner ON' e 'Scenner OFF'. nella pagina /tasks verificare che tutti i task siano rappresentati.
+   
 
   # Scanner QR : 
 
@@ -125,7 +128,91 @@
     - tasto SERVICE su GPIO per boot + reset P4
     
     - Interrupt su cambio stato I/O Expander
-  
+- USB
+  - letto lo scanner con il sorgente di test in /home/mauro/esp/esp-idf/examples/peripherals/usb/host/cdc/cdc_acm_host/main/usb_cdc_example_main.c
+  ```
+  I (2318) USB-CDC: Opening CDC ACM device 0x1EAB:0x0006...
+*** Device descriptor ***
+bLength 18
+bDescriptorType 1
+bcdUSB 1.10
+bDeviceClass 0x2
+bDeviceSubClass 0x0
+bDeviceProtocol 0x0
+bMaxPacketSize0 64
+idVendor 0x1eab
+idProduct 0x6
+bcdDevice 0.00
+iManufacturer 1
+iProduct 2
+iSerialNumber 3
+bNumConfigurations 1
+*** Configuration descriptor ***
+bLength 9
+bDescriptorType 2
+wTotalLength 67
+bNumInterfaces 2
+bConfigurationValue 1
+iConfiguration 4
+bmAttributes 0x80
+bMaxPower 500mA
+        *** Interface descriptor ***
+        bLength 9
+        bDescriptorType 4
+        bInterfaceNumber 0
+        bAlternateSetting 0
+        bNumEndpoints 1
+        bInterfaceClass 0x2
+        bInterfaceSubClass 0x2
+        bInterfaceProtocol 0x1
+        iInterface 7
+        *** CDC Header Descriptor ***
+        bcdCDC: 1.10
+        *** CDC ACM Descriptor ***
+        bmCapabilities: 0x02
+        *** CDC Union Descriptor ***
+        bControlInterface: 0
+        bSubordinateInterface[0]: 1
+        *** CDC Call Descriptor ***
+        bmCapabilities: 0x00
+        bDataInterface: 1
+                *** Endpoint descriptor ***
+                bLength 7
+                bDescriptorType 5
+                bEndpointAddress 0x83   EP 3 IN
+                bmAttributes 0x3        INT
+                wMaxPacketSize 16
+                bInterval 8
+        *** Interface descriptor ***
+        bLength 9
+        bDescriptorType 4
+        bInterfaceNumber 1
+        bAlternateSetting 0
+        bNumEndpoints 2
+        bInterfaceClass 0xa
+        bInterfaceSubClass 0x0
+        bInterfaceProtocol 0x0
+        iInterface 8
+                *** Endpoint descriptor ***
+                bLength 7
+                bDescriptorType 5
+                bEndpointAddress 0x81   EP 1 IN
+                bmAttributes 0x2        BULK
+                wMaxPacketSize 64
+                bInterval 0
+                *** Endpoint descriptor ***
+                bLength 7
+                bDescriptorType 5
+                bEndpointAddress 0x2    EP 2 OUT
+                bmAttributes 0x2        BULK
+                wMaxPacketSize 64
+                bInterval 0
+I (2648) USB-CDC: Setting up line coding
+I (2648) USB-CDC: Line Get: Rate: 115200, Stop bits: 0, Parity: 0, Databits: 8
+I (2648) USB-CDC: Line Set: Rate: 9600, Stop bits: 1, Parity: 1, Databits: 7
+I (2648) USB-CDC: Line Get: Rate: 9600, Stop bits: 1, Parity: 1, Databits: 7
+I (2658) USB-CDC: Example finished successfully! You can reconnect the device to run again.
+```  
 - App
   1. Aggiungere un task App per l'esecuzione delle funzioni operative della macchina controllata 
   2. Configurazione monitor/touch e integrazione LVGL 

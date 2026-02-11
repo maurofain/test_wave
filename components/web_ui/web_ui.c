@@ -13,10 +13,12 @@
 #include <time.h>
 #include <stdint.h>
 #include "usb_cdc_scanner.h"
+#include "usb/usb_host.h"
 #include "driver/uart.h"
 #include "init.h"
 #include "led.h"
 #include "mdb_test.h"
+#include <stdlib.h>
 #include "app_version.h"
 #include "serial_test.h"
 #include "mdb.h"
@@ -47,24 +49,7 @@ static stored_log_t stored_logs[MAX_STORED_LOGS];
 static int log_count = 0;
 static int log_index = 0;
 
-static char s_last_barcode[128] = "";
 
-static void on_barcode_cb(const char *barcode) {
-    strncpy(s_last_barcode, barcode, sizeof(s_last_barcode)-1);
-    s_last_barcode[sizeof(s_last_barcode)-1] = 0;
-    ESP_LOGI(TAG, "Barcode letto: %s", s_last_barcode);
-}
-
-static void usb_scanner_task(void *param) {
-    usb_cdc_scanner_config_t cfg = {.on_barcode = on_barcode_cb};
-    usb_cdc_scanner_init(&cfg);
-    usb_cdc_scanner_task(NULL);
-}
-
-// Avvio task scanner all'avvio Web UI
-__attribute__((constructor)) static void start_usb_scanner_task(void) {
-    xTaskCreate(usb_scanner_task, "usb_scanner_task", 4096, NULL, 5, NULL);
-}
 
 static httpd_handle_t s_server = NULL;
 
@@ -510,6 +495,12 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('sd_card').checked=c.sensors.sd_card_enabled;"
         "document.getElementById('pwm1').checked=c.sensors.pwm1_enabled;"
         "document.getElementById('pwm2').checked=c.sensors.pwm2_enabled;"
+        "if (c.scanner) {"
+        "    document.getElementById('scanner_en').checked = c.scanner.enabled;"
+        "    document.getElementById('scanner_vid').value = c.scanner.vid ? ('0x' + c.scanner.vid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
+        "    document.getElementById('scanner_pid').value = c.scanner.pid ? ('0x' + c.scanner.pid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
+        "    document.getElementById('scanner_dual_pid').value = c.scanner.dual_pid ? ('0x' + c.scanner.dual_pid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
+        "}"
         "document.getElementById('lcd_bright').value=c.display.lcd_brightness;"
         "document.getElementById('bright_val').innerText=c.display.lcd_brightness;"
         "document.getElementById('rs232_baud').value=c.rs232.baud;"
@@ -542,6 +533,7 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "ntp:{server1:document.getElementById('ntp_server1').value,server2:document.getElementById('ntp_server2').value,timezone_offset:parseInt(document.getElementById('ntp_timezone_offset').value)},"
         "remote_log:{server_port:parseInt(document.getElementById('remote_log_port').value),use_broadcast:document.getElementById('remote_log_broadcast').checked},"
         "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
+"scanner:{enabled:document.getElementById('scanner_en').checked,vid:document.getElementById('scanner_vid').value,pid:document.getElementById('scanner_pid').value,dual_pid:document.getElementById('scanner_dual_pid').value},"
         "display:{lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
         "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
         "rs485:{baud:parseInt(document.getElementById('rs485_baud').value),data_bits:parseInt(document.getElementById('rs485_bits').value),parity:parseInt(document.getElementById('rs485_par').value),stop_bits:parseInt(document.getElementById('rs485_stop').value),rx_buf:parseInt(document.getElementById('rs485_rx').value),tx_buf:parseInt(document.getElementById('rs485_tx').value)},"
@@ -552,10 +544,93 @@ static esp_err_t config_page_handler(httpd_req_t *req)
         "const r=await fetch('/api/config/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});"
         "if(r.ok) alert('✅ Configurazione salvata!'); else alert('❌ Errore durante il salvataggio!');"
         "}"
+        "// Sperimentali: append USB Debug buttons near scanner fields (se presenti)"
+        "try{(function(){const pidEl=document.getElementById('scanner_pid'); if(pidEl){const btnEnum=document.createElement('button'); btnEnum.textContent='USB:Enumerate (Sperimentali)'; btnEnum.type='button'; btnEnum.onclick=async function(){const r=await fetch('/api/debug/usb/enumerate'); const j=await r.json(); alert(JSON.stringify(j,null,2));}; pidEl.parentNode.insertBefore(btnEnum,pidEl.nextSibling); const btnRestart=document.createElement('button'); btnRestart.textContent='USB:Restart Host (Sperimentali)'; btnRestart.type='button'; btnRestart.onclick=async function(){const r=await fetch('/api/debug/usb/restart',{method:'POST'}); const txt=await r.text(); alert('Restart: '+txt);}; pidEl.parentNode.insertBefore(btnRestart,btnEnum.nextSibling);} })();}catch(e){}
         "</script></body></html>";
     
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
+// Handler API GET /api/debug/usb/enumerate
+static esp_err_t api_debug_usb_enumerate(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] GET /api/debug/usb/enumerate");
+    uint8_t addr_list[16];
+    int num_devs = 0;
+    esp_err_t err = usb_host_device_addr_list_fill(sizeof(addr_list), addr_list, &num_devs);
+
+    cJSON *root = cJSON_CreateObject();
+    if (err != ESP_OK) {
+        cJSON_AddStringToObject(root, "error", esp_err_to_name(err));
+    } else {
+        cJSON_AddNumberToObject(root, "count", num_devs);
+        cJSON *addrs = cJSON_CreateArray();
+        for (int i = 0; i < num_devs; ++i) {
+            cJSON_AddItemToArray(addrs, cJSON_CreateNumber(addr_list[i]));
+        }
+        cJSON_AddItemToObject(root, "addresses", addrs);
+
+        usb_host_client_handle_t usb_client = NULL;
+        const usb_host_client_config_t client_config = {
+            .is_synchronous = false,
+            .max_num_event_msg = 3,
+            .async = { .client_event_callback = NULL, .callback_arg = NULL }
+        };
+        if (usb_host_client_register(&client_config, &usb_client) == ESP_OK) {
+            cJSON *devices = cJSON_CreateArray();
+            for (int i = 0; i < num_devs; ++i) {
+                usb_device_handle_t dev_hdl;
+                if (usb_host_device_open(usb_client, addr_list[i], &dev_hdl) == ESP_OK) {
+                    const usb_device_desc_t *device_desc = NULL;
+                    if (usb_host_get_device_descriptor(dev_hdl, &device_desc) == ESP_OK && device_desc) {
+                        cJSON *d = cJSON_CreateObject();
+                        cJSON_AddNumberToObject(d, "addr", addr_list[i]);
+                        cJSON_AddNumberToObject(d, "vid", device_desc->idVendor);
+                        cJSON_AddNumberToObject(d, "pid", device_desc->idProduct);
+                        cJSON_AddNumberToObject(d, "class", device_desc->bDeviceClass);
+                        cJSON_AddItemToArray(devices, d);
+                    }
+                    usb_host_device_close(usb_client, dev_hdl);
+                }
+            }
+            cJSON_AddItemToObject(root, "devices", devices);
+            usb_host_client_deregister(usb_client);
+        } else {
+            cJSON_AddStringToObject(root, "client", "register_failed");
+        }
+    }
+
+    char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, strlen(json));
+    free(json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+// Sperimentali: POST /api/debug/usb/restart -> forces bsp_usb_host_stop + bsp_usb_host_start
+static esp_err_t api_debug_usb_restart(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] POST /api/debug/usb/restart (Sperimentali)");
+#ifdef CONFIG_USB_OTG_SUPPORTED
+    web_ui_add_log("INFO", "USB_DBG", "[Sperimentali] Restarting USB Host via API");
+    esp_err_t err = bsp_usb_host_stop();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "bsp_usb_host_stop returned %s", esp_err_to_name(err));
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+    err = bsp_usb_host_start(BSP_USB_HOST_POWER_MODE_USB_DEV, true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "bsp_usb_host_start returned %s", esp_err_to_name(err));
+        httpd_resp_sendstr(req, "restart_failed");
+    } else {
+        httpd_resp_sendstr(req, "ok");
+    }
+#else
+    httpd_resp_sendstr(req, "usb_not_supported");
+#endif
     return ESP_OK;
 }
 
@@ -655,6 +730,14 @@ static esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(remote_log, "server_port", cfg->remote_log.server_port);
     cJSON_AddBoolToObject(remote_log, "use_broadcast", cfg->remote_log.use_broadcast);
     cJSON_AddItemToObject(root, "remote_log", remote_log);
+
+    // Scanner configuration
+    cJSON *scanner = cJSON_CreateObject();
+    cJSON_AddBoolToObject(scanner, "enabled", cfg->scanner.enabled);
+    cJSON_AddNumberToObject(scanner, "vid", cfg->scanner.vid);
+    cJSON_AddNumberToObject(scanner, "pid", cfg->scanner.pid);
+    cJSON_AddNumberToObject(scanner, "dual_pid", cfg->scanner.dual_pid);
+    cJSON_AddItemToObject(root, "scanner", scanner);
     
     char *json = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -905,6 +988,27 @@ static esp_err_t api_config_save(httpd_req_t *req)
         cfg->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
         ESP_LOGI(TAG, "[C] Remote logging config: port=%d, broadcast=%d",
                 cfg->remote_log.server_port, cfg->remote_log.use_broadcast);
+    }
+
+    // Scanner configuration (API save)
+    cJSON *scanner_obj = cJSON_GetObjectItem(root, "scanner");
+    if (scanner_obj) {
+        cfg->scanner.enabled = cJSON_IsTrue(cJSON_GetObjectItem(scanner_obj, "enabled"));
+        cJSON *sv = cJSON_GetObjectItem(scanner_obj, "vid");
+        if (sv) {
+            if (cJSON_IsNumber(sv)) cfg->scanner.vid = (uint16_t)sv->valueint;
+            else if (cJSON_IsString(sv) && sv->valuestring) cfg->scanner.vid = (uint16_t)strtoul(sv->valuestring, NULL, 0);
+        }
+        cJSON *sp = cJSON_GetObjectItem(scanner_obj, "pid");
+        if (sp) {
+            if (cJSON_IsNumber(sp)) cfg->scanner.pid = (uint16_t)sp->valueint;
+            else if (cJSON_IsString(sp) && sp->valuestring) cfg->scanner.pid = (uint16_t)strtoul(sp->valuestring, NULL, 0);
+        }
+        cJSON *sdual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
+        if (sdual) {
+            if (cJSON_IsNumber(sdual)) cfg->scanner.dual_pid = (uint16_t)sdual->valueint;
+            else if (cJSON_IsString(sdual) && sdual->valuestring) cfg->scanner.dual_pid = (uint16_t)strtoul(sdual->valuestring, NULL, 0);
+        }
     }
     
     cfg->updated = true;
@@ -2238,7 +2342,7 @@ esp_err_t web_ui_init(void)
     httpd_uri_t uri_api_logs_get = {.uri = "/api/logs", .method = HTTP_GET, .handler = api_logs_get};
     httpd_register_uri_handler(s_server, &uri_api_logs_get);
     ESP_LOGI(TAG, "Registered GET /api/logs handler");
-    
+
     httpd_uri_t uri_api_logs_receive = {.uri = "/api/logs/receive", .method = HTTP_POST, .handler = api_logs_receive};
     httpd_register_uri_handler(s_server, &uri_api_logs_receive);
     ESP_LOGI(TAG, "Registered POST /api/logs/receive handler");
@@ -2246,6 +2350,16 @@ esp_err_t web_ui_init(void)
     httpd_uri_t uri_api_logs_options = {.uri = "/api/logs/*", .method = HTTP_OPTIONS, .handler = api_logs_options};
     httpd_register_uri_handler(s_server, &uri_api_logs_options);
     ESP_LOGI(TAG, "Registered OPTIONS /api/logs/* handler");
+
+    // Register debug USB enumeration endpoint
+    httpd_uri_t uri_api_debug_usb = {.uri = "/api/debug/usb/enumerate", .method = HTTP_GET, .handler = api_debug_usb_enumerate};
+    httpd_register_uri_handler(s_server, &uri_api_debug_usb);
+    ESP_LOGI(TAG, "Registered GET /api/debug/usb/enumerate handler");
+
+    // Sperimentali: register POST /api/debug/usb/restart
+    httpd_uri_t uri_api_debug_usb_restart = {.uri = "/api/debug/usb/restart", .method = HTTP_POST, .handler = api_debug_usb_restart};
+    httpd_register_uri_handler(s_server, &uri_api_debug_usb_restart);
+    ESP_LOGI(TAG, "Registered POST /api/debug/usb/restart handler (Sperimentali)");
 
     // Reboot Handlers
     httpd_uri_t uri_reboot_factory = {.uri = "/reboot/factory", .method = HTTP_GET, .handler = reboot_factory_handler};

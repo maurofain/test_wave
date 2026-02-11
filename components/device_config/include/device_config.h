@@ -60,6 +60,16 @@ typedef struct {
 } device_display_config_t;
 
 /**
+ * @brief Struttura di configurazione Scanner USB
+ */
+typedef struct {
+    bool enabled;           ///< Scanner abilitato
+    uint16_t vid;           ///< Vendor ID
+    uint16_t pid;           ///< Product ID
+    uint16_t dual_pid;      ///< Dual/alternate PID
+} device_scanner_config_t;
+
+/**
  * @brief Struttura di configurazione UART (RS232/RS485/MDB)
  */
 typedef struct {
@@ -121,6 +131,7 @@ typedef struct {
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;
     device_display_config_t display;
+    device_scanner_config_t scanner;    ///< Configurazione Scanner USB
     device_serial_config_t rs232;       ///< Configurazione RS232
     device_serial_config_t rs485;       ///< Configurazione RS485
     device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB

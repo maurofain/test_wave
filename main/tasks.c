@@ -5,6 +5,8 @@
 #include "device_config.h"
 #include "sht40.h"
 #include "esp_lcd_touch.h"
+#include "web_ui.h"
+#include "usb_cdc_scanner.h" // Scanner QR
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -129,21 +131,42 @@ static void touchscreen_task(void *arg)
     
     ESP_LOGI("TOUCH", "Touch task started with valid handle");
     
+    /* Track previous touch to avoid repeated logs when nothing changed */
+    bool prev_present = false;
+    esp_lcd_touch_point_data_t prev = {0};
+    const int MOVEMENT_THRESHOLD = 3; /* pixels */
+
     while (true) {
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(50)); // 50ms polling
-        
+
         // Read touch data
         esp_lcd_touch_read_data(touch_handle);
-        
+
         // Get touch points using new API
         esp_lcd_touch_point_data_t touch_data[1];
         uint8_t touch_points = 0;
-        
+
         esp_lcd_touch_get_data(touch_handle, touch_data, &touch_points, 1);
-        
+
         if (touch_points > 0) {
-            ESP_LOGI("TOUCH", "Touch detected: x=%d, y=%d, strength=%d, track_id=%d", 
-                     touch_data[0].x, touch_data[0].y, touch_data[0].strength, touch_data[0].track_id);
+            bool significant = !prev_present ||
+                abs((int)touch_data[0].x - (int)prev.x) >= MOVEMENT_THRESHOLD ||
+                abs((int)touch_data[0].y - (int)prev.y) >= MOVEMENT_THRESHOLD ||
+                touch_data[0].track_id != prev.track_id ||
+                touch_data[0].strength != prev.strength;
+
+            if (significant) {
+                ESP_LOGI("TOUCH", "Touch detected: x=%d, y=%d, strength=%d, track_id=%d", 
+                         touch_data[0].x, touch_data[0].y, touch_data[0].strength, touch_data[0].track_id);
+                prev = touch_data[0];
+                prev_present = true;
+            }
+        } else {
+            if (prev_present) {
+                ESP_LOGI("TOUCH", "Touch released (last x=%d, y=%d, track_id=%d)", prev.x, prev.y, prev.track_id);
+                prev_present = false;
+                prev.x = prev.y = prev.strength = prev.track_id = 0;
+            }
         }
     }
 }
@@ -182,6 +205,21 @@ static void ntp_task(void *arg)
         
         vTaskDelayUntil(&last_wake, param->period_ticks);
     }
+}
+
+// wrapper per lo scanner USB: inizializza il driver e poi entra nella sua routine
+static void scanner_on_barcode_cb(const char *barcode)
+{
+    ESP_LOGI("SCANNER", "Barcode: %s", barcode);
+    web_ui_add_log("INFO", "SCANNER", barcode);
+}
+
+static void usb_scanner_task_wrapper(void *arg)
+{
+    usb_cdc_scanner_config_t cfg = {.on_barcode = scanner_on_barcode_cb};
+    usb_cdc_scanner_init(&cfg);
+    // usa la task routine del componente scanner che gestisce sia la modalità reale (CDC-ACM) che simulata
+    usb_cdc_scanner_task(NULL);
 }
 
 static task_param_t s_tasks[] = {
@@ -302,6 +340,17 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(600000), // 600 secondi = 10 minuti
         .task_fn = ntp_task,
+        .stack_words = 8192,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "usb_scanner",
+        .state = TASK_STATE_IDLE, /* default: idle, abilita da /tasks o /config */
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(1000),
+        .task_fn = usb_scanner_task_wrapper,
         .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,

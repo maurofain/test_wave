@@ -114,6 +114,12 @@ static void _set_defaults(device_config_t *config)
     // Default GPIOs Configurable
     config->gpios.gpio33.mode = GPIO_CFG_MODE_INPUT_PULLUP;
     config->gpios.gpio33.initial_state = false;
+
+    // Default Scanner config: use sdkconfig defaults if available
+    config->scanner.enabled = true;
+    config->scanner.vid = (uint16_t)CONFIG_USB_CDC_SCANNER_VID;
+    config->scanner.pid = (uint16_t)CONFIG_USB_CDC_SCANNER_PID;
+    config->scanner.dual_pid = (uint16_t)CONFIG_USB_CDC_SCANNER_DUAL_PID;
 }
 
 static uint32_t _calculate_crc(const char *json_str)
@@ -386,6 +392,18 @@ esp_err_t device_config_load(device_config_t *config)
                     config->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled"));
                 }
 
+                // Analisi config Scanner USB
+                cJSON *scanner_obj = cJSON_GetObjectItem(root, "scanner");
+                if (scanner_obj) {
+                    config->scanner.enabled = cJSON_IsTrue(cJSON_GetObjectItem(scanner_obj, "enabled"));
+                    cJSON *vid = cJSON_GetObjectItem(scanner_obj, "vid");
+                    cJSON *pid = cJSON_GetObjectItem(scanner_obj, "pid");
+                    cJSON *dual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
+                    if (vid && cJSON_IsNumber(vid)) config->scanner.vid = (uint16_t)vid->valueint;
+                    if (pid && cJSON_IsNumber(pid)) config->scanner.pid = (uint16_t)pid->valueint;
+                    if (dual && cJSON_IsNumber(dual)) config->scanner.dual_pid = (uint16_t)dual->valueint;
+                }
+
                 // Analisi config MDB
                 cJSON *mdb_obj = cJSON_GetObjectItem(root, "mdb");
                 if (mdb_obj) {
@@ -510,6 +528,14 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddBoolToObject(sensors_obj, "pwm2_enabled", config->sensors.pwm2_enabled);
     cJSON_AddBoolToObject(sensors_obj, "sd_card_enabled", config->sensors.sd_card_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors_obj);
+
+    // Scanner
+    cJSON *scanner_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(scanner_obj, "enabled", config->scanner.enabled);
+    cJSON_AddNumberToObject(scanner_obj, "vid", config->scanner.vid);
+    cJSON_AddNumberToObject(scanner_obj, "pid", config->scanner.pid);
+    cJSON_AddNumberToObject(scanner_obj, "dual_pid", config->scanner.dual_pid);
+    cJSON_AddItemToObject(root, "scanner", scanner_obj);
 
     // MDB
     cJSON *mdb_obj = cJSON_CreateObject();

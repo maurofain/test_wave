@@ -10,3 +10,4 @@ pwm,idle,4,0,20,8192
 touchscreen,run,4,0,20,8192
 lvgl,idle,5,0,16,8192
 ntp,run,3,0,600000,8192
+usb_scanner,idle,4,0,1000,8192

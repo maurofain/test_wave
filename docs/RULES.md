@@ -1,6 +1,6 @@
 - il progetto si basa su 2 eseguibili : main è l'applicazione completa, factory è il software di base per il recovery, il test e il fash di main. Ogni app ha la sua partizione.
-- per il sourcing di ESP-IDF si può usare '. $HOME/esp/esp-idf/export.sh'
-- per la compilazione, flash e monitor si può usare $HOME/esp/tools/run_idf_command.py con i comandi predisposti visualizzati richiando questo script senza parametri
+- per il sourcing di ESP-IDF si può usare get_idf oppure '. $HOME/esp/esp-idf/export.sh'
+- per la compilazione, flash e monitor si può usare $HOME/esp/tools/run_idf_command.py con i comandi predisposti visualizzati richiamando questo script senza parametri
 - l'esecuzione degli script deve avvenire co path /home/mauro/Progetti/0.Clienti/MicroHard/scripts
 - i commenti vanno tradotti in italiano, i nomi di funzioni, costanti e variabili in inglese
 - il comando .el significa 'Controlla il file exec.log'
