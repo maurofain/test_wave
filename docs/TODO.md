@@ -63,6 +63,7 @@
 
 1. abilitazione WiFi
 2. display miimale 1.44"
+3. connessione HTTPS
 
 # 📋 DA FARE
 
@@ -74,7 +75,22 @@
  4. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate
  5. Controllo luminosità schermo: implementarla e collagarla nella pagina web /config
  6. riportare lo schermo in verticale 
- 7.
+ 7. in /httpservices usa per le sezioni la stessa impostazione grafica usata in /config con sezioni riquadrate e sottolineate
+ 8. la chiamata Login non funziona : memorizza nella configurazione serial e password, aggioungi l'editazione di questi 2 dati in cima /httservices e verifica la composizione dei messaggi considerando che questo è il formato completo 
+ ```
+> POST /api/login HTTP/1.1
+> Host: 195.231.69.227:5556
+> Content-Type: application/json
+> Date: 2026-01-23T13:25:13.218763+01:00
+> User-Agent: insomnia/12.1.0
+> Accept: */*
+> Content-Length: 83
+
+| {
+|     "serial":"AD-34-DFG-333",
+|     "password":"c1ef6429c5e0f753ff24a114de6ee7d4"
+| }
+```
    
 # ERRORI
 E (122479) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:

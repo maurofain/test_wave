@@ -2,6 +2,9 @@
 #include "device_config.h"
 #include "app_version.h"
 #include "esp_log.h"
+#include "esp_http_client.h"
+#include "esp_https_ota.h"
+#include <lwip/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,7 +42,13 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s [%s] - %s</h1></div>"
         "<div style='text-align:right;font-size:12px;opacity:0.8;'>v%s (%s)</div>"
         "</header>"
-        "%s", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
+        "%s"
+        "<script>/* Global fetch wrapper: injects Authorization */"
+        "(function(){if(window.__auth_wrapped) return; window.__auth_wrapped=true; const _fetch = window.fetch.bind(window);"
+        "window.setAuthToken = function(t){ if(t) localStorage.setItem('httpservices_token', t); else localStorage.removeItem('httpservices_token'); };"
+        "window.getAuthToken = function(){ return localStorage.getItem('httpservices_token'); };"
+        "window.clearAuthToken = function(){ localStorage.removeItem('httpservices_token'); };"
+        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
     httpd_resp_sendstr_chunk(req, buf);
     free(buf);
     return ESP_OK;
@@ -66,4 +75,33 @@ esp_err_t logo_get_handler(httpd_req_t *req)
     httpd_resp_send(req, buf, sz);
     free(buf);
     return ESP_OK;
+}
+
+/* Helper condivisi (spostati qui per rendere disponibili le funzioni alle pagine divise)
+   - ip_to_str(): converte esp_netif IP in stringa (usata da /status)
+   - perform_ota(): avvia OTA HTTPS con timeout e riavvio */
+void ip_to_str(esp_netif_t *netif, char *out, size_t len)
+{
+    if (!netif || !out) { if(out && len>0) out[0]='\0'; return; }
+    esp_netif_ip_info_t info;
+    if (esp_netif_get_ip_info(netif, &info) == ESP_OK) {
+        ip4addr_ntoa_r((const ip4_addr_t *)&info.ip, out, len);
+    } else {
+        if(len>0) out[0]='\0';
+    }
+}
+
+esp_err_t perform_ota(const char *url)
+{
+    if (!url || strlen(url) == 0) return ESP_ERR_INVALID_ARG;
+    ESP_LOGI("WEB_UI", "Avvio OTA da %s", url);
+    esp_http_client_config_t client_cfg = {.url = url, .timeout_ms = 15000, .cert_pem = NULL, .skip_cert_common_name_check = true};
+    esp_https_ota_config_t ota_cfg = {.http_config = &client_cfg};
+    esp_err_t ret = esp_https_ota(&ota_cfg);
+    if (ret == ESP_OK) {
+        ESP_LOGI("WEB_UI", "OTA riuscito. Riavvio in corso...");
+        vTaskDelay(pdMS_TO_TICKS(500));
+        esp_restart();
+    }
+    return ret;
 }
