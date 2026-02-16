@@ -66,6 +66,9 @@ static void _set_defaults(device_config_t *config)
     // Default Server/Cloud settings
     config->server.enabled = false; // not enabled by default
     strncpy(config->server.url, "http://195.231.69.227:5556/", sizeof(config->server.url) - 1);
+    /* Default API credentials used by http_services when calling the remote server */
+    strncpy(config->server.serial, "AD-34-DFG-333", sizeof(config->server.serial) - 1);
+    strncpy(config->server.password, "c1ef6429c5e0f753ff24a114de6ee7d4", sizeof(config->server.password) - 1);
 
     // Default Remote Logging (broadcast disabled by default)
     config->remote_log.server_port = 9514;  // Default port for broadcast
@@ -379,6 +382,10 @@ esp_err_t device_config_load(device_config_t *config)
                     config->server.enabled = cJSON_IsTrue(cJSON_GetObjectItem(server_obj, "enabled"));
                     cJSON *url = cJSON_GetObjectItem(server_obj, "url");
                     if (url && url->valuestring) strncpy(config->server.url, url->valuestring, sizeof(config->server.url) - 1);
+                    cJSON *serial = cJSON_GetObjectItem(server_obj, "serial");
+                    if (serial && serial->valuestring) strncpy(config->server.serial, serial->valuestring, sizeof(config->server.serial) - 1);
+                    cJSON *password = cJSON_GetObjectItem(server_obj, "password");
+                    if (password && password->valuestring) strncpy(config->server.password, password->valuestring, sizeof(config->server.password) - 1);
                 }
 
                 // Analisi config Remote Logging
@@ -528,6 +535,8 @@ char* device_config_to_json(const device_config_t *config)
     cJSON *server_obj = cJSON_CreateObject();
     cJSON_AddBoolToObject(server_obj, "enabled", config->server.enabled);
     cJSON_AddStringToObject(server_obj, "url", config->server.url);
+    cJSON_AddStringToObject(server_obj, "serial", config->server.serial);
+    cJSON_AddStringToObject(server_obj, "password", config->server.password);
     cJSON_AddItemToObject(root, "server", server_obj);
 
     // Remote Logging

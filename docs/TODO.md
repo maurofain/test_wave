@@ -77,7 +77,9 @@
  6. riportare lo schermo in verticale 
  7. in /httpservices usa per le sezioni la stessa impostazione grafica usata in /config con sezioni riquadrate e sottolineate
  8. la chiamata Login non funziona : memorizza nella configurazione serial e password, aggioungi l'editazione di questi 2 dati in cima /httservices e verifica la composizione dei messaggi considerando che questo è il formato completo 
+ 9. riorganizza la pagina /httpservices : metti in cima 2 textbox : richiesta e pi risposta: Richiesta mostra il messaggio post inviato in un a delle sezioni e in Risposta la risposta della chiamata. Compila  questi campi azzerandoli ad ogni richiesta. All pressione del send cambia lo sfondo di risposta fino a che la rioposta non arriva. Togli la text Token e mostra il token nella risposta, togli 'test token' e l'area hs_status
  ```
+
 > POST /api/login HTTP/1.1
 > Host: 195.231.69.227:5556
 > Content-Type: application/json
@@ -148,7 +150,8 @@ Please enable CONFIG_ESP_SYSTEM_USE_FRAME_POINTER option to have a full backtrac
     ```
   
    
-  
+  # API Server Base 📦
+
   - Server API base: `http://195.231.69.227:5556/`
   - Endpoints:
     - `POST http://195.231.69.227:5556/api/login`

@@ -107,6 +107,8 @@ typedef struct {
 typedef struct {
     bool enabled;           ///< Abilita invii al server cloud
     char url[128];          ///< Base URL del server (es. http://host:port/)
+    char serial[64];        ///< Seriale usata per il login verso il server remoto
+    char password[64];      ///< Password (MD5) usata per il login verso il server remoto
 } device_server_config_t;
 
 /**

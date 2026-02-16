@@ -321,10 +321,13 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='form-group'><label>Offset Fuso Orario (ore)</label><input type='number' id='ntp_timezone_offset' name='ntp_timezone_offset' min='-12' max='12' placeholder='1'></div>"
         "</div></div>"
 
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>☁️ Server (Cloud)<span class='section-toggle-icon'>▸</span></h2>"
+
+        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🔁 Server Remoto<span class='section-toggle-icon'>▸</span></h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='server_en' name='server_en'><span class='slider'></span></label><span>Server abilitato</span></div>"
         "<div class='form-group indent'><label>Base server URL</label><input type='text' id='server_url' name='server_url' placeholder='http://195.231.69.227:5556/'></div>"
-        "</div></div>"
+        "<div class='form-group indent'><label>Server serial</label><input type='text' id='server_serial' name='server_serial' placeholder='AD-34-DFG-333'></div>"
+        "<div class='form-group indent'><label>Server password (MD5)</label><input type='text' id='server_password' name='server_password' placeholder='c1ef6429c5e0f753ff24a114de6ee7d4'></div>"
+        "</div>"
 
         "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>📊 Logging Remoto<span class='section-toggle-icon'>▸</span></h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_broadcast' name='remote_log_broadcast'><span class='slider'></span></label><span>Usa broadcast UDP</span></div>"
@@ -445,6 +448,8 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('ntp_timezone_offset').value=c.ntp.timezone_offset;"
         "document.getElementById('server_en').checked = (c.server && c.server.enabled) ? true : false;"
         "document.getElementById('server_url').value = (c.server && c.server.url) ? c.server.url : 'http://195.231.69.227:5556/';"
+        "document.getElementById('server_serial').value = (c.server && c.server.serial) ? c.server.serial : 'AD-34-DFG-333';"
+        "document.getElementById('server_password').value = (c.server && c.server.password) ? c.server.password : 'c1ef6429c5e0f753ff24a114de6ee7d4';"
         "document.getElementById('remote_log_port').value=c.remote_log.server_port;"
         "document.getElementById('remote_log_broadcast').checked=c.remote_log.use_broadcast;"
         "document.getElementById('io_exp').checked=c.sensors.io_expander_enabled;"
@@ -497,7 +502,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
         "ntp_enabled:document.getElementById('ntp_en').checked,"
         "ntp:{server1:document.getElementById('ntp_server1').value,server2:document.getElementById('ntp_server2').value,timezone_offset:parseInt(document.getElementById('ntp_timezone_offset').value)},"
-        "server:{enabled:document.getElementById('server_en').checked,url:document.getElementById('server_url').value},"
+        "server:{enabled:document.getElementById('server_en').checked,url:document.getElementById('server_url').value,serial:document.getElementById('server_serial').value,password:document.getElementById('server_password').value},"
         "remote_log:{server_port:parseInt(document.getElementById('remote_log_port').value),use_broadcast:document.getElementById('remote_log_broadcast').checked},"
         "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
 "scanner:{enabled:document.getElementById('scanner_en').checked,vid:document.getElementById('scanner_vid').value,pid:document.getElementById('scanner_pid').value,dual_pid:document.getElementById('scanner_dual_pid').value},"
@@ -675,6 +680,8 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON *server = cJSON_CreateObject();
     cJSON_AddBoolToObject(server, "enabled", cfg->server.enabled);
     cJSON_AddStringToObject(server, "url", cfg->server.url);
+    cJSON_AddStringToObject(server, "serial", cfg->server.serial);
+    cJSON_AddStringToObject(server, "password", cfg->server.password);
     cJSON_AddItemToObject(root, "server", server);
     
     cJSON *sensors = cJSON_CreateObject();
@@ -915,6 +922,10 @@ esp_err_t api_config_save(httpd_req_t *req)
         cfg->server.enabled = cJSON_IsTrue(cJSON_GetObjectItem(server_obj, "enabled"));
         cJSON *url = cJSON_GetObjectItem(server_obj, "url");
         if (url && url->valuestring) strncpy(cfg->server.url, url->valuestring, sizeof(cfg->server.url)-1);
+        cJSON *serial = cJSON_GetObjectItem(server_obj, "serial");
+        if (serial && serial->valuestring) strncpy(cfg->server.serial, serial->valuestring, sizeof(cfg->server.serial)-1);
+        cJSON *password = cJSON_GetObjectItem(server_obj, "password");
+        if (password && password->valuestring) strncpy(cfg->server.password, password->valuestring, sizeof(cfg->server.password)-1);
     }
     
     cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
@@ -1348,12 +1359,14 @@ esp_err_t test_page_handler(httpd_req_t *req)
     const char *extra_style = 
         ".test-item{display:flex;align-items:center;justify-content:space-between;padding:15px;margin:10px 0;background:#ecf0f1;border-radius:6px}"
         ".test-label{font-weight:bold;color:#2c3e50;flex:1}.test-controls{display:flex;gap:10px;align-items:center}"
-        "button{padding:8px 16px;background:#e67e22;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold}"
-        "button:hover{background:#d35400}.btn-stop{background:#e74c3c}.btn-stop:hover{background:#c0392b}"
+        "button{padding:8px 16px;background:#e67e22;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;transition:background-color .14s ease, transform .06s ease;outline:none}"
+        "button:hover{background:#d35400;transform:translateY(-1px)}button:active{transform:translateY(1px);filter:brightness(0.92)}button:focus-visible{box-shadow:0 0 0 3px rgba(52,152,219,0.18)}"
+        ".test-controls button.disabled, .test-controls button:disabled{opacity:0.6; cursor:not-allowed; transform:none}"
+        ".btn-stop{background:#e74c3c}.btn-stop:hover{background:#c0392b}"
         "input[type=text],input[type=number]{padding:6px;border:1px solid #bdc3c7;border-radius:4px;width:120px;color:#333}"
         ".status-box{padding:10px;margin:10px 0;border-radius:4px;font-family:monospace;font-size:13px;background:#003366;color:#ffffff;min-height:60px;overflow-y:auto;max-height:250px;border:1px solid #3498db;box-sizing:border-box}"
         ".result{margin:5px 0;padding:5px;border-left:3px solid #3498db}"
-        ".refresh-btn{background:#3498db;margin-bottom:10px}" 
+        ".refresh-btn{background:#3498db;margin-bottom:10px;transition:background-color .12s ease} .refresh-btn:hover{background:#2980b9} " 
         "/* Collapsible sections support */"
         ".section.collapsed > :not(h2){display:none !important;}"
         ".section h2{cursor:pointer; position:relative;}"
@@ -1547,50 +1560,66 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "}"
         
         "async function toggleLedRainbow(){"
+        "  console.log('UI: toggleLedRainbow() called');"
         "  const btn = document.getElementById('btn_led_rainbow');"
-        "  const isRunning = btn.innerText.includes('FERMA');"
-        "  "
-        "  if(isRunning){"
-        "    btn.innerText = '▶️ Inizia Rainbow'; btn.style.background = '';"
-        "    await runTest('led_stop');"
-        "  } else {"
-        "    document.getElementById('btn_led_manual').innerText = '🚀 Inizia Manuale';"
-        "    document.getElementById('btn_led_manual').style.background = '#2ecc71';"
-        "    btn.innerText = '⏹️ FERMA Rainbow'; btn.style.background = '#e74c3c';"
-        "    const bright = document.getElementById('led_bright').value;"
-        "    await fetch('/api/test/led_bright', {method:'POST', body: JSON.stringify({bright: parseInt(bright)})});"
-        "    await runTest('led_start');"
+        "  const isRunning = btn && btn.innerText.includes('FERMA');"
+        "  const orig = btn?btn.innerHTML:null;"
+        "  if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Elaboro...'; }"
+        "  try {"
+        "    if(isRunning){"
+        "      if(btn){ btn.innerText = '▶️ Inizia Rainbow'; btn.style.background = ''; }"
+        "      try{ await runTest('led_stop'); } catch(e){ console.error('led_stop failed', e); }"
+        "    } else {"
+        "      document.getElementById('btn_led_manual').innerText = '🚀 Inizia Manuale';"
+        "      document.getElementById('btn_led_manual').style.background = '#2ecc71';"
+        "      if(btn){ btn.innerText = '⏹️ FERMA Rainbow'; btn.style.background = '#e74c3c'; }"
+        "      const bright = document.getElementById('led_bright').value;"
+        "      try{ await fetch('/api/test/led_bright', {method:'POST', body: JSON.stringify({bright: parseInt(bright)})}); }catch(e){ console.warn('led_bright post failed', e); }"
+        "      try{ await runTest('led_start'); } catch(e){ console.error('led_start failed', e); }"
+        "    }"
+        "  } finally {"
+        "    if(btn){ btn.disabled = false; if(orig) btn.innerHTML = orig; }"
         "  }"
         "}"
         
         "async function toggleLedManual(){"
+        "  console.log('UI: toggleLedManual() called');"
         "  const btn = document.getElementById('btn_led_manual');"
-        "  const isRunning = btn.innerText.includes('FERMA');"
-        "  "
-        "  if(isRunning){"
-        "    btn.innerText = '🚀 Inizia Manuale'; btn.style.background = '#2ecc71';"
-        "    await runTest('led_stop');"
-        "  } else {"
-        "    document.getElementById('btn_led_rainbow').innerText = '▶️ Inizia Rainbow';"
-        "    document.getElementById('btn_led_rainbow').style.background = '';"
-        "    btn.innerText = '⏹️ FERMA Manuale'; btn.style.background = '#e74c3c';"
-        "    const color = document.getElementById('led_color').value;"
-        "    const bright = document.getElementById('led_bright').value;"
-        "    await runTest('led_set', {r: parseInt(color.substr(1,2),16), g: parseInt(color.substr(3,2),16), b: parseInt(color.substr(5,2),16), bright: parseInt(bright)});"
+        "  const isRunning = btn && btn.innerText.includes('FERMA');"
+        "  const orig = btn?btn.innerHTML:null;"
+        "  if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Elaboro...'; }"
+        "  try {"
+        "    if(isRunning){"
+        "      if(btn){ btn.innerText = '🚀 Inizia Manuale'; btn.style.background = '#2ecc71'; }"
+        "      try{ await runTest('led_stop'); } catch(e){ console.error('led_stop failed', e); }"
+        "    } else {"
+        "      document.getElementById('btn_led_rainbow').innerText = '▶️ Inizia Rainbow';"
+        "      document.getElementById('btn_led_rainbow').style.background = '';"
+        "      if(btn){ btn.innerText = '⏹️ FERMA Manuale'; btn.style.background = '#e74c3c'; }"
+        "      const color = document.getElementById('led_color').value;"
+        "      const bright = document.getElementById('led_bright').value;"
+        "      try{ await runTest('led_set', {r: parseInt(color.substr(1,2),16), g: parseInt(color.substr(3,2),16), b: parseInt(color.substr(5,2),16), bright: parseInt(bright)}); } catch(e){ console.error('led_set failed', e); }"
+        "    }"
+        "  } finally {"
+        "    if(btn){ btn.disabled = false; if(orig) btn.innerHTML = orig; }"
         "  }"
         "}"
         
         "async function toggleSimpleTest(prefix, btnId, label){"
+        "  console.log('UI: toggleSimpleTest()', prefix, btnId, label);"
         "  const btn = document.getElementById(btnId);"
+        "  if(!btn) return; const orig = btn.innerHTML;"
         "  const isRunning = btn.innerText.includes('FERMA');"
-        "  "
-        "  if(isRunning){"
-        "    btn.innerText = '▶️ Inizia ' + label; btn.style.background = '';"
-        "    await runTest(prefix + '_stop');"
-        "  } else {"
-        "    btn.innerText = '⏹️ FERMA ' + label; btn.style.background = '#e74c3c';"
-        "    await runTest(prefix + '_start');"
-        "  }"
+        "  btn.disabled = true; btn.innerHTML = '⏳ Elaboro...';"
+        "  try{"
+        "    if(isRunning){"
+        "      btn.innerText = '▶️ Inizia ' + label; btn.style.background = '';"
+        "      try{ await runTest(prefix + '_stop'); } catch(e){ console.error(prefix + '_stop failed', e); }"
+        "    } else {"
+        "      btn.innerText = '⏹️ FERMA ' + label; btn.style.background = '#e74c3c';"
+        "      try{ await runTest(prefix + '_start'); } catch(e){ console.error(prefix + '_start failed', e); }"
+        "    }"
+        "  } finally { btn.disabled = false; if(orig) btn.innerHTML = orig; }"
         "}"
         
         "async function runTest(test,params={}){"
@@ -1634,11 +1663,14 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "}catch(e){console.error(e);}}"
         
         "async function sendSerial(port){"
-        "try{"
-        "const data=document.getElementById(port+'_input').value;"
-        "await fetch('/api/test/serial_send',{method:'POST',body:JSON.stringify({port,data})});"
-        "}catch(e){console.error(e);}"
-        "}"
+"  console.log('UI: sendSerial()', port);"
+"  const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; }"
+"  try{"
+"    const data = document.getElementById(port + '_input').value;"
+"    await fetch('/api/test/serial_send',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({port,data})});"
+"    const st = document.getElementById(port + '_status'); if(st) st.innerHTML = '<div class=\"result\">Inviato: '+(data||'')+'</div>';"
+"  }catch(e){ console.error(e); const st = document.getElementById(port + '_status'); if(st) st.innerHTML = '<div class=\"result\">Errore: '+e+'</div>'; }"
+"  finally{ if(btn){ btn.disabled=false; btn.innerHTML = orig; } }"
         
         "async function updateMonitors(){"
         "// display brightness slider handler (debounced + persist after idle)\n" 
@@ -1757,14 +1789,17 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "}catch(e){}}"
         
         "async function clearSerial(port){"
-        "try{"
-        "// Pulisce immediatamente l'area di testo lato client\n"
-        "const elId = port + '_status';"
-        "const el = document.getElementById(elId);"
-        "if(el) el.innerHTML = '';"
-        "// Poi pulisce lato server\n"
-        "await fetch('/api/test/serial_clear',{method:'POST', body:JSON.stringify({port})});"
-        "}catch(e){}}"
+        "  console.log('UI: clearSerial()', port);"
+        "  const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Pulendo...'; }"
+        "  try{"
+        "    // Pulisce immediatamente l'area di testo lato client\n"
+        "    const elId = port + '_status';"
+        "    const el = document.getElementById(elId);"
+        "    if(el) el.innerHTML = '';"
+        "    // Poi pulisce lato server\n"
+        "    await fetch('/api/test/serial_clear',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({port})});"
+        "  }catch(e){ console.error(e); } finally { if(btn){ btn.disabled=false; btn.innerHTML = orig; } }"
+        "}"
         
         "async function refreshEEPROMStatus(){"
         "try{"
@@ -2294,7 +2329,14 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
         ".test-item{display:flex;align-items:center;justify-content:space-between;padding:12px;margin:8px 0;background:#ecf0f1;border-radius:6px}"
         ".test-controls{display:flex;gap:8px;align-items:center}"
         "input[type=text], input[type=password]{padding:6px;border:1px solid #bdc3c7;border-radius:4px;color:#333;}"
-        "input[readonly]{background:#f6f8fa; font-family:monospace;}";
+        "input[readonly]{background:#f6f8fa; font-family:monospace;}"
+        "/* button visual feedback */"
+        ".test-controls button{transition:background-color .12s ease, transform .06s ease; cursor:pointer}"
+        ".test-controls button:hover{filter:brightness(0.96); transform:translateY(-1px)}"
+        ".test-controls button:active{transform:translateY(1px); filter:brightness(0.9)}"
+        ".test-controls button:disabled{opacity:0.6; cursor:not-allowed}"
+        ".hs-waiting{background:#fffacd} .section#section_calls{display:none !important;}"
+        "";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     send_head(req, "HTTP Services", extra_style, true);
@@ -2302,28 +2344,143 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
     const char *body =
         "<div class='container'>"
         "<div style='text-align:right; margin-bottom:8px;'><button onclick='location.reload()' style='background:#3498db; color:#fff; padding:6px 10px; border-radius:4px;'>🔄 Aggiorna Pagina</button></div>"
+        "<!-- Top request/response boxes -->"
+        "<div style='display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px'>"
+        "  <div><label style='font-weight:bold;display:block;margin-bottom:6px'>Richiesta</label><textarea id='hs_request' rows='6' style='width:100%;font-family:monospace;padding:8px;border:1px solid #ddd;border-radius:4px' readonly></textarea></div>"
+        "  <div><label style='font-weight:bold;display:block;margin-bottom:6px'>Risposta</label><textarea id='hs_response' rows='6' style='width:100%;font-family:monospace;padding:8px;border:1px solid #ddd;border-radius:4px' readonly></textarea></div>"
+        "</div>"
+        "<!-- Token visualizer -->"
+        "<div style='margin-top:8px'>"
+        "  <div class='token-info' style='padding:10px;background:#f5fbff;border:1px solid #e1eef6;border-radius:6px;font-family:monospace'>"
+        "    <div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'><strong style='width:80px'>Token:</strong><span id='hs_token_value' style='word-break:break-all;flex:1;color:#1b4f72'>—</span><button id='hs_token_copy' onclick='copyToken()' style='margin-left:8px;padding:6px 10px;border-radius:4px;background:#3498db;color:#fff;border:none;cursor:pointer'>Copia</button><button onclick='localStorage.removeItem(\"httpservices_token\"); showToken(\"\"); document.getElementById(\"hs_response\").value=\"\";' style='padding:6px 8px;border-radius:4px;background:#7f8c8d;color:#fff;border:none;cursor:pointer'>Rimuovi</button></div>"
+        "    <div style='margin-top:8px;display:flex;gap:12px;align-items:flex-start'>"
+        "      <div style='min-width:160px'><strong>Is JWT</strong><div id='hs_token_isjwt' style='margin-top:6px'>—</div></div>"
+        "      <div id='hs_jwt_sections' style='display:none;flex:1'>"
+        "        <div style='margin-bottom:8px'><strong>Header</strong><pre id='hs_jwt_header' style='white-space:pre-wrap;background:#fff;padding:8px;border:1px solid #e6eef3;border-radius:4px;max-height:120px;overflow:auto'></pre></div>"
+        "        <div><strong>Payload</strong><pre id='hs_jwt_payload' style='white-space:pre-wrap;background:#fff;padding:8px;border:1px solid #e6eef3;border-radius:4px;max-height:220px;overflow:auto'></pre></div>"
+        "      </div>"
+        "    </div>"
+        "  </div>"
+        "</div>"
 
         "<div id='section_httpservices' class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\"); if(i) i.innerText = s.classList.contains(\"collapsed\")?\"▸\":\"▾\";' tabindex='0'>🔐 Login HTTP Services<span class='section-toggle-icon'>▸</span></h2>"
         "<div class='test-item'><span>Serial:</span><div class='test-controls'><input id='hs_serial' type='text' placeholder='AD-34-DFG-333' style='width:220px'></div></div>"
         "<div class='test-item'><span>Password (MD5):</span><div class='test-controls'><input id='hs_password' type='text' placeholder='md5(...)' style='width:220px'></div></div>"
         "<div class='test-item'><div class='test-controls'><button id='hs_send' onclick='submitLogin()' style='background:#27ae60; color:#fff; padding:8px 12px; border-radius:4px;'>Invia</button></div></div>"
-        "<div class='test-item'><span>Token:</span><div class='test-controls'><input id='hs_token' type='text' readonly style='flex:1; padding:6px; font-family:monospace'> <button onclick='copyToken()' style='margin-left:8px; padding:6px 8px;'>📋 Copia</button> <button onclick='logoutToken()' style='margin-left:8px; padding:6px 8px; background:#c0392b; color:#fff;'>Logout</button></div></div>"
-        "<div class='test-item'><div class='test-controls'><button onclick='testToken()' style='background:#3498db; color:#fff; padding:6px 8px;'>Test token (GET /api/config)</button></div></div>"
-        "<div id='hs_status' style='margin-top:6px; color:#c0392b; font-weight:bold'></div>"
+
+        "<div style='margin:8px 0; padding:8px; border-radius:6px; background:#fbfcfd'>"
+
+        "<div class='test-item'><span>POST /api/keepalive</span><div class='test-controls'><button onclick='callKeepalive()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getconfig</span><div class='test-controls'><button onclick='callGetConfig()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getimages</span><div class='test-controls'><button onclick='callGetImages()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/gettranslations</span><div class='test-controls'><button onclick='callGetTranslations()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getfirmware</span><div class='test-controls'><button onclick='callGetFirmware()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/payment</span><div class='test-controls'><button onclick='callPayment()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/paymentoffline</span><div class='test-controls'><button onclick='callPaymentOffline()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/serviceused</span><div class='test-controls'><button onclick='callServiceUsed()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getcustomers</span><div class='test-controls'><input id='customers_code' placeholder='Code (es: CUST001)' style='padding:6px;border:1px solid #ddd;border-radius:4px;'> <button onclick='callGetCustomers()' style='background:#8e44ad;color:#fff;padding:6px 10px;border-radius:4px;margin-left:8px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getoperators</span><div class='test-controls'><button onclick='callGetOperators()' style='background:#8e44ad;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/activity</span><div class='test-controls'><button onclick='callActivity()' style='background:#f39c12;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+        "</div></div>"
+
+        
+
+        "</div></div>"
+
+        
+        "</div>"
+
+
+        "<div id='section_calls' class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\"); if(i) i.innerText = s.classList.contains(\"collapsed\")?\"▸\":\"▾\";' tabindex='0'>📡 Chiamate HTTP (proxy)</h2>"
+        "<div style='margin:8px 0; padding:8px; border-radius:6px; background:#fbfcfd'>"
+
+        "<div class='test-item'><span>POST /api/keepalive</span><div class='test-controls'><button onclick='callKeepalive()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getconfig</span><div class='test-controls'><button onclick='callGetConfig()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getimages</span><div class='test-controls'><button onclick='callGetImages()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/gettranslations</span><div class='test-controls'><button onclick='callGetTranslations()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getfirmware</span><div class='test-controls'><button onclick='callGetFirmware()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/payment</span><div class='test-controls'><button onclick='callPayment()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/paymentoffline</span><div class='test-controls'><button onclick='callPaymentOffline()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/serviceused</span><div class='test-controls'><button onclick='callServiceUsed()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getcustomers</span><div class='test-controls'><input id='customers_code' placeholder='Code (es: CUST001)' style='padding:6px;border:1px solid #ddd;border-radius:4px;'> <button onclick='callGetCustomers()' style='background:#8e44ad;color:#fff;padding:6px 10px;border-radius:4px;margin-left:8px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/getoperators</span><div class='test-controls'><button onclick='callGetOperators()' style='background:#8e44ad;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
+        "<div class='test-item'><span>POST /api/activity</span><div class='test-controls'><button onclick='callActivity()' style='background:#f39c12;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+
+
         "</div></div>"
 
         "<script>"
-        "window.addEventListener('DOMContentLoaded', function(){ const stored = localStorage.getItem('httpservices_token'); if(stored){ document.getElementById('hs_token').value = stored; document.getElementById('hs_status').style.color = '#27ae60'; document.getElementById('hs_status').innerText = 'Token caricato da LocalStorage'; } });"
+        "window.addEventListener('DOMContentLoaded', async function(){ const stored = localStorage.getItem('httpservices_token'); try{ if(stored){ const respEl = document.getElementById('hs_response'); if(respEl) respEl.value = 'Token (localStorage): ' + stored; try{ showToken(stored); }catch(e){} } const r = await fetch('/api/config'); if(r.ok){ const c = await r.json(); if(c.server){ if(c.server.serial) document.getElementById('hs_serial').value = c.server.serial; if(c.server.password) document.getElementById('hs_password').value = c.server.password; if(!stored && c.server.enabled && c.server.serial && c.server.password){ await submitLogin(); } } } }catch(e){} });"
 
-        "async function submitLogin(){ const s = document.getElementById('hs_serial').value || ''; const p = document.getElementById('hs_password').value || ''; const status = document.getElementById('hs_status'); const token = document.getElementById('hs_token'); status.innerText = ''; token.value = '';"
-        " if(!s || !p){ status.style.color = '#c0392b'; status.innerText = 'Compila serial e password'; return; }"
-        " try{ const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Date': new Date().toUTCString() }, body: JSON.stringify({ serial: s, password: p }) }); const j = await res.json().catch(()=>({})); if(res.ok && j.access_token){ token.value = j.access_token; localStorage.setItem('httpservices_token', j.access_token); status.style.color = '#27ae60'; status.innerText = 'Login riuscito — token salvato'; } else { status.style.color = '#c0392b'; status.innerText = j.deserror || ('HTTP ' + res.status); } }catch(e){ status.style.color = '#c0392b'; status.innerText = 'Errore di rete'; console.error(e); } }"
+        "async function submitLogin(){ const s = document.getElementById('hs_serial').value || ''; const p = document.getElementById('hs_password').value || ''; const btn = document.getElementById('hs_send'); const origBtn = btn ? btn.innerHTML : null; const reqEl = document.getElementById('hs_request'); const respEl = document.getElementById('hs_response'); if(reqEl) reqEl.value = ''; if(respEl) { respEl.value = ''; respEl.classList.remove('hs-waiting'); } if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Inviando...'; } if(!s || !p){ if(btn){ btn.disabled = false; btn.innerHTML = origBtn; } if(respEl) respEl.value = 'Compila serial e password'; return; } try{ const body = JSON.stringify({ serial: s, password: p }); if(reqEl) reqEl.value = body; if(respEl){ respEl.value = ''; respEl.classList.add('hs-waiting'); } const headers = { 'Content-Type': 'application/json', 'X-Request-Date': new Date().toUTCString() }; const res = await fetch('/api/login', { method: 'POST', headers: headers, body: body }); const txt = await res.text().catch(()=>('')); let j = null; try{ j = JSON.parse(txt); }catch(e){} if(res.ok){ if(respEl){ respEl.value = (j?JSON.stringify(j,null,2):txt); } if(j && j.access_token){ try{ showToken(j.access_token); }catch(e){}  localStorage.setItem('httpservices_token', j.access_token); if(respEl) respEl.value += '\\n\\nToken: ' + j.access_token; } } else { if(respEl) respEl.value = txt || ('HTTP ' + res.status); } }catch(e){ console.error(e); const respEl2 = document.getElementById('hs_response'); if(respEl2) respEl2.value = 'Errore di rete: ' + e; } finally { if(respEl) respEl.classList.remove('hs-waiting'); if(btn){ btn.disabled = false; btn.innerHTML = origBtn; } } }"
 
-        "function copyToken(){ const t = document.getElementById('hs_token').value; if(!t) return; navigator.clipboard.writeText(t).then(()=>{ const s = document.getElementById('hs_status'); s.style.color = '#27ae60'; s.innerText = 'Token copiato negli appunti'; }).catch(()=>{}); }"
+        
 
-        "function logoutToken(){ localStorage.removeItem('httpservices_token'); document.getElementById('hs_token').value = ''; const s = document.getElementById('hs_status'); s.style.color = '#c0392b'; s.innerText = 'Token rimosso'; }"
+        
 
-        "async function testToken(){ const t = document.getElementById('hs_token').value; const s = document.getElementById('hs_status'); s.innerText = ''; if(!t){ s.style.color = '#c0392b'; s.innerText = 'Nessun token disponibile'; return; } try{ const r = await fetch('/api/config', { method: 'GET', headers: { 'Authorization': 'Bearer ' + t } }); if(r.ok){ const j = await r.json().catch(()=>null); s.style.color = '#27ae60'; s.innerText = 'Chiamata OK — response JSON presente'; } else { s.style.color = '#c0392b'; s.innerText = 'HTTP ' + r.status; } }catch(e){ s.style.color = '#c0392b'; s.innerText = 'Errore rete'; console.error(e); } }"
+        
+
+        "// Token/JWT helper functions - showToken, copyToken, base64UrlDecode" 
+        "function base64UrlDecode(input){ try{ input = input.replace(/-/g,'+').replace(/_/g,'/'); while(input.length%4) input += '='; var decoded = atob(input); try{ return decodeURIComponent(Array.prototype.map.call(decoded, function(c){ return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); }catch(e){ return decoded; } }catch(e){ return null; } }" 
+        "function showToken(token){ try{ var v=document.getElementById('hs_token_value'); var isjwt=document.getElementById('hs_token_isjwt'); var hdr=document.getElementById('hs_jwt_header'); var pl=document.getElementById('hs_jwt_payload'); var sect=document.getElementById('hs_jwt_sections'); if(v) v.textContent = token || '—'; var parts = token?token.split('.') : []; var isJwt = (parts.length===3); if(isjwt) isjwt.textContent = isJwt? 'Yes' : 'No'; if(isJwt){ var h = base64UrlDecode(parts[0]); var p = base64UrlDecode(parts[1]); if(h && hdr){ try{ hdr.textContent = JSON.stringify(JSON.parse(h), null, 2); }catch(e){ hdr.textContent = h; } } if(p && pl){ try{ pl.textContent = JSON.stringify(JSON.parse(p), null, 2); }catch(e){ pl.textContent = p; } } if(sect) sect.style.display='block'; } else { if(hdr) hdr.textContent=''; if(pl) pl.textContent=''; if(sect) sect.style.display='none'; } }catch(e){} }" 
+        "function copyToken(){ try{ var t = (document.getElementById('hs_token_value')||{textContent:''}).textContent || ''; if(!t) return; if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t); alert('Token copiato'); } else { var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); alert('Token copiato'); } }catch(e){} }" 
+        "// Generic POST helper that injects Authorization from Token textbox when available"
+        "async function doPostLocal(path, body){ try{ const t = localStorage.getItem('httpservices_token') || ''; const headers = {'Content-Type':'application/json','X-Request-Date': new Date().toUTCString()}; if(t) headers['Authorization'] = 'Bearer ' + t; const reqEl = document.getElementById('hs_request'); const respEl = document.getElementById('hs_response'); if(reqEl) reqEl.value = body || '{}'; if(respEl){ respEl.value = ''; respEl.classList.add('hs-waiting'); } const res = await fetch(path, { method: 'POST', headers: headers, body: body || '{}' }); const txt = await res.text().catch(()=>('')); if(respEl) respEl.classList.remove('hs-waiting'); return {ok:res.ok, status: res.status, text: txt}; }catch(e){ const respEl = document.getElementById('hs_response'); if(respEl){ respEl.classList.remove('hs-waiting'); respEl.value = 'Errore: ' + e; } return {ok:false, status:0, text: String(e)}; } }"
+
+        "async function callKeepalive(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/keepalive'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callGetConfig(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/getconfig'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callGetImages(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/getimages'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callGetTranslations(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/gettranslations'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callGetFirmware(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/getfirmware'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callPayment(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const sample = JSON.stringify({ amount: 100 }); const r = await doPostLocal('/api/payment', sample); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callPaymentOffline(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const sample = JSON.stringify({ amount: 100 }); const r = await doPostLocal('/api/paymentoffline', sample); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callServiceUsed(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const sample = JSON.stringify({ service: 'test' }); const r = await doPostLocal('/api/serviceused', sample); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callGetCustomers(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const code = document.getElementById('customers_code').value || '*'; const r = await doPostLocal('/api/getcustomers', JSON.stringify({ Code: code })); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callGetOperators(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/getoperators'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+        "async function callActivity(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/activity', JSON.stringify({ action: 'test' })); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
+
+        "function clearResponse(){ try{ document.getElementById('hs_response').value = ''; }catch(e){} }"
 
         "</script>";
 

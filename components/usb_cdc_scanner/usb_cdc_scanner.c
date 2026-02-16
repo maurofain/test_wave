@@ -376,10 +376,10 @@ static void usb_cdc_scanner_open_task(void *arg)
                 }
                 cdc_dev = NULL;
             } else {
-                ESP_LOGI(TAG, "Retrying in 2s");
+                ESP_LOGI(TAG, "Retrying in 120s");
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(120000));
     }
 }
 
