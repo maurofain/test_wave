@@ -30,6 +30,7 @@ esp_err_t stats_page_handler(httpd_req_t *req);
 esp_err_t tasks_page_handler(httpd_req_t *req);
 esp_err_t test_page_handler(httpd_req_t *req);
 esp_err_t httpservices_page_handler(httpd_req_t *req);
+esp_err_t api_index_page_handler(httpd_req_t *req);
 
 // OTA handlers
 esp_err_t ota_get_handler(httpd_req_t *req);
@@ -45,6 +46,7 @@ esp_err_t api_ntp_sync(httpd_req_t *req);
 esp_err_t api_tasks_get(httpd_req_t *req);
 esp_err_t api_tasks_save(httpd_req_t *req);
 esp_err_t api_tasks_apply(httpd_req_t *req);
+esp_err_t api_test_endpoints_handler(httpd_req_t *req);
 esp_err_t api_test_handler(httpd_req_t *req);
 esp_err_t api_debug_usb_enumerate(httpd_req_t *req);
 esp_err_t api_debug_usb_restart(httpd_req_t *req);

@@ -1,0 +1,220 @@
+curl -v --http1.1   -H "PostmanRuntime/7.51.1" -H "date: 2026-01-23T13:25:13.218763+01:00"  -H "Accept-Encoding: deflate, br"   -H "Connection: close"   -H "Content-Type: application/json"   -d '{"serial":"AD-34-DFG-333","password":"c1ef6429c5e0f753ff24a114de6ee7d4"}'   'http://195.231.69.227:5556/api/login'
+
+curl -v --http1.1   -H "date: 2026-01-23T13:25:13.218763+01:00" -H "Content-Type: application/json"   -d '{"serial":"AD-34-DFG-333","password":"c1ef6429c5e0f753ff24a114de6ee7d4"}'   'http://195.231.69.227:5556/api/login'
+
+
+POST http://195.231.69.227:5556/api/login: {
+  "Network": {
+    "addresses": {
+      "local": {
+        "address": "172.17.0.2",
+        "family": "IPv4",
+        "port": 41710
+      },
+      "remote": {
+        "address": "195.231.69.227",
+        "family": "IPv4",
+        "port": 5556
+      }
+    }
+  },
+  "Request Headers": {
+    "date": "2026-01-23T13:25:13.218763+01:00",
+    "content-type": "application/json",
+    "user-agent": "PostmanRuntime/7.51.1",
+    "accept": "*/*",
+    "cache-control": "no-cache",
+    "postman-token": "2a2d72bb-a2ab-4392-9ebd-12ef0b1dcd52",
+    "host": "195.231.69.227:5556",
+    "accept-encoding": "gzip, deflate, br",
+    "connection": "keep-alive"
+  },
+  "Request Body": "{\r\n    \"serial\":\"AD-34-DFG-333\",\r\n    \"password\":\"c1ef6429c5e0f753ff24a114de6ee7d4\"\r\n}",
+  "Response Headers": {
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "content-type": "application/json; charset=utf-8",
+    "expires": "-1",
+    "server": "Microsoft-IIS/10.0",
+    "x-aspnet-version": "4.0.30319",
+    "x-powered-by": "ASP.NET",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "Content-Type",
+    "access-control-allow-methods": "*",
+    "date": "Mon, 16 Feb 2026 09:55:28 GMT",
+    "content-length": "496"
+  },
+  "Response Body": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiI5Mzc0ZjE3Yi0yYjBkLTQ0MzMtYTJjZC1iMTI3ZTI0MTYxMmUiLCJleHAiOjE3NzEyNDI5MjgsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.MEKrZiCR8PdbGEB22P6v6gm_J-2EWJZCV7CiG9KAmls\"}"
+}
+POST http://195.231.69.227:5556/api/login: {
+  "Network": {
+    "addresses": {
+      "local": {
+        "address": "172.17.0.2",
+        "family": "IPv4",
+        "port": 46160
+      },
+      "remote": {
+        "address": "195.231.69.227",
+        "family": "IPv4",
+        "port": 5556
+      }
+    }
+  },
+  "Request Headers": {
+    "date": "2026-01-23T13:25:13.218763+01:00",
+    "content-type": "application/json",
+    "user-agent": "PostmanRuntime/7.51.1",
+    "accept": "*/*",
+    "cache-control": "no-cache",
+    "postman-token": "88c53283-8b80-4255-8ba2-fa64071312b4",
+    "host": "195.231.69.227:5556",
+    "accept-encoding": "gzip, deflate, br",
+    "connection": "keep-alive"
+  },
+  "Request Body": "{\r\n    \"serial\":\"AD-34-DFG-333\",\r\n    \"password\":\"c1ef6429c5e0f753ff24a114de6ee7d4\"\r\n}",
+  "Response Headers": {
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "content-type": "application/json; charset=utf-8",
+    "expires": "-1",
+    "server": "Microsoft-IIS/10.0",
+    "x-aspnet-version": "4.0.30319",
+    "x-powered-by": "ASP.NET",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "Content-Type",
+    "access-control-allow-methods": "*",
+    "date": "Mon, 16 Feb 2026 14:44:36 GMT",
+    "content-length": "496"
+  },
+  "Response Body": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiJmODBhZWE1MC1lZjc3LTQ3MjYtOGE5OS05YjE1NmRjMDQ2NDQiLCJleHAiOjE3NzEyNjAyNzYsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.EdPONl6Ws99FyOa0nDQI6fXhobDqpM7XwTk1Igmy6Yo\"}"
+}
+POST http://195.231.69.227:5556/api/login: {
+  "Network": {
+    "addresses": {
+      "local": {
+        "address": "172.17.0.2",
+        "family": "IPv4",
+        "port": 53504
+      },
+      "remote": {
+        "address": "195.231.69.227",
+        "family": "IPv4",
+        "port": 5556
+      }
+    }
+  },
+  "Request Headers": {
+    "date": "2026-01-23T13:25:13.218763+01:00",
+    "content-type": "application/json",
+    "user-agent": "PostmanRuntime/7.51.1",
+    "accept": "*/*",
+    "cache-control": "no-cache",
+    "postman-token": "24e75993-a2be-4166-b0cc-896b06c319d4",
+    "host": "195.231.69.227:5556",
+    "accept-encoding": "gzip, deflate, br",
+    "connection": "keep-alive"
+  },
+  "Request Body": "{\r\n    \"serial\":\"AD-34-DFG-333\",\r\n    \"password\":\"c1ef6429c5e0f753ff24a114de6ee7d4\"\r\n}",
+  "Response Headers": {
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "content-type": "application/json; charset=utf-8",
+    "expires": "-1",
+    "server": "Microsoft-IIS/10.0",
+    "x-aspnet-version": "4.0.30319",
+    "x-powered-by": "ASP.NET",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "Content-Type",
+    "access-control-allow-methods": "*",
+    "date": "Mon, 16 Feb 2026 14:45:29 GMT",
+    "content-length": "496"
+  },
+  "Response Body": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiIyYTY3OTJlYS02Mjc5LTRkZTgtYjBiMi1mODNlMTdiYzFlOTUiLCJleHAiOjE3NzEyNjAzMjksImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.5ssVSDoNAxTuWKlqRMZqtr9wPln_C1NDDdSyuHYwVOI\"}"
+}
+POST http://195.231.69.227:5556/api/login: {
+  "Network": {
+    "addresses": {
+      "local": {
+        "address": "172.17.0.2",
+        "family": "IPv4",
+        "port": 46302
+      },
+      "remote": {
+        "address": "195.231.69.227",
+        "family": "IPv4",
+        "port": 5556
+      }
+    }
+  },
+  "Request Headers": {
+    "date": "2026-01-23T13:25:13.218763+01:00",
+    "content-type": "application/json",
+    "user-agent": "PostmanRuntime/7.51.1",
+    "accept": "*/*",
+    "cache-control": "no-cache",
+    "postman-token": "eea1e816-1c31-4adf-bc4c-dca1eaa2fbce",
+    "host": "195.231.69.227:5556",
+    "accept-encoding": "gzip, deflate, br",
+    "connection": "keep-alive"
+  },
+  "Request Body": "{\r\n    \"serial\":\"AD-34-DFG-333\",\r\n    \"password\":\"c1ef6429c5e0f753ff24a114de6ee7d4\"\r\n}",
+  "Response Headers": {
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "content-type": "application/json; charset=utf-8",
+    "expires": "-1",
+    "server": "Microsoft-IIS/10.0",
+    "x-aspnet-version": "4.0.30319",
+    "x-powered-by": "ASP.NET",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "Content-Type",
+    "access-control-allow-methods": "*",
+    "date": "Mon, 16 Feb 2026 15:04:50 GMT",
+    "content-length": "496"
+  },
+  "Response Body": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiI4YjI2Zjc0OC0xNmZmLTQwMTktOTA4NS0yZDFlMTI1ZWQ0NDEiLCJleHAiOjE3NzEyNjE0OTAsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.BwKPeRGPRUgGHjQOirTrdh4rmu8kCQqHDXIfBEicLK0\"}"
+}
+POST http://195.231.69.227:5556/api/login: {
+  "Network": {
+    "addresses": {
+      "local": {
+        "address": "172.17.0.2",
+        "family": "IPv4",
+        "port": 42374
+      },
+      "remote": {
+        "address": "195.231.69.227",
+        "family": "IPv4",
+        "port": 5556
+      }
+    }
+  },
+  "Request Headers": {
+    "date": "2026-01-23T13:25:13.218763+01:00",
+    "content-type": "application/json",
+    "user-agent": "PostmanRuntime/7.51.1",
+    "accept": "*/*",
+    "cache-control": "no-cache",
+    "postman-token": "9b6892cb-3515-4f6c-ab16-06eb10bc2457",
+    "host": "195.231.69.227:5556",
+    "accept-encoding": "gzip, deflate, br",
+    "connection": "keep-alive"
+  },
+  "Request Body": "{\r\n    \"serial\":\"AD-34-DFG-333\",\r\n    \"password\":\"c1ef6429c5e0f753ff24a114de6ee7d4\"\r\n}",
+  "Response Headers": {
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "content-type": "application/json; charset=utf-8",
+    "expires": "-1",
+    "server": "Microsoft-IIS/10.0",
+    "x-aspnet-version": "4.0.30319",
+    "x-powered-by": "ASP.NET",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "Content-Type",
+    "access-control-allow-methods": "*",
+    "date": "Mon, 16 Feb 2026 15:09:25 GMT",
+    "content-length": "496"
+  },
+  "Response Body": "{\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiIwZjZhYjAwMS1iNzk5LTQ4YTktYTFiYy02ZTgxNjY2ZjIzYzUiLCJleHAiOjE3NzEyNjE3NjUsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.za7xFdMH5OX-HZYu4aWOCPw30Kw8rwENdQTQV-CRBWM\"}"
+}

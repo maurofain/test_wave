@@ -1,0 +1,35 @@
+2026-02-17 09:59:38,176 INFO  Login tester starting — using project defaults where not overridden
+2026-02-17 09:59:38,176 INFO  Computed MD5(MMYYYYdd+serial) using date '2026-01-23T13:25:13.218763+01:00' => mm_yyyy_dd='01202623' => d22084fe6dc61d6262164a01a249774e
+2026-02-17 09:59:38,176 WARNING Provided password (from device config) DOES NOT MATCH computed value. Project stores password directly in config.
+2026-02-17 09:59:38,176 INFO  --- REQUEST (to be sent) ---
+2026-02-17 09:59:38,176 INFO  URL: http://195.231.69.227:5556/api/login
+2026-02-17 09:59:38,177 INFO  Method: POST
+2026-02-17 09:59:38,177 INFO  Headers: {'Content-Type': 'application/json', 'Date': '2026-01-23T13:25:13.218763+01:00'}
+2026-02-17 09:59:38,177 INFO  Body: {"serial": "AD-34-DFG-333", "password": "c1ef6429c5e0f753ff24a114de6ee7d4"}
+2026-02-17 09:59:38,177 INFO  Authorization header (request): <none>
+2026-02-17 09:59:38,177 DEBUG Prepared request URL: http://195.231.69.227:5556/api/login
+2026-02-17 09:59:38,177 DEBUG Prepared headers: {'Content-Type': 'application/json', 'Date': '2026-01-23T13:25:13.218763+01:00'}
+2026-02-17 09:59:38,177 DEBUG Prepared body: {"serial": "AD-34-DFG-333", "password": "c1ef6429c5e0f753ff24a114de6ee7d4"}
+2026-02-17 09:59:38,177 DEBUG Using requests library to POST
+2026-02-17 09:59:38,178 DEBUG Starting new HTTP connection (1): 195.231.69.227:5556
+2026-02-17 09:59:38,213 DEBUG http://195.231.69.227:5556 "POST /api/login HTTP/1.1" 200 496
+2026-02-17 09:59:38,214 INFO  Comparing server response with device proxy at http://192.168.2.24:80/api/login
+2026-02-17 09:59:38,214 DEBUG Prepared request URL: http://192.168.2.24:80/api/login
+2026-02-17 09:59:38,214 DEBUG Prepared headers: {'Content-Type': 'application/json', 'Date': '2026-01-23T13:25:13.218763+01:00'}
+2026-02-17 09:59:38,214 DEBUG Prepared body: {"serial": "AD-34-DFG-333", "password": "c1ef6429c5e0f753ff24a114de6ee7d4"}
+2026-02-17 09:59:38,214 DEBUG Using requests library to POST
+2026-02-17 09:59:38,215 DEBUG Starting new HTTP connection (1): 192.168.2.24:80
+2026-02-17 09:59:39,860 DEBUG http://192.168.2.24:80 "POST /api/login HTTP/1.1" 200 0
+2026-02-17 09:59:39,861 INFO  server status=200 proxy status=200
+2026-02-17 09:59:39,861 WARNING Server and proxy bodies DIFFER: server_len=496 proxy_len=0
+2026-02-17 09:59:39,876 INFO  Wrote server_body.json and proxy_body.json for manual diffing
+2026-02-17 09:59:39,876 INFO  HTTP status: 200
+2026-02-17 09:59:39,876 INFO  Response headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache', 'Content-Type': 'application/json; charset=utf-8', 'Expires': '-1', 'Server': 'Microsoft-IIS/10.0', 'X-AspNet-Version': '4.0.30319', 'X-Powered-By': 'ASP.NET', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': '*', 'Date': 'Tue, 17 Feb 2026 08:59:38 GMT', 'Content-Length': '496'}
+2026-02-17 09:59:39,876 INFO  Response body: {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiIwY2VmOTg4ZS1jNDk3LTRmMjItYTI2Yy0yOWFiN2U0OTY1ZDEiLCJleHAiOjE3NzEzMjU5NzgsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.T_WKv2DckB6ffvZJ_TmXOx6NPyvRLRHshr8rot3FKGk"}
+2026-02-17 09:59:39,876 INFO  Response JSON (pretty):
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiIwY2VmOTg4ZS1jNDk3LTRmMjItYTI2Yy0yOWFiN2U0OTY1ZDEiLCJleHAiOjE3NzEzMjU5NzgsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.T_WKv2DckB6ffvZJ_TmXOx6NPyvRLRHshr8rot3FKGk"
+}
+2026-02-17 09:59:39,876 INFO  access_token (from response body): eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiIwY2VmOTg4ZS1jNDk3LTRmMjItYTI2Yy0yOWFiN2U0OTY1ZDEiLCJleHAiOjE3NzEzMjU5NzgsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.T_WKv2DckB6ffvZJ_TmXOx6NPyvRLRHshr8rot3FKGk
+2026-02-17 09:59:39,876 INFO  Use in header: Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJzeXN0ZW1pZCI6IjEiLCJkZXNjcmlwdGlvbiI6Ildhc2ggMSIsImRlYnVnbGl2ZWwiOiIyIiwiZGJzZXJ2ZXIiOiIxOTUuMjMxLjY5LjIyN1xcTUhTUUwsNTU0MTciLCJkYnVzZXIiOiJzYSIsImRicHN3IjoiVzMxS2xlOUtXamMxaVMybXBBVVM4Y0FEZmczZU04Yk0iLCJkYmRhdGEiOiJzeXN0ZW0wMDEiLCJzd3ZlcnNpb24iOiIiLCJqdGkiOiIwY2VmOTg4ZS1jNDk3LTRmMjItYTI2Yy0yOWFiN2U0OTY1ZDEiLCJleHAiOjE3NzEzMjU5NzgsImlzcyI6Im1pY3JvaGFyZCIsImF1ZCI6Im1pY3JvaGFyZCJ9.T_WKv2DckB6ffvZJ_TmXOx6NPyvRLRHshr8rot3FKGk
+2026-02-17 09:59:39,876 INFO  Done — detailed log written to login_test.log

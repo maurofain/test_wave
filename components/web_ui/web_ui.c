@@ -136,9 +136,12 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "</div>"
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
         "<p>Benvenuti nell'interfaccia di configurazione e test.</p>"
-        "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
+        "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px; display:flex; justify-content:space-between; align-items:center; gap:10px;'>"
+        "<div>"
         "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>Reboot in Factory</a> "
         "<a href='/reboot/app' class='btn-reboot' style='background:#27ae60;'>Reboot in App</a>"
+        "</div>"
+        "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
         "</div>"
         "</div>"
         "</div></body></html>";
@@ -2335,7 +2338,7 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
         ".test-controls button:hover{filter:brightness(0.96); transform:translateY(-1px)}"
         ".test-controls button:active{transform:translateY(1px); filter:brightness(0.9)}"
         ".test-controls button:disabled{opacity:0.6; cursor:not-allowed}"
-        ".hs-waiting{background:#fffacd} .section#section_calls{display:none !important;}"
+        ".hs-waiting{background:#fffacd} .section#section_calls{max-width:960px; margin-left:auto; margin-right:auto;}"
         "";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -2352,7 +2355,7 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
         "<!-- Token visualizer -->"
         "<div style='margin-top:8px'>"
         "  <div class='token-info' style='padding:10px;background:#f5fbff;border:1px solid #e1eef6;border-radius:6px;font-family:monospace'>"
-        "    <div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'><strong style='width:80px'>Token:</strong><span id='hs_token_value' style='word-break:break-all;flex:1;color:#1b4f72'>—</span><button id='hs_token_copy' onclick='copyToken()' style='margin-left:8px;padding:6px 10px;border-radius:4px;background:#3498db;color:#fff;border:none;cursor:pointer'>Copia</button><button onclick='localStorage.removeItem(\"httpservices_token\"); showToken(\"\"); document.getElementById(\"hs_response\").value=\"\";' style='padding:6px 8px;border-radius:4px;background:#7f8c8d;color:#fff;border:none;cursor:pointer'>Rimuovi</button></div>"
+        "    <div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'><strong style='width:80px'>Token:</strong><input id='hs_token_value' type='text' readonly value='' style='flex:1;min-width:280px;padding:6px;border:1px solid #cfe3ef;border-radius:4px;color:#1b4f72;background:#fff;font-family:monospace'><button id='hs_token_copy' onclick='copyToken()' style='margin-left:8px;padding:6px 10px;border-radius:4px;background:#3498db;color:#fff;border:none;cursor:pointer'>Copia</button><button onclick='localStorage.removeItem(\"httpservices_token\"); showToken(\"\"); document.getElementById(\"hs_response\").value=\"\";' style='padding:6px 8px;border-radius:4px;background:#7f8c8d;color:#fff;border:none;cursor:pointer'>Rimuovi</button></div>"
         "    <div style='margin-top:8px;display:flex;gap:12px;align-items:flex-start'>"
         "      <div style='min-width:160px'><strong>Is JWT</strong><div id='hs_token_isjwt' style='margin-top:6px'>—</div></div>"
         "      <div id='hs_jwt_sections' style='display:none;flex:1'>"
@@ -2363,14 +2366,14 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
         "  </div>"
         "</div>"
 
-        "<div id='section_httpservices' class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\"); if(i) i.innerText = s.classList.contains(\"collapsed\")?\"▸\":\"▾\";' tabindex='0'>🔐 Login HTTP Services<span class='section-toggle-icon'>▸</span></h2>"
+        "<div id='section_httpservices' class='section'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\"); if(i) i.innerText = s.classList.contains(\"collapsed\")?\"▸\":\"▾\";' tabindex='0'>🔐 Login + Chiamate HTTP<span class='section-toggle-icon'>▾</span></h2>"
         "<div class='test-item'><span>Serial:</span><div class='test-controls'><input id='hs_serial' type='text' placeholder='AD-34-DFG-333' style='width:220px'></div></div>"
         "<div class='test-item'><span>Password (MD5):</span><div class='test-controls'><input id='hs_password' type='text' placeholder='md5(...)' style='width:220px'></div></div>"
         "<div class='test-item'><div class='test-controls'><button id='hs_send' onclick='submitLogin()' style='background:#27ae60; color:#fff; padding:8px 12px; border-radius:4px;'>Invia</button></div></div>"
 
         "<div style='margin:8px 0; padding:8px; border-radius:6px; background:#fbfcfd'>"
 
-        "<div class='test-item'><span>POST /api/keepalive</span><div class='test-controls'><button onclick='callKeepalive()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
+        "<div class='test-item'><span>POST /api/keepalive</span><div class='test-controls'><button id='hs_keepalive_btn_1' type='button' onclick='window.hsKeepaliveClick && window.hsKeepaliveClick(this); return false;' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
 
 
         "<div class='test-item'><span>POST /api/getconfig</span><div class='test-controls'><button onclick='callGetConfig()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
@@ -2411,49 +2414,12 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
         
         "</div>"
 
-
-        "<div id='section_calls' class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\"); if(i) i.innerText = s.classList.contains(\"collapsed\")?\"▸\":\"▾\";' tabindex='0'>📡 Chiamate HTTP (proxy)</h2>"
-        "<div style='margin:8px 0; padding:8px; border-radius:6px; background:#fbfcfd'>"
-
-        "<div class='test-item'><span>POST /api/keepalive</span><div class='test-controls'><button onclick='callKeepalive()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/getconfig</span><div class='test-controls'><button onclick='callGetConfig()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/getimages</span><div class='test-controls'><button onclick='callGetImages()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/gettranslations</span><div class='test-controls'><button onclick='callGetTranslations()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/getfirmware</span><div class='test-controls'><button onclick='callGetFirmware()' style='background:#2980b9;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/payment</span><div class='test-controls'><button onclick='callPayment()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/paymentoffline</span><div class='test-controls'><button onclick='callPaymentOffline()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/serviceused</span><div class='test-controls'><button onclick='callServiceUsed()' style='background:#16a085;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/getcustomers</span><div class='test-controls'><input id='customers_code' placeholder='Code (es: CUST001)' style='padding:6px;border:1px solid #ddd;border-radius:4px;'> <button onclick='callGetCustomers()' style='background:#8e44ad;color:#fff;padding:6px 10px;border-radius:4px;margin-left:8px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/getoperators</span><div class='test-controls'><button onclick='callGetOperators()' style='background:#8e44ad;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "<div class='test-item'><span>POST /api/activity</span><div class='test-controls'><button onclick='callActivity()' style='background:#f39c12;color:#fff;padding:6px 10px;border-radius:4px'>Invia</button></div></div>"
-
-
-        "</div></div>"
-
         "<script>"
-        "window.addEventListener('DOMContentLoaded', async function(){ const stored = localStorage.getItem('httpservices_token'); try{ if(stored){ const respEl = document.getElementById('hs_response'); if(respEl) respEl.value = 'Token (localStorage): ' + stored; try{ showToken(stored); }catch(e){} } const r = await fetch('/api/config'); if(r.ok){ const c = await r.json(); if(c.server){ if(c.server.serial) document.getElementById('hs_serial').value = c.server.serial; if(c.server.password) document.getElementById('hs_password').value = c.server.password; if(!stored && c.server.enabled && c.server.serial && c.server.password){ await submitLogin(); } } } }catch(e){} });"
+        "window.hsKeepaliveClick = async function(btn){ const caller = document.activeElement; btn = btn || ((caller && caller.tagName==='BUTTON')?caller:null); const orig = btn?btn.innerHTML:null; const reqEl = document.getElementById('hs_request'); const resp = document.getElementById('hs_response'); if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } try{ const payload = JSON.stringify({ status: 'OK', inputstates: '00010001', outputstates: '00000000', temperature: 2000, humidity: 4700, subdevices: [{ code: 'QRC', status: 'NOT FOUND' }, { code: 'PRN1', status: 'OK' }] }); const tokenEl = document.getElementById('hs_token_value'); const token = (tokenEl && tokenEl.value) ? tokenEl.value : (localStorage.getItem('httpservices_token') || ''); const headers = { 'Content-Type':'application/json', 'X-Request-Date': new Date().toUTCString() }; if(token) headers['Authorization'] = 'Bearer ' + token; if(reqEl){ let rq = 'POST /api/keepalive\\nContent-Type: application/json\\nX-Request-Date: ' + headers['X-Request-Date']; if(headers['Authorization']) rq += '\\nAuthorization: ' + headers['Authorization']; rq += '\\n\\n' + payload; reqEl.value = rq; } if(resp){ resp.value = '--> POST /api/keepalive\\nInvio in corso...'; resp.classList.add('hs-waiting'); } const res = await fetch('/api/keepalive', { method:'POST', headers: headers, body: payload, cache:'no-store' }); const txt = await res.text().catch(()=>('')); if(resp){ resp.classList.remove('hs-waiting'); resp.value = txt || ('HTTP ' + res.status); } }catch(e){ if(resp){ resp.classList.remove('hs-waiting'); resp.value = 'Errore keepalive: ' + e; } } finally{ if(resp) resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } };"
+        "window.callKeepalive = window.hsKeepaliveClick;"
+        "window.addEventListener('DOMContentLoaded', async function(){ const stored = localStorage.getItem('httpservices_token'); try{ if(stored){ const respEl = document.getElementById('hs_response'); if(respEl) respEl.value = 'Token (localStorage): ' + stored; try{ showToken(stored); }catch(e){} } const r = await fetch('/api/config'); if(r.ok){ const c = await r.json(); if(c.server){ if(c.server.serial) document.getElementById('hs_serial').value = c.server.serial; if(c.server.password) document.getElementById('hs_password').value = c.server.password; } } }catch(e){} });"
 
-        "async function submitLogin(){ const s = document.getElementById('hs_serial').value || ''; const p = document.getElementById('hs_password').value || ''; const btn = document.getElementById('hs_send'); const origBtn = btn ? btn.innerHTML : null; const reqEl = document.getElementById('hs_request'); const respEl = document.getElementById('hs_response'); if(reqEl) reqEl.value = ''; if(respEl) { respEl.value = ''; respEl.classList.remove('hs-waiting'); } if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Inviando...'; } if(!s || !p){ if(btn){ btn.disabled = false; btn.innerHTML = origBtn; } if(respEl) respEl.value = 'Compila serial e password'; return; } try{ const body = JSON.stringify({ serial: s, password: p }); if(reqEl) reqEl.value = body; if(respEl){ respEl.value = ''; respEl.classList.add('hs-waiting'); } const headers = { 'Content-Type': 'application/json', 'X-Request-Date': new Date().toUTCString() }; const res = await fetch('/api/login', { method: 'POST', headers: headers, body: body }); const txt = await res.text().catch(()=>('')); let j = null; try{ j = JSON.parse(txt); }catch(e){} if(res.ok){ if(respEl){ respEl.value = (j?JSON.stringify(j,null,2):txt); } if(j && j.access_token){ try{ showToken(j.access_token); }catch(e){}  localStorage.setItem('httpservices_token', j.access_token); if(respEl) respEl.value += '\\n\\nToken: ' + j.access_token; } } else { if(respEl) respEl.value = txt || ('HTTP ' + res.status); } }catch(e){ console.error(e); const respEl2 = document.getElementById('hs_response'); if(respEl2) respEl2.value = 'Errore di rete: ' + e; } finally { if(respEl) respEl.classList.remove('hs-waiting'); if(btn){ btn.disabled = false; btn.innerHTML = origBtn; } } }"
+        "async function submitLogin(){ const s = document.getElementById('hs_serial').value || ''; const p = document.getElementById('hs_password').value || ''; const btn = document.getElementById('hs_send'); const origBtn = btn ? btn.innerHTML : null; const reqEl = document.getElementById('hs_request'); const respEl = document.getElementById('hs_response'); if(respEl) { respEl.value = ''; respEl.classList.remove('hs-waiting'); } if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Inviando...'; } if(!s || !p){ if(reqEl) reqEl.value = 'POST /api/login\\n\\n{}'; if(btn){ btn.disabled = false; btn.innerHTML = origBtn; } if(respEl) respEl.value = 'Compila serial e password'; return; } try{ const body = JSON.stringify({ serial: s, password: p }); const headers = { 'Content-Type': 'application/json', 'X-Request-Date': new Date().toUTCString() }; if(reqEl) reqEl.value = 'POST /api/login\\nContent-Type: application/json\\nX-Request-Date: ' + headers['X-Request-Date'] + '\\n\\n' + body; if(respEl){ respEl.value = ''; respEl.classList.add('hs-waiting'); } const res = await fetch('/api/login', { method: 'POST', headers: headers, body: body }); const txt = await res.text().catch(()=>('')); let j = null; try{ j = JSON.parse(txt); }catch(e){} if(res.ok){ if(respEl){ respEl.value = (j?JSON.stringify(j,null,2):txt); } if(j && j.access_token){ try{ showToken(j.access_token); }catch(e){}  localStorage.setItem('httpservices_token', j.access_token); if(respEl) respEl.value += '\\n\\nToken: ' + j.access_token; } } else { if(respEl) respEl.value = txt || ('HTTP ' + res.status); } }catch(e){ console.error(e); const respEl2 = document.getElementById('hs_response'); if(respEl2) respEl2.value = 'Errore di rete: ' + e; } finally { if(respEl) respEl.classList.remove('hs-waiting'); if(btn){ btn.disabled = false; btn.innerHTML = origBtn; } } }"
 
         
 
@@ -2463,12 +2429,11 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
 
         "// Token/JWT helper functions - showToken, copyToken, base64UrlDecode" 
         "function base64UrlDecode(input){ try{ input = input.replace(/-/g,'+').replace(/_/g,'/'); while(input.length%4) input += '='; var decoded = atob(input); try{ return decodeURIComponent(Array.prototype.map.call(decoded, function(c){ return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); }catch(e){ return decoded; } }catch(e){ return null; } }" 
-        "function showToken(token){ try{ var v=document.getElementById('hs_token_value'); var isjwt=document.getElementById('hs_token_isjwt'); var hdr=document.getElementById('hs_jwt_header'); var pl=document.getElementById('hs_jwt_payload'); var sect=document.getElementById('hs_jwt_sections'); if(v) v.textContent = token || '—'; var parts = token?token.split('.') : []; var isJwt = (parts.length===3); if(isjwt) isjwt.textContent = isJwt? 'Yes' : 'No'; if(isJwt){ var h = base64UrlDecode(parts[0]); var p = base64UrlDecode(parts[1]); if(h && hdr){ try{ hdr.textContent = JSON.stringify(JSON.parse(h), null, 2); }catch(e){ hdr.textContent = h; } } if(p && pl){ try{ pl.textContent = JSON.stringify(JSON.parse(p), null, 2); }catch(e){ pl.textContent = p; } } if(sect) sect.style.display='block'; } else { if(hdr) hdr.textContent=''; if(pl) pl.textContent=''; if(sect) sect.style.display='none'; } }catch(e){} }" 
-        "function copyToken(){ try{ var t = (document.getElementById('hs_token_value')||{textContent:''}).textContent || ''; if(!t) return; if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t); alert('Token copiato'); } else { var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); alert('Token copiato'); } }catch(e){} }" 
+        "function showToken(token){ try{ var v=document.getElementById('hs_token_value'); var isjwt=document.getElementById('hs_token_isjwt'); var hdr=document.getElementById('hs_jwt_header'); var pl=document.getElementById('hs_jwt_payload'); var sect=document.getElementById('hs_jwt_sections'); if(v){ if(typeof v.value !== 'undefined') v.value = token || ''; else v.textContent = token || '—'; } var parts = token?token.split('.') : []; var isJwt = (parts.length===3); if(isjwt) isjwt.textContent = isJwt? 'Yes' : 'No'; if(isJwt){ var h = base64UrlDecode(parts[0]); var p = base64UrlDecode(parts[1]); if(h && hdr){ try{ hdr.textContent = JSON.stringify(JSON.parse(h), null, 2); }catch(e){ hdr.textContent = h; } } if(p && pl){ try{ pl.textContent = JSON.stringify(JSON.parse(p), null, 2); }catch(e){ pl.textContent = p; } } if(sect) sect.style.display='block'; } else { if(hdr) hdr.textContent=''; if(pl) pl.textContent=''; if(sect) sect.style.display='none'; } }catch(e){} }" 
+        "function copyToken(){ try{ var el = document.getElementById('hs_token_value') || {value:'',textContent:''}; var t = (typeof el.value !== 'undefined' ? el.value : el.textContent) || ''; if(!t) return; if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t); alert('Token copiato'); } else { var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); alert('Token copiato'); } }catch(e){} }" 
         "// Generic POST helper that injects Authorization from Token textbox when available"
-        "async function doPostLocal(path, body){ try{ const t = localStorage.getItem('httpservices_token') || ''; const headers = {'Content-Type':'application/json','X-Request-Date': new Date().toUTCString()}; if(t) headers['Authorization'] = 'Bearer ' + t; const reqEl = document.getElementById('hs_request'); const respEl = document.getElementById('hs_response'); if(reqEl) reqEl.value = body || '{}'; if(respEl){ respEl.value = ''; respEl.classList.add('hs-waiting'); } const res = await fetch(path, { method: 'POST', headers: headers, body: body || '{}' }); const txt = await res.text().catch(()=>('')); if(respEl) respEl.classList.remove('hs-waiting'); return {ok:res.ok, status: res.status, text: txt}; }catch(e){ const respEl = document.getElementById('hs_response'); if(respEl){ respEl.classList.remove('hs-waiting'); respEl.value = 'Errore: ' + e; } return {ok:false, status:0, text: String(e)}; } }"
+        "async function doPostLocal(path, body){ try{ const t = localStorage.getItem('httpservices_token') || ''; const headers = {'Content-Type':'application/json','X-Request-Date': new Date().toUTCString()}; if(t) headers['Authorization'] = 'Bearer ' + t; const reqEl = document.getElementById('hs_request'); const respEl = document.getElementById('hs_response'); const payload = body || '{}'; if(reqEl){ let rq = 'POST ' + path + '\\nContent-Type: application/json\\nX-Request-Date: ' + headers['X-Request-Date']; if(headers['Authorization']) rq += '\\nAuthorization: ' + headers['Authorization']; rq += '\\n\\n' + payload; reqEl.value = rq; } if(respEl){ respEl.value = ''; respEl.classList.add('hs-waiting'); } const res = await fetch(path, { method: 'POST', headers: headers, body: payload }); const txt = await res.text().catch(()=>('')); if(respEl){ respEl.classList.remove('hs-waiting'); respEl.value = txt || ('HTTP ' + res.status); } return {ok:res.ok, status: res.status, text: txt}; }catch(e){ const respEl = document.getElementById('hs_response'); if(respEl){ respEl.classList.remove('hs-waiting'); respEl.value = 'Errore: ' + e; } return {ok:false, status:0, text: String(e)}; } }"
 
-        "async function callKeepalive(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/keepalive'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
         "async function callGetConfig(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/getconfig'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
         "async function callGetImages(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/getimages'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
         "async function callGetTranslations(){ const caller = document.activeElement; const btn = (caller && caller.tagName==='BUTTON')?caller:null; const orig = btn?btn.innerHTML:null; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Inviando...'; } const resp = document.getElementById('hs_response'); try{ resp.value = 'Invio in corso...'; const r = await doPostLocal('/api/gettranslations'); resp.value = r.text || ('HTTP ' + r.status); }catch(e){ resp.value = 'Errore: ' + e; } finally{ resp.scrollTop = 0; if(btn){ btn.disabled=false; btn.innerHTML = orig; } } }"
@@ -2483,6 +2448,50 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
         "function clearResponse(){ try{ document.getElementById('hs_response').value = ''; }catch(e){} }"
 
         "</script>";
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
+esp_err_t api_index_page_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] GET /api (index)");
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "API Endpoints", NULL, true);
+
+    const char *body =
+        "<div class='container'><div class='card'><h2>📡 API Endpoints</h2>"
+        "<table style='width:100%;border-collapse:collapse'>"
+        "<tr><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>Method</th><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>URI</th><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>Description</th></tr>"
+        "<tr><td>GET</td><td><a href='/status'>/status</a></td><td>Device status JSON</td></tr>"
+        "<tr><td>GET</td><td><a href='/api/config'>/api/config</a></td><td>Current configuration</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/config/save'>/api/config/save</a></td><td>Save configuration</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/config/backup'>/api/config/backup</a></td><td>Backup configuration</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/config/reset'>/api/config/reset</a></td><td>Factory reset</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/ntp/sync'>/api/ntp/sync</a></td><td>Force NTP sync</td></tr>"
+        "<tr><td>GET</td><td><a href='/api/tasks'>/api/tasks</a></td><td>Tasks CSV</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/tasks/save'>/api/tasks/save</a></td><td>Save tasks</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/tasks/apply'>/api/tasks/apply</a></td><td>Apply tasks</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/test/*'>/api/test/*</a></td><td>Run internal tests</td></tr>"
+        "<tr><td>GET</td><td><a href='/api/logs'>/api/logs</a></td><td>Stored logs</td></tr>"
+        "<tr><td>GET</td><td><a href='/api/logs/levels'>/api/logs/levels</a></td><td>Log levels</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/logs/level'>/api/logs/level</a></td><td>Set log level</td></tr>"
+        "<tr><td>GET</td><td><a href='/api/debug/usb/enumerate'>/api/debug/usb/enumerate</a></td><td>USB enumerate</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/debug/usb/restart'>/api/debug/usb/restart</a></td><td>Restart USB host</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/login'>/api/login</a></td><td>Authenticate (remote)</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/getconfig'>/api/getconfig</a></td><td>Get remote config</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/getimages'>/api/getimages</a></td><td>Fetch images</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/gettranslations'>/api/gettranslations</a></td><td>Fetch translations</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/getfirmware'>/api/getfirmware</a></td><td>Fetch firmware</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/payment'>/api/payment</a></td><td>Payment request</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/paymentoffline'>/api/paymentoffline</a></td><td>Offline payment</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/serviceused'>/api/serviceused</a></td><td>Service used</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/getcustomers'>/api/getcustomers</a></td><td>Get customers</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/getoperators'>/api/getoperators</a></td><td>Get operators</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/activity'>/api/activity</a></td><td>Activity</td></tr>"
+        "<tr><td>POST</td><td><a href='/api/keepalive'>/api/keepalive</a></td><td>Keepalive</td></tr>"
+        "</table></div></div></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
@@ -2528,6 +2537,14 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     
     httpd_uri_t uri_logs = {.uri = "/logs", .method = HTTP_GET, .handler = logs_page_handler};
     httpd_register_uri_handler(server, &uri_logs);
+
+    httpd_uri_t uri_api_index = {.uri = "/api", .method = HTTP_GET, .handler = api_index_page_handler};
+    httpd_register_uri_handler(server, &uri_api_index);
+    ESP_LOGI(TAG, "Registered GET /api (index)");
+
+    httpd_uri_t uri_api_index_slash = {.uri = "/api/", .method = HTTP_GET, .handler = api_index_page_handler};
+    httpd_register_uri_handler(server, &uri_api_index_slash);
+    ESP_LOGI(TAG, "Registered GET /api/ (index)");
 
     // API
     httpd_uri_t uri_api_get = {.uri = "/api/config", .method = HTTP_GET, .handler = api_config_get};

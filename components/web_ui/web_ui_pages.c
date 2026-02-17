@@ -68,6 +68,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
         "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
         "<a href='/httpservices' class='btn-link'><span class='icon'>🔐</span><span>HTTP Services</span></a>"
+        "<a href='/api' class='btn-link'><span class='icon'>🔗</span><span>API Endpoints</span></a>"
         "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
@@ -80,6 +81,51 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "</div>"
         "</div></body></html>";
 
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
+/* Pagina: API Endpoints - elenco link alle API */
+esp_err_t api_index_page_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "[C] GET /api (index)");
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "API Endpoints", NULL, true);
+    const char *body =
+        "<div class='container'><div class='card'><h2>📡 API Endpoints</h2>"
+        "<table style='width:100%;border-collapse:collapse'>"
+        "<tr><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>Method</th><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>URI</th><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>Description</th></tr>"
+        "<tr><td>GET</td><td><a href='/status'>/status</a></td><td>Device status JSON</td></tr>"
+        "<tr><td>GET</td><td><a href='/api/config'>/api/config</a></td><td>Current configuration</td></tr>"
+        "<tr><td>POST</td><td>/api/config/save</td><td>Save configuration</td></tr>"
+        "<tr><td>POST</td><td>/api/config/backup</td><td>Backup configuration</td></tr>"
+        "<tr><td>POST</td><td>/api/config/reset</td><td>Factory reset</td></tr>"
+        "<tr><td>POST</td><td>/api/ntp/sync</td><td>Force NTP sync</td></tr>"
+        "<tr><td>GET</td><td>/api/tasks</td><td>Tasks CSV</td></tr>"
+        "<tr><td>POST</td><td>/api/tasks/save</td><td>Save tasks</td></tr>"
+        "<tr><td>POST</td><td>/api/tasks/apply</td><td>Apply tasks</td></tr>"
+        "<tr><td>GET</td><td>/api/test/endpoints</td><td>Catalogo endpoint test (legacy + REST)</td></tr>"
+        "<tr><td>POST</td><td>/api/test/*</td><td>Run internal tests (legacy: /api/test/&lt;token&gt;)</td></tr>"
+        "<tr><td>POST</td><td>/api/test/&lt;group&gt;/&lt;action&gt;</td><td>Run internal tests (REST: es. /api/test/led/start)</td></tr>"
+        "<tr><td>GET</td><td>/api/logs</td><td>Stored logs</td></tr>"
+        "<tr><td>GET</td><td>/api/logs/levels</td><td>Log levels</td></tr>"
+        "<tr><td>POST</td><td>/api/logs/level</td><td>Set log level</td></tr>"
+        "<tr><td>GET</td><td>/api/debug/usb/enumerate</td><td>USB enumerate</td></tr>"
+        "<tr><td>POST</td><td>/api/debug/usb/restart</td><td>Restart USB host</td></tr>"
+        "<tr><td>POST</td><td>/api/login</td><td>Authenticate (remote)</td></tr>"
+        "<tr><td>POST</td><td>/api/getconfig</td><td>Get remote config</td></tr>"
+        "<tr><td>POST</td><td>/api/getimages</td><td>Fetch images</td></tr>"
+        "<tr><td>POST</td><td>/api/gettranslations</td><td>Fetch translations</td></tr>"
+        "<tr><td>POST</td><td>/api/getfirmware</td><td>Fetch firmware</td></tr>"
+        "<tr><td>POST</td><td>/api/payment</td><td>Payment request</td></tr>"
+        "<tr><td>POST</td><td>/api/paymentoffline</td><td>Offline payment</td></tr>"
+        "<tr><td>POST</td><td>/api/serviceused</td><td>Service used</td></tr>"
+        "<tr><td>POST</td><td>/api/getcustomers</td><td>Get customers</td></tr>"
+        "<tr><td>POST</td><td>/api/getoperators</td><td>Get operators</td></tr>"
+        "<tr><td>POST</td><td>/api/activity</td><td>Activity</td></tr>"
+        "<tr><td>POST</td><td>/api/keepalive</td><td>Keepalive</td></tr>"
+        "</table></div></div></body></html>";
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;

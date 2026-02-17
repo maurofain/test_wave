@@ -158,12 +158,14 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "cctalk_enabled", cfg->sensors.cctalk_enabled);
     cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
     cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
     cJSON_AddBoolToObject(sensors, "pwm2_enabled", cfg->sensors.pwm2_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors);
 
     cJSON *display = cJSON_CreateObject();
+    cJSON_AddBoolToObject(display, "enabled", cfg->display.enabled);
     cJSON_AddNumberToObject(display, "lcd_brightness", cfg->display.lcd_brightness);
     cJSON_AddItemToObject(root, "display", display);
 
@@ -264,12 +266,14 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "cctalk_enabled", cfg->sensors.cctalk_enabled);
     cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
     cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
     cJSON_AddBoolToObject(sensors, "pwm2_enabled", cfg->sensors.pwm2_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors);
 
     cJSON *display = cJSON_CreateObject();
+    cJSON_AddBoolToObject(display, "enabled", cfg->display.enabled);
     cJSON_AddNumberToObject(display, "lcd_brightness", cfg->display.lcd_brightness);
     cJSON_AddItemToObject(root, "display", display);
 
@@ -393,6 +397,7 @@ esp_err_t api_config_save(httpd_req_t *req)
         cfg->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled"));
         cfg->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled"));
         cfg->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
+        cfg->sensors.cctalk_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "cctalk_enabled"));
         cfg->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled"));
         cfg->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
         cfg->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled"));
@@ -416,7 +421,15 @@ esp_err_t api_config_save(httpd_req_t *req)
 #endif
         }
         cJSON *lcd_b = cJSON_GetObjectItem(display_obj, "lcd_brightness");
-        if (lcd_b) cfg->display.lcd_brightness = (uint8_t)lcd_b->valueint;
+        if (lcd_b) {
+            int bright = lcd_b->valueint;
+            if (bright < 0) bright = 0;
+            if (bright > 100) bright = 100;
+            cfg->display.lcd_brightness = (uint8_t)bright;
+        }
+        if (cfg->display.enabled) {
+            bsp_display_brightness_set(cfg->display.lcd_brightness);
+        }
     }
 
     cJSON_Delete(root);
@@ -516,11 +529,48 @@ esp_err_t api_tasks_apply(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t api_test_endpoints_handler(httpd_req_t *req)
+{
+    static const char *json =
+        "{"
+        "\"note\":\"Supportati sia token legacy (/api/test/led_start) sia endpoint REST (/api/test/led/start)\","
+        "\"legacy_base\":\"/api/test/<token>\","
+        "\"rest_base\":\"/api/test/<group>/<action>\","
+        "\"tokens\":["
+        "\"led_start\",\"led_stop\",\"led_set\",\"led_bright\","
+        "\"pwm1_start\",\"pwm1_stop\",\"pwm2_start\",\"pwm2_stop\",\"pwm_set\","
+        "\"ioexp_start\",\"ioexp_stop\",\"io_get\",\"io_set\","
+        "\"rs232_start\",\"rs232_stop\",\"rs485_start\",\"rs485_stop\",\"cctalk_start\",\"cctalk_stop\","
+        "\"mdb_start\",\"mdb_stop\","
+        "\"serial_send\",\"serial_monitor\",\"serial_clear\","
+        "\"gpio_get\",\"gpio_set\","
+        "\"sht_read\","
+        "\"sd_init\",\"sd_list\",\"sd_format\","
+        "\"scanner_setup\",\"scanner_state\",\"scanner_on\",\"scanner_off\","
+        "\"display_bright\",\"eeprom\""
+        "]"
+        "}";
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+}
+
 /* --- Generic /api/test handler (routing) --- */
 esp_err_t api_test_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST %s", req->uri);
-    const char *test_name = req->uri + strlen("/api/test/");
+    const char *raw_test_name = req->uri + strlen("/api/test/");
+    char normalized_test_name[96] = {0};
+    size_t write_idx = 0;
+
+    while (*raw_test_name == '/') raw_test_name++;
+    for (size_t i = 0; raw_test_name[i] != '\0' && raw_test_name[i] != '?' && write_idx < sizeof(normalized_test_name) - 1; ++i) {
+        char current = raw_test_name[i];
+        normalized_test_name[write_idx++] = (current == '/' || current == '-') ? '_' : current;
+    }
+    normalized_test_name[write_idx] = '\0';
+
+    const char *test_name = normalized_test_name;
     char response[256] = {0};
 
     // --- TEST LED ---
@@ -717,6 +767,17 @@ esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test RS232 fermato\"}");
     }
 
+    else if (strcmp(test_name, "cctalk_start") == 0) {
+        if (!s_rs232_test_handle) {
+            rs232_init();
+            xTaskCreate(uart_test_task, "cctalk_test", 2048, (void*)CONFIG_APP_RS232_UART_PORT, 5, &s_rs232_test_handle);
+            snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk avviato\"}");
+        } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
+    } else if (strcmp(test_name, "cctalk_stop") == 0) {
+        if (s_rs232_test_handle) { vTaskDelete(s_rs232_test_handle); s_rs232_test_handle = NULL; }
+        snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk fermato\"}");
+    }
+
     else if (strcmp(test_name, "rs485_start") == 0) {
         if (!s_rs485_test_handle) {
             rs485_init();
@@ -855,6 +916,7 @@ esp_err_t api_test_handler(httpd_req_t *req)
         cJSON_AddStringToObject(root, "rs232", serial_test_get_monitor(CONFIG_APP_RS232_UART_PORT));
         cJSON_AddStringToObject(root, "rs485", serial_test_get_monitor(CONFIG_APP_RS485_UART_PORT));
         cJSON_AddStringToObject(root, "mdb", serial_test_get_monitor(CONFIG_APP_MDB_UART_PORT));
+        cJSON_AddStringToObject(root, "cctalk", serial_test_get_cctalk_monitor());
         char *json_out = cJSON_PrintUnformatted(root);
         httpd_resp_set_type(req, "application/json");
         httpd_resp_send(req, json_out, strlen(json_out));

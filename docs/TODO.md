@@ -57,7 +57,13 @@
 27. ✅ interfaccia web: implementare in /config l'abilitazione e la configurazione dello scanner. Nella pagina /test aggiungere la visualizzazione delle letture e i tasti 'Scanner ON' e 'Scenner OFF'. nella pagina /tasks verificare che tutti i task siano rappresentati.
 28. ✅ Implementare l'esclusione del display MIPI e di LVGL per uso senza interfaccia grafica. L'abilitazione va messaa nella pagina /config e se abilitato deve mostrare lo stato di attivazione di display e touch e se attivi la loro operatività
 29. ✅ nella pagina di visulzzazione del LOG remoto inserici un filtraggio in base a una stringa che verrà compilata in un textbox e attivata trami un pbutto' Filtra'
-- ✅ CCtalk: seriale attivata + task di background (driver in `components/cctalk`, UART = CONFIG_APP_RS232_UART_PORT, baud 4800 — TX=GPIO20, RX=GPIO21)
+30. ✅ CCtalk: seriale attivata + task di background (driver in `components/cctalk`, UART = CONFIG_APP_RS232_UART_PORT, baud 4800 — TX=GPIO20, RX=GP1.  ✅ CCtalk integrato in `/config` e `/test`
+31. ✅ in /httpservices usa per le sezioni la stessa impostazione grafica usata in /config con sezioni riquadrate e sottolineate
+32. ✅ riorganizza la pagina /httpservices : metti in cima 2 textbox : richiesta e pi risposta: Richiesta mostra il messaggio post inviato in un a delle sezioni e in Risposta la risposta della chiamata. Compila  questi campi azzerandoli ad ogni richiesta. All pressione del send cambia lo sfondo di risposta fino a che la rioposta non arriva. Togli la text Token e mostra il token nella risposta, togli 'test token' e l'area hs_status
+33. ✅ Impostare vscode per eseguire il flash via OTA (task: `Flash OTA (upload bin via /ota/upload)`, `Flash OTA (trigger URL via /ota)`)
+34. ✅ Controllo luminosità schermo implementato e collegato a /config (live update + persistenza)
+35. ✅ Riportare lo schermo in verticale (video portrait)
+36. ✅ Clear monitor seriale: pulizia aree testo + formato output (senza TX/RX testuale, TEXT compatto, HEX con prefisso '.')
 
 # ⏸️ RITARDATI
 
@@ -69,15 +75,58 @@
 
 - Factory 
 
- 1. CCtals da integrare in /config e /test
- 2. Creare una FSM per la gestione del ciclo operativo della macchina
- 3. il tasto CLEAR dei monitor non pulisce le aree di testo, togliere le indicazioni TX e RX>, c'è già il colore. Non inserire spazi tra i caratteri in modo TEXT. In modo HEX mettere un . prima del codice esadecimale.
- 4. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate
- 5. Controllo luminosità schermo: implementarla e collagarla nella pagina web /config
- 6. riportare lo schermo in verticale 
- 7. in /httpservices usa per le sezioni la stessa impostazione grafica usata in /config con sezioni riquadrate e sottolineate
- 8. la chiamata Login non funziona : memorizza nella configurazione serial e password, aggioungi l'editazione di questi 2 dati in cima /httservices e verifica la composizione dei messaggi considerando che questo è il formato completo 
- 9. riorganizza la pagina /httpservices : metti in cima 2 textbox : richiesta e pi risposta: Richiesta mostra il messaggio post inviato in un a delle sezioni e in Risposta la risposta della chiamata. Compila  questi campi azzerandoli ad ogni richiesta. All pressione del send cambia lo sfondo di risposta fino a che la rioposta non arriva. Togli la text Token e mostra il token nella risposta, togli 'test token' e l'area hs_status
+ 0. Fare valutazione per le funzioni di caricamento da remoto su chiamata degli artei immagini, tabelle testi e del firmware stesso. Considerare che questi contenuti possono essere salvarti sia in SPIFFS che in SD
+ 1. Creare una FSM per la gestione del ciclo operativo della macchina
+ 2. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
+ 3. Piano test endpoint e funzioni (da riprendere)
+
+    - Strutturare i test in 4 livelli:
+      - Smoke: endpoint raggiungibile, status code atteso, JSON valido.
+      - Contract: campi obbligatori e tipi minimi della risposta.
+      - Flow: sequenze operative (es. `sd_init -> sd_list`, `serial_send -> serial_monitor -> serial_clear`, `config/save -> config/get`).
+      - Hardware-aware: aspettative diverse in base a periferica abilitata/disabilitata o assente.
+
+    - Organizzazione consigliata:
+      - `tests/smoke`, `tests/contract`, `tests/flow`, `tests/hw`.
+      - File dati `tests/endpoints.yaml` con `method`, `path`, `payload`, `expected_status`, `required_keys`.
+      - Fixture comuni in `conftest.py`: `base_url`, timeout, retry, helper JSON.
+
+    - Regole pratiche:
+      - Per endpoint mutativi prevedere sempre rollback/ripristino stato.
+      - Separare test rapidi (default) da test hardware/lenti (`pytest -m hw` o `-m slow`).
+      - Loggare richiesta/risposta/tempo per facilitare diagnosi.
+
+    - Primo MVP test:
+      - Smoke completo di tutte le route `/api/test/*` e `/api/config/*` usate dalla UI.
+      - 3 flow critici: SD, seriale unificato, backup config su SD.
+      - Report `junit.xml` + riepilogo markdown.
+ 4. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
+
+    - Autenticazione/token
+      - Generare sempre header `Date` runtime (ora è hardcoded in `http_services.c`).
+      - Gestire scadenza token + relogin automatico su `401/403` e retry della request originale.
+      - Evitare esposizione token nei log verbosi/UI (mascheramento token in output).
+
+    - Sicurezza trasporto
+      - Completare supporto HTTPS con validazione certificato (ora presente `skip_cert_common_name_check = true`).
+      - Aggiungere opzione pinning/cert bundle e policy per ambienti test/prod.
+
+    - Allineamento API/spec
+      - Uniformare endpoint attività: codice usa `/api/activity`, specifica indica `/api/deviceactivity`.
+      - Verificare e allineare payload minimi richiesti per `keepalive`, `payment`, `serviceused`, `paymentoffline`.
+
+    - Affidabilità operativa
+      - Implementare coda persistente offline (SPIFFS/SD) per POST fallite con retry/backoff configurabile.
+      - Distinguere policy errori `4xx`/`5xx`/timeout e gestione `Retry-After` (429).
+      - Aggiungere task periodico per `keepalive` (non solo invocazione manuale/proxy).
+
+    - Risorse remote (config/images/translations/firmware)
+      - Implementare download file reale e salvataggio su SD/SPIFFS (oggi c’è proxy JSON della risposta).
+      - Per firmware: validazione (checksum/versione) + integrazione con flusso OTA locale.
+
+    - Osservabilità e test
+      - Aggiungere metriche minime (`last_ok`, `last_err`, `queue_len`, `last_status_code`) esposte via API/UI.
+      - Preparare test contract/flow dedicati alle route remote con mock server.
  ```
 
 > POST /api/login HTTP/1.1

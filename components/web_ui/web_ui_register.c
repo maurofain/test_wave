@@ -37,6 +37,13 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     
     httpd_uri_t uri_httpservices = {.uri = "/httpservices", .method = HTTP_GET, .handler = httpservices_page_handler};
     httpd_register_uri_handler(server, &uri_httpservices);
+
+    httpd_uri_t uri_api_index = {.uri = "/api", .method = HTTP_GET, .handler = api_index_page_handler};
+    httpd_register_uri_handler(server, &uri_api_index);
+    ESP_LOGI(TAG, "Registered GET /api (index)");
+    httpd_uri_t uri_api_index_slash = {.uri = "/api/", .method = HTTP_GET, .handler = api_index_page_handler};
+    httpd_register_uri_handler(server, &uri_api_index_slash);
+    ESP_LOGI(TAG, "Registered GET /api/ (index)");
     
     httpd_uri_t uri_logs = {.uri = "/logs", .method = HTTP_GET, .handler = logs_page_handler};
     httpd_register_uri_handler(server, &uri_logs);
@@ -59,6 +66,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_register_uri_handler(server, &uri_api_tasks_save);
     httpd_uri_t uri_api_tasks_apply = {.uri = "/api/tasks/apply", .method = HTTP_POST, .handler = api_tasks_apply};
     httpd_register_uri_handler(server, &uri_api_tasks_apply);
+
+    httpd_uri_t uri_api_test_endpoints = {.uri = "/api/test/endpoints", .method = HTTP_GET, .handler = api_test_endpoints_handler};
+    httpd_register_uri_handler(server, &uri_api_test_endpoints);
 
     httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
     httpd_register_uri_handler(server, &uri_api_test);

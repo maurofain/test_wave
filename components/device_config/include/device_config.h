@@ -38,6 +38,7 @@ typedef struct {
     bool rs232_enabled;         ///< UART RS232
     bool rs485_enabled;         ///< UART RS485
     bool mdb_enabled;           ///< UART MDB
+    bool cctalk_enabled;        ///< CCtalk (uses same UART as RS232)
     bool pwm1_enabled;          ///< PWM1
     bool pwm2_enabled;          ///< PWM2
     bool sd_card_enabled;       ///< SD Card

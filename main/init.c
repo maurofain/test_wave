@@ -63,9 +63,9 @@ static const char *TAG = "INIT";
  * Forzatura temporanea: disabilita SEMPRE la parte video (LVGL + LCD + touch + backlight).
  *
  * Impostare a 1 per modalità headless forzata, indipendentemente da /config.
- * Impostare a 0 per tornare al comportamento normale basato su cfg->display.enabled.
+ * Impostare a 0 per comportamento normale basato su cfg->display.enabled.
  */
-#define FORCE_VIDEO_DISABLED 1
+#define FORCE_VIDEO_DISABLED 0
 
 static esp_netif_t *s_netif_ap;
 static esp_netif_t *s_netif_sta;
@@ -552,10 +552,8 @@ static void update_time_display(lv_timer_t *timer)
     strftime(time_str, sizeof(time_str), "%d/%m/%Y %H:%M:%S", &timeinfo);
     lv_label_set_text(time_label, time_str);
 
-    // Rotazione del widget per layout orizzontale senza ruotare il display
-    lv_obj_set_style_transform_angle(time_label, 900, LV_PART_MAIN);
-    lv_obj_set_style_transform_pivot_x(time_label, lv_obj_get_width(time_label) / 2, LV_PART_MAIN);
-    lv_obj_set_style_transform_pivot_y(time_label, lv_obj_get_height(time_label) / 2, LV_PART_MAIN);
+    // Layout verticale: nessuna rotazione artificiale del widget
+    lv_obj_set_style_transform_angle(time_label, 0, LV_PART_MAIN);
     lv_obj_center(time_label);
 }
 
@@ -609,6 +607,9 @@ static esp_err_t init_display_lvgl_minimal(void)
     {
         return ESP_FAIL;
     }
+
+    // Forza orientamento verticale (portrait)
+    bsp_display_rotate(disp, LV_DISPLAY_ROTATION_0);
 
     ESP_LOGI(TAG, "Heap after LVGL init:");
     ESP_LOGI(TAG, "  INTERNAL free: %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL));

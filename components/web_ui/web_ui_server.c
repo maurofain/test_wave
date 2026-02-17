@@ -16,7 +16,7 @@ esp_err_t web_ui_init(void)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = CONFIG_APP_HTTP_PORT;
-    config.max_uri_handlers = 30;  // Aumentato da 20 a 30 per supportare tutti gli endpoint
+    config.max_uri_handlers = 64;  // aumentato per ospitare tutte le URI + future estensioni
     config.stack_size = 8192;
     config.lru_purge_enable = true;
     config.uri_match_fn = httpd_uri_match_wildcard;

@@ -30,6 +30,27 @@ HTTP endpoints:
 - `GET /status` → JSON with running/boot partition and IPs (AP/STA/Ethernet).
 - `POST /ota?url=<http(s)://...>` → triggers OTA to `ota_0` and reboots on success. If no query is provided, uses `APP_OTA_DEFAULT_URL` when set.
 
+### Test API (legacy + REST)
+
+`/api/test/*` supporta due formati equivalenti:
+- Legacy token: `/api/test/<token>` (es. `/api/test/led_start`)
+- REST path: `/api/test/<group>/<action>` (es. `/api/test/led/start`)
+
+Catalogo endpoint disponibili:
+- `GET /api/test/endpoints`
+
+Esempi rapidi:
+
+| Method | Endpoint | Body (JSON) | Risposta attesa (esempio) |
+|---|---|---|---|
+| GET | `/api/test/endpoints` | - | `{"tokens":[...],"legacy_base":"/api/test/<token>","rest_base":"/api/test/<group>/<action>"}` |
+| POST | `/api/test/led/start` | `{}` | `{"message":"Test LED avviato"}` |
+| POST | `/api/test/pwm1/start` | `{}` | `{"message":"Test PWM1 avviato"}` |
+| POST | `/api/test/ioexp/start` | `{}` | `{"message":"Test I/O Expander avviato (1Hz)"}` |
+| POST | `/api/test/serial/send` | `{"port":"rs232","data":"A5 C0 6D","mode":"HEX"}` | `{"status":"ok","message":"Inviato su rs232"}` |
+| POST | `/api/test/serial/monitor` | `{}` | `{"rs232":"...","rs485":"...","mdb":"...","cctalk":"..."}` |
+| POST | `/api/test/serial/clear` | `{"port":"rs232"}` | `{"status":"ok"}` |
+
 ## Build
 1. Install ESP-IDF (v5.1+ recommended for ESP32-P4) and set `IDF_PATH`/`idf.py` in PATH.
 2. Configure (adjust pins if needed):
@@ -42,6 +63,35 @@ HTTP endpoints:
    idf.py build
    idf.py -p <PORT> flash monitor
    ```
+
+## Flash OTA da VS Code
+
+Sono disponibili task VS Code per eseguire il flash via rete senza porta seriale.
+
+### Prerequisiti
+- Device raggiungibile via HTTP (es. AP `factory-setup`, IP `192.168.4.1`).
+- Firmware già compilato (`build/test_wave.bin` presente).
+- Endpoint OTA attivi nel firmware (`POST /ota/upload` e `POST /ota?url=...`).
+
+### Metodo 1: Upload diretto binario
+1. In VS Code apri `Run Task`.
+2. Esegui `Flash OTA (upload bin via /ota/upload)`.
+3. Inserisci `otaDeviceHost` (default `192.168.4.1`).
+
+Il task invia direttamente `build/test_wave.bin` al device tramite multipart upload.
+
+### Metodo 2: Trigger OTA da URL
+1. Pubblica `test_wave.bin` su un server HTTP raggiungibile dal device.
+2. In VS Code esegui `Flash OTA (trigger URL via /ota)`.
+3. Inserisci:
+   - `otaDeviceHost` (host del device)
+   - `otaUrl` (URL completo del firmware, es. `http://192.168.4.2:8000/test_wave.bin`)
+
+Il task chiama `POST /ota?url=<firmware_url>` e il device scarica il firmware in autonomia.
+
+### Task utili collegati
+- `Build (idfc -b)` per generare il binario prima dell'OTA.
+- `Monitor (idf.py monitor)` se vuoi verificare log e riavvio via seriale.
 
 ## Notes
 - WS2812 uses the RMT-based led_strip helper and blinks the first LED to indicate the app is alive.

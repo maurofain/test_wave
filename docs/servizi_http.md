@@ -2,6 +2,37 @@
 
 Richiesta token per chiamate successive 
 
+## Schema di autenticazione — ottenimento dell'access_token 🔐
+
+- Header richiesti
+  - `Content-Type: application/json`
+  - `Date: <ISO8601 con microsecondi e offset>` (es. `2026-01-23T13:25:13.218763+01:00`)
+
+- Corpo (POST /api/login)
+  - JSON: `{"serial":"<serial>","password":"<md5>"}`
+  - `password` è tipicamente `MD5(MMYYYYdd + serial)` ma il terminale può memorizzare un MD5 statico in configurazione; il server accetta il valore memorizzato.
+
+- Risposta
+  - 200 OK con JSON: `{ "access_token": "<JWT>" }`
+  - Il `access_token` va usato nelle richieste successive con header `Authorization: Bearer <access_token>`.
+
+- Note implementative
+  - Il server può rispondere con `Transfer-Encoding: chunked` oppure con `Content-Length` valido; il client deve raccogliere i dati dall'evento `HTTP_EVENT_ON_DATA` o leggere il buffer interno dopo `esp_http_client_perform()`.
+  - Inviare sempre `Date` nel formato ISO usato dal firmware; il server può validare la data/time-drift.
+  - Per evitare compressione, il client può usare `Accept-Encoding: identity`.
+
+- Esempi
+  - cURL (login):
+
+    curl -H 'Content-Type: application/json' \
+         -H 'Date: 2026-01-23T13:25:13.218763+01:00' \
+         -d '{"serial":"AD-34-DFG-333","password":"c1ef6429c5e0f753ff24a114de6ee7d4"}' \
+         http://195.231.69.227:5556/api/login
+
+  - cURL (richiesta protetta):
+
+    curl -H 'Authorization: Bearer <access_token>' http://195.231.69.227:5556/api/getconfig
+
 ```
 > POST /api/login HTTP/1.1
 > Host: 195.231.69.227:5556

@@ -23,6 +23,12 @@ static const char *TAG = "HTTP_SERVICES";
 // Global variable to store the token
 char g_auth_token[256] = {0};
 
+// Temporary implementation of validate_token
+bool validate_token(const char *token) {
+    // Add actual token validation logic here
+    return token != NULL && strlen(token) > 0;
+}
+
 /* Helper: compute MD5 hex (lowercase) of input */
 static void md5_hex(const unsigned char *input, size_t ilen, char *out_hex, size_t out_hex_len)
 {
@@ -146,6 +152,9 @@ static void webui_log_chunked(const char *level, const char *tag, const char *la
 }
 #endif
 
+/* small accumulator type used by the http client event handler */
+typedef struct { char *buf; size_t len; size_t cap; } http_acc_t;
+
 /* Helper: log incoming httpd request (method/uri, selected headers and body) */
 static void log_httpd_request(httpd_req_t *req, const char *body)
 {
@@ -213,8 +222,35 @@ static void log_httpd_request(httpd_req_t *req, const char *body)
 
 /* --- Proxy implementations forwarding to remote server (uses device_config.server.url + credentials) --- */
 
-/* Helper: perform HTTP POST to remote server (returns dynamically allocated response in out_resp) */
-static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header, char **out_resp, int *out_status)
+/* HTTP client event handler accumulator: collects HTTP_EVENT_ON_DATA into a dynamic buffer
+   so responses delivered via the event path (chunked or already-copied-perform) are not lost.
+*/
+static esp_err_t http_client_event_accumulator(esp_http_client_event_t *evt)
+{
+    http_acc_t *acc = (http_acc_t *)evt->user_data;
+    switch (evt->event_id) {
+    case HTTP_EVENT_ON_DATA:
+        if (!acc || evt->data_len <= 0) break;
+        if (acc->len + evt->data_len + 1 > acc->cap) {
+            size_t newcap = acc->cap ? acc->cap * 2 : 2048;
+            while (newcap < acc->len + evt->data_len + 1) newcap *= 2;
+            char *p = realloc(acc->buf, newcap);
+            if (!p) { free(acc->buf); acc->buf = NULL; acc->len = acc->cap = 0; return ESP_ERR_NO_MEM; }
+            acc->buf = p; acc->cap = newcap;
+        }
+        memcpy(acc->buf + acc->len, evt->data, evt->data_len);
+        acc->len += evt->data_len;
+        acc->buf[acc->len] = '\0';
+        break;
+    default:
+        break;
+    }
+    return ESP_OK;
+}
+
+/* Helper: perform HTTP POST to remote server (returns dynamically allocated response in out_resp)
+   and reports the number of bytes read via out_len (may differ from strlen when binary/NULs are present). */
+static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header, char **out_resp, int *out_status, size_t *out_len)
 {
     if (!remote_path) return ESP_ERR_INVALID_ARG;
     device_config_t *cfg = device_config_get();
@@ -229,11 +265,20 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
     else if (remote_path[0] == '/') snprintf(url, sizeof(url), "%s%s", base, remote_path);
     else snprintf(url, sizeof(url), "%s/%s", base, remote_path);
 
+    /* accumulator used by event handler to collect ON_DATA events */
+    http_acc_t acc = { .buf = NULL, .len = 0, .cap = 0 };
+
     esp_http_client_config_t cfg_http = {
         .url = url,
         .timeout_ms = 15000,
-        .skip_cert_common_name_check = true
+        .skip_cert_common_name_check = true,
+        /* increase internal buffers so large response headers (or many headers) fit */
+        .buffer_size = 8192,
+        .buffer_size_tx = 8192,
     };
+    /* attach event handler + user_data so esp_http_client_perform() delivers body via events */
+    cfg_http.event_handler = http_client_event_accumulator;
+    cfg_http.user_data = &acc;
 
     /* perform up to two attempts when we see incomplete/chunked errors */
     esp_err_t err = ESP_FAIL;
@@ -242,6 +287,11 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
     esp_http_client_handle_t client = NULL;
     /* diagnostic: server-reported content-length (set after perform) */
     long resp_content_len = -1;
+
+    /* response buffer that will be filled inside the attempt loop */
+    char *resp = NULL;
+    size_t total = 0;
+    bool use_fallback_headers = false;
 
     for (int attempt = 0; attempt < max_attempts; ++attempt) {
         if (client) {
@@ -255,15 +305,21 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 
         esp_http_client_set_method(client, HTTP_METHOD_POST);
 
-        /* only required headers for the remote server: Content-Type and Date */
+        /* only required headers for the remote server: Content-Type and Date
+           on fallback attempt we will also force Connection: close and Accept-Encoding: identity */
         const char hdr_content_type[40] = "application/json";
-
         esp_http_client_set_header(client, "Content-Type", hdr_content_type);
 
         char date_hdr[64] = "2026-01-23T13:25:13.218763+01:00";
         //format_iso8601_local_us_tz(date_hdr, sizeof(date_hdr));
         esp_http_client_set_header(client, "Date", date_hdr);
-                                                    
+
+        if (use_fallback_headers) {
+            esp_http_client_set_header(client, "Connection", "close");
+            esp_http_client_set_header(client, "Accept-Encoding", "identity");
+            ESP_LOGI(TAG, "Using fallback headers: Connection: close, Accept-Encoding: identity (attempt %d)", attempt + 1);
+        }
+
         char abuf[320] = {0};
         const char *hdr_authorization = NULL;
         if (auth_header && strlen(auth_header) > 0) {
@@ -312,12 +368,17 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 #endif
         }
 
-        /* perform */
+        /* perform (enable verbose http/tls logs briefly to help debug read failures) */
+        esp_log_level_set("esp_http_client", ESP_LOG_DEBUG);
+        esp_log_level_set("esp_tls", ESP_LOG_DEBUG);
         err = esp_http_client_perform(client);
         status = esp_http_client_get_status_code(client);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "esp_http_client_perform returned %s (attempt %d)", esp_err_to_name(err), attempt + 1);
         }
+        /* restore default levels (keep noise low) */
+        esp_log_level_set("esp_http_client", ESP_LOG_INFO);
+        esp_log_level_set("esp_tls", ESP_LOG_WARN);
 
         /* log response headers we care about (may help debug chunking issues).
            esp_http_client_get_header() returns a pointer to the client's internal header value — DO NOT free it. */
@@ -336,61 +397,111 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
         char clbuf[64]; snprintf(clbuf, sizeof(clbuf), "RESP reported Content-Length: %ld", resp_content_len); web_ui_add_log("INFO", TAG, clbuf);
 #endif
 
-        /* If we got an ESP_ERR_HTTP_INCOMPLETE_DATA and we still have retry attempts, try again */
-        if (err == ESP_ERR_HTTP_INCOMPLETE_DATA && attempt + 1 < max_attempts) {
-            ESP_LOGW(TAG, "Incomplete chunked data received — retrying (attempt %d)", attempt + 2);
-            continue;
+        /* If event-accumulator collected data during perform(), prefer it (covers chunked/on-data path
+           and cases where perform() already handed data to the internal event handler). */
+        if (acc.len > 0 && acc.buf) {
+            resp = acc.buf; /* transfer ownership to resp */
+            total = acc.len;
+            acc.buf = NULL;
+            ESP_LOGI(TAG, "Response collected via event handler: %u bytes", (unsigned)total);
+        } else {
+            /* read response (streaming, unknown length) */
+            char *tmp_resp = malloc(1);
+            if (!tmp_resp) { esp_http_client_cleanup(client); err = ESP_ERR_NO_MEM; break; }
+            tmp_resp[0] = '\0';
+            size_t tmp_total = 0;
+            char rbuf[512];
+            int rr = 0;
+            int chunk = 0;
+
+            /* first-pass read */
+            while ((rr = esp_http_client_read(client, rbuf, sizeof(rbuf))) > 0) {
+                ESP_LOGD(TAG, "esp_http_client_read chunk %d => %d bytes", chunk, rr);
+                if (chunk == 0) {
+                    int sample_n = rr < 128 ? rr : 128;
+                    char sample[129];
+                    memcpy(sample, rbuf, sample_n);
+                    sample[sample_n] = '\0';
+                    ESP_LOGD(TAG, "First RESP chunk sample: %s", sample);
+    #ifdef HTTP_SERVICES_LOG_TO_UI
+                    webui_log_chunked("DEBUG", TAG, "First RESP chunk", sample);
+    #endif
+                }
+                char *tmp = realloc(tmp_resp, tmp_total + rr + 1);
+                if (!tmp) { free(tmp_resp); tmp_resp = NULL; break; }
+                tmp_resp = tmp;
+                memcpy(tmp_resp + tmp_total, rbuf, rr);
+                tmp_total += rr;
+                tmp_resp[tmp_total] = '\0';
+                chunk++;
+            }
+            if (rr < 0) {
+                ESP_LOGW(TAG, "esp_http_client_read returned %d", rr);
+    #ifdef HTTP_SERVICES_LOG_TO_UI
+                char ebuf[64]; snprintf(ebuf, sizeof(ebuf), "esp_http_client_read error: %d", rr); web_ui_add_log("WARN", TAG, ebuf);
+    #endif
+            }
+
+            /* if we read nothing but the server reported a positive Content-Length, try a small read-retry loop
+               (some servers / network conditions can cause a race where body arrives shortly after perform()) */
+            if (tmp_total == 0 && resp_content_len > 0) {
+                ESP_LOGW(TAG, "No bytes read but server reports content-length=%ld — doing additional read retries", resp_content_len);
+                for (int rtry = 0; rtry < 3 && tmp_total == 0; ++rtry) {
+                    vTaskDelay(pdMS_TO_TICKS(100 * (rtry + 1)));
+                    ESP_LOGD(TAG, "Read-retry %d: attempting esp_http_client_read()", rtry + 1);
+                    while ((rr = esp_http_client_read(client, rbuf, sizeof(rbuf))) > 0) {
+                        ESP_LOGD(TAG, "esp_http_client_read(retry) chunk %d => %d bytes", chunk, rr);
+                        char *tmp = realloc(tmp_resp, tmp_total + rr + 1);
+                        if (!tmp) { free(tmp_resp); tmp_resp = NULL; break; }
+                        tmp_resp = tmp;
+                        memcpy(tmp_resp + tmp_total, rbuf, rr);
+                        tmp_total += rr;
+                        tmp_resp[tmp_total] = '\0';
+                        chunk++;
+                    }
+                    if (rr < 0) {
+                        ESP_LOGW(TAG, "esp_http_client_read (retry) returned %d", rr);
+                        break;
+                    }
+                }
+            }
+
+            /* Diagnostic: mismatch between reported content-length and bytes actually read */
+            if (resp_content_len >= 0 && (size_t)resp_content_len != tmp_total) {
+                ESP_LOGW(TAG, "Content-Length mismatch: server reported=%ld but client read=%u bytes", resp_content_len, (unsigned)tmp_total);
+    #ifdef HTTP_SERVICES_LOG_TO_UI
+                char mismatch[128]; snprintf(mismatch, sizeof(mismatch), "Content-Length mismatch: server=%ld client=%u", resp_content_len, (unsigned)tmp_total); web_ui_add_log("WARN", TAG, mismatch);
+    #endif
+                /* retry with fallback headers if we haven't tried them yet */
+                if (tmp_total == 0 && attempt + 1 < max_attempts && !use_fallback_headers) {
+                    ESP_LOGW(TAG, "Retrying with fallback headers because server reported a body but none was read (attempt %d)", attempt + 2);
+                    free(tmp_resp);
+                    tmp_resp = NULL;
+                    use_fallback_headers = true;
+                    esp_http_client_cleanup(client);
+                    client = NULL;
+                    vTaskDelay(pdMS_TO_TICKS(150));
+                    continue; /* next attempt will set Connection: close + Accept-Encoding: identity */
+                }
+            }
+
+            /* accept the response we read */
+            resp = tmp_resp;
+            total = tmp_total;
+
+            /* If we got an ESP_ERR_HTTP_INCOMPLETE_DATA and we still have retry attempts, try again */
+            if (err == ESP_ERR_HTTP_INCOMPLETE_DATA && attempt + 1 < max_attempts) {
+                ESP_LOGW(TAG, "Incomplete chunked data received — retrying (attempt %d)", attempt + 2);
+                if (resp) { free(resp); resp = NULL; total = 0; }
+                continue;
+            }
         }
 
-        /* otherwise break and read whatever is available (may be partial) */
+        /* otherwise break and use the data */
         break;
     }
 
     if (!client) return ESP_ERR_NO_MEM;
-
-    /* read response (streaming, unknown length) */
-    char *resp = malloc(1);
-    if (!resp) { esp_http_client_cleanup(client); return ESP_ERR_NO_MEM; }
-    resp[0] = '\0';
-    size_t total = 0;
-    char buf[512];
-    int r = 0;
-    int chunk = 0;
-    while ((r = esp_http_client_read(client, buf, sizeof(buf))) > 0) {
-        ESP_LOGD(TAG, "esp_http_client_read chunk %d => %d bytes", chunk, r);
-        /* log a short sample of the first chunk to help debugging */
-        if (chunk == 0) {
-            int sample_n = r < 128 ? r : 128;
-            char sample[129];
-            memcpy(sample, buf, sample_n);
-            sample[sample_n] = '\0';
-            ESP_LOGD(TAG, "First RESP chunk sample: %s", sample);
-#ifdef HTTP_SERVICES_LOG_TO_UI
-            webui_log_chunked("DEBUG", TAG, "First RESP chunk", sample);
-#endif
-        }
-        char *tmp = realloc(resp, total + r + 1);
-        if (!tmp) { free(resp); resp = NULL; break; }
-        resp = tmp;
-        memcpy(resp + total, buf, r);
-        total += r;
-        resp[total] = '\0';
-        chunk++;
-    }
-    if (r < 0) {
-        ESP_LOGW(TAG, "esp_http_client_read returned %d", r);
-#ifdef HTTP_SERVICES_LOG_TO_UI
-        char ebuf[64]; snprintf(ebuf, sizeof(ebuf), "esp_http_client_read error: %d", r); web_ui_add_log("WARN", TAG, ebuf);
-#endif
-    }
-
-    /* Diagnostic: mismatch between reported content-length and bytes actually read */
-    if (resp_content_len >= 0 && (size_t)resp_content_len != total) {
-        ESP_LOGW(TAG, "Content-Length mismatch: server reported=%ld but client read=%u bytes", resp_content_len, (unsigned)total);
-#ifdef HTTP_SERVICES_LOG_TO_UI
-        char mismatch[128]; snprintf(mismatch, sizeof(mismatch), "Content-Length mismatch: server=%ld client=%u", resp_content_len, (unsigned)total); web_ui_add_log("WARN", TAG, mismatch);
-#endif
-    }
 
     /* LOG: response summary */
     ESP_LOGI(TAG, "<<< HTTP RESP: status=%d content_len=%u", status, (unsigned)total);
@@ -424,6 +535,9 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
         err = ESP_OK;
     }
 
+    /* report length to caller so caller can forward exact byte count (handles embedded NULs/binary) */
+    if (out_len) *out_len = total;
+
     if (out_resp) *out_resp = resp; else if (resp) free(resp);
     if (out_status) *out_status = status;
     return err;
@@ -433,8 +547,29 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const char *override_body, bool override_with_config_credentials)
 {
     char *incoming_body = NULL;
+    
     if (!override_body) incoming_body = read_request_body(req);
     const char *body_to_send = override_body ? override_body : (incoming_body ? incoming_body : "{}");
+
+    /* Debug: log all input parameters for this forward_post call */
+    ESP_LOGI(TAG, "forward_post START: remote_path=%s override_with_config_credentials=%d override_body_present=%d req_uri=%s req_content_len=%d",
+             remote_path ? remote_path : "(null)",
+             override_with_config_credentials ? 1 : 0,
+             override_body ? 1 : 0,
+             req && req->uri ? req->uri : "(null)",
+             (int)(req ? req->content_len : 0));
+    ESP_LOGI(TAG, "forward_post: body_to_send_len=%u", (unsigned)(body_to_send ? strlen(body_to_send) : 0));
+    if (body_to_send && body_to_send[0] != '\0') {
+        const size_t SAMPLE = 128;
+        char sample[SAMPLE + 1];
+        size_t n = strlen(body_to_send) < SAMPLE ? strlen(body_to_send) : SAMPLE;
+        memcpy(sample, body_to_send, n);
+        sample[n] = '\0';
+        ESP_LOGD(TAG, "forward_post: body_to_send_sample: %s", sample);
+#ifdef HTTP_SERVICES_LOG_TO_UI
+        webui_log_chunked("DEBUG", TAG, "IN body_to_send (sample)", sample);
+#endif
+    }
 
     /* LOG incoming request */
     log_httpd_request(req, incoming_body);
@@ -446,6 +581,15 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
     if (auth_len > 0) {
         auth_hdr = malloc(auth_len + 1);
         if (auth_hdr) httpd_req_get_hdr_value_str(req, "Authorization", auth_hdr, auth_len + 1);
+    }
+
+    /* Debug: show whether Authorization header was provided */
+    ESP_LOGI(TAG, "forward_post: Authorization header length=%d", (int)auth_len);
+    if (auth_hdr && auth_hdr[0] != '\0') {
+        ESP_LOGD(TAG, "forward_post: Authorization header value: %s", auth_hdr);
+#ifdef HTTP_SERVICES_LOG_TO_UI
+        webui_log_chunked("DEBUG", TAG, "IN Authorization", auth_hdr);
+#endif
     }
 
     /* special case: if override_with_config_credentials == true, build login body from config */
@@ -464,7 +608,8 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
 
     char *remote_resp = NULL;
     int status = 0;
-    esp_err_t err = remote_post(remote_path, send_body, auth_hdr, &remote_resp, &status);
+    size_t remote_len = 0;
+    esp_err_t err = remote_post(remote_path, send_body, auth_hdr, &remote_resp, &status, &remote_len);
 
     if (auth_hdr) free(auth_hdr);
     if (incoming_body) free(incoming_body);
@@ -481,7 +626,11 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
         return httpd_resp_send(req, err_resp, strlen(err_resp));
     }
 
-    ESP_LOGI(TAG, "Forward to %s returned HTTP %d", remote_path, status);
+    ESP_LOGI(TAG, "Forward to %s returned HTTP %d (bytes_read=%u)", remote_path, status, (unsigned)remote_len);
+    if (remote_resp) ESP_LOGI(TAG, "forward_post: strlen(remote_resp)=%u", (unsigned)strlen(remote_resp));
+    if (remote_len != 0 && remote_resp && remote_len != strlen(remote_resp)) {
+        ESP_LOGW(TAG, "forward_post: byte-count != strlen(remote_resp) — forwarding exact byte count to client");
+    }
 
     /* on login, store access_token locally if provided */
     if (strcmp(remote_path, "/api/login") == 0 && remote_resp) {
@@ -501,7 +650,8 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
 
     httpd_resp_set_type(req, "application/json");
     if (remote_resp) {
-        httpd_resp_send(req, remote_resp, strlen(remote_resp));
+        size_t send_len = (remote_len > 0) ? remote_len : strlen(remote_resp);
+        httpd_resp_send(req, remote_resp, send_len);
         free(remote_resp);
     } else {
         httpd_resp_send(req, "{}", 2);
@@ -517,8 +667,126 @@ static esp_err_t api_login_post(httpd_req_t *req)
 
 static esp_err_t api_keepalive_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/keepalive -> proxy to remote server");
-    return forward_post(req, "/api/keepalive", NULL, false);
+    ESP_LOGI(TAG, "POST /api/keepalive -> processing request");
+
+    // Extract the Authorization header (dynamic length to support long JWT)
+    size_t auth_len = httpd_req_get_hdr_value_len(req, "Authorization");
+    if (auth_len == 0) {
+        ESP_LOGE(TAG, "Authorization header missing");
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Authorization header missing");
+        return ESP_FAIL;
+    }
+
+    char *auth_header = malloc(auth_len + 1);
+    if (!auth_header) {
+        ESP_LOGE(TAG, "OOM reading Authorization header");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    if (httpd_req_get_hdr_value_str(req, "Authorization", auth_header, auth_len + 1) != ESP_OK) {
+        free(auth_header);
+        ESP_LOGE(TAG, "Authorization header read failed");
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Authorization header missing");
+        return ESP_FAIL;
+    }
+
+    // Validate the token (example validation logic)
+    if (strncmp(auth_header, "Bearer ", 7) != 0 || strlen(auth_header) <= 7) {
+        free(auth_header);
+        ESP_LOGE(TAG, "Invalid Authorization header format");
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Invalid Authorization header");
+        return ESP_FAIL;
+    }
+
+    const char *token = auth_header + 7; // Skip "Bearer " prefix
+    if (!validate_token(token)) { // Assume validate_token is implemented elsewhere
+        free(auth_header);
+        ESP_LOGE(TAG, "Invalid or expired token");
+        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Invalid or expired token");
+        return ESP_FAIL;
+    }
+    free(auth_header);
+
+    // Buffer to store the incoming JSON payload
+    char content[256];
+    int content_len = httpd_req_recv(req, content, sizeof(content) - 1);
+    if (content_len <= 0) {
+        ESP_LOGE(TAG, "Failed to receive request payload");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive payload");
+        return ESP_FAIL;
+    }
+    content[content_len] = '\0'; // Null-terminate the received content
+
+    // Parse the JSON payload
+    cJSON *json = cJSON_Parse(content);
+    if (!json) {
+        ESP_LOGE(TAG, "Invalid JSON payload");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_FAIL;
+    }
+
+    // Extract fields from the JSON payload
+    const cJSON *status = cJSON_GetObjectItem(json, "status");
+    const cJSON *inputstates = cJSON_GetObjectItem(json, "inputstates");
+    const cJSON *outputstates = cJSON_GetObjectItem(json, "outputstates");
+    const cJSON *temperature = cJSON_GetObjectItem(json, "temperature");
+    const cJSON *humidity = cJSON_GetObjectItem(json, "humidity");
+    const cJSON *subdevices = cJSON_GetObjectItem(json, "subdevices");
+
+    if (!status || !cJSON_IsString(status) ||
+        !inputstates || !cJSON_IsString(inputstates) ||
+        !outputstates || !cJSON_IsString(outputstates) ||
+        !temperature || !cJSON_IsNumber(temperature) ||
+        !humidity || !cJSON_IsNumber(humidity) ||
+        !subdevices || !cJSON_IsArray(subdevices)) {
+        ESP_LOGE(TAG, "Missing or invalid fields in JSON payload");
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid fields in JSON");
+        return ESP_FAIL;
+    }
+
+    // Log the received data
+    ESP_LOGI(TAG, "Keepalive status: %s", status->valuestring);
+    ESP_LOGI(TAG, "Input states: %s", inputstates->valuestring);
+    ESP_LOGI(TAG, "Output states: %s", outputstates->valuestring);
+    ESP_LOGI(TAG, "Temperature: %d", temperature->valueint);
+    ESP_LOGI(TAG, "Humidity: %d", humidity->valueint);
+
+    cJSON *subdevice = NULL;
+    cJSON_ArrayForEach(subdevice, subdevices) {
+        const cJSON *code = cJSON_GetObjectItem(subdevice, "code");
+        const cJSON *sub_status = cJSON_GetObjectItem(subdevice, "status");
+        if (code && cJSON_IsString(code) && sub_status && cJSON_IsString(sub_status)) {
+            ESP_LOGI(TAG, "Subdevice code: %s, status: %s", code->valuestring, sub_status->valuestring);
+        }
+    }
+
+    // Create the response JSON
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddBoolToObject(response, "iserror", false);
+    cJSON_AddNumberToObject(response, "codeerror", 0);
+    cJSON_AddStringToObject(response, "deserror", "");
+    cJSON_AddStringToObject(response, "datetime", "2026-01-23T13:25:13.218763+01:00");
+
+    cJSON *activities = cJSON_AddArrayToObject(response, "activities");
+    cJSON *activity = cJSON_CreateObject();
+    cJSON_AddNumberToObject(activity, "activityid", 1);
+    cJSON_AddStringToObject(activity, "code", "example_activity");
+    cJSON_AddStringToObject(activity, "parameters", "example_parameters");
+    cJSON_AddItemToArray(activities, activity);
+
+    // Send the response
+    const char *response_str = cJSON_Print(response);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response_str, strlen(response_str));
+
+    // Clean up
+    cJSON_Delete(json);
+    cJSON_Delete(response);
+    free((void *)response_str);
+
+    return ESP_OK;
 }
 
 static esp_err_t api_getimages_post(httpd_req_t *req)
