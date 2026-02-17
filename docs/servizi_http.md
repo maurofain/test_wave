@@ -2,6 +2,24 @@
 
 Richiesta token per chiamate successive 
 
+```
+> POST /api/login HTTP/1.1
+> Host: 195.231.69.227:5556
+> Content-Type: application/json
+> Date: 2026-01-23T13:25:13.218763+01:00
+> User-Agent: insomnia/12.1.0
+> Accept: */*
+> Content-Length: 83
+
+| {
+|     "serial":"AD-34-DFG-333",
+|     "password":"c1ef6429c5e0f753ff24a114de6ee7d4"
+| }
+
+```
+
+
+
 Body
 
 {
@@ -28,7 +46,7 @@ Password = MD5(MMyyyydd + serial)
 | password | string   | password 		crittografata md5 |
 
 
- 
+
 
 Restituisce
 
@@ -39,12 +57,11 @@ Restituisce
 }
 
 
+
+
+
  
 
-
- 
-
-**api\keepalive - POST**
 
 Invio keepalive terminali 
 
@@ -82,7 +99,7 @@ Body
 | status       | string   | Stati 		dispositivo                      |
 
 
- 
+
 
 Restituisce
 
@@ -98,25 +115,28 @@ Restituisce
 | parameters | string            | parametri 		aggiuntivi         |
 
 
- 
 
-
- 
 
 
  
 
-**api\deviceactivity - POST**
+
+
+/* POST /api/deviceactivity - Device activity information */
+static esp_err_t api_deviceactivity_post(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "POST /api/deviceactivity");
+
+
 
 Invio da parte del terminale dello stato di esecuzione delle attività 
-
 |            | **Tipo** | **Note**                                             |
 | ---------- | -------- | ---------------------------------------------------- |
 | activityid | int      | Riferimento 		identificativo attività eseguita |
 | status     | string   | Stato 		dell’esecuzione                        |
 
 
- 
+
 
 Restituisce
 
@@ -127,7 +147,7 @@ Restituisce
 | deserror  | string   | descrizione 		errore           |
 
 
- 
+
 
 
  
@@ -150,7 +170,7 @@ Restituisce
 | path      | string               | percorso 		server ftp          |
 
 
- 
+
 
 **api\getconfig - POST**
 
@@ -170,7 +190,7 @@ Restituisce
 | path      | string               | percorso 		server ftp          |
 
 
- 
+
 
 **api\gettranslations - POST**
 
@@ -190,7 +210,7 @@ Restituisce
 | path      | string               | percorso 		server ftp          |
 
 
- 
+
 
 **api\getfirmware - POST**
 
@@ -243,7 +263,7 @@ Body
 | used         | bool              | utilizzato                                                   |
 
 
- 
+
 
 Restituisce
 
@@ -256,7 +276,7 @@ Restituisce
 | paymentid | int               | identificativo 		del pagamento inserito |
 
 
- 
+
 
 
  
@@ -277,7 +297,7 @@ Body
 | quantity | int               | quantità                          |
 
 
- 
+
 
 Restituisce
 
@@ -322,7 +342,7 @@ Body
 | used         | bool              | utilizzato                                                   |
 
 
- 
+
 
 Restituisce
 
@@ -335,7 +355,7 @@ Restituisce
 | paymentid | int               | identificativo 		del pagamento inserito |
 
 
- 
+
 
 
  
@@ -352,7 +372,7 @@ Body
 | Telephone | String   |                                                             |
 
 
- 
+
 
 Restituisce
 
@@ -372,7 +392,7 @@ Restituisce
 | new       | bool     | true: 		esiste ma non su questo impianto |
 
 
- 
+
 
 **api\getoperators – POST**   			
 
@@ -385,7 +405,7 @@ Body
 | Code | String   | Codice 		operatore – se  *  restituisce elenco completo |
 
 
- 
+
 
 Restituisce
 
@@ -403,13 +423,13 @@ Restituisce
 | opeativity | string   |                                      |
 
 
- 
 
-
- 
 
 
  
+
+
+
 
 **api\activity– POST**   			
 
@@ -426,7 +446,7 @@ Body
 | subactivity | string            | codice 		sotto attività                                |
 
 
- 
+
 
 Restituisce
 
@@ -437,13 +457,13 @@ Restituisce
 | deserror  | string   | descrizione 		errore           |
 
 
- 
 
-
- 
 
 
  
+
+
+
 
 **CODICE CLIENTE**
 
@@ -456,13 +476,13 @@ ULTIMI TRE CARATTERI DELL’ ANNO
 NUMERO DI SECONDI DALLA MEZZANOTTE
 
 
- 
 
-
- 
 
 
  
+
+
+
 
 
  

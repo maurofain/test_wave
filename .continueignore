@@ -1,0 +1,7 @@
+build/
+.cache/
+**/html/
+**/latex/
+*.elf
+*.bin
+*.map

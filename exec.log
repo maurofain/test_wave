@@ -6371,3 +6371,1481 @@ or
  python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_size 16MB --flash_freq 80m 0x2000 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/test_wave.bin 0xe7e000 build/ota_data_initial.bin 0xe80000 build/storage.bin
 or from the "/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build" directory
  python -m esptool --chip esp32p4 -b 460800 --before default_reset --after hard_reset write_flash "@flash_args"
+[0;33m--- esp-idf-monitor 1.9.0 on /dev/ttyACM0 115200[0m
+[0;33m--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H[0m
+Executing action: monitor
+Running idf_monitor in directory /home/mauro/Progetti/0.Clienti/MicroHard/test_wave
+Executing "/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python /home/mauro/esp/v5.5.2/esp-idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 1 --decode-panic backtrace /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/test_wave.elf /home/mauro/Progetti/0.Clienti/MicroHard/test_wave/build/bootloader/bootloader.elf -m '/home/mauro/.espressif/python_env/idf5.5_py3.13_env/bin/python' '/home/mauro/esp/v5.5.2/esp-idf/tools/idf.py' '-b' '115200'"...
+��
+[0;32mI (158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (168512) APP: [M] Device in funzioe in funzione ✓[0m
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x1 (POWERON),boot:0x30f (SPI_FAST_FLASH_BOOT)
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x164c
+load:0x4ff29ed0,len:0xe08
+[0m--- 0x4ff29ed0: [0;33mcall_start_cpu0[0m[0m at [0;32m/home/mauro/esp/v5.5.2/esp-idf/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m25[0m
+load:0x4ff2cbd0,len:0x3588
+[0m--- 0x4ff2cbd0: [0;33mesp_flash_encryption_enabled[0m[0m at [0;32m/home/mauro/esp/v5.5.2/esp-idf/components/bootloader_support/src/flash_encrypt.c[0m[0m:[1;31m89[0m
+entry 0x4ff29eda
+[0m--- 0x4ff29eda: [0;33mcall_start_cpu0[0m[0m at [0;32m/home/mauro/esp/v5.5.2/esp-idf/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m28[0m
+[0;32mI (25) boot: ESP-IDF v5.5.2-dirty 2nd stage bootloader[0m
+[0;32mI (26) boot: compile time Feb 12 2026 12:18:09[0m
+[0;32mI (26) boot: Multicore bootloader[0m
+[0;32mI (28) boot: chip revision: v1.0[0m
+[0;32mI (29) boot: efuse block revision: v0.3[0m
+[0;32mI (33) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (37) boot.esp32p4: SPI Mode       : DIO[0m
+[0;32mI (40) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (44) boot: Enabling RNG early entropy source...[0m
+[0;32mI (49) boot: Partition Table:[0m
+[0;32mI (51) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (58) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (64) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (71) boot:  2 factory          factory app      00 00 00010000 00300000[0m
+[0;32mI (77) boot:  3 ota_0            OTA app          00 10 00310000 005a0000[0m
+[0;32mI (84) boot:  4 ota_1            OTA app          00 11 008b0000 005a0000[0m
+[0;32mI (90) boot:  5 otadata          OTA data         01 00 00e7e000 00002000[0m
+[0;32mI (97) boot:  6 storage          Unknown data     01 82 00e80000 00180000[0m
+[0;32mI (104) boot: End of partition table[0m
+[0;32mI (108) boot: Defaulting to factory image[0m
+[0;32mI (110) esp_image: segment 0: paddr=00010020 vaddr=400d0020 size=467b8h (288696) map[0m
+[0;32mI (162) esp_image: segment 1: paddr=000567e0 vaddr=30100000 size=00088h (   136) load[0m
+[0;32mI (163) esp_image: segment 2: paddr=00056870 vaddr=4ff00000 size=097a8h ( 38824) load[0m
+[0;32mI (173) esp_image: segment 3: paddr=00060020 vaddr=40000020 size=c51f0h (807408) map[0m
+[0;32mI (294) esp_image: segment 4: paddr=00125218 vaddr=4ff097a8 size=0d028h ( 53288) load[0m
+[0;32mI (305) esp_image: segment 5: paddr=00132248 vaddr=4ff16800 size=0332ch ( 13100) load[0m
+[0;32mI (309) esp_image: segment 6: paddr=0013557c vaddr=50108080 size=00020h (    32) load[0m
+[0;32mI (315) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (316) boot: Disabling RNG early entropy source...[0m
+[1;31mE (1032) IO_EXP: [C] Errore comunicazione chip OUTPUT (0x43)[0m
+Name: SD
+Type: SDHC
+Speed: 10.00 MHz (limit: 10.00 MHz)
+Size: 90000MB
+CSD: ver=2, sector_size=512, capacity=184320000 read_bl_len=9
+SSR: bus_width=4
+[0;32mI (3432) TASKS: [M] Avvio task ws2812_blink (stack=8192 words)...[0m
+[0;32mI (3432) TASKS: [M] Task saltato eeprom (stato=1)[0m
+[0;32mI (3432) TASKS: [M] Avvio task io_expander (stack=8192 words)...[0m
+[0;32mI (3442) TASKS: [M] Avvio task sht40 (stack=8192 words)...[0m
+[0;32mI (3442) TASKS: [M] Task saltato rs232 (stato=1)[0m
+[0;32mI (3452) TASKS: [M] Task saltato rs485 (stato=1)[0m
+[0;32mI (3452) TASKS: [M] Task saltato mdb (stato=1)[0m
+[0;32mI (3462) TASKS: [M] Task saltato pwm (stato=1)[0m
+[0;32mI (3462) TASKS: [M] Task saltato touchscreen (display disabilitato da config)[0m
+[0;32mI (3472) TASKS: [M] Task saltato lvgl (display disabilitato da config)[0m
+[0;32mI (3472) TASKS: [M] Avvio task ntp (stack=8192 words)...[0m
+[0;32mI (3482) TASKS: [NTP] NTP task started, period: 600 seconds[0m
+[0;32mI (3482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (3492) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (3502) TASKS: [M] Avvio task usb_scanner (stack=8192 words)...[0m
+[0;32mI (3502) APP: [M] App factory pronta: endpoint HTTP /status e /ota disponibili[0m
+[0;32mI (3502) USB_CDC_SCANNER: Starting USB Host via BSP[0m
+[0;32mI (3512) ESP32_P4_EV: Installing USB Host[0m
+[0;32mI (3552) USB_CDC_SCANNER: USB Host started via BSP[0m
+[0;32mI (3552) USB_CDC_SCANNER: CDC-ACM host enabled by config: installing CDC-ACM host component (if available)[0m
+[0;32mI (3552) USB_CDC_SCANNER: Registered USB host diagnostic client (Sperimentali)[0m
+[0;32mI (3562) USB_CDC_SCANNER: Configured scanner VID:PID 1EAB:0006 (dual 0000), runtime enabled=1[0m
+[0;32mI (3572) USB_CDC_SCANNER: Trying to open CDC device 1EAB:0006[0m
+[0;32mI (3872) esp_netif_handlers: eth ip: 192.168.2.24, mask: 255.255.255.0, gw: 192.168.2.209[0m
+[0;32mI (3872) INIT: [M] Ethernet ha ottenuto l'indirizzo IP[0m
+[0;32mI (3872) INIT: [M] ~~~~~~~~~~~[0m
+[0;32mI (3872) INIT: [M] ETH IP:192.168.2.24[0m
+[0;32mI (3872) INIT: [M] ETH MASCHERA:255.255.255.0[0m
+[0;32mI (3882) INIT: [M] ETH GATEWAY:192.168.2.209[0m
+[0;32mI (3882) INIT: [M] ~~~~~~~~~~~[0m
+[0;32mI (3882) INIT: [M] Gratuitous ARP inviato[0m
+[0;32mI (3892) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (4572) USB_CDC_SCANNER: Try dual PID 1EAB:0000[0m
+[0;32mI (4702) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (4702) USB_CDC_SCANNER: New USB device connected: VID:1EAB PID:0006 class:02[0m
+[0;32mI (4702) INIT: [NTP] Forcing NTP synchronization...[0m
+[0;32mI (4702) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (4712) INIT: [NTP] Initializing SNTP with servers: time.google.com, pool.ntp.org[0m
+[0;32mI (4722) INIT: [NTP] SNTP inizializzato - la sincronizzazione avverrà in background[0m
+[0;32mI (4722) USB_CDC_SCANNER: CDC device opened[0m
+[0;32mI (4722) INIT: [NTP] Richiesta di sincronizzazione inviata — completamento in background[0m
+[0;32mI (4742) TASKS: [NTP] NTP sync successful[0m
+[0;32mI (5562) USB_CDC_SCANNER: [Sperimentali] Devices changed: 0 -> 1[0m
+[0;32mI (8512) APP: [M] Device in funzione ✓[0m
+[0;32mI (9332) WEB_UI: [C] GET /test[0m
+[0;32mI (9722) INIT: [NTP] Offset del fuso orario applicato: +1 ore[0m
+[0;32mI (9722) INIT: [NTP] Time synchronized: 2026-02-13 16:51:35 (UTC+1)[0m
+[0;32mI (9722) INIT: [NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)[0m
+[0;32mI (13512) APP: [M] Device in funzione ✓[0m
+[0;32mI (18512) APP: [M] Device in funzione ✓[0m
+[0;32mI (23512) APP: [M] Device in funzione ✓[0m
+[0;32mI (28512) APP: [M] Device in funzione ✓[0m
+[0;32mI (33512) APP: [M] Device in funzione ✓[0m
+[0;32mI (38512) APP: [M] Device in funzione ✓[0m
+[0;32mI (43512) APP: [M] Device in funzione ✓[0m
+[0;32mI (48512) APP: [M] Device in funzione ✓[0m
+[0;32mI (53512) APP: [M] Device in funzione ✓[0m
+[0;32mI (58512) APP: [M] Device in funzione ✓[0m
+[0;32mI (63512) APP: [M] Device in funzione ✓[0m
+[0;32mI (68512) APP: [M] Device in funzione ✓[0m
+[0;32mI (73512) APP: [M] Device in funzione ✓[0m
+[0;32mI (78512) APP: [M] Device in funzione ✓[0m
+[0;32mI (83512) APP: [M] Device in funzione ✓[0m
+[0;32mI (88512) APP: [M] Device in funzione ✓[0m
+[0;32mI (93512) APP: [M] Device in funzione ✓[0m
+[0;32mI (98512) APP: [M] Device in funzione ✓[0m
+[0;32mI (103512) APP: [M] Device in funzione ✓[0m
+[0;32mI (108512) APP: [M] Device in funzione ✓[0m
+[0;32mI (113512) APP: [M] Device in funzione ✓[0m
+[0;32mI (118512) APP: [M] Device in funzione ✓[0m
+[0;32mI (123512) APP: [M] Device in funzione ✓[0m
+[0;32mI (128512) APP: [M] Device in funzione ✓[0m
+[0;32mI (133512) APP: [M] Device in funzione ✓[0m
+[0;32mI (138512) APP: [M] Device in funzione ✓[0m
+[0;32mI (143512) APP: [M] Device in funzione ✓[0m
+[0;32mI (148512) APP: [M] Device in funzione ✓[0m
+[0;32mI (153512) APP: [M] Device in funzione ✓[0m
+[0;32mI (158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (168512) APP: [M] Device in funzione ✓[0m
+[0;32mI (173512) APP: [M] Device in funzione ✓[0m
+[0;32mI (178512) APP: [M] Device in funzione ✓[0m
+[0;32mI (183512) APP: [M] Device in funzione ✓[0m
+[0;32mI (188512) APP: [M] Device in funzione ✓[0m
+[0;32mI (193512) APP: [M] Device in funzione ✓[0m
+[0;32mI (198512) APP: [M] Device in funzione ✓[0m
+[0;32mI (203512) APP: [M] Device in funzione ✓[0m
+[0;32mI (208512) APP: [M] Device in funzione ✓[0m
+[0;32mI (213512) APP: [M] Device in funzione ✓[0m
+[0;32mI (218512) APP: [M] Device in funzione ✓[0m
+[0;32mI (223512) APP: [M] Device in funzione ✓[0m
+[0;32mI (228512) APP: [M] Device in funzione ✓[0m
+[0;32mI (233512) APP: [M] Device in funzione ✓[0m
+[0;32mI (238512) APP: [M] Device in funzione ✓[0m
+[0;32mI (243512) APP: [M] Device in funzione ✓[0m
+[0;32mI (248512) APP: [M] Device in funzione ✓[0m
+[0;32mI (253512) APP: [M] Device in funzione ✓[0m
+[0;32mI (258512) APP: [M] Device in funzione ✓[0m
+[0;32mI (263512) APP: [M] Device in funzione ✓[0m
+[0;32mI (268512) APP: [M] Device in funzione ✓[0m
+[0;32mI (273512) APP: [M] Device in funzione ✓[0m
+[0;32mI (278512) APP: [M] Device in funzione ✓[0m
+[0;32mI (283512) APP: [M] Device in funzione ✓[0m
+[0;32mI (288512) APP: [M] Device in funzione ✓[0m
+[0;32mI (293512) APP: [M] Device in funzione ✓[0m
+[0;32mI (298512) APP: [M] Device in funzione ✓[0m
+[0;32mI (303512) APP: [M] Device in funzione ✓[0m
+[0;32mI (308512) APP: [M] Device in funzione ✓[0m
+[0;32mI (313512) APP: [M] Device in funzione ✓[0m
+[0;32mI (318512) APP: [M] Device in funzione ✓[0m
+[0;32mI (323512) APP: [M] Device in funzione ✓[0m
+[0;32mI (328512) APP: [M] Device in funzione ✓[0m
+[0;32mI (333512) APP: [M] Device in funzione ✓[0m
+[0;32mI (338512) APP: [M] Device in funzione ✓[0m
+[0;32mI (343512) APP: [M] Device in funzione ✓[0m
+[0;32mI (348512) APP: [M] Device in funzione ✓[0m
+[0;32mI (353512) APP: [M] Device in funzione ✓[0m
+[0;32mI (358512) APP: [M] Device in funzione ✓[0m
+[0;32mI (363512) APP: [M] Device in funzione ✓[0m
+[0;32mI (368512) APP: [M] Device in funzione ✓[0m
+[0;32mI (373512) APP: [M] Device in funzione ✓[0m
+[0;32mI (378512) APP: [M] Device in funzione ✓[0m
+[0;32mI (383512) APP: [M] Device in funzione ✓[0m
+[0;32mI (388512) APP: [M] Device in funzione ✓[0m
+[0;32mI (393512) APP: [M] Device in funzione ✓[0m
+[0;32mI (398512) APP: [M] Device in funzione ✓[0m
+[0;32mI (403512) APP: [M] Device in funzione ✓[0m
+[0;32mI (408512) APP: [M] Device in funzione ✓[0m
+[0;32mI (413512) APP: [M] Device in funzione ✓[0m
+[0;32mI (418512) APP: [M] Device in funzione ✓[0m
+[0;32mI (423512) APP: [M] Device in funzione ✓[0m
+[0;32mI (428512) APP: [M] Device in funzione ✓[0m
+[0;32mI (433512) APP: [M] Device in funzione ✓[0m
+[0;32mI (438512) APP: [M] Device in funzione ✓[0m
+[0;32mI (443512) APP: [M] Device in funzione ✓[0m
+[0;32mI (448512) APP: [M] Device in funzione ✓[0m
+[0;32mI (453512) APP: [M] Device in funzione ✓[0m
+[0;32mI (458512) APP: [M] Device in funzione ✓[0m
+[0;32mI (463512) APP: [M] Device in funzione ✓[0m
+[0;32mI (468512) APP: [M] Device in funzione ✓[0m
+[0;32mI (473512) APP: [M] Device in funzione ✓[0m
+[0;32mI (478512) APP: [M] Device in funzione ✓[0m
+[0;32mI (483512) APP: [M] Device in funzione ✓[0m
+[0;32mI (488512) APP: [M] Device in funzione ✓[0m
+[0;32mI (493512) APP: [M] Device in funzione ✓[0m
+[0;32mI (498512) APP: [M] Device in funzione ✓[0m
+[0;32mI (503512) APP: [M] Device in funzione ✓[0m
+[0;32mI (508512) APP: [M] Device in funzione ✓[0m
+[0;32mI (513512) APP: [M] Device in funzione ✓[0m
+[0;32mI (518512) APP: [M] Device in funzione ✓[0m
+[0;32mI (523512) APP: [M] Device in funzione ✓[0m
+[0;32mI (528512) APP: [M] Device in funzione ✓[0m
+[0;32mI (533512) APP: [M] Device in funzione ✓[0m
+[0;32mI (538512) APP: [M] Device in funzione ✓[0m
+[0;32mI (543512) APP: [M] Device in funzione ✓[0m
+[0;32mI (548512) APP: [M] Device in funzione ✓[0m
+[0;32mI (553512) APP: [M] Device in funzione ✓[0m
+[0;32mI (558512) APP: [M] Device in funzione ✓[0m
+[0;32mI (563512) APP: [M] Device in funzione ✓[0m
+[0;32mI (568512) APP: [M] Device in funzione ✓[0m
+[0;32mI (573512) APP: [M] Device in funzione ✓[0m
+[0;32mI (578512) APP: [M] Device in funzione ✓[0m
+[0;32mI (583512) APP: [M] Device in funzione ✓[0m
+[0;32mI (588512) APP: [M] Device in funzione ✓[0m
+[0;32mI (593512) APP: [M] Device in funzione ✓[0m
+[0;32mI (598512) APP: [M] Device in funzione ✓[0m
+[0;32mI (603482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (603482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (603512) APP: [M] Device in funzione ✓[0m
+[0;32mI (603732) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (603732) INIT: [NTP] Forcing NTP synchronization...[0m
+[0;32mI (603732) INIT: [NTP] Richiesta di sincronizzazione inviata — completamento in background[0m
+[0;32mI (603742) TASKS: [NTP] NTP sync successful[0m
+[0;32mI (604572) INIT: [NTP] Offset del fuso orario applicato: +1 ore[0m
+[0;32mI (604572) INIT: [NTP] Time synchronized: 2026-02-13 17:01:30 (UTC+1)[0m
+[0;32mI (604572) INIT: [NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)[0m
+[0;32mI (608512) APP: [M] Device in funzione ✓[0m
+[0;32mI (613512) APP: [M] Device in funzione ✓[0m
+[0;32mI (618512) APP: [M] Device in funzione ✓[0m
+[0;32mI (623512) APP: [M] Device in funzione ✓[0m
+[0;32mI (628512) APP: [M] Device in funzione ✓[0m
+[0;32mI (633512) APP: [M] Device in funzione ✓[0m
+[0;32mI (638512) APP: [M] Device in funzione ✓[0m
+[0;32mI (643512) APP: [M] Device in funzione ✓[0m
+[0;32mI (648512) APP: [M] Device in funzione ✓[0m
+[0;32mI (653512) APP: [M] Device in funzione ✓[0m
+[0;32mI (658512) APP: [M] Device in funzione ✓[0m
+[0;32mI (663512) APP: [M] Device in funzione ✓[0m
+[0;32mI (668512) APP: [M] Device in funzione ✓[0m
+[0;32mI (673512) APP: [M] Device in funzione ✓[0m
+[0;32mI (678512) APP: [M] Device in funzione ✓[0m
+[0;32mI (683512) APP: [M] Device in funzione ✓[0m
+[0;32mI (688512) APP: [M] Device in funzione ✓[0m
+[0;32mI (693512) APP: [M] Device in funzione ✓[0m
+[0;32mI (698512) APP: [M] Device in funzione ✓[0m
+[0;32mI (703512) APP: [M] Device in funzione ✓[0m
+[0;32mI (708512) APP: [M] Device in funzione ✓[0m
+[0;32mI (713512) APP: [M] Device in funzione ✓[0m
+[0;32mI (718512) APP: [M] Device in funzione ✓[0m
+[0;32mI (723512) APP: [M] Device in funzione ✓[0m
+[0;32mI (728512) APP: [M] Device in funzione ✓[0m
+[0;32mI (733512) APP: [M] Device in funzione ✓[0m
+[0;32mI (738512) APP: [M] Device in funzione ✓[0m
+[0;32mI (743512) APP: [M] Device in funzione ✓[0m
+[0;32mI (748512) APP: [M] Device in funzione ✓[0m
+[0;32mI (753512) APP: [M] Device in funzione ✓[0m
+[0;32mI (758512) APP: [M] Device in funzione ✓[0m
+[0;32mI (763512) APP: [M] Device in funzione ✓[0m
+[0;32mI (768512) APP: [M] Device in funzione ✓[0m
+[0;32mI (773512) APP: [M] Device in funzione ✓[0m
+[0;32mI (778512) APP: [M] Device in funzione ✓[0m
+[0;32mI (783512) APP: [M] Device in funzione ✓[0m
+[0;32mI (788512) APP: [M] Device in funzione ✓[0m
+[0;32mI (793512) APP: [M] Device in funzione ✓[0m
+[0;32mI (798512) APP: [M] Device in funzione ✓[0m
+[0;32mI (803512) APP: [M] Device in funzione ✓[0m
+[0;32mI (808512) APP: [M] Device in funzione ✓[0m
+[0;32mI (813512) APP: [M] Device in funzione ✓[0m
+[0;32mI (818512) APP: [M] Device in funzione ✓[0m
+[0;32mI (823512) APP: [M] Device in funzione ✓[0m
+[0;32mI (828512) APP: [M] Device in funzione ✓[0m
+[0;32mI (833512) APP: [M] Device in funzione ✓[0m
+[0;32mI (838512) APP: [M] Device in funzione ✓[0m
+[0;32mI (843512) APP: [M] Device in funzione ✓[0m
+[0;32mI (848512) APP: [M] Device in funzione ✓[0m
+[0;32mI (853512) APP: [M] Device in funzione ✓[0m
+[0;32mI (858512) APP: [M] Device in funzione ✓[0m
+[0;32mI (863512) APP: [M] Device in funzione ✓[0m
+[0;32mI (868512) APP: [M] Device in funzione ✓[0m
+[0;32mI (873512) APP: [M] Device in funzione ✓[0m
+[0;32mI (878512) APP: [M] Device in funzione ✓[0m
+[0;32mI (883512) APP: [M] Device in funzione ✓[0m
+[0;32mI (888512) APP: [M] Device in funzione ✓[0m
+[0;32mI (893512) APP: [M] Device in funzione ✓[0m
+[0;32mI (898512) APP: [M] Device in funzione ✓[0m
+[0;32mI (903512) APP: [M] Device in funzione ✓[0m
+[0;32mI (908512) APP: [M] Device in funzione ✓[0m
+[0;32mI (913512) APP: [M] Device in funzione ✓[0m
+[0;32mI (918512) APP: [M] Device in funzione ✓[0m
+[0;32mI (923512) APP: [M] Device in funzione ✓[0m
+[0;32mI (928512) APP: [M] Device in funzione ✓[0m
+[0;32mI (933512) APP: [M] Device in funzione ✓[0m
+[0;32mI (938512) APP: [M] Device in funzione ✓[0m
+[0;32mI (943512) APP: [M] Device in funzione ✓[0m
+[0;32mI (948512) APP: [M] Device in funzione ✓[0m
+[0;32mI (953512) APP: [M] Device in funzione ✓[0m
+[0;32mI (958512) APP: [M] Device in funzione ✓[0m
+[0;32mI (963512) APP: [M] Device in funzione ✓[0m
+[0;32mI (968512) APP: [M] Device in funzione ✓[0m
+[0;32mI (973512) APP: [M] Device in funzione ✓[0m
+[0;32mI (978512) APP: [M] Device in funzione ✓[0m
+[0;32mI (983512) APP: [M] Device in funzione ✓[0m
+[0;32mI (988512) APP: [M] Device in funzione ✓[0m
+[0;32mI (993512) APP: [M] Device in funzione ✓[0m
+[0;32mI (998512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1003512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1008512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1013512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1018512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1023512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1028512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1033512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1038512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1043512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1048512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1053512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1058512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1063512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1068512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1073512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1078512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1083512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1088512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1093512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1098512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1103512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1108512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1113512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1118512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1123512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1128512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1133512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1138512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1143512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1148512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1153512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1168512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1173512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1178512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1183512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1188512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1193512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1198512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1203482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (1203482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (1203512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1203732) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (1203732) INIT: [NTP] Forcing NTP synchronization...[0m
+[0;32mI (1203732) INIT: [NTP] Richiesta di sincronizzazione inviata — completamento in background[0m
+[0;32mI (1203742) TASKS: [NTP] NTP sync successful[0m
+[0;32mI (1206892) INIT: [NTP] Offset del fuso orario applicato: +1 ore[0m
+[0;32mI (1206892) INIT: [NTP] Time synchronized: 2026-02-13 17:11:32 (UTC+1)[0m
+[0;32mI (1206892) INIT: [NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)[0m
+[0;32mI (1208512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1213512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1218512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1223512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1228512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1233512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1238512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1243512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1248512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1253512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1258512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1263512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1268512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1273512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1278512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1283512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1288512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1293512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1298512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1303512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1308512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1313512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1318512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1323512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1328512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1333512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1338512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1343512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1348512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1353512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1358512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1363512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1368512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1373512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1378512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1383512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1388512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1393512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1398512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1403512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1408512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1413512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1418512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1423512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1428512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1433512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1438512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1443512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1448512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1453512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1458512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1463512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1468512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1473512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1478512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1483512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1488512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1493512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1498512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1503512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1508512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1513512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1518512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1523512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1528512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1533512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1538512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1543512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1548512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1553512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1558512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1563512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1568512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1573512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1578512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1583512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1588512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1593512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1598512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1603512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1608512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1613512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1618512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1623512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1628512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1633512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1638512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1643512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1648512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1653512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1658512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1663512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1668512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1673512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1678512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1683512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1688512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1693512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1698512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1703512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1708512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1713512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1718512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1723512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1728512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1733512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1738512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1743512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1748512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1753512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1758512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1763512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1768512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1773512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1778512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1783512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1788512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1793512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1798512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1803482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (1803482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (1803512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1803752) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (1803752) INIT: [NTP] Forcing NTP synchronization...[0m
+[0;32mI (1803752) INIT: [NTP] Richiesta di sincronizzazione inviata — completamento in background[0m
+[0;32mI (1803762) TASKS: [NTP] NTP sync successful[0m
+[0;32mI (1805602) INIT: [NTP] Offset del fuso orario applicato: +1 ore[0m
+[0;32mI (1805602) INIT: [NTP] Time synchronized: 2026-02-13 17:21:31 (UTC+1)[0m
+[0;32mI (1805612) INIT: [NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)[0m
+[0;32mI (1808512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1813512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1818512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1823512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1828512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1833512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1838512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1843512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1848512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1853512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1858512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1863512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1868512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1873512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1878512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1883512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1888512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1893512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1898512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1903512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1908512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1913512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1918512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1923512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1928512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1933512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1938512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1943512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1948512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1953512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1958512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1963512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1968512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1973512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1978512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1983512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1988512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1993512) APP: [M] Device in funzione ✓[0m
+[0;32mI (1998512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2003512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2008512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2013512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2018512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2023512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2028512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2033512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2038512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2043512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2048512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2053512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2058512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2063512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2068512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2073512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2078512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2083512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2088512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2093512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2098512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2103512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2108512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2113512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2118512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2123512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2128512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2133512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2138512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2143512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2148512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2153512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2168512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2173512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2178512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2183512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2188512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2193512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2198512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2203512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2208512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2213512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2218512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2223512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2228512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2233512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2238512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2243512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2248512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2253512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2258512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2263512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2268512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2273512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2278512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2283512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2288512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2293512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2298512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2303512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2308512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2313512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2318512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2323512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2328512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2333512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2338512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2343512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2348512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2353512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2358512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2363512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2368512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2373512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2378512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2383512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2388512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2393512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2398512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2403482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (2403482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (2403512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2404372) INIT: [NTP] Internet access confirmed (HTTP status: 200)[0m
+[0;32mI (2404372) INIT: [NTP] Forcing NTP synchronization...[0m
+[0;32mI (2404372) INIT: [NTP] Richiesta di sincronizzazione inviata — completamento in background[0m
+[0;32mI (2404372) TASKS: [NTP] NTP sync successful[0m
+[0;32mI (2407152) INIT: [NTP] Offset del fuso orario applicato: +1 ore[0m
+[0;32mI (2407152) INIT: [NTP] Time synchronized: 2026-02-13 17:31:32 (UTC+1)[0m
+[0;32mI (2407152) INIT: [NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)[0m
+[0;32mI (2408512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2413512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2418512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2423512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2428512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2433512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2438512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2443512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2448512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2453512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2458512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2463512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2468512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2473512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2478512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2483512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2488512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2493512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2498512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2503512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2508512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2513512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2518512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2523512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2528512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2533512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2538512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2543512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2548512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2553512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2558512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2563512) APP: [M] Device in funzione ✓[0m
+[0;33mW (2566872) INIT: [M] Collegamento Ethernet inattivo[0m
+[0;32mI (2568512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2573512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2578512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2583512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2588512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2593512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2598512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2603512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2608512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2613512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2618512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2623512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2628512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2633512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2638512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2643512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2648512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2653512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2658512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2663512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2668512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2673512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2678512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2683512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2688512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2693512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2698512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2703512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2708512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2713512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2718512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2723512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2728512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2733512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2738512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2743512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2748512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2753512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2758512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2763512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2768512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2773512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2778512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2783512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2788512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2793512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2798512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2803512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2808512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2813512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2818512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2823512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2828512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2833512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2838512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2843512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2848512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2853512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2858512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2863512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2868512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2873512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2878512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2883512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2888512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2893512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2898512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2903512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2908512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2913512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2918512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2923512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2928512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2933512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2938512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2943512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2948512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2953512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2958512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2963512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2968512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2973512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2978512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2983512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2988512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2993512) APP: [M] Device in funzione ✓[0m
+[0;32mI (2998512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3003482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (3003482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (3003512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3008512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3013512) APP: [M] Device in funzione ✓[0m
+[1;31mE (3016502) esp-tls: couldn't get hostname for :www.google.com: getaddrinfo() returns 202, addrinfo=0x0[0m
+[1;31mE (3016502) transport_base: Failed to open a new connection: 32769[0m
+[1;31mE (3016502) HTTP_CLIENT: Connection failed, sock < 0[0m
+[0;33mW (3016502) INIT: [NTP] No internet access detected (err: ESP_ERR_HTTP_CONNECT, status: 0)[0m
+[0;33mW (3016512) INIT: [NTP] No internet access, cannot sync NTP[0m
+[0;33mW (3016522) TASKS: [NTP] NTP sync failed[0m
+[0;32mI (3018512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3023512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3028512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3033512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3038512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3043512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3048512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3053512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3058512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3063512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3068512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3073512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3078512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3083512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3088512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3093512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3098512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3103512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3108512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3113512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3118512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3123512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3128512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3133512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3138512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3143512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3148512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3153512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3168512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3173512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3178512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3183512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3188512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3193512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3198512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3203512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3208512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3213512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3218512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3223512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3228512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3233512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3238512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3243512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3248512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3253512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3258512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3263512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3268512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3273512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3278512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3283512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3288512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3293512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3298512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3303512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3308512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3313512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3318512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3323512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3328512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3333512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3338512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3343512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3348512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3353512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3358512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3363512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3368512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3373512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3378512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3383512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3388512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3393512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3398512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3403512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3408512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3413512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3418512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3423512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3428512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3433512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3438512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3443512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3448512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3453512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3458512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3463512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3468512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3473512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3478512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3483512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3488512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3493512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3498512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3503512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3508512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3513512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3518512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3523512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3528512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3533512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3538512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3543512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3548512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3553512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3558512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3563512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3568512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3573512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3578512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3583512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3588512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3593512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3598512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3603482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (3603482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (3603512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3608512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3613512) APP: [M] Device in funzione ✓[0m
+[1;31mE (3616502) esp-tls: couldn't get hostname for :www.google.com: getaddrinfo() returns 202, addrinfo=0x0[0m
+[1;31mE (3616502) transport_base: Failed to open a new connection: 32769[0m
+[1;31mE (3616502) HTTP_CLIENT: Connection failed, sock < 0[0m
+[0;33mW (3616502) INIT: [NTP] No internet access detected (err: ESP_ERR_HTTP_CONNECT, status: 0)[0m
+[0;33mW (3616512) INIT: [NTP] No internet access, cannot sync NTP[0m
+[0;33mW (3616522) TASKS: [NTP] NTP sync failed[0m
+[0;32mI (3618512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3623512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3628512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3633512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3638512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3643512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3648512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3653512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3658512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3663512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3668512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3673512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3678512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3683512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3688512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3693512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3698512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3703512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3708512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3713512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3718512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3723512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3728512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3733512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3738512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3743512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3748512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3753512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3758512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3763512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3768512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3773512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3778512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3783512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3788512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3793512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3798512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3803512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3808512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3813512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3818512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3823512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3828512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3833512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3838512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3843512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3848512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3853512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3858512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3863512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3868512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3873512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3878512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3883512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3888512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3893512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3898512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3903512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3908512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3913512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3918512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3923512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3928512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3933512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3938512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3943512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3948512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3953512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3958512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3963512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3968512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3973512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3978512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3983512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3988512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3993512) APP: [M] Device in funzione ✓[0m
+[0;32mI (3998512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4003512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4008512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4013512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4018512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4023512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4028512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4033512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4038512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4043512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4048512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4053512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4058512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4063512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4068512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4073512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4078512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4083512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4088512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4093512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4098512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4103512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4108512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4113512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4118512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4123512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4128512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4133512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4138512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4143512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4148512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4153512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4168512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4173512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4178512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4183512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4188512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4193512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4198512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4203482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (4203482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (4203512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4208512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4213512) APP: [M] Device in funzione ✓[0m
+[1;31mE (4216502) esp-tls: couldn't get hostname for :www.google.com: getaddrinfo() returns 202, addrinfo=0x0[0m
+[1;31mE (4216502) transport_base: Failed to open a new connection: 32769[0m
+[1;31mE (4216502) HTTP_CLIENT: Connection failed, sock < 0[0m
+[0;33mW (4216502) INIT: [NTP] No internet access detected (err: ESP_ERR_HTTP_CONNECT, status: 0)[0m
+[0;33mW (4216512) INIT: [NTP] No internet access, cannot sync NTP[0m
+[0;33mW (4216522) TASKS: [NTP] NTP sync failed[0m
+[0;32mI (4218512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4223512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4228512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4233512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4238512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4243512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4248512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4253512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4258512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4263512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4268512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4273512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4278512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4283512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4288512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4293512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4298512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4303512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4308512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4313512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4318512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4323512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4328512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4333512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4338512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4343512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4348512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4353512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4358512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4363512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4368512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4373512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4378512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4383512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4388512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4393512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4398512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4403512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4408512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4413512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4418512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4423512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4428512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4433512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4438512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4443512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4448512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4453512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4458512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4463512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4468512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4473512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4478512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4483512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4488512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4493512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4498512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4503512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4508512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4513512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4518512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4523512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4528512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4533512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4538512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4543512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4548512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4553512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4558512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4563512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4568512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4573512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4578512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4583512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4588512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4593512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4598512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4603512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4608512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4613512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4618512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4623512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4628512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4633512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4638512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4643512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4648512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4653512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4658512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4663512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4668512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4673512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4678512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4683512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4688512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4693512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4698512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4703512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4708512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4713512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4718512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4723512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4728512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4733512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4738512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4743512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4748512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4753512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4758512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4763512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4768512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4773512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4778512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4783512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4788512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4793512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4798512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4803482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (4803482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (4803512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4808512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4813512) APP: [M] Device in funzione ✓[0m
+[1;31mE (4816502) esp-tls: couldn't get hostname for :www.google.com: getaddrinfo() returns 202, addrinfo=0x0[0m
+[1;31mE (4816502) transport_base: Failed to open a new connection: 32769[0m
+[1;31mE (4816502) HTTP_CLIENT: Connection failed, sock < 0[0m
+[0;33mW (4816502) INIT: [NTP] No internet access detected (err: ESP_ERR_HTTP_CONNECT, status: 0)[0m
+[0;33mW (4816512) INIT: [NTP] No internet access, cannot sync NTP[0m
+[0;33mW (4816522) TASKS: [NTP] NTP sync failed[0m
+[0;32mI (4818512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4823512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4828512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4833512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4838512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4843512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4848512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4853512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4858512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4863512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4868512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4873512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4878512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4883512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4888512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4893512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4898512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4903512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4908512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4913512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4918512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4923512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4928512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4933512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4938512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4943512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4948512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4953512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4958512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4963512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4968512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4973512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4978512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4983512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4988512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4993512) APP: [M] Device in funzione ✓[0m
+[0;32mI (4998512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5003512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5008512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5013512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5018512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5023512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5028512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5033512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5038512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5043512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5048512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5053512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5058512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5063512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5068512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5073512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5078512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5083512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5088512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5093512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5098512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5103512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5108512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5113512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5118512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5123512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5128512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5133512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5138512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5143512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5148512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5153512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5168512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5173512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5178512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5183512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5188512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5193512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5198512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5203512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5208512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5213512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5218512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5223512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5228512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5233512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5238512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5243512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5248512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5253512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5258512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5263512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5268512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5273512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5278512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5283512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5288512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5293512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5298512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5303512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5308512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5313512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5318512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5323512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5328512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5333512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5338512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5343512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5348512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5353512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5358512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5363512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5368512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5373512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5378512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5383512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5388512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5393512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5398512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5403482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (5403482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (5403512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5408512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5413512) APP: [M] Device in funzione ✓[0m
+[1;31mE (5416502) esp-tls: couldn't get hostname for :www.google.com: getaddrinfo() returns 202, addrinfo=0x0[0m
+[1;31mE (5416502) transport_base: Failed to open a new connection: 32769[0m
+[1;31mE (5416502) HTTP_CLIENT: Connection failed, sock < 0[0m
+[0;33mW (5416502) INIT: [NTP] No internet access detected (err: ESP_ERR_HTTP_CONNECT, status: 0)[0m
+[0;33mW (5416512) INIT: [NTP] No internet access, cannot sync NTP[0m
+[0;33mW (5416522) TASKS: [NTP] NTP sync failed[0m
+[0;32mI (5418512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5423512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5428512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5433512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5438512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5443512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5448512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5453512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5458512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5463512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5468512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5473512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5478512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5483512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5488512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5493512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5498512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5503512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5508512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5513512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5518512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5523512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5528512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5533512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5538512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5543512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5548512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5553512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5558512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5563512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5568512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5573512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5578512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5583512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5588512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5593512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5598512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5603512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5608512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5613512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5618512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5623512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5628512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5633512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5638512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5643512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5648512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5653512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5658512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5663512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5668512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5673512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5678512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5683512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5688512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5693512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5698512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5703512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5708512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5713512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5718512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5723512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5728512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5733512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5738512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5743512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5748512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5753512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5758512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5763512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5768512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5773512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5778512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5783512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5788512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5793512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5798512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5803512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5808512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5813512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5818512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5823512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5828512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5833512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5838512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5843512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5848512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5853512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5858512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5863512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5868512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5873512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5878512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5883512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5888512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5893512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5898512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5903512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5908512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5913512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5918512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5923512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5928512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5933512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5938512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5943512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5948512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5953512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5958512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5963512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5968512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5973512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5978512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5983512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5988512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5993512) APP: [M] Device in funzione ✓[0m
+[0;32mI (5998512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6003482) TASKS: [NTP] Checking NTP sync...[0m
+[0;32mI (6003482) INIT: [NTP] Checking internet access by HTTP request to http://www.google.com...[0m
+[0;32mI (6003512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6008512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6013512) APP: [M] Device in funzione ✓[0m
+[1;31mE (6016502) esp-tls: couldn't get hostname for :www.google.com: getaddrinfo() returns 202, addrinfo=0x0[0m
+[1;31mE (6016502) transport_base: Failed to open a new connection: 32769[0m
+[1;31mE (6016502) HTTP_CLIENT: Connection failed, sock < 0[0m
+[0;33mW (6016502) INIT: [NTP] No internet access detected (err: ESP_ERR_HTTP_CONNECT, status: 0)[0m
+[0;33mW (6016512) INIT: [NTP] No internet access, cannot sync NTP[0m
+[0;33mW (6016522) TASKS: [NTP] NTP sync failed[0m
+[0;32mI (6018512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6023512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6028512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6033512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6038512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6043512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6048512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6053512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6058512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6063512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6068512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6073512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6078512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6083512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6088512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6093512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6098512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6103512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6108512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6113512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6118512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6123512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6128512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6133512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6138512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6143512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6148512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6153512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6158512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6163512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6168512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6173512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6178512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6183512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6188512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6193512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6198512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6203512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6208512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6213512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6218512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6223512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6228512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6233512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6238512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6243512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6248512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6253512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6258512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6263512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6268512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6273512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6278512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6283512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6288512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6293512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6298512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6303512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6308512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6313512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6318512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6323512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6328512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6333512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6338512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6343512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6348512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6353512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6358512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6363512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6368512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6373512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6378512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6383512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6388512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6393512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6398512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6403512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6408512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6413512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6418512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6423512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6428512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6433512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6438512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6443512) APP: [M] Device in funzione ✓[0m
+[0;32mI (6448512) APP: [M] Device in funzione ✓[0m
+[0m
