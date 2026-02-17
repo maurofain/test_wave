@@ -118,3 +118,15 @@ CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST=y
 CONFIG_USB_CDC_SCANNER_VID=0x1EAB
 CONFIG_USB_CDC_SCANNER_PID=0x0006
 CONFIG_USB_CDC_SCANNER_DUAL_PID=0x0000
+
+# Policy log di boot: minimo rumore all'avvio, con margine di aumento runtime
+CONFIG_BOOTLOADER_LOG_LEVEL_ERROR=y
+CONFIG_BOOTLOADER_LOG_LEVEL=1
+CONFIG_LOG_DEFAULT_LEVEL_ERROR=y
+CONFIG_LOG_DEFAULT_LEVEL=1
+# non vincolare il massimo al default: possiamo alzare runtime fino a INFO
+# CONFIG_LOG_MAXIMUM_EQUALS_DEFAULT is not set
+# CONFIG_LOG_MAXIMUM_LEVEL_WARN is not set
+CONFIG_LOG_MAXIMUM_LEVEL_INFO=y
+# massimo runtime consentito: INFO (es. regolazione dinamica da codice/API)
+CONFIG_LOG_MAXIMUM_LEVEL=3

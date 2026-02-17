@@ -11,14 +11,14 @@ config USB_CDC_SCANNER_USE_CDC_ACM_HOST
 
 config USB_CDC_SCANNER_VID
     hex "Vendor ID (VID) of the scanner"
-    default 0x303A
+    default 0x1EAB
 
 config USB_CDC_SCANNER_PID
     hex "Product ID (PID) of the scanner"
-    default 0x4001
+    default 0x0006
 
 config USB_CDC_SCANNER_DUAL_PID
     hex "Optional dual PID variant"
-    default 0x4002
+    default 0x0000
 
 endmenu

@@ -2,6 +2,7 @@
 #define SHT40_H
 
 #include "esp_err.h"
+#include <stdbool.h>
 
 /**
  * @brief Inizializza il sensore SHT40
@@ -16,5 +17,11 @@ esp_err_t sht40_init(void);
  * @return ESP_OK se successo
  */
 esp_err_t sht40_read(float *temp, float *hum);
+
+/**
+ * @brief Indica se il sensore SHT40 è inizializzato correttamente
+ * @return true se pronto all'uso, false altrimenti
+ */
+bool sht40_is_ready(void);
 
 #endif

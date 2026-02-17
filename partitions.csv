@@ -1,11 +1,26 @@
 # Name,   Type, SubType, Offset,  Size, Flags
-# Partition table per 16MB flash ottimizzata con OTA dual
-# factory: 3MB, ota_0: 5MB, ota_1: 5MB, storage: ~3MB (nvs+phy+otadata: ~52KB)
-nvs,      data, nvs,     0x9000,  0x6000,
-phy_init, data, phy,     0xf000,  0x1000,
-factory,  app,  factory, 0x10000, 0x300000,
-ota_0,    app,  ota_0,   0x310000,0x500000,
-ota_1,    app,  ota_1,   0x810000,0x500000,
-otadata,  data, ota,     0xD10000,0x2000,
-storage,  data, spiffs,  0xD12000,0x2EE000,
+# Partition table — 16 MB flash, OTA dual, strict alignment
+# - Total flash: 16_777_216 bytes (0x1000000)
+# Layout decisions:
+#  - factory = 3.00 MB at 0x10000 (requested)
+#  - ota_0 / ota_1 reduced and equal-sized to fit remaining app area
+#  - storage = 1.50 MB (0x180000) at flash end (requested)
+#  - otadata placed immediately before `storage`
+#  - app partitions aligned to 0x10000 (64 KB)
+# Calculations:
+#  factory:  start 0x010000, size 0x00300000 -> end 0x0310000
+#  ota area: start 0x0310000 .. end 0x0E7E000 (space for two OTA slots)
+#  ota_0:   0x0310000, size 0x05A0000
+#  ota_1:   0x08B0000, size 0x05A0000
+#  otadata: 0xE7E000, size 0x2000
+#  storage: 0xE80000, size 0x180000 (exactly 1.5 MB)
+# End of layout = 0xE80000 + 0x180000 = 0x1000000 (full flash)
+
+nvs,      data, nvs,     0x9000,   0x6000
+phy_init, data, phy,     0xF000,   0x1000
+factory,  app,  factory, 0x10000,  0x00300000
+ota_0,    app,  ota_0,   0x310000, 0x5A0000
+ota_1,    app,  ota_1,   0x8B0000, 0x5A0000
+otadata,  data, ota,     0xE7E000, 0x2000
+storage,  data, spiffs,  0xE80000, 0x180000
 

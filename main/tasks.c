@@ -70,7 +70,7 @@ static void sht40_task(void *arg)
     task_param_t *param = (task_param_t *)arg;
     TickType_t last_wake = xTaskGetTickCount();
     while (true) {
-        if (device_config_get()->sensors.temperature_enabled) {
+        if (device_config_get()->sensors.temperature_enabled && sht40_is_ready()) {
             float t, h;
             if (sht40_read(&t, &h) == ESP_OK) {
                 s_temperature = t;
@@ -131,15 +131,15 @@ static void touchscreen_task(void *arg)
     
     ESP_LOGI("TOUCH", "Touch task started with valid handle");
     
-    /* Track previous touch to avoid repeated logs when nothing changed */
+    /* Memorizza il tocco precedente per evitare log ripetuti quando non cambia nulla */
     bool prev_present = false;
     esp_lcd_touch_point_data_t prev = {0};
-    const int MOVEMENT_THRESHOLD = 3; /* pixels */
+    const int MOVEMENT_THRESHOLD = 3; /* pixel */
 
     while (true) {
-        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(50)); // 50ms polling
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(50)); // Polling ogni 50 ms
 
-        // Read touch data
+        // Legge i dati del touchscreen
         esp_lcd_touch_read_data(touch_handle);
 
         // Get touch points using new API
@@ -211,7 +211,8 @@ static void ntp_task(void *arg)
 static void scanner_on_barcode_cb(const char *barcode)
 {
     ESP_LOGI("SCANNER", "Barcode: %s", barcode);
-    web_ui_add_log("INFO", "SCANNER", barcode);
+    /* Barcode readings: use distinct tag so UI can display readings separately */
+    web_ui_add_log("INFO", "SCANNER_DATA", barcode);
 }
 
 static void usb_scanner_task_wrapper(void *arg)
@@ -437,6 +438,11 @@ void tasks_start_all(void)
 {
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
+        // Rispetta la configurazione di display: se headless salta lvgl/touchscreen
+        if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0) && !device_config_get()->display.enabled) {
+            ESP_LOGI(TAG, "[M] Task saltato %s (display disabilitato da config)", t->name);
+            continue;
+        }
         if (t->state != TASK_STATE_RUN) {
             ESP_LOGI(TAG, "[M] Task saltato %s (stato=%d)", t->name, (int)t->state);
             continue;
@@ -456,9 +462,19 @@ void tasks_start_all(void)
 void tasks_apply_n_run(void)
 {
     ESP_LOGI(TAG, "Applicazione nuovi stati task...");
+    device_config_t *cfg = device_config_get();
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
-        
+
+        // Forza comportamento dei task legati al display in base alla config
+        if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0)) {
+            if (!cfg->display.enabled) {
+                t->state = TASK_STATE_IDLE; // headless: garantiamo che siano disabilitati
+            } else {
+                t->state = TASK_STATE_RUN; // display abilitato => assicuriamo che partano
+            }
+        }
+
         if (t->state == TASK_STATE_RUN) {
             if (t->handle == NULL) {
                 ESP_LOGI(TAG, "Avvio task %s (stack=%lu words)...", t->name, (unsigned long)t->stack_words);

@@ -29,7 +29,7 @@ struct cdc_acm_intf_t {
     esp_err_t (*line_coding_get)(cdc_acm_dev_hdl_t cdc_hdl, cdc_acm_line_coding_t *line_coding);
     esp_err_t (*set_control_line_state)(cdc_acm_dev_hdl_t cdc_hdl, bool dtr, bool rts);
     esp_err_t (*send_break)(cdc_acm_dev_hdl_t cdc_hdl, uint16_t duration_ms);
-    void *user_data;                        // Can be used to store device-specific data
+    void *user_data;                        // Può essere usato per memorizzare dati specifici del dispositivo
     void (*del)(cdc_acm_dev_hdl_t cdc_hdl); // Called when the device is closed, to free any resources allocated by the device
 };
 

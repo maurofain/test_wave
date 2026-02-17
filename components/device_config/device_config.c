@@ -63,6 +63,10 @@ static void _set_defaults(device_config_t *config)
     strncpy(config->ntp.server2, "pool.ntp.org", sizeof(config->ntp.server2) - 1);
     config->ntp.timezone_offset = 1;  // Default to CET (Central European Time)
 
+    // Default Server/Cloud settings
+    config->server.enabled = false; // not enabled by default
+    strncpy(config->server.url, "http://195.231.69.227:5556/", sizeof(config->server.url) - 1);
+
     // Default Remote Logging (broadcast disabled by default)
     config->remote_log.server_port = 9514;  // Default port for broadcast
     config->remote_log.use_broadcast = false; // No broadcast by default
@@ -85,6 +89,7 @@ static void _set_defaults(device_config_t *config)
     config->mdb.cashless_en = false;
 
     // Default Display
+    config->display.enabled = true; // display abilitato di default
     config->display.lcd_brightness = 80;
 
     // Default RS232
@@ -368,6 +373,14 @@ esp_err_t device_config_load(device_config_t *config)
                     if (tz_offset && cJSON_IsNumber(tz_offset)) config->ntp.timezone_offset = tz_offset->valueint;
                 }
 
+                // Analisi config Server/Cloud
+                cJSON *server_obj = cJSON_GetObjectItem(root, "server");
+                if (server_obj) {
+                    config->server.enabled = cJSON_IsTrue(cJSON_GetObjectItem(server_obj, "enabled"));
+                    cJSON *url = cJSON_GetObjectItem(server_obj, "url");
+                    if (url && url->valuestring) strncpy(config->server.url, url->valuestring, sizeof(config->server.url) - 1);
+                }
+
                 // Analisi config Remote Logging
                 cJSON *remote_log_obj = cJSON_GetObjectItem(root, "remote_log");
                 if (remote_log_obj) {
@@ -415,6 +428,8 @@ esp_err_t device_config_load(device_config_t *config)
                 // Analisi config Display
                 cJSON *disp_obj = cJSON_GetObjectItem(root, "display");
                 if (disp_obj) {
+                    cJSON *enabled = cJSON_GetObjectItem(disp_obj, "enabled");
+                    if (enabled) config->display.enabled = cJSON_IsTrue(enabled);
                     cJSON *bright = cJSON_GetObjectItem(disp_obj, "lcd_brightness");
                     if (bright) config->display.lcd_brightness = (uint8_t)bright->valueint;
                 }
@@ -509,6 +524,12 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(ntp_obj, "timezone_offset", config->ntp.timezone_offset);
     cJSON_AddItemToObject(root, "ntp", ntp_obj);
 
+    // Server/Cloud
+    cJSON *server_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(server_obj, "enabled", config->server.enabled);
+    cJSON_AddStringToObject(server_obj, "url", config->server.url);
+    cJSON_AddItemToObject(root, "server", server_obj);
+
     // Remote Logging
     cJSON *remote_log_obj = cJSON_CreateObject();
     cJSON_AddNumberToObject(remote_log_obj, "server_port", config->remote_log.server_port);
@@ -546,6 +567,7 @@ char* device_config_to_json(const device_config_t *config)
 
     // Display
     cJSON *disp_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(disp_obj, "enabled", config->display.enabled);
     cJSON_AddNumberToObject(disp_obj, "lcd_brightness", config->display.lcd_brightness);
     cJSON_AddItemToObject(root, "display", disp_obj);
 

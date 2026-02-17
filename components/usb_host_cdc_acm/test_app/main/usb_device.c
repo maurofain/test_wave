@@ -152,7 +152,7 @@ void tud_resume_cb(void)
     ESP_LOGI(CDC_DEV_TAG, "resumed");
 }
 
-/* Following test cases implement dual CDC-ACM USB device that can be used as mock device for CDC-ACM Host tests */
+/* I seguenti casi di test implementano un dispositivo USB CDC-ACM dual che può essere usato come mock per i test del CDC-ACM Host */
 
 /**
  * @brief Run CDC-ACM Device with 2 interfaces in a loopback mode

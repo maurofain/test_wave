@@ -54,22 +54,51 @@
 24. ✅ Implementare il log su ethernet da visualizzare su una apposita pagina HTML  : valutare se utilizzare UDP sia il protocollo validoper l'invio dei dati
 25. ✅ RUOTA LO SCHERMO 90° ccw e gestisci il controllo di luminosità in /config INCONTRATO LIMITAZINI LVGL
 26. ✅ all'avvio della app per prima cosa inizializzare I2C ed attivare l'I/O expander. poi controllare il GPIO3 del del expander 1 e loggar eil valore (0/1) e se è risulta a 0 fermare il programma fino al ritorno a 1  
-
-
+27. ✅ interfaccia web: implementare in /config l'abilitazione e la configurazione dello scanner. Nella pagina /test aggiungere la visualizzazione delle letture e i tasti 'Scanner ON' e 'Scenner OFF'. nella pagina /tasks verificare che tutti i task siano rappresentati.
+28. ✅ Implementare l'esclusione del display MIPI e di LVGL per uso senza interfaccia grafica. L'abilitazione va messaa nella pagina /config e se abilitato deve mostrare lo stato di attivazione di display e touch e se attivi la loro operatività
+29. ✅ nella pagina di visulzzazione del LOG remoto inserici un filtraggio in base a una stringa che verrà compilata in un textbox e attivata trami un pbutto' Filtra'
+- ✅ CCtalk: seriale attivata + task di background (driver in `components/cctalk`, UART = CONFIG_APP_RS232_UART_PORT, baud 4800 — TX=GPIO20, RX=GPIO21)
 
 # ⏸️ RITARDATI
 
 1. abilitazione WiFi
+2. display miimale 1.44"
 
 # 📋 DA FARE
 
 - Factory 
 
- 1. il tasto CLEAR dei monitor non pulisce le aree di testo, togliere le indicazioni TX e RX>, c'è già il colore. Non inserire spazi tra i caratteri in modo TEXT. In modo HEX mettere un . prima del codice esadecimale.
- 2. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate
- 3. Controllo luminosità schermo: implementarla e collagarla nella pagina web /config
- 4. interfaccia web: implementare in /config l'abilitazione e la configurazione dello scanner. Nella pagina /test aggiungere la visualizzazione delle letture e i tastoi 'Scanner ON' e 'Scenner OFF'. nella pagina /tasks verificare che tutti i task siano rappresentati.
+ 1. CCtals da integrare in /config e /test
+ 2. Creare una FSM per la gestione del ciclo operativo della macchina
+ 3. il tasto CLEAR dei monitor non pulisce le aree di testo, togliere le indicazioni TX e RX>, c'è già il colore. Non inserire spazi tra i caratteri in modo TEXT. In modo HEX mettere un . prima del codice esadecimale.
+ 4. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate
+ 5. Controllo luminosità schermo: implementarla e collagarla nella pagina web /config
+ 6. riportare lo schermo in verticale 
+ 7.
    
+# ERRORI
+E (122479) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (122479) task_wdt:  - IDLE0 (CPU 0)
+E (122479) task_wdt: Tasks currently running:
+E (122479) task_wdt: CPU 0: main
+E (122479) task_wdt: CPU 1: IDLE1
+E (122479) task_wdt: Print CPU 0 (current core) registers
+Core  0 register dump:
+MEPC    : 0x4007f862  RA      : 0x4007f854  SP      : 0x4ff299a0  GP      : 0x4ff22300  
+--- 0x4007f862: mipi_dsi_host_ll_gen_is_read_fifo_empty at /home/mauro/esp/v5.5.2/esp-idf/components/hal/esp32p4/include/hal/mipi_dsi_host_ll.h:690
+--- (inlined by) mipi_dsi_hal_host_gen_read_short_packet at /home/mauro/esp/v5.5.2/esp-idf/components/hal/mipi_dsi_hal.c:212
+--- 0x4007f854: mipi_dsi_hal_host_gen_read_short_packet at /home/mauro/esp/v5.5.2/esp-idf/components/hal/mipi_dsi_hal.c:210
+TP      : 0x4ff29c40  T0      : 0x4fc0a9f8  T1      : 0x4ff3f004  T2      : 0x00003000  
+S0/FP   : 0x00000001  S1      : 0x4ff3f008  A0      : 0x4ff3f008  A1      : 0x00000000  
+A2      : 0x00000006  A3      : 0x00002005  A4      : 0x500a0000  A5      : 0x00000000  
+A6      : 0x00000000  A7      : 0x00000008  S2      : 0x4ff299fb  S3      : 0x00000000  
+S4      : 0x00000006  S5      : 0x00000000  S6      : 0x00000000  S7      : 0x00000000  
+S8      : 0x00000000  S9      : 0x00000000  S10     : 0x00000000  S11     : 0x00000000  
+T3      : 0x00000004  T4      : 0x00000003  T5      : 0x00000175  T6      : 0x00000033  
+MSTATUS : 0x00001888  MTVEC   : 0x4ff00003  MCAUSE  : 0xdeadc0de  MTVAL   : 0xdeadc0de  
+--- 0x4ff00003: _vector_table at ??:?
+MHARTID : 0x00000000  
+Please enable CONFIG_ESP_SYSTEM_USE_FRAME_POINTER option to have a full backtrace.
 
   # Scanner QR : 
 
@@ -104,7 +133,19 @@
   
    
   
-  - IP Server API 195.231.69.227:5556/api/login
+  - Server API base: `http://195.231.69.227:5556/`
+  - Endpoints:
+    - `POST http://195.231.69.227:5556/api/login`
+    - `POST http://195.231.69.227:5556/api/keepalive`
+    - `POST http://195.231.69.227:5556/api/payment`
+    - `POST http://195.231.69.227:5556/api/paymentoffline`
+    - `POST http://195.231.69.227:5556/api/serviceused`
+    - `POST http://195.231.69.227:5556/api/deviceactivity`
+    - `POST http://195.231.69.227:5556/api/getconfig`
+    - `POST http://195.231.69.227:5556/api/getimages`
+    - `POST http://195.231.69.227:5556/api/getfirmware`
+    - `POST http://195.231.69.227:5556/api/gettranslations`
+  - Auth: `Authorization: Bearer <token>` (ottenuto da `/api/login`)
     
   - Seriale Terminale 
     
@@ -130,89 +171,7 @@
     - Interrupt su cambio stato I/O Expander
 - USB
   - letto lo scanner con il sorgente di test in /home/mauro/esp/esp-idf/examples/peripherals/usb/host/cdc/cdc_acm_host/main/usb_cdc_example_main.c
-  ```
-  I (2318) USB-CDC: Opening CDC ACM device 0x1EAB:0x0006...
-*** Device descriptor ***
-bLength 18
-bDescriptorType 1
-bcdUSB 1.10
-bDeviceClass 0x2
-bDeviceSubClass 0x0
-bDeviceProtocol 0x0
-bMaxPacketSize0 64
-idVendor 0x1eab
-idProduct 0x6
-bcdDevice 0.00
-iManufacturer 1
-iProduct 2
-iSerialNumber 3
-bNumConfigurations 1
-*** Configuration descriptor ***
-bLength 9
-bDescriptorType 2
-wTotalLength 67
-bNumInterfaces 2
-bConfigurationValue 1
-iConfiguration 4
-bmAttributes 0x80
-bMaxPower 500mA
-        *** Interface descriptor ***
-        bLength 9
-        bDescriptorType 4
-        bInterfaceNumber 0
-        bAlternateSetting 0
-        bNumEndpoints 1
-        bInterfaceClass 0x2
-        bInterfaceSubClass 0x2
-        bInterfaceProtocol 0x1
-        iInterface 7
-        *** CDC Header Descriptor ***
-        bcdCDC: 1.10
-        *** CDC ACM Descriptor ***
-        bmCapabilities: 0x02
-        *** CDC Union Descriptor ***
-        bControlInterface: 0
-        bSubordinateInterface[0]: 1
-        *** CDC Call Descriptor ***
-        bmCapabilities: 0x00
-        bDataInterface: 1
-                *** Endpoint descriptor ***
-                bLength 7
-                bDescriptorType 5
-                bEndpointAddress 0x83   EP 3 IN
-                bmAttributes 0x3        INT
-                wMaxPacketSize 16
-                bInterval 8
-        *** Interface descriptor ***
-        bLength 9
-        bDescriptorType 4
-        bInterfaceNumber 1
-        bAlternateSetting 0
-        bNumEndpoints 2
-        bInterfaceClass 0xa
-        bInterfaceSubClass 0x0
-        bInterfaceProtocol 0x0
-        iInterface 8
-                *** Endpoint descriptor ***
-                bLength 7
-                bDescriptorType 5
-                bEndpointAddress 0x81   EP 1 IN
-                bmAttributes 0x2        BULK
-                wMaxPacketSize 64
-                bInterval 0
-                *** Endpoint descriptor ***
-                bLength 7
-                bDescriptorType 5
-                bEndpointAddress 0x2    EP 2 OUT
-                bmAttributes 0x2        BULK
-                wMaxPacketSize 64
-                bInterval 0
-I (2648) USB-CDC: Setting up line coding
-I (2648) USB-CDC: Line Get: Rate: 115200, Stop bits: 0, Parity: 0, Databits: 8
-I (2648) USB-CDC: Line Set: Rate: 9600, Stop bits: 1, Parity: 1, Databits: 7
-I (2648) USB-CDC: Line Get: Rate: 9600, Stop bits: 1, Parity: 1, Databits: 7
-I (2658) USB-CDC: Example finished successfully! You can reconnect the device to run again.
-```  
+
 - App
   1. Aggiungere un task App per l'esecuzione delle funzioni operative della macchina controllata 
   2. Configurazione monitor/touch e integrazione LVGL 
@@ -226,3 +185,4 @@ I (2658) USB-CDC: Example finished successfully! You can reconnect the device to
 3. RS232 (tx rx)
 4. RS485 (tx)
 5. MDB (tx)
+6. Scanner

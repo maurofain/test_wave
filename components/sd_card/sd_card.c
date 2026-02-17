@@ -109,7 +109,7 @@ esp_err_t sd_card_mount(void) {
     host.slot = SDMMC_HOST_SLOT_0;
     // Riduciamo la frequenza per maggiore stabilità (20MHz -> 10MHz)
     host.max_freq_khz = SDMMC_FREQ_DEFAULT; // Tentiamo il default, ma...
-    host.max_freq_khz = 10000; // Forziamo 10MHz per debug stability
+    host.max_freq_khz = 10000; // Forziamo 10MHz per stabilità durante il debug
 
     // Configurazione LDO per alimentazione SD (ID 4 trovato nel reference WT99P4C5-S1)
     if (s_pwr_ctrl_handle == NULL) {

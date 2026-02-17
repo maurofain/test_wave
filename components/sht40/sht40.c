@@ -4,6 +4,7 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stdbool.h>
 
 static const char *TAG = "SHT40";
 
@@ -11,6 +12,7 @@ static const char *TAG = "SHT40";
 #define SHT40_CMD_MEAS      0xFD  // High precision measurement
 
 static i2c_master_dev_handle_t sht_dev;
+static bool s_sht40_ready = false;
 
 static uint8_t crc8(const uint8_t *data, size_t len) {
     uint8_t crc = 0xFF;
@@ -28,6 +30,8 @@ static uint8_t crc8(const uint8_t *data, size_t len) {
 }
 
 esp_err_t sht40_init(void) {
+    s_sht40_ready = false;
+
     i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
     i2c_device_config_t cfg = {
         .device_address = SHT40_ADDR,
@@ -51,11 +55,16 @@ esp_err_t sht40_init(void) {
     // Attesa dopo reset (1ms richiesto da datasheet)
     vTaskDelay(pdMS_TO_TICKS(10));
 
+    s_sht40_ready = true;
     ESP_LOGI(TAG, "[C] Sensore SHT40 trovato e resettato all'indirizzo 0x%02X", SHT40_ADDR);
     return ESP_OK;
 }
 
 esp_err_t sht40_read(float *temp, float *hum) {
+    if (!s_sht40_ready || sht_dev == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     uint8_t cmd = SHT40_CMD_MEAS;
     uint8_t data[6] = {0};
 
@@ -110,4 +119,9 @@ esp_err_t sht40_read(float *temp, float *hum) {
     if (*hum > 100) *hum = 100;
 
     return ESP_OK;
+}
+
+bool sht40_is_ready(void)
+{
+    return s_sht40_ready;
 }

@@ -1,8 +1,12 @@
 - il progetto si basa su 2 eseguibili : main è l'applicazione completa, factory è il software di base per il recovery, il test e il fash di main. Ogni app ha la sua partizione.
-- per il sourcing di ESP-IDF si può usare get_idf oppure '. $HOME/esp/esp-idf/export.sh'
-- per la compilazione, flash e monitor si può usare $HOME/esp/tools/run_idf_command.py con i comandi predisposti visualizzati richiamando questo script senza parametri
+- per il sourcing di ESP-IDF si può usare get_idf 
+- per la compilazione usare 'idfc -b', flash  'idfc -f', per flash solo factory 'idfc -f -o f' per monitor 'idfc -m'
+- per analizzare il funzionamento di idfc chiamare 'idfc -h'
+- va gestito un blocco per la generazione del codice che deve inibire la modifica di funzioni marcate con //DO_NOT_MODIFY o di sezioni di codice racchiuse tra //DO_NOT_MODIFY and //DO_NOT_MODIFY_END : io indicherò l'operazione con `fai DNM a <file>` o `fai DNME a <file>`
+- Il markup/JS generato per le pagine ` /config ` e ` / ` (home) deve essere sempre racchiuso tra i marcatori `/* DO_NOT_MODIFY_START: <page> */` e `/* DO_NOT_MODIFY_END: <page> */` per impedire modifiche automatiche.
 - l'esecuzione degli script deve avvenire co path /home/mauro/Progetti/0.Clienti/MicroHard/scripts
 - i commenti vanno tradotti in italiano, i nomi di funzioni, costanti e variabili in inglese
+- il comando .rl significa 'leggi il file docs/RULES.md'
 - il comando .el significa 'Controlla il file exec.log'
 - il comando .lt sugnifica 'leggi il file docs/TODO.md'
 - il comando .cp sugnifica 'fai il commit e il push'
@@ -12,7 +16,7 @@
 - il comando .bf esegue build_flash_no_spiffs.sh
 - il codice che si trova in  ~/Progetti/0.Clienti/MicroHard/WT99P4C5-S1 è un esempio per la stessa configurazione da cui prelevare codice di esempio : lo chiamerò PDR
 - il codice che si trova in  ~/Progetti/0.Clienti/MicroHard/test è una versione precedente di prova  per la stessa configurazione da cui prelevare porzioni di codice specifiche cha vanno riadattate al progetto attuale  : lo chiamerò PSI
-- i comandi git vanno fatti solo su mia richiesta
+- i comandi git vanno fatti solo su mia richiesta e proposti solo dopo un test di compilazione positivo
 - salvo esplicita richiesta i build flash e monitor vengono eseguiti in un terminale a parte
 - i file di documentazione vanno salvati in docs
 - quando indico che uno step previsto in TODO.md è completato spuntiamo la relativa voce

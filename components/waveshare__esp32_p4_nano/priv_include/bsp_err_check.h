@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-/* Assert on error, if selected in menuconfig. Otherwise return error code. */
+/* Esegue assert in caso di errore, se selezionato in menuconfig. Altrimenti restituisce il codice di errore. */
 #if CONFIG_BSP_ERROR_CHECK
 #define BSP_ERROR_CHECK_RETURN_ERR(x)    ESP_ERROR_CHECK(x)
 #define BSP_ERROR_CHECK_RETURN_NULL(x)   ESP_ERROR_CHECK(x)

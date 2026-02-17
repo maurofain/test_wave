@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_err.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,6 +17,10 @@ typedef struct {
 
 void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config);
 void usb_cdc_scanner_task(void *param);
+esp_err_t usb_cdc_scanner_send_setup_command(void);
+esp_err_t usb_cdc_scanner_send_state_command(void);
+esp_err_t usb_cdc_scanner_send_on_command(void);
+esp_err_t usb_cdc_scanner_send_off_command(void);
 
 #ifdef __cplusplus
 }

@@ -46,7 +46,7 @@ static i2s_chan_handle_t i2s_tx_chan = NULL;
 static i2s_chan_handle_t i2s_rx_chan = NULL;
 static const audio_codec_data_if_t *i2s_data_if = NULL;  /* Codec data interface */
 
-/* Can be used for `i2s_std_gpio_config_t` and/or `i2s_std_config_t` initialization */
+/* Può essere usato per l'inizializzazione di `i2s_std_gpio_config_t` e/o `i2s_std_config_t` */
 #define BSP_I2S_GPIO_CFG       \
     {                          \
         .mclk = BSP_I2S_MCLK,  \
@@ -129,7 +129,7 @@ esp_err_t bsp_sdcard_mount(void)
     host.pwr_ctrl_handle = pwr_ctrl_handle;
 
     const sdmmc_slot_config_t slot_config = {
-        /* SD card is connected to Slot 0 pins. Slot 0 uses IO MUX, so not specifying the pins here */
+        /* La scheda SD è collegata ai pin dello Slot 0. Lo Slot 0 usa IO MUX, quindi non specificare i pin qui */
         .cd = SDMMC_SLOT_NO_CD,
         .wp = SDMMC_SLOT_NO_WP,
         .width = 4,
@@ -186,7 +186,7 @@ esp_err_t bsp_audio_init(const i2s_std_config_t *i2s_config)
 
     /* Setup I2S peripheral */
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(CONFIG_BSP_I2S_NUM, I2S_ROLE_MASTER);
-    chan_cfg.auto_clear = true; // Auto clear the legacy data in the DMA buffer
+    chan_cfg.auto_clear = true; // Pulisce automaticamente i dati legacy presenti nel buffer DMA
     ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, &i2s_tx_chan, &i2s_rx_chan));
 
     /* Setup I2S channels */
@@ -383,7 +383,7 @@ esp_err_t bsp_display_backlight_on(void)
 static esp_err_t bsp_enable_dsi_phy_power(void)
 {
 #if BSP_MIPI_DSI_PHY_PWR_LDO_CHAN > 0
-    // Turn on the power for MIPI DSI PHY, so it can go from "No Power" state to "Shutdown" state
+    // Alimenta la PHY MIPI DSI in modo che passi dallo stato "No Power" a "Shutdown"
     static esp_ldo_channel_handle_t phy_pwr_chan = NULL;
     esp_ldo_channel_config_t ldo_cfg = {
         .chan_id = BSP_MIPI_DSI_PHY_PWR_LDO_CHAN,
@@ -426,12 +426,12 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
     ESP_RETURN_ON_ERROR(esp_lcd_new_dsi_bus(&bus_config, &mipi_dsi_bus), TAG, "New DSI bus init failed");
 
     ESP_LOGI(TAG, "Install MIPI DSI LCD control panel");
-    // we use DBI interface to send LCD commands and parameters
+    // Usiamo l'interfaccia DBI per inviare comandi e parametri al display LCD
     esp_lcd_panel_io_handle_t io;
     esp_lcd_dbi_io_config_t dbi_config = {
         .virtual_channel = 0,
-        .lcd_cmd_bits = 8,   // according to the LCD ILI9881C spec
-        .lcd_param_bits = 8, // according to the LCD ILI9881C spec
+        .lcd_cmd_bits = 8,   // come specificato dal datasheet ILI9881C
+        .lcd_param_bits = 8, // come specificato dal datasheet ILI9881C
     };
     ESP_GOTO_ON_ERROR(esp_lcd_new_panel_io_dbi(mipi_dsi_bus, &dbi_config, &io), err, TAG, "New panel IO failed");
 
@@ -846,7 +846,7 @@ void bsp_display_unlock(void)
 static void usb_lib_task(void *arg)
 {
     while (1) {
-        // Start handling system events
+        // Avvia la gestione degli eventi di sistema
         uint32_t event_flags;
         usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
@@ -856,11 +856,11 @@ static void usb_lib_task(void *arg)
             ESP_LOGI(TAG, "USB: All devices freed");
         }
     }
-}
+} 
 
 esp_err_t bsp_usb_host_start(bsp_usb_host_power_mode_t mode, bool limit_500mA)
 {
-    //Install USB Host driver. Should only be called once in entire application
+    // Installa il driver USB Host. Deve essere chiamato una sola volta nell'applicazione
     ESP_LOGI(TAG, "Installing USB Host");
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
@@ -868,7 +868,7 @@ esp_err_t bsp_usb_host_start(bsp_usb_host_power_mode_t mode, bool limit_500mA)
     };
     BSP_ERROR_CHECK_RETURN_ERR(usb_host_install(&host_config));
 
-    // Create a task that will handle USB library events
+    // Crea un task che gestirà gli eventi della libreria USB
     if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE) {
         ESP_LOGE(TAG, "Creating USB host lib task failed");
         abort();

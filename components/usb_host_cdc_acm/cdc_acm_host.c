@@ -26,8 +26,8 @@
 static const char *TAG = "cdc_acm";
 
 // Control transfer constants
-#define CDC_ACM_CTRL_TRANSFER_SIZE (64)   // All standard CTRL requests and responses fit in this size
-#define CDC_ACM_CTRL_TIMEOUT_MS    (5000) // Every CDC device should be able to respond to CTRL transfer in 5 seconds
+#define CDC_ACM_CTRL_TRANSFER_SIZE (64)   // Tutte le richieste/risposte CTRL standard rientrano in questa dimensione
+#define CDC_ACM_CTRL_TIMEOUT_MS    (5000) // Ogni dispositivo CDC dovrebbe rispondere a una transfer CTRL entro 5 secondi
 
 // CDC-ACM spinlock
 static portMUX_TYPE cdc_acm_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -112,8 +112,8 @@ static void cdc_acm_reset_in_transfer(cdc_dev_t *cdc_dev)
     uint8_t **ptr = (uint8_t **)(&(transfer->data_buffer));
     *ptr = cdc_dev->data.in_data_buffer_base;
     transfer->num_bytes = transfer->data_buffer_size;
-    // This is a hotfix for IDF changes, where 'transfer->data_buffer_size' does not contain actual buffer length,
-    // but *allocated* buffer length, which can be larger if CONFIG_HEAP_POISONING_COMPREHENSIVE is enabled
+    // Hotfix per cambiamenti IDF: 'transfer->data_buffer_size' contiene la dimensione allocata,
+    // non necessariamente la lunghezza effettiva del buffer; può essere maggiore se abilitato CONFIG_HEAP_POISONING_COMPREHENSIVE
     transfer->num_bytes -= transfer->data_buffer_size % cdc_dev->data.in_mps;
 }
 
@@ -130,7 +130,7 @@ static void cdc_acm_client_task(void *arg)
     cdc_acm_obj_t *cdc_acm_obj = p_cdc_acm_obj; // Make local copy of the driver's handle
     assert(cdc_acm_obj->cdc_acm_client_hdl);
 
-    // Start handling client's events
+    // Avvia la gestione degli eventi del client
     while (1) {
         usb_host_client_handle_events(cdc_acm_obj->cdc_acm_client_hdl, portMAX_DELAY);
         EventBits_t events = xEventGroupGetBits(cdc_acm_obj->event_group);
@@ -187,29 +187,29 @@ static esp_err_t cdc_acm_start(cdc_dev_t *cdc_dev, cdc_acm_host_dev_callback_t e
     cdc_dev->cb_arg = user_arg;
     CDC_ACM_EXIT_CRITICAL();
 
-    // Claim data interface and start polling its IN endpoint
+    // Richiama l'interfaccia dati e avvia il polling del suo endpoint IN
     ESP_GOTO_ON_ERROR(
         usb_host_interface_claim(
             p_cdc_acm_obj->cdc_acm_client_hdl,
             cdc_dev->dev_hdl,
             cdc_dev->data.intf_desc->bInterfaceNumber,
             cdc_dev->data.intf_desc->bAlternateSetting),
-        err, TAG, "Could not claim interface");
+        err, TAG, "Impossibile claimare l'interfaccia");
     if (cdc_dev->data.in_xfer) {
         ESP_LOGD(TAG, "Submitting poll for BULK IN transfer");
         ESP_ERROR_CHECK(usb_host_transfer_submit(cdc_dev->data.in_xfer));
     }
 
-    // If notification are supported, claim its interface and start polling its IN endpoint
-    if (cdc_dev->notif.xfer) {
-        if (cdc_dev->notif.intf_desc != cdc_dev->data.intf_desc) {
+// Se le notifiche sono supportate, claim dell'interfaccia e avvio del polling sull'endpoint IN
+        if (cdc_dev->notif.xfer) {
+            if (cdc_dev->notif.intf_desc != cdc_dev->data.intf_desc) {
             ESP_GOTO_ON_ERROR(
                 usb_host_interface_claim(
                     p_cdc_acm_obj->cdc_acm_client_hdl,
                     cdc_dev->dev_hdl,
                     cdc_dev->notif.intf_desc->bInterfaceNumber,
                     cdc_dev->notif.intf_desc->bAlternateSetting),
-                err, TAG, "Could not claim interface");
+                err, TAG, "Impossibile claimare l'interfaccia");
         }
         ESP_LOGD(TAG, "Submitting poll for INTR IN transfer");
         ESP_ERROR_CHECK(usb_host_transfer_submit(cdc_dev->notif.xfer));
@@ -832,11 +832,11 @@ static void notif_xfer_cb(usb_transfer_t *transfer)
             break;
         }
 
-        // Start polling for new data again
+        // Riprendi il polling per i nuovi dati
         ESP_LOGD(TAG, "Submitting poll for INTR IN transfer");
         usb_host_transfer_submit(cdc_dev->notif.xfer);
     }
-}
+} 
 
 static void out_xfer_cb(usb_transfer_t *transfer)
 {
@@ -974,7 +974,7 @@ esp_err_t cdc_acm_host_data_tx_blocking(cdc_acm_dev_hdl_t cdc_hdl, const uint8_t
     const uint8_t *data_ptr = data;
     size_t remaining = data_len;
 
-    // Record start time for timeout tracking
+    // Registra il tempo di inizio per il calcolo del timeout
     TickType_t start_ticks = xTaskGetTickCount();
     TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
     TickType_t elapsed_ticks = 0;
@@ -993,7 +993,7 @@ esp_err_t cdc_acm_host_data_tx_blocking(cdc_acm_dev_hdl_t cdc_hdl, const uint8_t
         size_t chunk_size = (remaining > buffer_size) ? buffer_size : remaining;
 
         ESP_LOGV(TAG, "Submitting BULK OUT transfer chunk: %zu bytes (remaining: %zu)", chunk_size, remaining);
-        xSemaphoreTake(transfer_finished_semaphore, 0); // Make sure the semaphore is taken before we submit new transfer
+        xSemaphoreTake(transfer_finished_semaphore, 0); // Assicurati che il semaforo sia stato preso prima di inviare una nuova transfer
 
         memcpy(cdc_dev->data.out_xfer->data_buffer, data_ptr, chunk_size);
         cdc_dev->data.out_xfer->num_bytes = chunk_size;

@@ -56,6 +56,7 @@ typedef struct {
  * @brief Struttura di configurazione Display
  */
 typedef struct {
+    bool enabled;              ///< Display abilitato (true = display on, false = headless)
     uint8_t lcd_brightness;     ///< Luminosità LCD (0-100)
 } device_display_config_t;
 
@@ -101,6 +102,14 @@ typedef struct {
 } device_gpios_config_t;
 
 /**
+ * @brief Struttura di configurazione Server/Cloud
+ */
+typedef struct {
+    bool enabled;           ///< Abilita invii al server cloud
+    char url[128];          ///< Base URL del server (es. http://host:port/)
+} device_server_config_t;
+
+/**
  * @brief Struttura di configurazione NTP
  */
 typedef struct {
@@ -127,6 +136,7 @@ typedef struct {
     device_wifi_config_t wifi;
     bool ntp_enabled;           ///< NTP abilitato
     device_ntp_config_t ntp;
+    device_server_config_t server;          ///< Configurazione Server/Cloud (base URL + abilitazione)
     device_remote_log_config_t remote_log;  ///< Configurazione logging remoto
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;

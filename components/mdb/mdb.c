@@ -13,8 +13,10 @@ static const char *TAG = "MDB";
 #define MDB_UART_PORT   CONFIG_APP_MDB_UART_PORT
 #define MDB_TX_GPIO     CONFIG_APP_MDB_TX_GPIO
 #define MDB_RX_GPIO     CONFIG_APP_MDB_RX_GPIO
+#define MDB_COIN_SETUP_MAX_RETRIES 5
 
 static mdb_status_t s_mdb_status = {0};
+static uint8_t s_coin_setup_retries = 0;
 
 const mdb_status_t* mdb_get_status(void) {
     return &s_mdb_status;
@@ -50,6 +52,7 @@ static void mdb_coin_sm(void) {
             ESP_LOGI(TAG, "Gettoniera MDB: Invio RESET...");
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_RESET, NULL, 0);
             vTaskDelay(pdMS_TO_TICKS(500)); // Aspetta reboot periferica
+            s_coin_setup_retries = 0;
             s_mdb_status.coin.state = MDB_STATE_INIT_SETUP;
             break;
 
@@ -58,6 +61,7 @@ static void mdb_coin_sm(void) {
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_SETUP, NULL, 0);
             if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 100) == ESP_OK) {
                 if (rx_len >= 23) {
+                    s_coin_setup_retries = 0;
                     s_mdb_status.coin.feature_level = rx[0];
                     s_mdb_status.coin.currency_code = (rx[1] << 8) | rx[2];
                     s_mdb_status.coin.scaling_factor = rx[3];
@@ -76,7 +80,20 @@ static void mdb_coin_sm(void) {
                     s_mdb_status.coin.is_online = true;
                 } else {
                     ESP_LOGW(TAG, "Gettoniera MDB: Risposta di setup troppo breve (%zu)", rx_len);
+                    s_coin_setup_retries++;
                 }
+            } else {
+                s_coin_setup_retries++;
+            }
+
+            if (s_coin_setup_retries >= MDB_COIN_SETUP_MAX_RETRIES) {
+                device_config_t *cfg = device_config_get();
+                if (cfg) {
+                    cfg->mdb.coin_acceptor_en = false;
+                }
+                s_mdb_status.coin.is_online = false;
+                s_mdb_status.coin.state = MDB_STATE_INACTIVE;
+                ESP_LOGE(TAG, "Gettoniera MDB: setup fallito %u volte, periferica disabilitata a runtime", (unsigned)s_coin_setup_retries);
             }
             break;
 

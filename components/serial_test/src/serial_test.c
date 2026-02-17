@@ -18,6 +18,10 @@ static int  s_ptr_485 = 0;
 static char s_monitor_mdb[MONITOR_BUF_SIZE];
 static int  s_ptr_mdb = 0;
 
+// CCtalk monitor buffer (separato per chiarezza)
+static char s_monitor_cctalk[MONITOR_BUF_SIZE];
+static int  s_ptr_cctalk = 0;
+
 static SemaphoreHandle_t s_monitor_mux = NULL;
 
 void serial_test_init(void) {
@@ -44,8 +48,29 @@ static void add_to_monitor(int port, const uint8_t *data, size_t len, const char
             *ptr += snprintf(buf + *ptr, MONITOR_BUF_SIZE - *ptr, "%s|%02X|%c|", prefix, data[i], c);
             if (*ptr > MONITOR_BUF_SIZE - 40) *ptr = 0; 
         }
+    }
+}
+
+// Pubblica una voce di monitor per CCtalk (o etichetta custom)
+void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size_t len) {
+    if (!s_monitor_mux) return;
+    if (xSemaphoreTake(s_monitor_mux, pdMS_TO_TICKS(100))) {
+        char *buf = NULL;
+        int *ptr = NULL;
+        if (label && strcmp(label, "CCTALK") == 0) { buf = s_monitor_cctalk; ptr = &s_ptr_cctalk; }
+        else { xSemaphoreGive(s_monitor_mux); return; }
+
+        for (size_t i = 0; i < len; ++i) {
+            char c = (isprint(data[i]) ? data[i] : '.');
+            *ptr += snprintf(buf + *ptr, MONITOR_BUF_SIZE - *ptr, "RX<|%02X|%c|", data[i], c);
+            if (*ptr > MONITOR_BUF_SIZE - 40) *ptr = 0;
+        }
         xSemaphoreGive(s_monitor_mux);
     }
+}
+
+const char* serial_test_get_cctalk_monitor(void) {
+    return s_monitor_cctalk;
 }
 
 size_t serial_test_parse_escape(const char *src, uint8_t *dest) {

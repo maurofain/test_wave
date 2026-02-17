@@ -41,8 +41,8 @@ typedef struct
 {
     esp_lcd_panel_io_handle_t io;
     int reset_gpio_num;
-    uint8_t madctl_val; // save current value of LCD_CMD_MADCTL register
-    uint8_t colmod_val; // save surrent value of LCD_CMD_COLMOD register
+    uint8_t madctl_val; /* salva il valore corrente del registro LCD_CMD_MADCTL */
+    uint8_t colmod_val; /* salva il valore corrente del registro LCD_CMD_COLMOD */
     const ili9881c_lcd_init_cmd_t *init_cmds;
     uint16_t init_cmds_size;
     uint8_t lane_num;
@@ -50,7 +50,7 @@ typedef struct
     {
         unsigned int reset_level : 1;
     } flags;
-    // To save the original functions of MIPI DPI panel
+    // Per salvare le funzioni originali del pannello MIPI DPI
     esp_err_t (*del)(esp_lcd_panel_t *panel);
     esp_err_t (*init)(esp_lcd_panel_t *panel);
 } ili9881c_panel_t;
@@ -149,15 +149,15 @@ esp_err_t esp_lcd_new_panel_ili9881c(const esp_lcd_panel_io_handle_t io, const e
 
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    // Create MIPI DPI panel
+    // Crea pannello MIPI DPI
     ESP_GOTO_ON_ERROR(esp_lcd_new_panel_dpi(vendor_config->mipi_config.dsi_bus, vendor_config->mipi_config.dpi_config, ret_panel), err, TAG,
                       "create MIPI DPI panel failed");
     ESP_LOGD(TAG, "new MIPI DPI panel @%p", *ret_panel);
 
-    // Save the original functions of MIPI DPI panel
+    // Salva le funzioni originali del pannello MIPI DPI
     ili9881c->del = (*ret_panel)->del;
     ili9881c->init = (*ret_panel)->init;
-    // Overwrite the functions of MIPI DPI panel
+    // Sovrascrive le funzioni del pannello MIPI DPI
     (*ret_panel)->del = panel_ili9881c_del;
     (*ret_panel)->init = panel_ili9881c_init;
     (*ret_panel)->reset = panel_ili9881c_reset;
@@ -465,7 +465,7 @@ static esp_err_t panel_ili9881c_init(esp_lcd_panel_t *panel)
                         TAG, "send command failed");
 
     // vendor specific initialization, it can be different between manufacturers
-    // should consult the LCD supplier for initialization sequence code
+    // consultare il fornitore del display per la sequenza di inizializzazione
     if (ili9881c->init_cmds)
     {
         init_cmds = ili9881c->init_cmds;
@@ -479,7 +479,7 @@ static esp_err_t panel_ili9881c_init(esp_lcd_panel_t *panel)
 
     for (int i = 0; i < init_cmds_size; i++)
     {
-        // Check if the command has been used or conflicts with the internal
+        // Verifica se il comando è già stato usato o confligge con comandi interni
         if (is_command0_enable && init_cmds[i].data_bytes > 0)
         {
             switch (init_cmds[i].cmd)
@@ -505,7 +505,7 @@ static esp_err_t panel_ili9881c_init(esp_lcd_panel_t *panel)
             }
         }
 
-        // Send command
+        // Invia il comando
         ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(io, init_cmds[i].cmd, init_cmds[i].data, init_cmds[i].data_bytes), TAG, "send command failed");
         vTaskDelay(pdMS_TO_TICKS(init_cmds[i].delay_ms));
 

@@ -75,9 +75,9 @@ static bool cdc_parse_is_cdc_compliant(const usb_device_desc_t *device_desc, con
  */
 static cdc_func_array_t *cdc_parse_functional_descriptors(const usb_intf_desc_t *intf_desc, uint16_t total_len, int desc_offset, int *desc_cnt)
 {
-    // CDC specific descriptors should be right after CDC-Communication interface descriptor
-    // Note: That's why we use usb_parse_next_descriptor instead of usb_parse_next_descriptor_of_type.
-    // The latter could return CDC specific descriptors that don't belong to this interface
+    // I descriptor specifici CDC dovrebbero trovarsi subito dopo il descriptor dell'interfaccia CDC-Communication
+    // Nota: per questo usiamo usb_parse_next_descriptor invece di usb_parse_next_descriptor_of_type.
+    // Quest'ultima potrebbe restituire descriptor CDC che non appartengono a questa interfaccia
     int func_desc_cnt = 0;
     int intf_offset = desc_offset;
     const usb_standard_desc_t *cdc_desc = (const usb_standard_desc_t *)intf_desc;
@@ -141,7 +141,7 @@ esp_err_t cdc_parse_interface_descriptor(const usb_device_desc_t *device_desc, c
 
     const bool cdc_compliant = cdc_parse_is_cdc_compliant(device_desc, config_desc, intf_idx);
     if (cdc_compliant) {
-        info_ret->notif_intf = first_intf_desc; // We make sure that intf_desc is set for CDC compliant devices that use EP0 as notification element
+        info_ret->notif_intf = first_intf_desc; // Ci assicuriamo che intf_desc sia impostato per dispositivi CDC-compliant che usano EP0 come elemento di notifica
         info_ret->func = cdc_parse_functional_descriptors(first_intf_desc, config_desc->wTotalLength, desc_offset, &info_ret->func_cnt);
     }
 
@@ -180,7 +180,7 @@ esp_err_t cdc_parse_interface_descriptor(const usb_device_desc_t *device_desc, c
 void cdc_print_desc(const usb_standard_desc_t *_desc)
 {
     if (_desc->bDescriptorType != ((USB_CLASS_COMM << 4) | USB_B_DESCRIPTOR_TYPE_INTERFACE )) {
-        // Quietly return in case that this descriptor is not CDC interface descriptor
+        // Ritorna silenziosamente se questo descriptor non è di tipo CDC interface
         return;
     }
 

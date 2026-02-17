@@ -248,9 +248,9 @@ static esp_eth_handle_t eth_init_internal(void)
     esp32_emac_config.smi_gpio.mdc_num = CONFIG_APP_ETH_MDC_GPIO;
     esp32_emac_config.smi_gpio.mdio_num = CONFIG_APP_ETH_MDIO_GPIO;
 
-    // Create new ESP32 Ethernet MAC instance
+    // Crea istanza MAC Ethernet ESP32
     esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
-    // Create new PHY instance (IP101 for ESP32-P4 Module DEV KIT)
+    // Crea istanza PHY (IP101 per ESP32-P4 Module DEV KIT)
     esp_eth_phy_t *phy = esp_eth_phy_new_ip101(&phy_config);
     // Inizializza il driver Ethernet ai valori di default e installalo
     esp_eth_handle_t eth_handle = NULL;

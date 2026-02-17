@@ -1,5 +1,8 @@
 #include "cctalk.h"
 #include "driver/uart.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <string.h>
 
 #define CCTALK_UART_BUF_SIZE 256

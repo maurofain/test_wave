@@ -36,6 +36,7 @@
 #include "led.h"
 #include "device_config.h"
 #include "mdb.h"
+extern esp_err_t cctalk_driver_init(void); /* forward decl - header in components/cctalk */
 #include "web_ui.h"
 #include "sdkconfig.h"
 #include "bsp/esp-bsp.h"
@@ -57,6 +58,14 @@
 #endif
 
 static const char *TAG = "INIT";
+
+/*
+ * Forzatura temporanea: disabilita SEMPRE la parte video (LVGL + LCD + touch + backlight).
+ *
+ * Impostare a 1 per modalità headless forzata, indipendentemente da /config.
+ * Impostare a 0 per tornare al comportamento normale basato su cfg->display.enabled.
+ */
+#define FORCE_VIDEO_DISABLED 1
 
 static esp_netif_t *s_netif_ap;
 static esp_netif_t *s_netif_sta;
@@ -231,12 +240,12 @@ static void ntp_sync_callback(struct timeval *tv)
 {
     device_config_t *cfg = device_config_get();
     
-    // Apply timezone offset
+    // Applica l'offset del fuso orario
     if (cfg->ntp.timezone_offset != 0) {
-        // Adjust time by timezone offset (in seconds)
+        // Regola l'ora aggiungendo l'offset (in secondi)
         tv->tv_sec += (cfg->ntp.timezone_offset * 3600);
         settimeofday(tv, NULL);
-        ESP_LOGI(TAG, "[NTP] Applied timezone offset: %+d hours", cfg->ntp.timezone_offset);
+        ESP_LOGI(TAG, "[NTP] Offset del fuso orario applicato: %+d ore", cfg->ntp.timezone_offset);
     }
     
     time_t now = time(NULL);
@@ -246,10 +255,10 @@ static void ntp_sync_callback(struct timeval *tv)
              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec, cfg->ntp.timezone_offset);
     
-    // When NTP sync succeeds, increase interval to 1 hour (3600000 ms)
-    // This prevents continuous sync attempts when time is already correct
+    // Quando la sincronizzazione NTP ha successo, aumenta l'intervallo a 1 ora (3600000 ms)
+    // Evita tentativi continui quando l'ora è già corretta
     sntp_set_sync_interval(3600000);
-    ESP_LOGI(TAG, "[NTP] Sync interval changed to 1 hour (time is synchronized)");
+    ESP_LOGI(TAG, "[NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)");
 }
 
 static void init_sntp(void)
@@ -262,21 +271,21 @@ static void init_sntp(void)
     esp_sntp_setservername(0, cfg->ntp.server1);
     esp_sntp_setservername(1, cfg->ntp.server2);
     
-    // Set callback for successful NTP sync
+    // Imposta la callback da chiamare alla sincronizzazione NTP riuscita
     esp_sntp_set_time_sync_notification_cb(ntp_sync_callback);
     
     esp_sntp_init();
 
-    // Set sync mode to immediate for faster initial sync
+    // Imposta la modalità di sincronizzazione su "immediata" per velocizzare la sync iniziale
     sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
 
-    // Start with 5 minute interval for initial sync attempts
+    // Avvia con intervallo di 5 minuti per i tentativi di sincronizzazione iniziali
     sntp_set_sync_interval(300000);
 
-    ESP_LOGI(TAG, "[NTP] SNTP initialized - synchronization will happen in background");
+    ESP_LOGI(TAG, "[NTP] SNTP inizializzato - la sincronizzazione avverrà in background");
 
-    // Note: Removed blocking wait loop - NTP sync will happen asynchronously
-    // The system can continue initialization while NTP syncs in background
+    // Nota: rimosso il loop di attesa bloccante — la sincronizzazione NTP è asincrona
+    // Il sistema può proseguire l'inizializzazione mentre NTP si sincronizza in background
 }
 
 /**
@@ -299,13 +308,13 @@ esp_err_t init_sync_ntp(void)
     
     ESP_LOGI(TAG, "[NTP] Forcing NTP synchronization...");
     
-    // Restart SNTP to force sync
+    // Riavvia SNTP per forzare la sincronizzazione
     esp_sntp_restart();
     
-    ESP_LOGI(TAG, "[NTP] NTP sync request sent - will complete in background");
+    ESP_LOGI(TAG, "[NTP] Richiesta di sincronizzazione inviata — completamento in background");
     
-    // Note: Removed blocking wait - sync happens asynchronously
-    // The web interface can poll the status if needed
+    // Nota: rimosso il wait bloccante — la sincronizzazione è asincrona
+    // L'interfaccia web può interrogare lo stato se necessario
     
     return ESP_OK;
 }
@@ -404,9 +413,9 @@ static esp_eth_handle_t eth_init_internal(void)
     esp32_emac_config.smi_gpio.mdc_num = CONFIG_APP_ETH_MDC_GPIO;
     esp32_emac_config.smi_gpio.mdio_num = CONFIG_APP_ETH_MDIO_GPIO;
 
-    // Create new ESP32 Ethernet MAC instance
+    // Crea istanza MAC Ethernet ESP32
     esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
-    // Create new PHY instance (IP101 for ESP32-P4 Module DEV KIT)
+    // Crea istanza PHY (IP101 per ESP32-P4 Module DEV KIT)
     esp_eth_phy_t *phy = esp_eth_phy_new_ip101(&phy_config);
     // Inizializza il driver Ethernet ai valori di default e installalo
     esp_eth_handle_t eth_handle = NULL;
@@ -566,10 +575,10 @@ static void lvgl_show_minimal_screen(void)
     lv_obj_set_style_text_color(time_label, lv_color_make(0xEE, 0xEE, 0xEE), LV_PART_MAIN);
     lv_obj_center(time_label);
     
-    // Initial time update
+    // Aggiorna l'orario iniziale
     update_time_display(NULL);
     
-    // Create timer to update time every second
+    // Crea un timer per aggiornare l'orario ogni secondo
     lv_timer_create(update_time_display, 1000, NULL);
 
     bsp_display_unlock();
@@ -618,7 +627,7 @@ static esp_err_t init_display_lvgl_minimal(void)
     device_config_t *device_cfg = device_config_get();
     ESP_RETURN_ON_ERROR(bsp_display_brightness_set(device_cfg->display.lcd_brightness), TAG, "brightness set failed");
 
-    // Initialize touch
+    // Inizializza il touch
     bsp_touch_config_t touch_cfg = {
         .dummy = NULL,
     };
@@ -668,14 +677,26 @@ esp_err_t init_run_factory(void)
     // Inizializza GPIO ausiliari
     aux_gpio_init();
 
-    // Display + LVGL (minimal screen)
-    esp_err_t disp_ret = init_display_lvgl_minimal();
-    if (disp_ret != ESP_OK)
-    {
-        ESP_LOGW(TAG, "[M] Display/LVGL init failed: %s", esp_err_to_name(disp_ret));
-    }
-
+    // Display + LVGL (minimal screen) - skip se headless
     device_config_t *cfg = device_config_get();
+
+#if FORCE_VIDEO_DISABLED
+    /* Override runtime: blocca ogni inizializzazione video in questa build */
+    if (cfg->display.enabled) {
+        ESP_LOGW(TAG, "[M] FORCE_VIDEO_DISABLED attivo: disabilito display da runtime");
+    }
+    cfg->display.enabled = false;
+#endif
+
+    if (cfg->display.enabled) {
+        esp_err_t disp_ret = init_display_lvgl_minimal();
+        if (disp_ret != ESP_OK)
+        {
+            ESP_LOGW(TAG, "[M] Display/LVGL init failed: %s", esp_err_to_name(disp_ret));
+        }
+    } else {
+        ESP_LOGI(TAG, "[M] Display disabilitato da config: salto init LVGL/display (modalità headless)");
+    }
 
     // Ethernet - continua anche se fallisce
     if (cfg->eth.enabled)
@@ -730,7 +751,12 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.led_enabled)
     {
-        ESP_ERROR_CHECK(led_init());
+        esp_err_t led_ret = led_init();
+        if (led_ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "[M] Inizializzazione LED fallita (%s): periferica disabilitata a runtime", esp_err_to_name(led_ret));
+            cfg->sensors.led_enabled = false;
+        }
     }
     else
     {
@@ -739,7 +765,18 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.rs232_enabled)
     {
-        ESP_ERROR_CHECK(rs232_init());
+        esp_err_t rs232_ret = rs232_init();
+        if (rs232_ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "[M] Inizializzazione RS232 fallita (%s): periferica disabilitata a runtime", esp_err_to_name(rs232_ret));
+            cfg->sensors.rs232_enabled = false;
+        } else {
+            /* Avvia anche il driver CCtalk (se presente) che usa la stessa UART fisica */
+            esp_err_t cctalk_ret = cctalk_driver_init();
+            if (cctalk_ret != ESP_OK) {
+                ESP_LOGW(TAG, "CCTALK driver non avviato: %s", esp_err_to_name(cctalk_ret));
+            }
+        }
     }
     else
     {
@@ -748,7 +785,12 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.rs485_enabled)
     {
-        ESP_ERROR_CHECK(rs485_init());
+        esp_err_t rs485_ret = rs485_init();
+        if (rs485_ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "[M] Inizializzazione RS485 fallita (%s): periferica disabilitata a runtime", esp_err_to_name(rs485_ret));
+            cfg->sensors.rs485_enabled = false;
+        }
     }
     else
     {
@@ -757,8 +799,17 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.mdb_enabled)
     {
-        ESP_ERROR_CHECK(mdb_init());
-        ESP_ERROR_CHECK(mdb_start_engine());
+        esp_err_t mdb_ret = mdb_init();
+        if (mdb_ret == ESP_OK)
+        {
+            mdb_ret = mdb_start_engine();
+        }
+
+        if (mdb_ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "[M] Inizializzazione MDB fallita (%s): periferica disabilitata a runtime", esp_err_to_name(mdb_ret));
+            cfg->sensors.mdb_enabled = false;
+        }
     }
     else
     {
@@ -767,7 +818,13 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled)
     {
-        ESP_ERROR_CHECK(pwm_init());
+        esp_err_t pwm_ret = pwm_init();
+        if (pwm_ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "[M] Inizializzazione PWM fallita (%s): PWM1/PWM2 disabilitati a runtime", esp_err_to_name(pwm_ret));
+            cfg->sensors.pwm1_enabled = false;
+            cfg->sensors.pwm2_enabled = false;
+        }
     }
     else
     {
@@ -779,7 +836,8 @@ esp_err_t init_run_factory(void)
         esp_err_t sht_ret = sht40_init();
         if (sht_ret != ESP_OK)
         {
-            ESP_LOGE(TAG, "[M] Inizializzazione SHT40 fallita!");
+            ESP_LOGE(TAG, "[M] Inizializzazione SHT40 fallita! Sensore temperatura disabilitato a runtime");
+            cfg->sensors.temperature_enabled = false;
         }
     }
 
@@ -791,7 +849,8 @@ esp_err_t init_run_factory(void)
         esp_err_t sd_ret = sd_card_mount();
         if (sd_ret != ESP_OK)
         {
-            ESP_LOGW(TAG, "[M] Montaggio SD Card salvato, continuo senza");
+            ESP_LOGE(TAG, "[M] Inizializzazione SD Card fallita (%s): periferica disabilitata a runtime", esp_err_to_name(sd_ret));
+            cfg->sensors.sd_card_enabled = false;
         }
     }
     else
