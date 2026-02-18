@@ -21,9 +21,6 @@ static const char *HTML_STYLE_NAV =
 // Nota: questa funzione è usata da diverse pagine; non è più `static` perché
 // sarà condivisa tra i file del componente web_ui dopo lo split.
 esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style, bool show_nav) {
-    char *buf = malloc(4096);
-    if (!buf) return ESP_ERR_NO_MEM;
-
     // Get current time
     time_t now = time(NULL);
     struct tm timeinfo;
@@ -38,7 +35,35 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         ? "<a href='/emulator' style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>Emulatore</a>"
         : "";
 
-    snprintf(buf, 4096,
+    int needed = snprintf(
+        NULL,
+        0,
+        "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>%s</title><style>"
+        "body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
+        ".container{max-width:1000px;margin:20px auto;padding:0 20px}" 
+        "%s %s"
+        "</style></head><body>"
+        "<header>"
+        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s [%s] - %s</h1>%s</div>"
+        "<div style='text-align:right;font-size:12px;opacity:0.8;'>v%s (%s)</div>"
+        "</header>"
+        "%s"
+        "<script>/* Global fetch wrapper: injects Authorization */"
+        "(function(){if(window.__auth_wrapped) return; window.__auth_wrapped=true; const _fetch = window.fetch.bind(window);"
+        "window.setAuthToken = function(t){ if(t) localStorage.setItem('httpservices_token', t); else localStorage.removeItem('httpservices_token'); };"
+        "window.getAuthToken = function(){ return localStorage.getItem('httpservices_token'); };"
+        "window.clearAuthToken = function(){ localStorage.removeItem('httpservices_token'); };"
+        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
+    if (needed < 0) {
+        return ESP_FAIL;
+    }
+
+    char *buf = malloc((size_t)needed + 1);
+    if (!buf) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    snprintf(buf, (size_t)needed + 1,
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>%s</title><style>"
         "body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
         ".container{max-width:1000px;margin:20px auto;padding:0 20px}" 
