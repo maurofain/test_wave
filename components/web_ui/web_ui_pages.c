@@ -12,6 +12,7 @@
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
 #include "mdb.h"
+#include "app_version.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -48,6 +49,13 @@ void uart_test_task(void *arg)
 /* Handler della Homepage (spostato qui) */
 esp_err_t root_get_handler(httpd_req_t *req)
 {
+    bool show_test = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_TEST);
+    bool show_httpservices = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_HTTP_SERVICES);
+    bool show_emulator = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_EMULATOR);
+    const char *profile_label = web_ui_profile_view_label();
+    const bool is_factory_view = (strcmp(profile_label, "Factory View") == 0);
+    const char *home_title = is_factory_view ? "Factory Console" : "MH1001 control";
+
     const char *extra_style =
         ".card{background:white;padding:25px;margin:20px 0;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:.3s}"
         ".card:hover{transform:translateY(-5px)}h2{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;margin-top:0}"
@@ -61,35 +69,115 @@ esp_err_t root_get_handler(httpd_req_t *req)
         ".btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Factory Console", extra_style, false);
+    send_head(req, home_title, extra_style, false);
 
-    const char *body =
+    const char *test_link = show_test
+        ? "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
+        : "";
+
+    const char *httpservices_link = show_httpservices
+        ? "<a href='/httpservices' class='btn-link'><span class='icon'>🔐</span><span>HTTP Services</span></a>"
+        : "";
+
+    const char *emulator_link = show_emulator
+        ? "<a href='/emulator' class='btn-link btn-emu'><span class='icon'>🕹️</span><span>Emulator</span></a>"
+        : "";
+
+    const char *info_text = show_emulator
+        ? "Benvenuti nell'interfaccia di configurazione e test."
+        : "Benvenuti nell'interfaccia APP.";
+
+    int body_len = snprintf(NULL, 0,
         "<div class='container'><div class='grid'>"
         "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
-        "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
-        "<a href='/httpservices' class='btn-link'><span class='icon'>🔐</span><span>HTTP Services</span></a>"
-        "<a href='/emulator' class='btn-link btn-emu'><span class='icon'>🕹️</span><span>Emulator</span></a>"
+        "%s"
+        "%s"
+        "%s"
         "<a href='/api' class='btn-link'><span class='icon'>🔗</span><span>API Endpoints</span></a>"
         "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
-        "<p>Benvenuti nell'interfaccia di configurazione e test.</p>"
+        "<p><strong>Profilo:</strong> %s</p>"
+        "<p><strong>Firmware:</strong> %s</p>"
+        "<p>%s</p>"
         "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
-        "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>Reboot in Factory</a> "
-        "<a href='/reboot/app' class='btn-reboot' style='background:#27ae60;'>Reboot in App</a>"
+        "<h3 style='margin:0 0 10px 0;color:#2c3e50;'>Reboot</h3>"
+        "<div style='display:flex;flex-wrap:wrap;gap:8px;'>"
+        "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>FACTORY</a>"
+        "<a href='/reboot/app_last' class='btn-reboot' style='background:#27ae60;'>APP LAST</a>"
+        "<a href='/reboot/ota0' class='btn-reboot' style='background:#2980b9;'>OTA0</a>"
+        "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
         "</div>"
         "</div>"
-        "</div></body></html>";
+        "</div>"
+        "</div></body></html>",
+        test_link,
+        httpservices_link,
+        emulator_link,
+        profile_label,
+        APP_VERSION,
+        info_text);
+
+    if (body_len < 0) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    char *body = malloc((size_t)body_len + 1);
+    if (!body) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    snprintf(body, (size_t)body_len + 1,
+        "<div class='container'><div class='grid'>"
+        "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
+        "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
+        "%s"
+        "%s"
+        "%s"
+        "<a href='/api' class='btn-link'><span class='icon'>🔗</span><span>API Endpoints</span></a>"
+        "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
+        "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
+        "</div>"
+        "<div class='card'><h2>ℹ️ Informazioni</h2>"
+        "<p><strong>Profilo:</strong> %s</p>"
+        "<p><strong>Firmware:</strong> %s</p>"
+        "<p>%s</p>"
+        "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
+        "<h3 style='margin:0 0 10px 0;color:#2c3e50;'>Reboot</h3>"
+        "<div style='display:flex;flex-wrap:wrap;gap:8px;'>"
+        "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>FACTORY</a>"
+        "<a href='/reboot/app_last' class='btn-reboot' style='background:#27ae60;'>APP LAST</a>"
+        "<a href='/reboot/ota0' class='btn-reboot' style='background:#2980b9;'>OTA0</a>"
+        "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
+        "</div>"
+        "</div>"
+        "</div>"
+        "</div></body></html>",
+        test_link,
+        httpservices_link,
+        emulator_link,
+        profile_label,
+        APP_VERSION,
+        info_text);
 
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
+    free(body);
     return ESP_OK;
 }
 
 esp_err_t emulator_page_handler(httpd_req_t *req)
 {
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_EMULATOR)) {
+        httpd_resp_set_status(req, "404 Not Found");
+        httpd_resp_send(req, "404 Not Found", -1);
+        return ESP_FAIL;
+    }
+
     const char *extra_style =
         ".emu-wrap{max-width:1400px;margin:20px auto;padding:0 20px;box-sizing:border-box;display:flex;gap:18px;align-items:flex-start}"
         ".emu-display{width:800px;height:1280px;background:#111;border-radius:16px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,0.25);box-sizing:border-box}"
@@ -97,6 +185,7 @@ esp_err_t emulator_page_handler(httpd_req_t *req)
         ".emu-left{width:30%;display:grid;grid-template-rows:repeat(8,1fr);gap:10px}"
         ".prog-btn{border:none;border-radius:10px;background:#2c3e50;color:#fff;font-size:22px;font-weight:bold;cursor:pointer}"
         ".prog-btn.active{background:#3498db}"
+        ".prog-btn:disabled{opacity:.45;cursor:not-allowed}"
         ".emu-main{width:60%;display:flex;flex-direction:column;gap:14px}"
         ".credit-box{background:#fdfdfd;border-radius:12px;padding:20px;flex:0 0 38%;display:flex;align-items:center;justify-content:center;flex-direction:column}"
         ".credit-label{font-size:22px;color:#2c3e50}"
@@ -112,6 +201,8 @@ esp_err_t emulator_page_handler(httpd_req_t *req)
         ".coin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}"
         ".coin-btn{border:none;border-radius:8px;background:#27ae60;color:#fff;padding:12px 8px;font-size:18px;font-weight:bold;cursor:pointer}"
         ".coin-btn:hover{background:#219150}"
+        ".home-btn{display:block;text-align:center;text-decoration:none;background:#3498db;color:#fff;padding:10px 12px;border-radius:8px;font-weight:bold;margin-bottom:14px}"
+        ".home-btn:hover{background:#2980b9}"
         ".relay-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}"
         ".relay{border-radius:8px;background:#d5d8dc;color:#2c3e50;padding:10px 4px;text-align:center;font-weight:bold;font-size:14px}"
         ".relay.on{background:#f39c12;color:#fff}"
@@ -145,6 +236,7 @@ esp_err_t emulator_page_handler(httpd_req_t *req)
         "</div>"
         "</div></div>"
         "<div class='emu-side'>"
+        "<a href='/' class='home-btn'>🏠 Home</a>"
         "<h2 class='side-title'>Ricarica Coin</h2>"
         "<div class='coin-grid'>"
         "<button class='coin-btn' data-coin='1'>+1</button>"
@@ -176,19 +268,25 @@ esp_err_t emulator_page_handler(httpd_req_t *req)
         "const msgEl=document.getElementById('msg');"
         "const maskEl=document.getElementById('gmask');"
         "const gaugeText=document.getElementById('gtext');"
-        "let credit=100;let activeProgram=0;"
+        "const minCreditToStart=10;"
+        "let credit=0;let activeProgram=0;"
         "function dispatchHardwareCommand(type,payload){"
         "  const detail={type:type,payload:payload,timestamp:Date.now()};"
         "  window.dispatchEvent(new CustomEvent('emulator:hardware-command',{detail:detail}));"
         "  console.log('[EMULATOR_CMD]',detail);"
+        "}"
+        "function updateProgramAvailability(){"
+        "  const enabled=credit>=minCreditToStart;"
+        "  buttons.forEach(function(btn){btn.disabled=!enabled;});"
+        "  if(!enabled&&activeProgram===0){msgEl.textContent='Credito insufficiente: ricarica almeno '+minCreditToStart+' coin';}"
         "}"
         "function updateRelays(programId){"
         "  relays.forEach(function(r){r.classList.remove('on');});"
         "  if(programId>0&&programId<=10){const target=relays[programId-1];if(target)target.classList.add('on');}"
         "  dispatchHardwareCommand('relay_update',{program:programId});"
         "}"
-        "function render(){const clamped=Math.max(0,Math.min(100,credit));creditEl.textContent=String(clamped);gaugeText.textContent=clamped+'%';maskEl.style.height=(100-clamped)+'%';}"
-        "buttons.forEach(function(btn){btn.addEventListener('click',function(){buttons.forEach(function(b){b.classList.remove('active');});btn.classList.add('active');activeProgram=parseInt(btn.dataset.id||'0',10);msgEl.textContent='Programma '+activeProgram+' avviato';updateRelays(activeProgram);dispatchHardwareCommand('program_start',{program:activeProgram});});});"
+        "function render(){const clamped=Math.max(0,Math.min(100,credit));creditEl.textContent=String(clamped);gaugeText.textContent=clamped+'%';maskEl.style.height=(100-clamped)+'%';updateProgramAvailability();}"
+        "buttons.forEach(function(btn){btn.addEventListener('click',function(){if(credit<minCreditToStart)return;buttons.forEach(function(b){b.classList.remove('active');});btn.classList.add('active');activeProgram=parseInt(btn.dataset.id||'0',10);msgEl.textContent='Programma '+activeProgram+' avviato';updateRelays(activeProgram);dispatchHardwareCommand('program_start',{program:activeProgram});});});"
         "coinButtons.forEach(function(btn){btn.addEventListener('click',function(){const delta=parseInt(btn.dataset.coin||'0',10);credit=Math.min(100,credit+delta);render();msgEl.textContent='Ricarica +'+delta+' coin';dispatchHardwareCommand('coin_add',{value:delta,current_credit:credit});});});"
         "setInterval(function(){if(activeProgram===0)return;if(credit<=0){msgEl.textContent='Credito terminato. Seleziona un programma o ricarica.';activeProgram=0;buttons.forEach(function(b){b.classList.remove('active');});updateRelays(0);dispatchHardwareCommand('program_stop',{reason:'credit_end'});return;}credit=Math.max(0,credit-1);render();},1000);"
         "render();"

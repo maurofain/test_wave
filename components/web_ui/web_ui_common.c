@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
+#include "esp_ota_ops.h"
 #include <lwip/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +33,11 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         strftime(time_str, sizeof(time_str), "%H:%M:%S", &timeinfo);
     }
 
+    const bool is_app_home = (req && strcmp(req->uri, "/") == 0 && web_ui_feature_enabled(WEB_UI_FEATURE_HOME_EMULATOR));
+    const char *emu_button = is_app_home
+        ? "<a href='/emulator' style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>Emulatore</a>"
+        : "";
+
     snprintf(buf, 4096,
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>%s</title><style>"
         "body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}"
@@ -39,7 +45,7 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "%s %s"
         "</style></head><body>"
         "<header>"
-        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s [%s] - %s</h1></div>"
+        "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>%s [%s] - %s</h1>%s</div>"
         "<div style='text-align:right;font-size:12px;opacity:0.8;'>v%s (%s)</div>"
         "</header>"
         "%s"
@@ -48,7 +54,7 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "window.setAuthToken = function(t){ if(t) localStorage.setItem('httpservices_token', t); else localStorage.removeItem('httpservices_token'); };"
         "window.getAuthToken = function(){ return localStorage.getItem('httpservices_token'); };"
         "window.clearAuthToken = function(){ localStorage.removeItem('httpservices_token'); };"
-        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
+        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
     httpd_resp_sendstr_chunk(req, buf);
     free(buf);
     return ESP_OK;
@@ -104,4 +110,21 @@ esp_err_t perform_ota(const char *url)
         esp_restart();
     }
     return ret;
+}
+
+static bool is_factory_runtime(void)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    return (running && running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
+}
+
+const char *web_ui_profile_view_label(void)
+{
+    return is_factory_runtime() ? "Factory View" : "App View";
+}
+
+bool web_ui_feature_enabled(web_ui_feature_t feature)
+{
+    bool is_factory = is_factory_runtime();
+    return web_ui_scope_allows(web_ui_feature_scope(feature), is_factory);
 }

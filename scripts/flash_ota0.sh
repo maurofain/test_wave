@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script per il flash della sola partizione OTA_0 (5MB - Test OTA localmente)
+# Script per il flash della sola partizione OTA_0 (0x5A0000 ≈ 5.625 MB - Test OTA localmente)
 # Utilizzo: ./scripts/flash_ota0.sh [-p /dev/ttyPORT] [-b BAUD] [-m]
 
 PORT="/dev/ttyACM0"
@@ -15,16 +15,21 @@ while getopts "p:b:m" opt; do
   esac
 done
 
-CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash 0x310000 build/test_wave.bin"
+CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0x310000 build/test_wave.bin"
 
-echo "🚀 Avvio flash partizione OTA_0 (5MB) su $PORT a $BAUD baud..."
+echo "🚀 Avvio flash partizione OTA_0"
+echo "   Porta: $PORT"
+echo "   Baud: $BAUD"
+echo "   Offset: 0x310000"
+echo "   Size: 0x5A0000 (≈ 5.625 MB)"
+echo "   Immagine: build/test_wave.bin"
 echo "📝 Comando: $CMD"
 echo ""
 
 eval $CMD
 
 if [ $? -eq 0 ]; then
-    echo "✅ Flash OTA_0 completato!"
+  echo "✅ Flash OTA_0 completato"
   if [ -z "$IDF_PATH" ] && [ -f "$HOME/esp/esp-idf/export.sh" ]; then
     . "$HOME/esp/esp-idf/export.sh" >/dev/null 2>&1
   fi
@@ -50,6 +55,6 @@ if [ $? -eq 0 ]; then
         idf.py monitor -p "$PORT" -b 115200
     fi
 else
-    echo "❌ Errore durante il flash."
+  echo "❌ Errore durante il flash OTA_0"
     exit 1
 fi

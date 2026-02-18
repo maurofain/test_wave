@@ -107,6 +107,68 @@ esp_err_t reboot_app_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t reboot_app_last_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in App Last...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_app_last();
+    return ESP_OK;
+}
+
+esp_err_t reboot_ota0_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in OTA0...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_ota0();
+    return ESP_OK;
+}
+
+esp_err_t reboot_ota1_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in OTA1...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_ota1();
+    return ESP_OK;
+}
+
+static esp_err_t emulator_page_handler_local(httpd_req_t *req)
+{
+    const char *extra_style =
+        ".emu-wrap{max-width:1100px;margin:20px auto;padding:0 20px;box-sizing:border-box;display:flex;gap:18px;align-items:flex-start}"
+        ".emu-display{width:800px;height:800px;background:#111;border-radius:16px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,0.25);box-sizing:border-box}"
+        ".emu-title{color:#fff;font-size:24px;font-weight:bold;margin:0 0 14px 0}"
+        ".emu-card{background:#fdfdfd;border-radius:12px;padding:20px;color:#2c3e50}"
+        ".emu-side{width:260px;background:#ffffff;border-radius:16px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.12);box-sizing:border-box}"
+        ".home-btn{display:block;text-align:center;text-decoration:none;background:#3498db;color:#fff;padding:10px 12px;border-radius:8px;font-weight:bold;margin-bottom:14px}"
+        ".home-btn:hover{background:#2980b9}"
+        ".btn{display:block;text-align:center;text-decoration:none;background:#8e44ad;color:#fff;padding:12px;border-radius:8px;font-weight:bold;margin-top:10px}"
+        ".btn:hover{background:#7d3c98}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Emulator", extra_style, true);
+
+    const char *body =
+        "<div class='emu-wrap'>"
+        "<div class='emu-display'>"
+        "<h2 class='emu-title'>Emulatore pannello</h2>"
+        "<div class='emu-card'>"
+        "<p>Pagina emulatore attiva in modalità APP.</p>"
+        "<p>Usa questa pagina come punto di ingresso per i test operativi prima delle API.</p>"
+        "<p>L'accesso è previsto nel contesto operativo applicativo.</p>"
+        "</div>"
+        "</div>"
+        "<div class='emu-side'>"
+        "<a href='/' class='home-btn'>🏠 Home</a>"
+        "<a href='/api' class='btn'>API</a>"
+        "<a href='/test' class='btn'>Test Hardware</a>"
+        "</div>"
+        "</div></body></html>";
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
 // Handler della Homepage
 esp_err_t root_get_handler(httpd_req_t *req)
 {
@@ -136,12 +198,15 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "</div>"
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
         "<p>Benvenuti nell'interfaccia di configurazione e test.</p>"
-        "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px; display:flex; justify-content:space-between; align-items:center; gap:10px;'>"
-        "<div>"
-        "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>Reboot in Factory</a> "
-        "<a href='/reboot/app' class='btn-reboot' style='background:#27ae60;'>Reboot in App</a>"
-        "</div>"
+        "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
+        "<h3 style='margin:0 0 10px 0;color:#2c3e50;'>Reboot</h3>"
+        "<div style='display:flex;flex-wrap:wrap;gap:8px;'>"
+        "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>FACTORY</a>"
+        "<a href='/reboot/app_last' class='btn-reboot' style='background:#27ae60;'>APP LAST</a>"
+        "<a href='/reboot/ota0' class='btn-reboot' style='background:#2980b9;'>OTA0</a>"
+        "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
+        "</div>"
         "</div>"
         "</div>"
         "</div></body></html>";
@@ -2667,12 +2732,26 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     // Register API handlers from http_services component
     http_services_register_handlers(server);
 
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_EMULATOR)) {
+        httpd_uri_t uri_emulator = {.uri = "/emulator", .method = HTTP_GET, .handler = emulator_page_handler_local};
+        httpd_register_uri_handler(server, &uri_emulator);
+    }
+
     // Reboot Handlers
     httpd_uri_t uri_reboot_factory = {.uri = "/reboot/factory", .method = HTTP_GET, .handler = reboot_factory_handler};
     httpd_register_uri_handler(server, &uri_reboot_factory);
 
     httpd_uri_t uri_reboot_app = {.uri = "/reboot/app", .method = HTTP_GET, .handler = reboot_app_handler};
     httpd_register_uri_handler(server, &uri_reboot_app);
+
+    httpd_uri_t uri_reboot_app_last = {.uri = "/reboot/app_last", .method = HTTP_GET, .handler = reboot_app_last_handler};
+    httpd_register_uri_handler(server, &uri_reboot_app_last);
+
+    httpd_uri_t uri_reboot_ota0 = {.uri = "/reboot/ota0", .method = HTTP_GET, .handler = reboot_ota0_handler};
+    httpd_register_uri_handler(server, &uri_reboot_ota0);
+
+    httpd_uri_t uri_reboot_ota1 = {.uri = "/reboot/ota1", .method = HTTP_GET, .handler = reboot_ota1_handler};
+    httpd_register_uri_handler(server, &uri_reboot_ota1);
 
     httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, not_found_handler);
 

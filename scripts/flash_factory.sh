@@ -15,21 +15,34 @@ while getopts "p:b:m" opt; do
   esac
 done
 
-CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash 0x10000 build/test_wave.bin"
+CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0x10000 build/test_wave.bin"
 
-echo "🚀 Avvio flash partizione FACTORY su $PORT a $BAUD baud..."
+echo "🚀 Avvio flash partizione FACTORY"
+echo "   Porta: $PORT"
+echo "   Baud: $BAUD"
+echo "   Offset: 0x10000"
+echo "   Immagine: build/test_wave.bin"
 echo "📝 Comando: $CMD"
 echo ""
 
 eval $CMD
 
 if [ $? -eq 0 ]; then
-    echo "✅ Flash Factory completato!"
+  echo "✅ Flash FACTORY completato"
+  BOOT_SCRIPT="$(dirname "$0")/select_boot_partition.sh"
+  if [ -x "$BOOT_SCRIPT" ]; then
+    echo "🔁 Imposto il prossimo boot su FACTORY..."
+    "$BOOT_SCRIPT" -f -p "$PORT" -b "$BAUD"
+  else
+    echo "⚠️  Script boot selector non trovato o non eseguibile: $BOOT_SCRIPT"
+    echo "   Esegui manualmente: ./scripts/select_boot_partition.sh -f -p $PORT -b $BAUD"
+  fi
+
     if [ "$MONITOR" = true ]; then
         echo "🖥️  Avvio monitor (115200 baud)..."
         idf.py monitor -p "$PORT" -b 115200
     fi
 else
-    echo "❌ Errore durante il flash."
+  echo "❌ Errore durante il flash FACTORY"
     exit 1
 fi

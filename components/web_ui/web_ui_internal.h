@@ -3,6 +3,7 @@
 #include "esp_http_server.h"
 #include "esp_err.h"
 #include "esp_netif.h"
+#include "web_ui_profile.h"
 #include <stdbool.h>
 
 // Helper interni esportati tra i file di web_ui (NON API pubblica)
@@ -55,6 +56,9 @@ esp_err_t api_debug_usb_restart(httpd_req_t *req);
 // Reboot handlers
 esp_err_t reboot_factory_handler(httpd_req_t *req);
 esp_err_t reboot_app_handler(httpd_req_t *req);
+esp_err_t reboot_app_last_handler(httpd_req_t *req);
+esp_err_t reboot_ota0_handler(httpd_req_t *req);
+esp_err_t reboot_ota1_handler(httpd_req_t *req);
 
 // Task handles and helpers used across web_ui files
 extern TaskHandle_t s_rs232_test_handle;
@@ -64,6 +68,10 @@ void uart_test_task(void *arg);
 // Helper spostati in web_ui_common.c e usati da più file
 void ip_to_str(esp_netif_t *netif, char *out, size_t len);
 esp_err_t perform_ota(const char *url);
+
+// Profilo/UI feature flags (factory/app) per visibilità e accessibilità endpoint
+bool web_ui_feature_enabled(web_ui_feature_t feature);
+const char *web_ui_profile_view_label(void);
 
 // Error handler esposto per la registrazione (moved to pages)
 esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error);

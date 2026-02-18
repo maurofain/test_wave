@@ -93,6 +93,17 @@ Il task chiama `POST /ota?url=<firmware_url>` e il device scarica il firmware in
 - `Build (idfc -b)` per generare il binario prima dell'OTA.
 - `Monitor (idf.py monitor)` se vuoi verificare log e riavvio via seriale.
 
+## Valutazione: update firmware triggerato dal server
+
+È possibile gestire l'aggiornamento firmware in operatività normale facendo restituire al server (in risposta a una chiamata app) un parametro/flag di update, quindi scaricando il `.bin` da rete e applicando OTA sulla partizione inattiva.
+
+- **Fattibilità tecnica:** alta su ESP-IDF (flusso già coerente con il meccanismo OTA standard).
+- **FTP:** utilizzabile ma non ideale in produzione (credenziali in chiaro, minori garanzie di integrità/autenticità).
+- **Raccomandazione produzione:** preferire HTTPS oppure firma firmware + verifica hash SHA256.
+- **Robustezza minima richiesta:** download a chunk con retry/timeout, verifica dimensione e integrità, controllo versione/anti-rollback, switch della boot partition solo dopo `esp_ota_end()` riuscito, rollback in caso di boot fallito.
+- **Gestione del file `.bin` (stato attuale):** il firmware non salva l'immagine completa né in RAM né su SD; usa streaming a chunk con buffer ridotto in RAM e scrittura diretta sulla partizione OTA inattiva.
+- **Impatto operativo:** medio; soluzione consigliata se accompagnata da controlli di sicurezza e recovery.
+
 ## Notes
 - WS2812 uses the RMT-based led_strip helper and blinks the first LED to indicate the app is alive.
 - RS485 and MDB UARTs are only initialized if the target exposes enough UART controllers; warnings are logged otherwise.

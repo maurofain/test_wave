@@ -16,8 +16,32 @@ esp_err_t reboot_factory_handler(httpd_req_t *req)
 
 esp_err_t reboot_app_handler(httpd_req_t *req)
 {
-    httpd_resp_sendstr(req, "<html><body><h1>Reboot in Production Mode...</h1><p>Attendere il riavvio.</p></body></html>");
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in App Last...</h1><p>Attendere il riavvio.</p></body></html>");
     vTaskDelay(pdMS_TO_TICKS(1000));
-    device_config_reboot_app();
+    device_config_reboot_app_last();
+    return ESP_OK;
+}
+
+esp_err_t reboot_app_last_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in App Last...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_app_last();
+    return ESP_OK;
+}
+
+esp_err_t reboot_ota0_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in OTA0...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_ota0();
+    return ESP_OK;
+}
+
+esp_err_t reboot_ota1_handler(httpd_req_t *req)
+{
+    httpd_resp_sendstr(req, "<html><body><h1>Reboot in OTA1...</h1><p>Attendere il riavvio.</p></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    device_config_reboot_ota1();
     return ESP_OK;
 }

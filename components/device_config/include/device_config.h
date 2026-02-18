@@ -211,6 +211,21 @@ void device_config_reboot_factory(void);
 void device_config_reboot_app(void);
 
 /**
+ * @brief Riavvia il dispositivo sull'ultima app (OTA_0/OTA_1) usata come boot
+ */
+void device_config_reboot_app_last(void);
+
+/**
+ * @brief Riavvia il dispositivo forzando il boot su OTA_0
+ */
+void device_config_reboot_ota0(void);
+
+/**
+ * @brief Riavvia il dispositivo forzando il boot su OTA_1
+ */
+void device_config_reboot_ota1(void);
+
+/**
  * @brief Ritorna una stringa descrittiva dell'app attualmente avviata
  */
 const char* device_config_get_running_app_name(void);

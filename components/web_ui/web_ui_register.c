@@ -32,14 +32,20 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_tasks = {.uri = "/tasks", .method = HTTP_GET, .handler = tasks_page_handler};
     httpd_register_uri_handler(server, &uri_tasks);
     
-    httpd_uri_t uri_test = {.uri = "/test", .method = HTTP_GET, .handler = test_page_handler};
-    httpd_register_uri_handler(server, &uri_test);
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TEST)) {
+        httpd_uri_t uri_test = {.uri = "/test", .method = HTTP_GET, .handler = test_page_handler};
+        httpd_register_uri_handler(server, &uri_test);
+    }
     
-    httpd_uri_t uri_httpservices = {.uri = "/httpservices", .method = HTTP_GET, .handler = httpservices_page_handler};
-    httpd_register_uri_handler(server, &uri_httpservices);
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_HTTP_SERVICES)) {
+        httpd_uri_t uri_httpservices = {.uri = "/httpservices", .method = HTTP_GET, .handler = httpservices_page_handler};
+        httpd_register_uri_handler(server, &uri_httpservices);
+    }
 
-    httpd_uri_t uri_emulator = {.uri = "/emulator", .method = HTTP_GET, .handler = emulator_page_handler};
-    httpd_register_uri_handler(server, &uri_emulator);
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_EMULATOR)) {
+        httpd_uri_t uri_emulator = {.uri = "/emulator", .method = HTTP_GET, .handler = emulator_page_handler};
+        httpd_register_uri_handler(server, &uri_emulator);
+    }
 
     httpd_uri_t uri_api_index = {.uri = "/api", .method = HTTP_GET, .handler = api_index_page_handler};
     httpd_register_uri_handler(server, &uri_api_index);
@@ -102,6 +108,12 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_register_uri_handler(server, &uri_reboot_factory);
     httpd_uri_t uri_reboot_app = {.uri = "/reboot/app", .method = HTTP_GET, .handler = reboot_app_handler};
     httpd_register_uri_handler(server, &uri_reboot_app);
+    httpd_uri_t uri_reboot_app_last = {.uri = "/reboot/app_last", .method = HTTP_GET, .handler = reboot_app_last_handler};
+    httpd_register_uri_handler(server, &uri_reboot_app_last);
+    httpd_uri_t uri_reboot_ota0 = {.uri = "/reboot/ota0", .method = HTTP_GET, .handler = reboot_ota0_handler};
+    httpd_register_uri_handler(server, &uri_reboot_ota0);
+    httpd_uri_t uri_reboot_ota1 = {.uri = "/reboot/ota1", .method = HTTP_GET, .handler = reboot_ota1_handler};
+    httpd_register_uri_handler(server, &uri_reboot_ota1);
 
     ESP_LOGI(TAG, "All web_ui handlers registered");
     return ESP_OK;

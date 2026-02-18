@@ -697,13 +697,57 @@ void device_config_reboot_factory(void)
 
 void device_config_reboot_app(void)
 {
+    device_config_reboot_app_last();
+}
+
+void device_config_reboot_ota0(void)
+{
     const esp_partition_t *ota0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
     if (ota0) {
-        ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_0 (Produzione)");
+        ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_0");
         esp_ota_set_boot_partition(ota0);
         esp_restart();
     } else {
         ESP_LOGE(TAG, "Partizione OTA_0 non trovata!");
+    }
+}
+
+void device_config_reboot_ota1(void)
+{
+    const esp_partition_t *ota1 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, NULL);
+    if (ota1) {
+        ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_1");
+        esp_ota_set_boot_partition(ota1);
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "Partizione OTA_1 non trovata!");
+    }
+}
+
+void device_config_reboot_app_last(void)
+{
+    const esp_partition_t *boot = esp_ota_get_boot_partition();
+    const esp_partition_t *target = NULL;
+
+    if (boot && (boot->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 || boot->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1)) {
+        target = boot;
+    } else {
+        const esp_partition_t *running = esp_ota_get_running_partition();
+        if (running && (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 || running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1)) {
+            target = running;
+        }
+    }
+
+    if (!target) {
+        target = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
+    }
+
+    if (target) {
+        ESP_LOGI(TAG, "Impostazione partizione di boot: APP LAST (%s)", target->label);
+        esp_ota_set_boot_partition(target);
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "Partizione APP LAST non trovata (OTA_0/OTA_1 assenti)!");
     }
 }
 
