@@ -11,8 +11,6 @@
 #include <string.h>
 #include <time.h>
 
-static const char *HTML_NAV = "<nav><a href='/'>🏠 Home</a><a href='/config'>⚙️ Config</a><a href='/stats'>📈 Statistiche</a><a href='/tasks'>📋 Task</a><a href='/logs'>📋 Log</a><a href='/test'>🔧 Test</a><a href='/ota'>🔄 OTA</a></nav>";
-
 static const char *HTML_STYLE_NAV = 
     "nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
     "nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}"
@@ -30,10 +28,22 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         strftime(time_str, sizeof(time_str), "%H:%M:%S", &timeinfo);
     }
 
-    const bool is_app_home = (req && strcmp(req->uri, "/") == 0 && web_ui_feature_enabled(WEB_UI_FEATURE_HOME_EMULATOR));
-    const char *emu_button = is_app_home
-        ? "<a href='/emulator' style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>Emulatore</a>"
-        : "";
+    const bool is_emulator_page =
+        (req && strncmp(req->uri, "/emulator", 9) == 0 &&
+         (req->uri[9] == '\0' || req->uri[9] == '?'));
+    const char *emu_button = is_emulator_page
+        ? "<a href='/' style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>Home</a>"
+        : "<a href='#' onclick=\"return window.goProtectedPath('/emulator');\" style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>Emulatore</a>";
+
+    const bool show_tasks = web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TASKS);
+    const bool show_test = web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TEST);
+    const char *nav_tasks = show_tasks ? "<a href='/tasks'>📋 Task</a>" : "";
+    const char *nav_test = show_test ? "<a href='/test'>🔧 Test</a>" : "";
+    char nav_html[768] = {0};
+    snprintf(nav_html, sizeof(nav_html),
+             "<nav><a href='/'>🏠 Home</a><a href='/config'>⚙️ Config</a><a href='/stats'>📈 Statistiche</a>%s<a href='/logs'>📋 Log</a>%s<a href='/ota'>🔄 OTA</a></nav>",
+             nav_tasks,
+             nav_test);
 
     int needed = snprintf(
         NULL,
@@ -53,7 +63,18 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "window.setAuthToken = function(t){ if(t) localStorage.setItem('httpservices_token', t); else localStorage.removeItem('httpservices_token'); };"
         "window.getAuthToken = function(){ return localStorage.getItem('httpservices_token'); };"
         "window.clearAuthToken = function(){ localStorage.removeItem('httpservices_token'); };"
-        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
+        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };"
+        "window.askProtectedPassword=function(path){return new Promise(function(resolve){var ov=document.createElement('div');ov.style='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999;';"
+        "var box=document.createElement('div');box.style='background:#fff;border-radius:10px;padding:18px;min-width:320px;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.25);font-family:Arial';"
+        "box.innerHTML='<h3 style=\"margin:0 0 10px 0;color:#2c3e50\">Password richiesta</h3><p style=\"margin:0 0 10px 0;color:#566573\">Inserisci password per continuare</p><input id=\"pw_masked_input\" type=\"password\" autocomplete=\"current-password\" style=\"width:100%%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box\"><div style=\"display:flex;justify-content:flex-end;gap:8px;margin-top:12px\"><button id=\"pw_cancel_btn\" style=\"padding:8px 12px;border:none;border-radius:6px;background:#7f8c8d;color:#fff;cursor:pointer\">Annulla</button><button id=\"pw_ok_btn\" style=\"padding:8px 12px;border:none;border-radius:6px;background:#8e44ad;color:#fff;cursor:pointer\">Continua</button></div>';"
+        "ov.appendChild(box);document.body.appendChild(ov);"
+        "var input=box.querySelector('#pw_masked_input');var ok=box.querySelector('#pw_ok_btn');var cancel=box.querySelector('#pw_cancel_btn');"
+        "function close(v){try{document.body.removeChild(ov);}catch(e){} resolve(v);}"
+        "ok.onclick=function(){var pwd=input.value||'';if(!pwd){input.focus();return;} close(path+'?pwd='+encodeURIComponent(pwd));};"
+        "cancel.onclick=function(){close(null);};"
+        "input.addEventListener('keydown',function(e){if(e.key==='Enter'){ok.click();} if(e.key==='Escape'){cancel.click();}});"
+        "setTimeout(function(){input.focus();},0);});};"
+        "window.goProtectedPath=function(path){window.askProtectedPassword(path).then(function(url){if(url){window.location.href=url;}});return false;};})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?nav_html:"");
     if (needed < 0) {
         return ESP_FAIL;
     }
@@ -79,7 +100,18 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "window.setAuthToken = function(t){ if(t) localStorage.setItem('httpservices_token', t); else localStorage.removeItem('httpservices_token'); };"
         "window.getAuthToken = function(){ return localStorage.getItem('httpservices_token'); };"
         "window.clearAuthToken = function(){ localStorage.removeItem('httpservices_token'); };"
-        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?HTML_NAV:"");
+        "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };"
+        "window.askProtectedPassword=function(path){return new Promise(function(resolve){var ov=document.createElement('div');ov.style='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999;';"
+        "var box=document.createElement('div');box.style='background:#fff;border-radius:10px;padding:18px;min-width:320px;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.25);font-family:Arial';"
+        "box.innerHTML='<h3 style=\"margin:0 0 10px 0;color:#2c3e50\">Password richiesta</h3><p style=\"margin:0 0 10px 0;color:#566573\">Inserisci password per continuare</p><input id=\"pw_masked_input\" type=\"password\" autocomplete=\"current-password\" style=\"width:100%%;padding:8px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box\"><div style=\"display:flex;justify-content:flex-end;gap:8px;margin-top:12px\"><button id=\"pw_cancel_btn\" style=\"padding:8px 12px;border:none;border-radius:6px;background:#7f8c8d;color:#fff;cursor:pointer\">Annulla</button><button id=\"pw_ok_btn\" style=\"padding:8px 12px;border:none;border-radius:6px;background:#8e44ad;color:#fff;cursor:pointer\">Continua</button></div>';"
+        "ov.appendChild(box);document.body.appendChild(ov);"
+        "var input=box.querySelector('#pw_masked_input');var ok=box.querySelector('#pw_ok_btn');var cancel=box.querySelector('#pw_cancel_btn');"
+        "function close(v){try{document.body.removeChild(ov);}catch(e){} resolve(v);}"
+        "ok.onclick=function(){var pwd=input.value||'';if(!pwd){input.focus();return;} close(path+'?pwd='+encodeURIComponent(pwd));};"
+        "cancel.onclick=function(){close(null);};"
+        "input.addEventListener('keydown',function(e){if(e.key==='Enter'){ok.click();} if(e.key==='Escape'){cancel.click();}});"
+        "setTimeout(function(){input.focus();},0);});};"
+        "window.goProtectedPath=function(path){window.askProtectedPassword(path).then(function(url){if(url){window.location.href=url;}});return false;};})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?nav_html:"");
     httpd_resp_sendstr_chunk(req, buf);
     free(buf);
     return ESP_OK;

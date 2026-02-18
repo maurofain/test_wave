@@ -35,9 +35,12 @@
 #include "eeprom_test.h"
 #include "sht40.h"
 #include "http_services.h"
+#include "web_ui_programs.h"
 
 #define TAG "WEB_UI"
 #define MAX_STORED_LOGS 100
+#define WEB_UI_PROTECTED_PASSWORD "factoryUser"
+#define WEB_UI_PASSWORD_FILE "/spiffs/ui_password.txt"
 
 /*
  * Forzatura temporanea: disabilita SEMPRE la parte video.
@@ -91,8 +94,106 @@ void uart_test_task(void *arg) {
 /* Helpers `ip_to_str` and `perform_ota` are implemented in `web_ui_common.c` (shared helpers).
    Definitions removed here to avoid duplicate symbols. */
 
+static char s_boot_password[64] = {0};
+static bool s_boot_password_loaded = false;
+
+static void web_ui_load_boot_password(void)
+{
+    if (s_boot_password_loaded) {
+        return;
+    }
+
+    snprintf(s_boot_password, sizeof(s_boot_password), "%s", WEB_UI_PROTECTED_PASSWORD);
+
+    FILE *file = fopen(WEB_UI_PASSWORD_FILE, "r");
+    if (!file) {
+        s_boot_password_loaded = true;
+        return;
+    }
+
+    char line[64] = {0};
+    if (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\r\n")] = '\0';
+        if (strlen(line) >= 4) {
+            snprintf(s_boot_password, sizeof(s_boot_password), "%s", line);
+        }
+    }
+
+    fclose(file);
+    s_boot_password_loaded = true;
+}
+
+static const char *web_ui_get_boot_password(void)
+{
+    web_ui_load_boot_password();
+    return s_boot_password;
+}
+
+static esp_err_t web_ui_set_boot_password(const char *new_password)
+{
+    if (!new_password || strlen(new_password) < 4 || strlen(new_password) >= sizeof(s_boot_password)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    FILE *file = fopen(WEB_UI_PASSWORD_FILE, "w");
+    if (!file) {
+        return ESP_FAIL;
+    }
+
+    size_t len = strlen(new_password);
+    size_t written = fwrite(new_password, 1, len, file);
+    fclose(file);
+    if (written != len) {
+        return ESP_FAIL;
+    }
+
+    snprintf(s_boot_password, sizeof(s_boot_password), "%s", new_password);
+    s_boot_password_loaded = true;
+    return ESP_OK;
+}
+
+static bool web_ui_has_valid_password(httpd_req_t *req)
+{
+    if (!req) {
+        return false;
+    }
+
+    char query[128] = {0};
+    char password[64] = {0};
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+        return false;
+    }
+    if (httpd_query_key_value(query, "pwd", password, sizeof(password)) != ESP_OK) {
+        return false;
+    }
+
+    return strcmp(password, web_ui_get_boot_password()) == 0;
+}
+
+static esp_err_t web_ui_send_password_required(httpd_req_t *req, const char *title, const char *target)
+{
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_status(req, "401 Unauthorized");
+
+    char html[1024] = {0};
+    snprintf(html, sizeof(html),
+             "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>%s</title></head><body style='font-family:Arial;background:#f5f5f5;padding:24px;'>"
+             "<h2>🔒 Password richiesta</h2>"
+             "<p>Inserire la password per continuare.</p>"
+             "<button onclick=\"var p=prompt('Inserisci password');if(p!==null){location.href='%s?pwd='+encodeURIComponent(p);}\" style='padding:10px 14px;background:#3498db;color:white;border:none;border-radius:6px;cursor:pointer;'>Inserisci password</button>"
+             "</body></html>",
+             title,
+             target);
+
+    return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
+}
+
 esp_err_t reboot_factory_handler(httpd_req_t *req)
 {
+    if (!web_ui_has_valid_password(req)) {
+        return web_ui_send_password_required(req, "Reboot Factory", "/reboot/factory");
+    }
+
     httpd_resp_sendstr(req, "<html><body><h1>Reboot in Factory Mode...</h1><p>Attendere il riavvio.</p></body></html>");
     vTaskDelay(pdMS_TO_TICKS(1000));
     device_config_reboot_factory();
@@ -133,25 +234,25 @@ esp_err_t reboot_ota1_handler(httpd_req_t *req)
 
 static esp_err_t emulator_page_handler_local(httpd_req_t *req)
 {
+    if (!web_ui_has_valid_password(req)) {
+        return web_ui_send_password_required(req, "Emulator", "/emulator");
+    }
+
     const char *extra_style =
-        ".emu-wrap{width:100%;max-width:none;margin:16px 0;padding:0 20px;box-sizing:border-box;display:flex;gap:18px;align-items:stretch}"
-        ".emu-panel{width:800px;min-width:800px;height:1280px;background:#111;border-radius:16px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,0.25);box-sizing:border-box}"
+        ".emu-wrap{width:100%;max-width:1024px;margin:16px auto;padding:0 8px;box-sizing:border-box;display:flex;gap:12px;align-items:stretch}"
+        ".emu-panel{flex:0 0 700px;min-width:700px;height:1024px;background:#111;border-radius:16px;padding:14px;box-shadow:0 4px 20px rgba(0,0,0,0.25);box-sizing:border-box}"
         ".emu-layout{height:100%;display:flex;gap:14px}"
-        ".emu-left{width:30%;display:grid;grid-template-rows:repeat(8,1fr);gap:10px}"
-        ".prog-btn{border:none;border-radius:10px;background:#2c3e50;color:#fff;font-size:22px;font-weight:bold;cursor:pointer}"
-        ".prog-btn.active{background:#3498db}"
-        ".prog-btn:disabled{opacity:.45;cursor:not-allowed}"
-        ".emu-main{width:60%;display:flex;flex-direction:column;gap:14px}"
+        ".emu-main{width:78%;display:flex;flex-direction:column;gap:14px}"
         ".credit-box{background:#fdfdfd;border-radius:12px;padding:20px;flex:0 0 38%;display:flex;align-items:center;justify-content:center;flex-direction:column}"
         ".credit-label{font-size:22px;color:#2c3e50}"
         ".credit-value{font-size:110px;font-weight:bold;line-height:1;color:#111}"
         ".msg-box{background:#fdfdfd;border-radius:12px;padding:20px;flex:1;font-size:30px;color:#2c3e50;display:flex;align-items:center;justify-content:center;text-align:center}"
-        ".emu-gauge{width:10%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}"
+        ".emu-gauge{width:22%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}"
         ".gauge-title{color:#fff;font-weight:bold;font-size:18px;text-align:center}"
         ".gauge-track{position:relative;width:100%;height:92%;border-radius:12px;overflow:hidden;border:2px solid #d9d9d9;background:linear-gradient(to top,#c0392b 0%,#c0392b 20%,#27ae60 20%,#27ae60 100%)}"
         ".gauge-mask{position:absolute;left:0;top:0;width:100%;height:0%;background:#111;transition:height .25s linear}"
         ".gauge-text{color:#fff;font-size:20px;font-weight:bold}"
-        ".emu-electrical{flex:1;min-width:320px;background:#ffffff;border-radius:16px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.12);box-sizing:border-box}"
+        ".emu-electrical{flex:1;min-width:280px;background:#ffffff;border-radius:16px;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12);box-sizing:border-box}"
         ".side-title{margin:0 0 10px 0;color:#2c3e50;font-size:22px}"
         ".coin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}"
         ".coin-btn{border:none;border-radius:8px;background:#27ae60;color:#fff;padding:12px 8px;font-size:18px;font-weight:bold;cursor:pointer}"
@@ -160,27 +261,17 @@ static esp_err_t emulator_page_handler_local(httpd_req_t *req)
         ".relay{border-radius:8px;background:#d5d8dc;color:#2c3e50;padding:10px 4px;text-align:center;font-weight:bold;font-size:14px}"
         ".relay.on{background:#f39c12;color:#fff}"
         ".side-note{margin-top:12px;font-size:13px;color:#566573;line-height:1.4}"
-        "@media(max-width:1250px){.emu-wrap{flex-direction:column;align-items:center}.emu-electrical{width:800px;flex:none}.credit-value{font-size:82px}.msg-box{font-size:24px}.prog-btn{font-size:19px}}";
+        "@media(max-width:1250px){.emu-wrap{flex-direction:column;align-items:center}.emu-panel{flex:none;width:100%;min-width:0;height:920px}.emu-electrical{width:100%;flex:none}.credit-value{font-size:82px}.msg-box{font-size:24px}}";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Emulator", extra_style, true);
+    send_head(req, "Emulator", extra_style, false);
 
     const char *body =
         "<div class='emu-wrap'>"
         "<div class='emu-panel'><div class='emu-layout'>"
-        "<div class='emu-left'>"
-        "<button class='prog-btn' data-id='1'>Programma 1</button>"
-        "<button class='prog-btn' data-id='2'>Programma 2</button>"
-        "<button class='prog-btn' data-id='3'>Programma 3</button>"
-        "<button class='prog-btn' data-id='4'>Programma 4</button>"
-        "<button class='prog-btn' data-id='5'>Programma 5</button>"
-        "<button class='prog-btn' data-id='6'>Programma 6</button>"
-        "<button class='prog-btn' data-id='7'>Programma 7</button>"
-        "<button class='prog-btn' data-id='8'>Programma 8</button>"
-        "</div>"
         "<div class='emu-main'>"
         "<div class='credit-box'><div class='credit-label'>Credito</div><div id='credit' class='credit-value'>0</div></div>"
-        "<div id='msg' class='msg-box'>Credito insufficiente: ricarica almeno 10 coin</div>"
+        "<div id='msg' class='msg-box'>Pannello ridotto: gestisci credito e relay virtuali</div>"
         "</div>"
         "<div class='emu-gauge'>"
         "<div class='gauge-title'>Stato credito</div>"
@@ -214,34 +305,24 @@ static esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "</div>"
         "<script>"
         "(function(){"
-        "const buttons=[...document.querySelectorAll('.prog-btn')];"
         "const coinButtons=[...document.querySelectorAll('.coin-btn')];"
         "const relays=[...document.querySelectorAll('.relay')];"
         "const creditEl=document.getElementById('credit');"
         "const msgEl=document.getElementById('msg');"
         "const maskEl=document.getElementById('gmask');"
         "const gaugeText=document.getElementById('gtext');"
-        "const minCreditToStart=10;"
-        "let credit=0;let activeProgram=0;"
+        "let credit=0;"
         "function dispatchHardwareCommand(type,payload){"
         "  const detail={type:type,payload:payload,timestamp:Date.now()};"
         "  window.dispatchEvent(new CustomEvent('emulator:hardware-command',{detail:detail}));"
         "  console.log('[EMULATOR_CMD]',detail);"
         "}"
-        "function updateProgramAvailability(){"
-        "  const enabled=credit>=minCreditToStart;"
-        "  buttons.forEach(function(btn){btn.disabled=!enabled;});"
-        "  if(!enabled&&activeProgram===0){msgEl.textContent='Credito insufficiente: ricarica almeno '+minCreditToStart+' coin';}"
+        "function updateVirtualRelay(relayNumber,status,duration){"
+        "  fetch('/api/emulator/relay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({relay_number:relayNumber,status:status,duration:duration||0})}).catch(function(e){console.warn('virtual relay update failed',e);});"
         "}"
-        "function updateRelays(programId){"
-        "  relays.forEach(function(r){r.classList.remove('on');});"
-        "  if(programId>0&&programId<=10){const target=relays[programId-1];if(target)target.classList.add('on');}"
-        "  dispatchHardwareCommand('relay_update',{program:programId});"
-        "}"
-        "function render(){const clamped=Math.max(0,Math.min(100,credit));creditEl.textContent=String(clamped);gaugeText.textContent=clamped+'%';maskEl.style.height=(100-clamped)+'%';updateProgramAvailability();}"
-        "buttons.forEach(function(btn){btn.addEventListener('click',function(){if(credit<minCreditToStart)return;buttons.forEach(function(b){b.classList.remove('active');});btn.classList.add('active');activeProgram=parseInt(btn.dataset.id||'0',10);msgEl.textContent='Programma '+activeProgram+' avviato';updateRelays(activeProgram);dispatchHardwareCommand('program_start',{program:activeProgram});});});"
+        "function render(){const clamped=Math.max(0,Math.min(100,credit));creditEl.textContent=String(clamped);gaugeText.textContent=clamped+'%';maskEl.style.height=(100-clamped)+'%';}"
         "coinButtons.forEach(function(btn){btn.addEventListener('click',function(){const delta=parseInt(btn.dataset.coin||'0',10);credit=Math.min(100,credit+delta);render();msgEl.textContent='Ricarica +'+delta+' coin';dispatchHardwareCommand('coin_add',{value:delta,current_credit:credit});});});"
-        "setInterval(function(){if(activeProgram===0)return;if(credit<=0){msgEl.textContent='Credito terminato. Seleziona un programma o ricarica.';activeProgram=0;buttons.forEach(function(b){b.classList.remove('active');});updateRelays(0);dispatchHardwareCommand('program_stop',{reason:'credit_end'});return;}credit=Math.max(0,credit-1);render();},1000);"
+        "relays.forEach(function(relay){relay.addEventListener('click',function(){const relayNumber=parseInt(relay.dataset.relay||'0',10);const nextState=!relay.classList.contains('on');relay.classList.toggle('on',nextState);updateVirtualRelay(relayNumber,nextState,0);msgEl.textContent='Relay R'+relayNumber+' '+(nextState?'ON':'OFF');dispatchHardwareCommand('relay_toggle',{relay:relayNumber,status:nextState});});});"
         "render();"
         "})();"
         "</script></body></html>";
@@ -254,6 +335,14 @@ static esp_err_t emulator_page_handler_local(httpd_req_t *req)
 // Handler della Homepage
 esp_err_t root_get_handler(httpd_req_t *req)
 {
+    bool show_test = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_TEST);
+    bool show_tasks = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_TASKS);
+    bool show_httpservices = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_HTTP_SERVICES);
+    bool show_emulator = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_EMULATOR);
+    const char *profile_label = web_ui_profile_view_label();
+    const bool is_factory_view = (strcmp(profile_label, "Factory View") == 0);
+    const char *home_title = is_factory_view ? "Factory Console" : "MH1001 control";
+
     const char *extra_style = 
         ".card{background:white;padding:25px;margin:20px 0;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:.3s}"
         ".card:hover{transform:translateY(-5px)}h2{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;margin-top:0}"
@@ -262,39 +351,89 @@ esp_err_t root_get_handler(httpd_req_t *req)
         ".btn-link:hover{background:#2980b9;box-shadow:0 4px 8px rgba(0,0,0,0.2)}"
         ".btn-config{background:#27ae60}.btn-config:hover{background:#219150}"
         ".btn-test{background:#e67e22}.btn-test:hover{background:#d35400}"
+        ".btn-emu{background:#8e44ad}.btn-emu:hover{background:#7d3c98}"
         ".btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}"
         ".btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Factory Console", extra_style, false);
+    send_head(req, home_title, extra_style, false);
 
-    /* DO_NOT_MODIFY_START: / (home page) - autogenerated UI markup */
-    const char *body = 
+    const char *test_link = show_test
+        ? "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
+        : "";
+    const char *tasks_link = show_tasks
+        ? "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
+        : "";
+    const char *httpservices_link = show_httpservices
+        ? "<a href='/httpservices' class='btn-link'><span class='icon'>🔐</span><span>HTTP Services</span></a>"
+        : "";
+    const char *emulator_link = show_emulator
+        ? "<a href='/emulator' class='btn-link btn-emu'><span class='icon'>🕹️</span><span>Emulatore</span></a>"
+        : "";
+
+    int body_len = snprintf(NULL, 0,
         "<div class='container'><div class='grid'>"
         "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
-        "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
-        "<a href='/httpservices' class='btn-link'><span class='icon'>🔐</span><span>HTTP Services</span></a>"
-        "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
+        "%s%s%s%s"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
+        "<p><strong>Profilo:</strong> %s</p>"
         "<p>Benvenuti nell'interfaccia di configurazione e test.</p>"
         "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
         "<h3 style='margin:0 0 10px 0;color:#2c3e50;'>Reboot</h3>"
         "<div style='display:flex;flex-wrap:wrap;gap:8px;'>"
-        "<a href='/reboot/factory' class='btn-reboot' style='background:#c0392b;'>FACTORY</a>"
+        "<a href='#' onclick=\"return window.goProtectedPath('/reboot/factory');\" class='btn-reboot' style='background:#c0392b;'>FACTORY</a>"
         "<a href='/reboot/app_last' class='btn-reboot' style='background:#27ae60;'>APP LAST</a>"
         "<a href='/reboot/ota0' class='btn-reboot' style='background:#2980b9;'>OTA0</a>"
         "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
+        "</div></div></div></div></body></html>",
+        test_link,
+        tasks_link,
+        httpservices_link,
+        emulator_link,
+        profile_label);
+
+    if (body_len < 0) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    char *body = malloc((size_t)body_len + 1);
+    if (!body) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    snprintf(body, (size_t)body_len + 1,
+        "<div class='container'><div class='grid'>"
+        "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
+        "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
+        "%s%s%s%s"
+        "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
-        "</div>"
-        "</div>"
-        "</div></body></html>";
-    /* DO_NOT_MODIFY_END: / (home page) */
-    
+        "<div class='card'><h2>ℹ️ Informazioni</h2>"
+        "<p><strong>Profilo:</strong> %s</p>"
+        "<p>Benvenuti nell'interfaccia di configurazione e test.</p>"
+        "<div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px;'>"
+        "<h3 style='margin:0 0 10px 0;color:#2c3e50;'>Reboot</h3>"
+        "<div style='display:flex;flex-wrap:wrap;gap:8px;'>"
+        "<a href='#' onclick=\"return window.goProtectedPath('/reboot/factory');\" class='btn-reboot' style='background:#c0392b;'>FACTORY</a>"
+        "<a href='/reboot/app_last' class='btn-reboot' style='background:#27ae60;'>APP LAST</a>"
+        "<a href='/reboot/ota0' class='btn-reboot' style='background:#2980b9;'>OTA0</a>"
+        "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
+        "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
+        "</div></div></div></div></body></html>",
+        test_link,
+        tasks_link,
+        httpservices_link,
+        emulator_link,
+        profile_label);
+
     httpd_resp_sendstr_chunk(req, body);
+    free(body);
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 }
@@ -469,6 +608,7 @@ esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
 esp_err_t config_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /config");
+    const bool config_read_only = !web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS);
     
     const char *extra_style = 
         ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
@@ -491,6 +631,12 @@ esp_err_t config_page_handler(httpd_req_t *req)
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     send_head(req, "Configurazione Device", extra_style, true);
+
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_sendstr_chunk(req, "<script>window.__showFactoryPasswordSection=true;</script>");
+    } else {
+        httpd_resp_sendstr_chunk(req, "<script>window.__showFactoryPasswordSection=false;</script>");
+    }
 
     /* DO_NOT_MODIFY_START: /config page - autogenerated UI markup */
     const char *body = 
@@ -700,8 +846,32 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('g33_mode').value=c.gpios.gpio33.mode;"
         "document.getElementById('g33_state').checked=c.gpios.gpio33.state;"
         "if(c.remote_log.use_broadcast){const ipEl=document.getElementById('remote_log_ip'); if(ipEl){ipEl.disabled=true; ipEl.value='255.255.255.255';}}"
+        "if(window.__showFactoryPasswordSection){"
+        "const form=document.getElementById('configForm');"
+        "const nameSection=form?form.querySelector('.section'):null;"
+        "if(nameSection){"
+        "const pwd=document.createElement('div');"
+        "pwd.className='section';"
+        "pwd.innerHTML=\"<h2>🔐 Password boot/emulatore</h2><p style='margin:8px 0 12px 0;color:#566573;'>Modifica password richiesta per /emulator e reboot FACTORY.</p><div class='form-group'><label>Password attuale</label><input type='password' id='boot_pwd_current' placeholder='password attuale'></div><div class='form-group'><label>Nuova password</label><input type='password' id='boot_pwd_new' placeholder='min 4 caratteri'></div><div class='form-group'><label>Conferma nuova password</label><input type='password' id='boot_pwd_confirm' placeholder='ripeti password'></div><button type='button' onclick='saveBootPassword()' style='background:#8e44ad;'>💾 Salva password boot</button>\";"
+        "nameSection.insertAdjacentElement('afterend',pwd);"
+        "const prg=document.createElement('div');"
+        "prg.className='section';"
+        "prg.style.cssText='background:#eef6ff;border-left:5px solid #1f6feb;';"
+        "prg.innerHTML=\"<h2 style='margin-top:0;'>📊 Tabella Programmi</h2><p style='margin:10px 0 14px 0;'>Gestione prezzi, durata e relay per programma (solo FACTORY).</p><a href='/config/programs' style='display:inline-block;padding:10px 14px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri editor programmi</a>\";"
+        "pwd.insertAdjacentElement('afterend',prg);"
+        "}"
+        "}"
         "updateCurrentTime();"
         "}catch(e){console.error(e);}"
+        "}"
+        "async function saveBootPassword(){"
+        "const current=document.getElementById('boot_pwd_current');"
+        "const next=document.getElementById('boot_pwd_new');"
+        "const confirm=document.getElementById('boot_pwd_confirm');"
+        "if(!current||!next||!confirm)return;"
+        "if(next.value.length<4){alert('Password troppo corta (min 4)');return;}"
+        "if(next.value!==confirm.value){alert('Conferma password non valida');return;}"
+        "try{const r=await fetch('/api/security/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:current.value,new_password:next.value})});const t=await r.text();if(r.ok){alert('✅ Password aggiornata');current.value='';next.value='';confirm.value='';}else{alert('❌ '+(t||('HTTP '+r.status)));}}catch(e){alert('❌ Errore: '+e);}"
         "}"
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
         "const cfg={"
@@ -763,6 +933,18 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "</script></body></html>";
     
     httpd_resp_sendstr_chunk(req, body);
+    if (config_read_only) {
+        httpd_resp_sendstr_chunk(req,
+            "<script>(function(){"
+            "var box=document.createElement('div');"
+            "box.style='margin:16px 20px;padding:10px 12px;background:#fff3cd;color:#856404;border:1px solid #ffeeba;border-radius:6px;font-weight:bold;';"
+            "box.innerText='Modalità APP: configurazione in sola lettura';"
+            "var c=document.querySelector('.container');if(c){c.insertBefore(box,c.firstChild);}"
+            "var form=document.getElementById('configForm');"
+            "if(form){form.addEventListener('submit',function(e){e.preventDefault();alert('Modalità APP: modifica configurazione non consentita.');});"
+            "form.querySelectorAll('input,select,textarea,button').forEach(function(el){el.disabled=true;});}"
+            "})();</script>");
+    }
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 }
@@ -1070,6 +1252,11 @@ esp_err_t api_config_backup(httpd_req_t *req)
 // Handler API POST /api/config/save
 esp_err_t api_config_save(httpd_req_t *req)
 {
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Configurazione in sola lettura in modalità APP", -1);
+    }
+
     ESP_LOGI(TAG, "[C] Ricevuta richiesta salvataggio configurazione");
     
     char buf[4096] = {0};
@@ -1349,6 +1536,184 @@ esp_err_t stats_page_handler(httpd_req_t *req)
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
+}
+
+// Handler pagina tasks
+esp_err_t programs_page_handler(httpd_req_t *req)
+{
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "404 Non Trovato");
+        return httpd_resp_send(req, "404 Non Trovato", -1);
+    }
+
+    ESP_LOGI(TAG, "[C] GET /config/programs");
+
+    const char *extra_style =
+        ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
+        "table{width:100%;border-collapse:collapse;margin-top:15px}"
+        "th,td{padding:8px;border:1px solid #ddd;text-align:left;color:#333}"
+        "th{background:#34495e;color:white}"
+        "input[type=text],input[type=number]{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}"
+        "input[type=checkbox]{transform:scale(1.2)}"
+        "button{padding:10px 16px;background:#27ae60;color:white;border:none;border-radius:5px;cursor:pointer;font-weight:bold}"
+        "button:hover{background:#229954}"
+        ".btn-secondary{background:#3498db}.btn-secondary:hover{background:#2c80b7}"
+        ".status{margin:12px 0;padding:10px;border-radius:5px;display:none}"
+        ".status.ok{display:block;background:#d4edda;color:#155724;border:1px solid #c3e6cb}"
+        ".status.err{display:block;background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Tabella Programmi", extra_style, true);
+
+    const char *body =
+        "<div class='container'><div class='section'>"
+        "<h2>📊 Editor Tabella Programmi (FACTORY)</h2>"
+        "<p>Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.</p>"
+        "<div id='status' class='status'></div>"
+        "<table><thead><tr><th>ID</th><th>Nome</th><th>Abilitato</th><th>Prezzo</th><th>Durata (s)</th><th>Relay mask</th></tr></thead><tbody id='programRows'></tbody></table>"
+        "<div style='display:flex;gap:10px;margin-top:14px;'>"
+        "<button onclick='savePrograms()'>💾 Salva tabella</button>"
+        "<button class='btn-secondary' onclick='loadPrograms()'>🔄 Ricarica</button>"
+        "</div>"
+        "</div></div>"
+        "<script>"
+        "let programs=[];"
+        "function showStatus(msg,ok){const s=document.getElementById('status');s.textContent=msg;s.className='status '+(ok?'ok':'err');}"
+        "function rowHtml(p,idx){"
+        "return `<tr>`+"
+        "`<td><input type='number' min='1' max='255' value='${p.program_id||idx+1}' onchange='programs[${idx}].program_id=parseInt(this.value||0,10)'></td>`+"
+        "`<td><input type='text' value='${(p.name||'').replace(/\"/g,'&quot;')}' onchange='programs[${idx}].name=this.value'></td>`+"
+        "`<td style='text-align:center'><input type='checkbox' ${p.enabled?'checked':''} onchange='programs[${idx}].enabled=this.checked'></td>`+"
+        "`<td><input type='number' min='0' max='65535' value='${p.price_units||0}' onchange='programs[${idx}].price_units=parseInt(this.value||0,10)'></td>`+"
+        "`<td><input type='number' min='0' max='65535' value='${p.duration_sec||0}' onchange='programs[${idx}].duration_sec=parseInt(this.value||0,10)'></td>`+"
+        "`<td><input type='number' min='0' max='65535' value='${p.relay_mask||0}' onchange='programs[${idx}].relay_mask=parseInt(this.value||0,10)'></td>`+"
+        "`</tr>`;"
+        "}"
+        "function render(){const b=document.getElementById('programRows');b.innerHTML='';programs.forEach((p,i)=>{b.insertAdjacentHTML('beforeend',rowHtml(p,i));});}"
+        "async function loadPrograms(){try{const r=await fetch('/api/programs');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();programs=data.programs||[];render();showStatus('Tabella programmi caricata',true);}catch(e){showStatus('Errore caricamento: '+e.message,false);}}"
+        "async function savePrograms(){try{const r=await fetch('/api/programs/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({programs})});if(!r.ok){const t=await r.text();throw new Error(t||('HTTP '+r.status));}showStatus('Tabella programmi salvata',true);}catch(e){showStatus('Errore salvataggio: '+e.message,false);}}"
+        "window.addEventListener('load',loadPrograms);"
+        "</script></body></html>";
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
+esp_err_t api_programs_get(httpd_req_t *req)
+{
+    char *json = web_ui_program_table_to_json();
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, strlen(json));
+    free(json);
+    return ret;
+}
+
+esp_err_t api_programs_save(httpd_req_t *req)
+{
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "404 Non Trovato");
+        return httpd_resp_send(req, "404 Non Trovato", -1);
+    }
+
+    if (req->content_len <= 0 || req->content_len > 16384) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Payload non valido", -1);
+    }
+
+    char *payload = calloc(1, (size_t)req->content_len + 1);
+    if (!payload) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    int received = 0;
+    while (received < req->content_len) {
+        int r = httpd_req_recv(req, payload + received, req->content_len - received);
+        if (r <= 0) {
+            free(payload);
+            httpd_resp_set_status(req, "400 Bad Request");
+            return httpd_resp_send(req, "Errore lettura payload", -1);
+        }
+        received += r;
+    }
+
+    char err_msg[128] = {0};
+    esp_err_t err = web_ui_program_table_update_from_json(payload, (size_t)received, err_msg, sizeof(err_msg));
+    free(payload);
+
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, err_msg[0] ? err_msg : "Errore validazione", -1);
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, "{\"status\":\"ok\"}", -1);
+}
+
+esp_err_t api_emulator_relay_control(httpd_req_t *req)
+{
+    if (req->content_len <= 0 || req->content_len > 1024) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Payload non valido", -1);
+    }
+
+    char *payload = calloc(1, (size_t)req->content_len + 1);
+    if (!payload) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    int received = 0;
+    while (received < req->content_len) {
+        int r = httpd_req_recv(req, payload + received, req->content_len - received);
+        if (r <= 0) {
+            free(payload);
+            httpd_resp_set_status(req, "400 Bad Request");
+            return httpd_resp_send(req, "Errore lettura payload", -1);
+        }
+        received += r;
+    }
+
+    cJSON *root = cJSON_Parse(payload);
+    free(payload);
+    if (!root) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "JSON non valido", -1);
+    }
+
+    cJSON *relay_number = cJSON_GetObjectItem(root, "relay_number");
+    cJSON *status = cJSON_GetObjectItem(root, "status");
+    cJSON *duration = cJSON_GetObjectItem(root, "duration");
+
+    if (!cJSON_IsNumber(relay_number) || !cJSON_IsBool(status) || !cJSON_IsNumber(duration)) {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Campi relay_number/status/duration obbligatori", -1);
+    }
+
+    esp_err_t err = web_ui_virtual_relay_control((uint8_t)relay_number->valueint, cJSON_IsTrue(status), (uint32_t)duration->valueint);
+    cJSON_Delete(root);
+
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "relay_number fuori range", -1);
+    }
+
+    char *json = web_ui_virtual_relays_to_json();
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, strlen(json));
+    free(json);
+    return ret;
 }
 
 // Handler pagina tasks
@@ -2500,6 +2865,11 @@ esp_err_t api_test_handler(httpd_req_t *req)
 // Handler API POST /api/config/reset
 esp_err_t api_config_reset(httpd_req_t *req)
 {
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Configurazione in sola lettura in modalità APP", -1);
+    }
+
     ESP_LOGI(TAG, "[C] POST /api/config/reset");
     device_config_reset_defaults();
     httpd_resp_set_type(req, "application/json");
@@ -2508,9 +2878,74 @@ esp_err_t api_config_reset(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t api_security_password(httpd_req_t *req)
+{
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "404 Non Trovato");
+        return httpd_resp_send(req, "404 Non Trovato", -1);
+    }
+
+    if (req->method == HTTP_GET) {
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_send(req, "{\"status\":\"ok\",\"editable\":true}", -1);
+    }
+
+    if (req->method != HTTP_POST) {
+        httpd_resp_set_status(req, "405 Method Not Allowed");
+        return httpd_resp_send(req, "Method not allowed", -1);
+    }
+
+    if (req->content_len <= 0 || req->content_len > 1024) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Payload non valido", -1);
+    }
+
+    char payload[1024] = {0};
+    int len = httpd_req_recv(req, payload, req->content_len);
+    if (len <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Errore lettura payload", -1);
+    }
+
+    cJSON *root = cJSON_Parse(payload);
+    if (!root) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "JSON non valido", -1);
+    }
+
+    cJSON *current = cJSON_GetObjectItem(root, "current_password");
+    cJSON *next = cJSON_GetObjectItem(root, "new_password");
+    if (!cJSON_IsString(current) || !cJSON_IsString(next)) {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Campi current_password/new_password obbligatori", -1);
+    }
+
+    if (strcmp(current->valuestring, web_ui_get_boot_password()) != 0) {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Password attuale non valida", -1);
+    }
+
+    esp_err_t err = web_ui_set_boot_password(next->valuestring);
+    cJSON_Delete(root);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Nuova password non valida o errore salvataggio", -1);
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, "{\"status\":\"ok\"}", -1);
+}
+
 // Handler API POST /api/ntp/sync
 esp_err_t api_ntp_sync(httpd_req_t *req)
 {
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Configurazione in sola lettura in modalità APP", -1);
+    }
+
     ESP_LOGI(TAG, "[C] POST /api/ntp/sync");
     httpd_resp_set_type(req, "application/json");
     
@@ -2730,12 +3165,21 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     
     httpd_uri_t uri_stats = {.uri = "/stats", .method = HTTP_GET, .handler = stats_page_handler};
     httpd_register_uri_handler(server, &uri_stats);
+
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_uri_t uri_programs = {.uri = "/config/programs", .method = HTTP_GET, .handler = programs_page_handler};
+        httpd_register_uri_handler(server, &uri_programs);
+    }
     
-    httpd_uri_t uri_tasks = {.uri = "/tasks", .method = HTTP_GET, .handler = tasks_page_handler};
-    httpd_register_uri_handler(server, &uri_tasks);
-    
-    httpd_uri_t uri_test = {.uri = "/test", .method = HTTP_GET, .handler = test_page_handler};
-    httpd_register_uri_handler(server, &uri_test);
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TASKS)) {
+        httpd_uri_t uri_tasks = {.uri = "/tasks", .method = HTTP_GET, .handler = tasks_page_handler};
+        httpd_register_uri_handler(server, &uri_tasks);
+    }
+
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TEST)) {
+        httpd_uri_t uri_test = {.uri = "/test", .method = HTTP_GET, .handler = test_page_handler};
+        httpd_register_uri_handler(server, &uri_test);
+    }
 
     httpd_uri_t uri_httpservices = {.uri = "/httpservices", .method = HTTP_GET, .handler = httpservices_page_handler};
     httpd_register_uri_handler(server, &uri_httpservices);
@@ -2767,17 +3211,37 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_api_ntp_sync = {.uri = "/api/ntp/sync", .method = HTTP_POST, .handler = api_ntp_sync};
     httpd_register_uri_handler(server, &uri_api_ntp_sync);
 
-    httpd_uri_t uri_api_tasks = {.uri = "/api/tasks", .method = HTTP_GET, .handler = api_tasks_get};
-    httpd_register_uri_handler(server, &uri_api_tasks);
-    
-    httpd_uri_t uri_api_tasks_save = {.uri = "/api/tasks/save", .method = HTTP_POST, .handler = api_tasks_save};
-    httpd_register_uri_handler(server, &uri_api_tasks_save);
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TASKS)) {
+        httpd_uri_t uri_api_tasks = {.uri = "/api/tasks", .method = HTTP_GET, .handler = api_tasks_get};
+        httpd_register_uri_handler(server, &uri_api_tasks);
 
-    httpd_uri_t uri_api_tasks_apply = {.uri = "/api/tasks/apply", .method = HTTP_POST, .handler = api_tasks_apply};
-    httpd_register_uri_handler(server, &uri_api_tasks_apply);
-    
-    httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
-    httpd_register_uri_handler(server, &uri_api_test);
+        httpd_uri_t uri_api_tasks_save = {.uri = "/api/tasks/save", .method = HTTP_POST, .handler = api_tasks_save};
+        httpd_register_uri_handler(server, &uri_api_tasks_save);
+
+        httpd_uri_t uri_api_tasks_apply = {.uri = "/api/tasks/apply", .method = HTTP_POST, .handler = api_tasks_apply};
+        httpd_register_uri_handler(server, &uri_api_tasks_apply);
+    }
+
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TEST)) {
+        httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
+        httpd_register_uri_handler(server, &uri_api_test);
+    }
+
+    {
+        httpd_uri_t uri_api_programs_get = {.uri = "/api/programs", .method = HTTP_GET, .handler = api_programs_get};
+        httpd_register_uri_handler(server, &uri_api_programs_get);
+    }
+
+    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_uri_t uri_api_programs_save = {.uri = "/api/programs/save", .method = HTTP_POST, .handler = api_programs_save};
+        httpd_register_uri_handler(server, &uri_api_programs_save);
+
+        httpd_uri_t uri_api_security_password = {.uri = "/api/security/password", .method = HTTP_POST, .handler = api_security_password};
+        httpd_register_uri_handler(server, &uri_api_security_password);
+    }
+
+    httpd_uri_t uri_api_emulator_relay = {.uri = "/api/emulator/relay", .method = HTTP_POST, .handler = api_emulator_relay_control};
+    httpd_register_uri_handler(server, &uri_api_emulator_relay);
     
     httpd_uri_t uri_api_logs_get = {.uri = "/api/logs", .method = HTTP_GET, .handler = api_logs_get};
     httpd_register_uri_handler(server, &uri_api_logs_get);
