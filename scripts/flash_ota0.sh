@@ -25,6 +25,26 @@ eval $CMD
 
 if [ $? -eq 0 ]; then
     echo "✅ Flash OTA_0 completato!"
+  if [ -z "$IDF_PATH" ] && [ -f "$HOME/esp/esp-idf/export.sh" ]; then
+    . "$HOME/esp/esp-idf/export.sh" >/dev/null 2>&1
+  fi
+
+  OTATOOL="$IDF_PATH/components/app_update/otatool.py"
+  if [ -z "$IDF_PATH" ] || [ ! -f "$OTATOOL" ]; then
+    echo "❌ Impossibile trovare otatool.py (IDF_PATH non configurato)."
+    exit 1
+  fi
+
+  BOOT_CMD="python3 $OTATOOL --port $PORT --baud $BAUD --partition-table-file partitions.csv switch_ota_partition --slot 0"
+  echo "🔁 Imposto il prossimo boot su OTA_0..."
+  echo "📝 Comando: $BOOT_CMD"
+  eval $BOOT_CMD
+  if [ $? -ne 0 ]; then
+    echo "❌ Errore durante l'impostazione della partizione di boot OTA_0."
+    exit 1
+  fi
+  echo "✅ Boot impostato su OTA_0."
+
     if [ "$MONITOR" = true ]; then
         echo "🖥️  Avvio monitor (115200 baud)..."
         idf.py monitor -p "$PORT" -b 115200

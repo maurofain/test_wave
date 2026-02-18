@@ -711,9 +711,11 @@ const char* device_config_get_running_app_name(void)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
     if (running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY) {
-        return "FACTORY (Test)";
+        return "MAINTENANCE";
     } else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0) {
-        return "PRODUCTION";
+        return "OTA0";
+    } else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1) {
+        return "OTA1";
     }
     return "UNKNOWN";
 }

@@ -38,6 +38,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_httpservices = {.uri = "/httpservices", .method = HTTP_GET, .handler = httpservices_page_handler};
     httpd_register_uri_handler(server, &uri_httpservices);
 
+    httpd_uri_t uri_emulator = {.uri = "/emulator", .method = HTTP_GET, .handler = emulator_page_handler};
+    httpd_register_uri_handler(server, &uri_emulator);
+
     httpd_uri_t uri_api_index = {.uri = "/api", .method = HTTP_GET, .handler = api_index_page_handler};
     httpd_register_uri_handler(server, &uri_api_index);
     ESP_LOGI(TAG, "Registered GET /api (index)");

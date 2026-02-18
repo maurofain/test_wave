@@ -18,3 +18,11 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth);
  * @return Handle della LED strip, NULL se non inizializzato
  */
 led_strip_handle_t init_get_ws2812_handle(void);
+
+/**
+ * @brief Forza la sincronizzazione NTP manuale
+ * @return ESP_OK se la sincronizzazione è riuscita, ESP_FAIL altrimenti
+ */
+esp_err_t init_sync_ntp(void);
+
+void init_i2c_and_io_expander(void); // Inizializza I2C e I/O Expander e controlla GPIO3

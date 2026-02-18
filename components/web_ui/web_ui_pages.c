@@ -56,6 +56,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         ".btn-link:hover{background:#2980b9;box-shadow:0 4px 8px rgba(0,0,0,0.2)}"
         ".btn-config{background:#27ae60}.btn-config:hover{background:#219150}"
         ".btn-test{background:#e67e22}.btn-test:hover{background:#d35400}"
+        ".btn-emu{background:#8e44ad}.btn-emu:hover{background:#7d3c98}"
         ".btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}"
         ".btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}";
 
@@ -68,6 +69,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
         "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
         "<a href='/httpservices' class='btn-link'><span class='icon'>🔐</span><span>HTTP Services</span></a>"
+        "<a href='/emulator' class='btn-link btn-emu'><span class='icon'>🕹️</span><span>Emulator</span></a>"
         "<a href='/api' class='btn-link'><span class='icon'>🔗</span><span>API Endpoints</span></a>"
         "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
@@ -80,6 +82,118 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "</div>"
         "</div>"
         "</div></body></html>";
+
+    httpd_resp_sendstr_chunk(req, body);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
+esp_err_t emulator_page_handler(httpd_req_t *req)
+{
+    const char *extra_style =
+        ".emu-wrap{max-width:1400px;margin:20px auto;padding:0 20px;box-sizing:border-box;display:flex;gap:18px;align-items:flex-start}"
+        ".emu-display{width:800px;height:1280px;background:#111;border-radius:16px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,0.25);box-sizing:border-box}"
+        ".emu-layout{height:100%;display:flex;gap:14px}"
+        ".emu-left{width:30%;display:grid;grid-template-rows:repeat(8,1fr);gap:10px}"
+        ".prog-btn{border:none;border-radius:10px;background:#2c3e50;color:#fff;font-size:22px;font-weight:bold;cursor:pointer}"
+        ".prog-btn.active{background:#3498db}"
+        ".emu-main{width:60%;display:flex;flex-direction:column;gap:14px}"
+        ".credit-box{background:#fdfdfd;border-radius:12px;padding:20px;flex:0 0 38%;display:flex;align-items:center;justify-content:center;flex-direction:column}"
+        ".credit-label{font-size:22px;color:#2c3e50}"
+        ".credit-value{font-size:110px;font-weight:bold;line-height:1;color:#111}"
+        ".msg-box{background:#fdfdfd;border-radius:12px;padding:20px;flex:1;font-size:30px;color:#2c3e50;display:flex;align-items:center;justify-content:center;text-align:center}"
+        ".emu-gauge{width:10%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}"
+        ".gauge-title{color:#fff;font-weight:bold;font-size:18px;text-align:center}"
+        ".gauge-track{position:relative;width:100%;height:92%;border-radius:12px;overflow:hidden;border:2px solid #d9d9d9;background:linear-gradient(to top,#c0392b 0%,#c0392b 20%,#27ae60 20%,#27ae60 100%)}"
+        ".gauge-mask{position:absolute;left:0;top:0;width:100%;height:0%;background:#111;transition:height .25s linear}"
+        ".gauge-text{color:#fff;font-size:20px;font-weight:bold}"
+        ".emu-side{width:300px;background:#ffffff;border-radius:16px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.12);box-sizing:border-box}"
+        ".side-title{margin:0 0 10px 0;color:#2c3e50;font-size:22px}"
+        ".coin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}"
+        ".coin-btn{border:none;border-radius:8px;background:#27ae60;color:#fff;padding:12px 8px;font-size:18px;font-weight:bold;cursor:pointer}"
+        ".coin-btn:hover{background:#219150}"
+        ".relay-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}"
+        ".relay{border-radius:8px;background:#d5d8dc;color:#2c3e50;padding:10px 4px;text-align:center;font-weight:bold;font-size:14px}"
+        ".relay.on{background:#f39c12;color:#fff}"
+        ".side-note{margin-top:12px;font-size:13px;color:#566573;line-height:1.4}"
+        "@media(max-width:1250px){.emu-wrap{flex-direction:column;align-items:center}.emu-side{width:800px}.credit-value{font-size:82px}.msg-box{font-size:24px}.prog-btn{font-size:19px}}";
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    send_head(req, "Emulator", extra_style, true);
+
+    const char *body =
+        "<div class='emu-wrap'>"
+        "<div class='emu-display'><div class='emu-layout'>"
+        "<div class='emu-left'>"
+        "<button class='prog-btn' data-id='1'>Programma 1</button>"
+        "<button class='prog-btn' data-id='2'>Programma 2</button>"
+        "<button class='prog-btn' data-id='3'>Programma 3</button>"
+        "<button class='prog-btn' data-id='4'>Programma 4</button>"
+        "<button class='prog-btn' data-id='5'>Programma 5</button>"
+        "<button class='prog-btn' data-id='6'>Programma 6</button>"
+        "<button class='prog-btn' data-id='7'>Programma 7</button>"
+        "<button class='prog-btn' data-id='8'>Programma 8</button>"
+        "</div>"
+        "<div class='emu-main'>"
+        "<div class='credit-box'><div class='credit-label'>Credito</div><div id='credit' class='credit-value'>100</div></div>"
+        "<div id='msg' class='msg-box'>Seleziona un programma per avviare la simulazione</div>"
+        "</div>"
+        "<div class='emu-gauge'>"
+        "<div class='gauge-title'>Stato credito</div>"
+        "<div class='gauge-track'><div id='gmask' class='gauge-mask'></div></div>"
+        "<div id='gtext' class='gauge-text'>100%</div>"
+        "</div>"
+        "</div></div>"
+        "<div class='emu-side'>"
+        "<h2 class='side-title'>Ricarica Coin</h2>"
+        "<div class='coin-grid'>"
+        "<button class='coin-btn' data-coin='1'>+1</button>"
+        "<button class='coin-btn' data-coin='5'>+5</button>"
+        "<button class='coin-btn' data-coin='10'>+10</button>"
+        "</div>"
+        "<h2 class='side-title'>Relay</h2>"
+        "<div id='relayGrid' class='relay-grid'>"
+        "<div class='relay' data-relay='1'>R1</div>"
+        "<div class='relay' data-relay='2'>R2</div>"
+        "<div class='relay' data-relay='3'>R3</div>"
+        "<div class='relay' data-relay='4'>R4</div>"
+        "<div class='relay' data-relay='5'>R5</div>"
+        "<div class='relay' data-relay='6'>R6</div>"
+        "<div class='relay' data-relay='7'>R7</div>"
+        "<div class='relay' data-relay='8'>R8</div>"
+        "<div class='relay' data-relay='9'>R9</div>"
+        "<div class='relay' data-relay='10'>R10</div>"
+        "</div>"
+        "<div class='side-note'>Predisposizione hardware attiva: la pagina emette eventi JS per comando programma, ricarica credito e stato relay, pronti per integrazione con endpoint/device fisici.</div>"
+        "</div>"
+        "</div>"
+        "<script>"
+        "(function(){"
+        "const buttons=[...document.querySelectorAll('.prog-btn')];"
+        "const coinButtons=[...document.querySelectorAll('.coin-btn')];"
+        "const relays=[...document.querySelectorAll('.relay')];"
+        "const creditEl=document.getElementById('credit');"
+        "const msgEl=document.getElementById('msg');"
+        "const maskEl=document.getElementById('gmask');"
+        "const gaugeText=document.getElementById('gtext');"
+        "let credit=100;let activeProgram=0;"
+        "function dispatchHardwareCommand(type,payload){"
+        "  const detail={type:type,payload:payload,timestamp:Date.now()};"
+        "  window.dispatchEvent(new CustomEvent('emulator:hardware-command',{detail:detail}));"
+        "  console.log('[EMULATOR_CMD]',detail);"
+        "}"
+        "function updateRelays(programId){"
+        "  relays.forEach(function(r){r.classList.remove('on');});"
+        "  if(programId>0&&programId<=10){const target=relays[programId-1];if(target)target.classList.add('on');}"
+        "  dispatchHardwareCommand('relay_update',{program:programId});"
+        "}"
+        "function render(){const clamped=Math.max(0,Math.min(100,credit));creditEl.textContent=String(clamped);gaugeText.textContent=clamped+'%';maskEl.style.height=(100-clamped)+'%';}"
+        "buttons.forEach(function(btn){btn.addEventListener('click',function(){buttons.forEach(function(b){b.classList.remove('active');});btn.classList.add('active');activeProgram=parseInt(btn.dataset.id||'0',10);msgEl.textContent='Programma '+activeProgram+' avviato';updateRelays(activeProgram);dispatchHardwareCommand('program_start',{program:activeProgram});});});"
+        "coinButtons.forEach(function(btn){btn.addEventListener('click',function(){const delta=parseInt(btn.dataset.coin||'0',10);credit=Math.min(100,credit+delta);render();msgEl.textContent='Ricarica +'+delta+' coin';dispatchHardwareCommand('coin_add',{value:delta,current_credit:credit});});});"
+        "setInterval(function(){if(activeProgram===0)return;if(credit<=0){msgEl.textContent='Credito terminato. Seleziona un programma o ricarica.';activeProgram=0;buttons.forEach(function(b){b.classList.remove('active');});updateRelays(0);dispatchHardwareCommand('program_stop',{reason:'credit_end'});return;}credit=Math.max(0,credit-1);render();},1000);"
+        "render();"
+        "})();"
+        "</script></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
@@ -186,14 +300,20 @@ esp_err_t ota_get_handler(httpd_req_t *req)
 
     const char *body = 
         "<div class='container'><div class='card'>"
-        "<form id='f' enctype='multipart/form-data'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Carica Firmware</button></form>"
-        "<div id='s'></div></div></div><script>"
-        "document.getElementById('f').onsubmit=async function(e){e.preventDefault();"
-        "const fd=new FormData();fd.append('f',document.getElementById('i').files[0]);"
-        "document.getElementById('s').innerText='Upload in corso...';"
-        "try{const r=await fetch('/ota/upload',{method:'POST',body:fd});"
-        "if(r.ok) document.getElementById('s').innerText='✅ Successo! Riavvio...';"
-        "else document.getElementById('s').innerText='❌ Errore';}catch(e){document.getElementById('s').innerText='❌ Errore: '+e;}};"
+        "<form id='f'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Carica Firmware</button></form>"
+        "<div style='margin-top:10px'><progress id='p' value='0' max='100' style='width:100%;height:20px;'></progress><div id='pct' style='margin-top:6px;font-weight:bold;'>0%</div></div>"
+        "<div id='s' style='margin-top:10px'></div></div></div><script>"
+        "document.getElementById('f').onsubmit=function(e){e.preventDefault();"
+        "const file=document.getElementById('i').files[0];if(!file){return;}"
+        "const p=document.getElementById('p');const pct=document.getElementById('pct');const s=document.getElementById('s');"
+        "p.value=0;pct.innerText='0%';s.innerText='Upload in corso...';"
+        "const x=new XMLHttpRequest();x.open('POST','/ota/upload',true);"
+        "x.setRequestHeader('Content-Type','application/octet-stream');"
+        "x.upload.onprogress=function(ev){if(ev.lengthComputable){const v=Math.min(100,Math.round((ev.loaded*100)/ev.total));p.value=v;pct.innerText=v+'%';}};"
+        "x.onload=function(){if(x.status>=200&&x.status<300){p.value=100;pct.innerText='100%';s.innerText='✅ Successo! Riavvio...';}else{s.innerText='❌ Errore ('+x.status+')';}};"
+        "x.onerror=function(){s.innerText='❌ Errore di rete';};"
+        "x.send(file);"
+        "};"
         "</script></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);
@@ -203,17 +323,69 @@ esp_err_t ota_get_handler(httpd_req_t *req)
 
 esp_err_t ota_upload_handler(httpd_req_t *req)
 {
-    if (req->content_len <= 0) return ESP_FAIL;
+    char content_type[64] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Content-Type", content_type, sizeof(content_type)) == ESP_OK) {
+        if (strstr(content_type, "multipart/form-data") != NULL) {
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_send(req, "Inviare binario raw (application/octet-stream), non multipart/form-data", -1);
+            return ESP_FAIL;
+        }
+    }
+
+    if (req->content_len <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_send(req, "Payload OTA vuoto", -1);
+        return ESP_FAIL;
+    }
+
     const esp_partition_t *p = esp_ota_get_next_update_partition(NULL);
-    if (!p) return ESP_FAIL;
-    esp_ota_handle_t h; esp_ota_begin(p, OTA_SIZE_UNKNOWN, &h);
+    if (!p) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    esp_ota_handle_t h;
+    esp_err_t err = esp_ota_begin(p, OTA_SIZE_UNKNOWN, &h);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "Errore avvio OTA", -1);
+        return ESP_FAIL;
+    }
+
     char b[1024]; int rem = req->content_len;
     while (rem > 0) {
         int n = httpd_req_recv(req, b, MIN(rem, 1024));
-        if (n <= 0) { esp_ota_abort(h); return ESP_FAIL; }
-        esp_ota_write(h, b, n); rem -= n;
+        if (n <= 0) {
+            esp_ota_abort(h);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            httpd_resp_send(req, "Errore ricezione dati OTA", -1);
+            return ESP_FAIL;
+        }
+
+        err = esp_ota_write(h, b, n);
+        if (err != ESP_OK) {
+            esp_ota_abort(h);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            httpd_resp_send(req, "Errore scrittura OTA", -1);
+            return ESP_FAIL;
+        }
+        rem -= n;
     }
-    esp_ota_end(h); esp_ota_set_boot_partition(p);
+
+    err = esp_ota_end(h);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "Immagine OTA non valida", -1);
+        return ESP_FAIL;
+    }
+
+    err = esp_ota_set_boot_partition(p);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "Errore impostazione boot partition", -1);
+        return ESP_FAIL;
+    }
+
     httpd_resp_send(req, "OTA completato con successo, riavvio in corso...", -1);
     vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart();
     return ESP_OK;

@@ -209,14 +209,20 @@ esp_err_t ota_get_handler(httpd_req_t *req)
 
     const char *body = 
         "<div class='container'><div class='card'>"
-        "<form id='f' enctype='multipart/form-data'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Carica Firmware</button></form>"
-        "<div id='s'></div></div></div><script>"
-        "document.getElementById('f').onsubmit=async function(e){e.preventDefault();"
-        "const fd=new FormData();fd.append('f',document.getElementById('i').files[0]);"
-        "document.getElementById('s').innerText='Upload in corso...';"
-        "try{const r=await fetch('/ota/upload',{method:'POST',body:fd});"
-        "if(r.ok) document.getElementById('s').innerText='✅ Successo! Riavvio...';"
-        "else document.getElementById('s').innerText='❌ Errore';}catch(e){document.getElementById('s').innerText='❌ Errore: '+e;}};"
+        "<form id='f'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Carica Firmware</button></form>"
+        "<div style='margin-top:10px'><progress id='p' value='0' max='100' style='width:100%;height:20px;'></progress><div id='pct' style='margin-top:6px;font-weight:bold;'>0%</div></div>"
+        "<div id='s' style='margin-top:10px'></div></div></div><script>"
+        "document.getElementById('f').onsubmit=function(e){e.preventDefault();"
+        "const file=document.getElementById('i').files[0];if(!file){return;}"
+        "const p=document.getElementById('p');const pct=document.getElementById('pct');const s=document.getElementById('s');"
+        "p.value=0;pct.innerText='0%';s.innerText='Upload in corso...';"
+        "const x=new XMLHttpRequest();x.open('POST','/ota/upload',true);"
+        "x.setRequestHeader('Content-Type','application/octet-stream');"
+        "x.upload.onprogress=function(ev){if(ev.lengthComputable){const v=Math.min(100,Math.round((ev.loaded*100)/ev.total));p.value=v;pct.innerText=v+'%';}};"
+        "x.onload=function(){if(x.status>=200&&x.status<300){p.value=100;pct.innerText='100%';s.innerText='✅ Successo! Riavvio...';}else{s.innerText='❌ Errore ('+x.status+')';}};"
+        "x.onerror=function(){s.innerText='❌ Errore di rete';};"
+        "x.send(file);"
+        "};"
         "</script></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);
@@ -227,17 +233,69 @@ esp_err_t ota_get_handler(httpd_req_t *req)
 // Handler per l'upload OTA (POST)
 esp_err_t ota_upload_handler(httpd_req_t *req)
 {
-    if (req->content_len <= 0) return ESP_FAIL;
+    char content_type[64] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Content-Type", content_type, sizeof(content_type)) == ESP_OK) {
+        if (strstr(content_type, "multipart/form-data") != NULL) {
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_send(req, "Inviare binario raw (application/octet-stream), non multipart/form-data", -1);
+            return ESP_FAIL;
+        }
+    }
+
+    if (req->content_len <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_send(req, "Payload OTA vuoto", -1);
+        return ESP_FAIL;
+    }
+
     const esp_partition_t *p = esp_ota_get_next_update_partition(NULL);
-    if (!p) return ESP_FAIL;
-    esp_ota_handle_t h; esp_ota_begin(p, OTA_SIZE_UNKNOWN, &h);
+    if (!p) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    esp_ota_handle_t h;
+    esp_err_t err = esp_ota_begin(p, OTA_SIZE_UNKNOWN, &h);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "Errore avvio OTA", -1);
+        return ESP_FAIL;
+    }
+
     char b[1024]; int rem = req->content_len;
     while (rem > 0) {
         int n = httpd_req_recv(req, b, MIN(rem, 1024));
-        if (n <= 0) { esp_ota_abort(h); return ESP_FAIL; }
-        esp_ota_write(h, b, n); rem -= n;
+        if (n <= 0) {
+            esp_ota_abort(h);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            httpd_resp_send(req, "Errore ricezione dati OTA", -1);
+            return ESP_FAIL;
+        }
+
+        err = esp_ota_write(h, b, n);
+        if (err != ESP_OK) {
+            esp_ota_abort(h);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            httpd_resp_send(req, "Errore scrittura OTA", -1);
+            return ESP_FAIL;
+        }
+        rem -= n;
     }
-    esp_ota_end(h); esp_ota_set_boot_partition(p);
+
+    err = esp_ota_end(h);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "Immagine OTA non valida", -1);
+        return ESP_FAIL;
+    }
+
+    err = esp_ota_set_boot_partition(p);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "Errore impostazione boot partition", -1);
+        return ESP_FAIL;
+    }
+
     httpd_resp_send(req, "OTA completato con successo, riavvio in corso...", -1);
     vTaskDelay(pdMS_TO_TICKS(1000)); esp_restart();
     return ESP_OK;

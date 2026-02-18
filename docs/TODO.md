@@ -76,7 +76,7 @@
 - Factory 
 
  0. Fare valutazione per le funzioni di caricamento da remoto su chiamata degli artei immagini, tabelle testi e del firmware stesso. Considerare che questi contenuti possono essere salvarti sia in SPIFFS che in SD
- 1. Creare una FSM per la gestione del ciclo operativo della macchina
+ 1. Creare una FSM per la gestione del ciclo operativo della macchina (vedi FSM.md)
  2. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
  3. Piano test endpoint e funzioni (da riprendere)
 
@@ -127,6 +127,11 @@
     - Osservabilità e test
       - Aggiungere metriche minime (`last_ok`, `last_err`, `queue_len`, `last_status_code`) esposte via API/UI.
       - Preparare test contract/flow dedicati alle route remote con mock server.
+  5. Emulatore
+      - ora che gli stati sono definiti, creiamo una pagina web /emulator  , con un button per entrare in home page prima di API, per emulare l'operatività del pannello utente. 
+      la pagina web si sviluppa con HTML/CSS/JS, dove:  : a sx simulando una display con risoluzione 800x1280 diviso in due sezioni e che contiene una colonna (larghezza 30%) con 8 tasti per la scelta programmi, poi un'area per visualizzare il credito (larghezza 70%) con un contatore con caratteri grandi e sotto di questo un'area per le comunicazioni con l'utente, a dx un gauge con lo stato del credito che cambia con il passare del tempo e che è rappresentato con una colonna (larghezza 10% dello spazio verticale) che è rossa in basso (0%-20%) del credito e poi diventa verde (20%-100%). 
+      a destra dello schermo inseriamo i comandi per ricaricare virtualmente 1, 5, 10 coin e una serie di 10 indicatori che corrisponderanno ad altrettanti relais in commutazione in base ai programmi. L'emulatore deve ricevere comandi e comandare dall'hardware fisico. L'implentazione di comando dei device verrà descritta in seguito, ora solo predisponiamo il tutto
+      
  ```
 
 > POST /api/login HTTP/1.1

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script per il flash della sola partizione OTA_1 (5MB - Test OTA localmente)
+# Script per il flash della sola partizione OTA_1 (offset da partitions.csv)
 # Utilizzo: ./scripts/flash_ota1.sh [-p /dev/ttyPORT] [-b BAUD] [-m]
 
 PORT="/dev/ttyACM0"
@@ -15,7 +15,7 @@ while getopts "p:b:m" opt; do
   esac
 done
 
-CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash 0x810000 build/test_wave.bin"
+CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash 0x8B0000 build/test_wave.bin"
 
 echo "🚀 Avvio flash partizione OTA_1 (5MB) su $PORT a $BAUD baud..."
 echo "📝 Comando: $CMD"
@@ -25,6 +25,26 @@ eval $CMD
 
 if [ $? -eq 0 ]; then
     echo "✅ Flash OTA_1 completato!"
+  if [ -z "$IDF_PATH" ] && [ -f "$HOME/esp/esp-idf/export.sh" ]; then
+    . "$HOME/esp/esp-idf/export.sh" >/dev/null 2>&1
+  fi
+
+  OTATOOL="$IDF_PATH/components/app_update/otatool.py"
+  if [ -z "$IDF_PATH" ] || [ ! -f "$OTATOOL" ]; then
+    echo "❌ Impossibile trovare otatool.py (IDF_PATH non configurato)."
+    exit 1
+  fi
+
+  BOOT_CMD="python3 $OTATOOL --port $PORT --baud $BAUD --partition-table-file partitions.csv switch_ota_partition --slot 1"
+  echo "🔁 Imposto il prossimo boot su OTA_1..."
+  echo "📝 Comando: $BOOT_CMD"
+  eval $BOOT_CMD
+  if [ $? -ne 0 ]; then
+    echo "❌ Errore durante l'impostazione della partizione di boot OTA_1."
+    exit 1
+  fi
+  echo "✅ Boot impostato su OTA_1."
+
     if [ "$MONITOR" = true ]; then
         echo "🖥️  Avvio monitor (115200 baud)..."
         idf.py monitor -p "$PORT" -b 115200

@@ -23,3 +23,7 @@ typedef struct {
 
 void tasks_start_all(void);
 void tasks_load_config(const char *path);
+void tasks_apply_n_run(void);
+void tasks_set_touchscreen_handle(void *handle);
+float tasks_get_temperature(void);
+float tasks_get_humidity(void);

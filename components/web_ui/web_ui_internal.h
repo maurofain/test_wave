@@ -30,6 +30,7 @@ esp_err_t stats_page_handler(httpd_req_t *req);
 esp_err_t tasks_page_handler(httpd_req_t *req);
 esp_err_t test_page_handler(httpd_req_t *req);
 esp_err_t httpservices_page_handler(httpd_req_t *req);
+esp_err_t emulator_page_handler(httpd_req_t *req);
 esp_err_t api_index_page_handler(httpd_req_t *req);
 
 // OTA handlers
