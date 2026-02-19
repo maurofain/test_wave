@@ -64,6 +64,7 @@
 34. ✅ Controllo luminosità schermo implementato e collegato a /config (live update + persistenza)
 35. ✅ Riportare lo schermo in verticale (video portrait)
 36. ✅ Clear monitor seriale: pulizia aree testo + formato output (senza TX/RX testuale, TEXT compatto, HEX con prefisso '.')
+37. ✅ Emulatore: pagina web /emulator con layout pannello utente (tasti programmi, credito, messaggi, gauge, coin virtuali e indicatori relay) e predisposizione comandi hardware
 
 # ⏸️ RITARDATI
 
@@ -127,10 +128,7 @@
     - Osservabilità e test
       - Aggiungere metriche minime (`last_ok`, `last_err`, `queue_len`, `last_status_code`) esposte via API/UI.
       - Preparare test contract/flow dedicati alle route remote con mock server.
-  5. Emulatore
-      - ora che gli stati sono definiti, creiamo una pagina web /emulator  , con un button per entrare in home page prima di API, per emulare l'operatività del pannello utente. 
-      la pagina web si sviluppa con HTML/CSS/JS, dove:  : a sx simulando una display con risoluzione 800x1280 diviso in due sezioni e che contiene una colonna (larghezza 30%) con 8 tasti per la scelta programmi, poi un'area per visualizzare il credito (larghezza 70%) con un contatore con caratteri grandi e sotto di questo un'area per le comunicazioni con l'utente, a dx un gauge con lo stato del credito che cambia con il passare del tempo e che è rappresentato con una colonna (larghezza 10% dello spazio verticale) che è rossa in basso (0%-20%) del credito e poi diventa verde (20%-100%). 
-      a destra dello schermo inseriamo i comandi per ricaricare virtualmente 1, 5, 10 coin e una serie di 10 indicatori che corrisponderanno ad altrettanti relais in commutazione in base ai programmi. L'emulatore deve ricevere comandi e comandare dall'hardware fisico. L'implentazione di comando dei device verrà descritta in seguito, ora solo predisponiamo il tutto
+
       
  ```
 

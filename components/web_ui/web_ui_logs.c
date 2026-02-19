@@ -324,7 +324,7 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "}"
         "// Client-side log filter + bulk-apply levels (supports wildcards * and ?)\n"
         "var LOG_FILTER_RE = null;\n"
-        "function wildcardToRegExp(pat){ if(!pat) return null; var s = pat.replace(/[-\/\\^$+?.()|[\]{}]/g, '\\\\$&'); s = s.replace(/\\\*/g, '.*').replace(/\\\?/g, '.'); try{ return new RegExp(s, 'i'); }catch(e){console.error('Invalid filter',e); return null;} }\n"
+        "function wildcardToRegExp(pat){ if(!pat) return null; var specials='^$.*+?()[]{}|/\\\\'; var s=''; for(var i=0;i<pat.length;i++){ var ch=pat[i]; s += (specials.indexOf(ch)!==-1 ? ('\\\\'+ch) : ch); } s = s.split('\\\\*').join('.*').split('\\\\?').join('.'); try{ return new RegExp(s, 'i'); }catch(e){console.error('Invalid filter',e); return null;} }\n"
         "document.addEventListener('DOMContentLoaded', function(){\n"
         "  var applyBtn = document.getElementById('applyLevelsBtn');\n"
         "  if(applyBtn){ applyBtn.addEventListener('click', async function(){ var container = document.getElementById('levelsContainer'); if(!container) return; var selects = container.querySelectorAll('select[data-tag]'); applyBtn.disabled=true; applyBtn.innerText='Applicazione...'; for(const s of selects){ var tag = s.getAttribute('data-tag'); var lvl = parseInt(s.value); try{ await setLogLevel(tag,lvl); }catch(e){console.error(e);} } applyBtn.disabled=false; applyBtn.innerText='Applica livelli'; }); }\n"

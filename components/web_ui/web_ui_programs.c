@@ -1,4 +1,5 @@
 #include "web_ui_programs.h"
+#include "fsm.h"
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -98,6 +99,7 @@ static void programs_init_defaults(void)
         entry->enabled = true;
         entry->price_units = 10;
         entry->duration_sec = 60;
+        entry->pause_max_suspend_sec = 60;
         entry->relay_mask = (uint16_t)(1U << index);
     }
 
@@ -136,6 +138,7 @@ char *web_ui_program_table_to_json(void)
         cJSON_AddBoolToObject(item, "enabled", entry->enabled);
         cJSON_AddNumberToObject(item, "price_units", entry->price_units);
         cJSON_AddNumberToObject(item, "duration_sec", entry->duration_sec);
+        cJSON_AddNumberToObject(item, "pause_max_suspend_sec", entry->pause_max_suspend_sec);
         cJSON_AddNumberToObject(item, "relay_mask", entry->relay_mask);
         cJSON_AddItemToArray(programs, item);
     }
@@ -211,6 +214,7 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         cJSON *enabled = cJSON_GetObjectItem(item, "enabled");
         cJSON *price_units = cJSON_GetObjectItem(item, "price_units");
         cJSON *duration_sec = cJSON_GetObjectItem(item, "duration_sec");
+        cJSON *pause_max_suspend_sec = cJSON_GetObjectItem(item, "pause_max_suspend_sec");
         cJSON *relay_mask = cJSON_GetObjectItem(item, "relay_mask");
 
         if (!cJSON_IsNumber(program_id) || !cJSON_IsString(name) || !cJSON_IsBool(enabled) ||
@@ -225,9 +229,11 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         int pid = program_id->valueint;
         int price = price_units->valueint;
         int duration = duration_sec->valueint;
+        int pause_max = cJSON_IsNumber(pause_max_suspend_sec) ? pause_max_suspend_sec->valueint : 60;
         int mask = relay_mask->valueint;
 
-        if (pid <= 0 || pid > 255 || price < 0 || price > 65535 || duration < 0 || duration > 65535 || mask < 0 || mask > 0xFFFF) {
+        if (pid <= 0 || pid > 255 || price < 0 || price > 65535 || duration < 0 || duration > 65535 ||
+            pause_max < 0 || pause_max > 65535 || mask < 0 || mask > 0xFFFF) {
             cJSON_Delete(root);
             if (err_msg && err_msg_len > 0) {
                 snprintf(err_msg, err_msg_len, "valori fuori range entry %d", index);
@@ -240,6 +246,7 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         entry->enabled = cJSON_IsTrue(enabled);
         entry->price_units = (uint16_t)price;
         entry->duration_sec = (uint16_t)duration;
+        entry->pause_max_suspend_sec = (uint16_t)pause_max;
         entry->relay_mask = (uint16_t)mask;
     }
 
@@ -276,6 +283,13 @@ esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32
              (unsigned)relay_number,
              status ? "ON" : "OFF",
              (unsigned long)duration_ms);
+
+    char msg[FSM_EVENT_TEXT_MAX_LEN] = {0};
+    snprintf(msg, sizeof(msg), "Relay R%u %s (dur=%lu)",
+             (unsigned)relay_number,
+             status ? "ON" : "OFF",
+             (unsigned long)duration_ms);
+    fsm_append_message(msg);
 
     return ESP_OK;
 }

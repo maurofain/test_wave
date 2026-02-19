@@ -6,6 +6,8 @@
 #include "sht40.h"
 #include "esp_lcd_touch.h"
 #include "web_ui.h"
+#include "web_ui_programs.h"
+#include "fsm.h"
 #include "usb_cdc_scanner.h" // Scanner QR
 #include <stdio.h>
 #include <string.h>
@@ -118,6 +120,51 @@ static void pwm_task(void *arg)
     }
 }
 
+static void fsm_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    fsm_ctx_t fsm;
+    fsm_init(&fsm);
+    TickType_t prev_tick = xTaskGetTickCount();
+
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGE(TAG, "[FSM] Event queue init failed");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    ESP_LOGI(TAG, "[FSM] Task started in state=%s", fsm_state_to_string(fsm.state));
+    fsm_runtime_publish(&fsm);
+
+    while (true) {
+        fsm_input_event_t event;
+        bool changed = false;
+        fsm_state_t state_before = fsm.state;
+        TickType_t now_tick = xTaskGetTickCount();
+        uint32_t elapsed_ms = (uint32_t)pdTICKS_TO_MS(now_tick - prev_tick);
+        prev_tick = now_tick;
+
+        if (fsm_event_receive(&event, param->period_ticks)) {
+            changed = fsm_handle_input_event(&fsm, &event);
+        }
+
+        changed = fsm_tick(&fsm, elapsed_ms) || changed;
+
+        if ((state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) && fsm.state == FSM_STATE_CREDIT) {
+            for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
+                (void)web_ui_virtual_relay_control(relay, false, 0);
+            }
+            fsm_append_message("Programma terminato: reset relay/schermata");
+        }
+
+        if (changed) {
+            ESP_LOGI(TAG, "[FSM] State=%s credit=%ldc", fsm_state_to_string(fsm.state), (long)fsm.credit_cents);
+        }
+
+        fsm_runtime_publish(&fsm);
+    }
+}
+
 static void touchscreen_task(void *arg)
 {
     esp_lcd_touch_handle_t touch_handle = (esp_lcd_touch_handle_t)arg;
@@ -158,6 +205,7 @@ static void touchscreen_task(void *arg)
             if (significant) {
                 ESP_LOGI("TOUCH", "Touch detected: x=%d, y=%d, strength=%d, track_id=%d", 
                          touch_data[0].x, touch_data[0].y, touch_data[0].strength, touch_data[0].track_id);
+                (void)fsm_publish_simple_event(FSM_INPUT_EVENT_TOUCH, 0, NULL, 0);
                 prev = touch_data[0];
                 prev_present = true;
             }
@@ -213,6 +261,7 @@ static void scanner_on_barcode_cb(const char *barcode)
     ESP_LOGI("SCANNER", "Barcode: %s", barcode);
     /* Barcode readings: use distinct tag so UI can display readings separately */
     web_ui_add_log("INFO", "SCANNER_DATA", barcode);
+    (void)fsm_publish_simple_event(FSM_INPUT_EVENT_QR_SCANNED, 0, barcode, 0);
 }
 
 static void usb_scanner_task_wrapper(void *arg)
@@ -308,6 +357,17 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(20),
         .task_fn = pwm_task,
+        .stack_words = 8192,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "fsm",
+        .state = TASK_STATE_RUN,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(100),
+        .task_fn = fsm_task,
         .stack_words = 8192,
         .arg = NULL,
         .handle = NULL,

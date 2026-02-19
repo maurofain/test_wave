@@ -40,7 +40,7 @@ static inline web_ui_scope_t web_ui_feature_scope(web_ui_feature_t feature)
     case WEB_UI_FEATURE_ENDPOINT_EMULATOR:
         return WEB_UI_SCOPE_ALL;
     case WEB_UI_FEATURE_ENDPOINT_PROGRAMS:
-        return WEB_UI_SCOPE_FACTORY;
+        return WEB_UI_SCOPE_ALL;
     default:
         return WEB_UI_SCOPE_ALL;
     }

@@ -15,6 +15,7 @@ typedef struct {
     bool enabled;
     uint16_t price_units;
     uint16_t duration_sec;
+    uint16_t pause_max_suspend_sec;
     uint16_t relay_mask;
 } web_ui_program_entry_t;
 
