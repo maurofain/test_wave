@@ -64,6 +64,11 @@ Esempi rapidi:
    idf.py -p <PORT> flash monitor
    ```
 
+### Single source for init
+- `main/init.c` è la sorgente unica della sequenza di inizializzazione runtime.
+- Anche il profilo `factory/` riusa `main/init.c` (evita divergenze tra due copie).
+- Se devi modificare boot/network/web server init, fallo solo in `main/init.c`.
+
 ## Flash OTA da VS Code
 
 Sono disponibili task VS Code per eseguire il flash via rete senza porta seriale.

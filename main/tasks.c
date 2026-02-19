@@ -477,6 +477,9 @@ void tasks_load_config(const char *path)
 
         task_param_t *t = find_task_by_name(name);
         if (!t) {
+            if (strcmp(name, "http_server") == 0) {
+                continue;
+            }
             ESP_LOGW(TAG, "[M] Task sconosciuto '%s' nella configurazione", name);
             continue;
         }

@@ -11,17 +11,398 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
 
 static const char *HTML_STYLE_NAV = 
     "nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
     "nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}"
     "nav a:hover{background:#3498db}";
 
+static const char *TAG = "WEB_UI_COMMON";
+
+#define I18N_CACHE_MAX_ENTRIES 8
+
+typedef struct {
+    char lang[8];
+    char scope[16];
+    char *table_json;
+} i18n_cache_entry_t;
+
+static i18n_cache_entry_t s_i18n_cache[I18N_CACHE_MAX_ENTRIES];
+static size_t s_i18n_cache_next_slot = 0;
+
+static char *dup_cstr(const char *src)
+{
+    if (!src) {
+        return NULL;
+    }
+    size_t len = strlen(src);
+    char *dst = malloc(len + 1);
+    if (!dst) {
+        return NULL;
+    }
+    memcpy(dst, src, len + 1);
+    return dst;
+}
+
+static const char *i18n_scope_for_uri(const char *uri)
+{
+    if (!uri || uri[0] == '\0') {
+        return "p_runtime";
+    }
+
+    if (strncmp(uri, "/config/programs", 16) == 0) {
+        return "p_programs";
+    }
+    if (strncmp(uri, "/config", 7) == 0) {
+        return "p_config";
+    }
+    if (strncmp(uri, "/emulator", 9) == 0) {
+        return "p_emulator";
+    }
+    if (strncmp(uri, "/logs", 5) == 0) {
+        return "p_logs";
+    }
+    if (strncmp(uri, "/test", 5) == 0) {
+        return "p_test";
+    }
+
+    return "p_runtime";
+}
+
+static bool i18n_scope_allowed(const char *scope, const char *page_scope)
+{
+    if (!scope || !page_scope) {
+        return false;
+    }
+
+    if (strcmp(scope, "nav") == 0 ||
+        strcmp(scope, "header") == 0 ||
+        strcmp(scope, "lvgl") == 0) {
+        return true;
+    }
+
+    return strcmp(scope, page_scope) == 0;
+}
+
+static char *i18n_cache_get(const char *lang, const char *page_scope)
+{
+    if (!lang || !page_scope) {
+        return NULL;
+    }
+
+    for (size_t i = 0; i < I18N_CACHE_MAX_ENTRIES; i++) {
+        i18n_cache_entry_t *entry = &s_i18n_cache[i];
+        if (!entry->table_json) {
+            continue;
+        }
+        if (strcmp(entry->lang, lang) == 0 && strcmp(entry->scope, page_scope) == 0) {
+            return dup_cstr(entry->table_json);
+        }
+    }
+
+    return NULL;
+}
+
+static void i18n_cache_put(const char *lang, const char *page_scope, const char *table_json)
+{
+    if (!lang || !page_scope || !table_json) {
+        return;
+    }
+
+    char *copy = dup_cstr(table_json);
+    if (!copy) {
+        return;
+    }
+
+    for (size_t i = 0; i < I18N_CACHE_MAX_ENTRIES; i++) {
+        i18n_cache_entry_t *entry = &s_i18n_cache[i];
+        if (entry->table_json && strcmp(entry->lang, lang) == 0 && strcmp(entry->scope, page_scope) == 0) {
+            free(entry->table_json);
+            entry->table_json = copy;
+            return;
+        }
+    }
+
+    i18n_cache_entry_t *entry = &s_i18n_cache[s_i18n_cache_next_slot % I18N_CACHE_MAX_ENTRIES];
+    free(entry->table_json);
+    entry->table_json = copy;
+    strncpy(entry->lang, lang, sizeof(entry->lang) - 1);
+    entry->lang[sizeof(entry->lang) - 1] = '\0';
+    strncpy(entry->scope, page_scope, sizeof(entry->scope) - 1);
+    entry->scope[sizeof(entry->scope) - 1] = '\0';
+    s_i18n_cache_next_slot = (s_i18n_cache_next_slot + 1) % I18N_CACHE_MAX_ENTRIES;
+}
+
+void web_ui_i18n_cache_invalidate(void)
+{
+    for (size_t i = 0; i < I18N_CACHE_MAX_ENTRIES; i++) {
+        free(s_i18n_cache[i].table_json);
+        s_i18n_cache[i].table_json = NULL;
+        s_i18n_cache[i].lang[0] = '\0';
+        s_i18n_cache[i].scope[0] = '\0';
+    }
+    s_i18n_cache_next_slot = 0;
+}
+
+static void add_table_mapping(cJSON *table, const char *key, const char *value)
+{
+    if (!table || !key || !value || key[0] == '\0') {
+        return;
+    }
+    if (!cJSON_GetObjectItemCaseSensitive(table, key)) {
+        cJSON_AddStringToObject(table, key, value);
+    }
+}
+
+static char *build_i18n_table_json(const char *records_json, const char *base_records_json)
+{
+    if (!records_json) {
+        return NULL;
+    }
+
+    cJSON *records = cJSON_Parse(records_json);
+    if (!records || !cJSON_IsArray(records)) {
+        if (records) {
+            cJSON_Delete(records);
+        }
+        return NULL;
+    }
+
+    cJSON *table = cJSON_CreateObject();
+    if (!table) {
+        cJSON_Delete(records);
+        return NULL;
+    }
+
+    cJSON *base_lookup = NULL;
+    if (base_records_json && base_records_json[0] != '\0') {
+        cJSON *base_records = cJSON_Parse(base_records_json);
+        if (base_records && cJSON_IsArray(base_records)) {
+            base_lookup = cJSON_CreateObject();
+            if (base_lookup) {
+                cJSON *b_item = NULL;
+                cJSON_ArrayForEach(b_item, base_records) {
+                    if (!cJSON_IsObject(b_item)) {
+                        continue;
+                    }
+                    cJSON *b_scope = cJSON_GetObjectItem(b_item, "scope");
+                    cJSON *b_key = cJSON_GetObjectItem(b_item, "key");
+                    cJSON *b_text = cJSON_GetObjectItem(b_item, "text");
+                    if (!cJSON_IsString(b_scope) || !b_scope->valuestring ||
+                        !cJSON_IsString(b_key) || !b_key->valuestring ||
+                        !cJSON_IsString(b_text) || !b_text->valuestring) {
+                        continue;
+                    }
+                    char b_scoped_key[96] = {0};
+                    snprintf(b_scoped_key, sizeof(b_scoped_key), "%s.%s", b_scope->valuestring, b_key->valuestring);
+                    add_table_mapping(base_lookup, b_scoped_key, b_text->valuestring);
+                }
+            }
+        }
+        if (base_records) {
+            cJSON_Delete(base_records);
+        }
+    }
+
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, records) {
+        if (!cJSON_IsObject(item)) {
+            continue;
+        }
+
+        cJSON *scope = cJSON_GetObjectItem(item, "scope");
+        cJSON *key = cJSON_GetObjectItem(item, "key");
+        cJSON *text = cJSON_GetObjectItem(item, "text");
+        if (!cJSON_IsString(scope) || !scope->valuestring ||
+            !cJSON_IsString(key) || !key->valuestring ||
+            !cJSON_IsString(text) || !text->valuestring) {
+            continue;
+        }
+
+        char scoped_key[96] = {0};
+        snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope->valuestring, key->valuestring);
+        add_table_mapping(table, scoped_key, text->valuestring);
+
+        add_table_mapping(table, key->valuestring, text->valuestring);
+
+        if (base_lookup) {
+            cJSON *b_text = cJSON_GetObjectItemCaseSensitive(base_lookup, scoped_key);
+            if (cJSON_IsString(b_text) && b_text->valuestring && strcmp(b_text->valuestring, text->valuestring) != 0) {
+                add_table_mapping(table, b_text->valuestring, text->valuestring);
+
+                const char *start = b_text->valuestring;
+                while (*start && isspace((unsigned char)*start)) {
+                    start++;
+                }
+                const char *end = b_text->valuestring + strlen(b_text->valuestring);
+                while (end > start && isspace((unsigned char)end[-1])) {
+                    end--;
+                }
+                size_t trim_len = (size_t)(end - start);
+                if (trim_len > 0 && (start != b_text->valuestring || end != b_text->valuestring + strlen(b_text->valuestring))) {
+                    char *trimmed = malloc(trim_len + 1);
+                    if (trimmed) {
+                        memcpy(trimmed, start, trim_len);
+                        trimmed[trim_len] = '\0';
+                        add_table_mapping(table, trimmed, text->valuestring);
+                        free(trimmed);
+                    }
+                }
+            }
+        }
+    }
+
+    char *out = cJSON_PrintUnformatted(table);
+    if (base_lookup) {
+        cJSON_Delete(base_lookup);
+    }
+    cJSON_Delete(table);
+    cJSON_Delete(records);
+    return out;
+}
+
+static char *filter_i18n_records_json_for_scope(const char *records_json, const char *page_scope)
+{
+    if (!records_json || !page_scope) {
+        return NULL;
+    }
+
+    cJSON *root = cJSON_Parse(records_json);
+    if (!root || !cJSON_IsArray(root)) {
+        if (root) {
+            cJSON_Delete(root);
+        }
+        return NULL;
+    }
+
+    cJSON *filtered = cJSON_CreateArray();
+    if (!filtered) {
+        cJSON_Delete(root);
+        return NULL;
+    }
+
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, root) {
+        if (!cJSON_IsObject(item)) {
+            continue;
+        }
+
+        cJSON *scope = cJSON_GetObjectItem(item, "scope");
+        if (!cJSON_IsString(scope) || !scope->valuestring) {
+            continue;
+        }
+
+        if (!i18n_scope_allowed(scope->valuestring, page_scope)) {
+            continue;
+        }
+
+        cJSON *copy = cJSON_Duplicate(item, 1);
+        if (!copy) {
+            cJSON_Delete(filtered);
+            cJSON_Delete(root);
+            return NULL;
+        }
+        cJSON_AddItemToArray(filtered, copy);
+    }
+
+    char *out = cJSON_PrintUnformatted(filtered);
+    cJSON_Delete(filtered);
+    cJSON_Delete(root);
+    return out;
+}
+
+static char *escape_script_end_tag(const char *src)
+{
+    if (!src) {
+        return NULL;
+    }
+
+    const char *needle = "</script";
+    const char *replacement = "<\\/script";
+    const size_t needle_len = strlen(needle);
+    const size_t repl_len = strlen(replacement);
+
+    size_t count = 0;
+    const char *p = src;
+    while ((p = strstr(p, needle)) != NULL) {
+        count++;
+        p += needle_len;
+    }
+
+    if (count == 0) {
+        char *copy = malloc(strlen(src) + 1);
+        if (!copy) {
+            return NULL;
+        }
+        strcpy(copy, src);
+        return copy;
+    }
+
+    size_t src_len = strlen(src);
+    size_t out_len = src_len + (count * (repl_len - needle_len));
+    char *out = malloc(out_len + 1);
+    if (!out) {
+        return NULL;
+    }
+
+    const char *in = src;
+    char *dst = out;
+    while ((p = strstr(in, needle)) != NULL) {
+        size_t chunk = (size_t)(p - in);
+        memcpy(dst, in, chunk);
+        dst += chunk;
+        memcpy(dst, replacement, repl_len);
+        dst += repl_len;
+        in = p + needle_len;
+    }
+
+    strcpy(dst, in);
+    return out;
+}
+
 static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
 {
     const char *lang = device_config_get_ui_language();
-    char *texts_json = device_config_get_ui_texts_records_json(lang);
-    if (!texts_json) {
+    const char *page_scope = i18n_scope_for_uri(req ? req->uri : NULL);
+
+    char *table_json = i18n_cache_get(lang, page_scope);
+    if (!table_json) {
+        char *texts_json = device_config_get_ui_texts_records_json(lang);
+        if (!texts_json) {
+            return ESP_ERR_NO_MEM;
+        }
+
+        char *filtered_texts_json = filter_i18n_records_json_for_scope(texts_json, page_scope);
+        free(texts_json);
+        if (!filtered_texts_json) {
+            return ESP_ERR_NO_MEM;
+        }
+
+        char *base_filtered_json = NULL;
+        if (strcmp(lang, "it") != 0) {
+            char *base_json = device_config_get_ui_texts_records_json("it");
+            if (base_json) {
+                base_filtered_json = filter_i18n_records_json_for_scope(base_json, page_scope);
+                free(base_json);
+            }
+        }
+
+        table_json = build_i18n_table_json(filtered_texts_json, base_filtered_json);
+        free(filtered_texts_json);
+        if (base_filtered_json) {
+            free(base_filtered_json);
+        }
+        if (!table_json) {
+            return ESP_ERR_NO_MEM;
+        }
+
+        i18n_cache_put(lang, page_scope, table_json);
+    }
+
+    char *safe_texts_json = escape_script_end_tag(table_json);
+    free(table_json);
+    if (!safe_texts_json) {
         return ESP_ERR_NO_MEM;
     }
 
@@ -30,19 +411,14 @@ static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
         "if(window.__ui_i18n_ready)return;"
         "window.__ui_i18n_ready=true;"
         "const lang='%s';"
-        "const records=%s;"
-        "const table={};"
-        "for(const r of (Array.isArray(records)?records:[])){"
-        "if(!r||!r.scope||!r.key)continue;"
-        "const k=String(r.scope)+'.'+String(r.key);"
-        "table[k]=String(r.text||'');"
-        "if(table[String(r.key)]===undefined){table[String(r.key)]=String(r.text||'');}"
-        "}"
+        "const table=%s||{};"
+        "const SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1};"
         "function mapText(t){if(!t)return t;return (table[t]!==undefined&&table[t]!==null)?String(table[t]):t;}"
         "function applyNode(node){if(!node)return;"
-        "if(node.nodeType===Node.TEXT_NODE){const v=node.nodeValue;if(!v)return;const tt=v.trim();if(!tt)return;"
+        "if(node.nodeType===Node.TEXT_NODE){const p=node.parentElement;if(p&&SKIP[p.tagName])return;const v=node.nodeValue;if(!v)return;const tt=v.trim();if(!tt)return;"
         "const tr=mapText(tt);if(tr!==tt){node.nodeValue=v.replace(tt,tr);}return;}"
         "if(node.nodeType!==Node.ELEMENT_NODE)return;"
+        "if(SKIP[node.tagName])return;"
         "if(node.hasAttribute&&node.hasAttribute('data-i18n')){const k=node.getAttribute('data-i18n');if(k){const tr=mapText(k);if(tr&&tr!==k)node.textContent=tr;}}"
         "const attrs=['placeholder','title','aria-label','value'];"
         "for(const a of attrs){if(node.hasAttribute&&node.hasAttribute(a)){const ov=node.getAttribute(a);const nv=mapText(ov);if(nv!==ov)node.setAttribute(a,nv);}}"
@@ -51,26 +427,25 @@ static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
         "function apply(root){if(!root)return;applyNode(root);}"
         "window.uiI18n={language:lang,table:table,apply:apply,translate:mapText};"
         "document.addEventListener('DOMContentLoaded',function(){apply(document.body);"
-        "const obs=new MutationObserver(function(ms){for(const m of ms){if(m.type==='characterData'){applyNode(m.target);}"
-        "for(const n of m.addedNodes){applyNode(n);}}});"
-        "obs.observe(document.body,{subtree:true,childList:true,characterData:true});"
+        "const obs=new MutationObserver(function(ms){for(const m of ms){for(const n of m.addedNodes){applyNode(n);}}});"
+        "obs.observe(document.body,{subtree:true,childList:true});"
         "});"
         "})();</script>";
 
-    int needed = snprintf(NULL, 0, script_fmt, lang, texts_json);
+    int needed = snprintf(NULL, 0, script_fmt, lang, safe_texts_json);
     if (needed < 0) {
-        free(texts_json);
+        free(safe_texts_json);
         return ESP_FAIL;
     }
 
     char *script = malloc((size_t)needed + 1);
     if (!script) {
-        free(texts_json);
+        free(safe_texts_json);
         return ESP_ERR_NO_MEM;
     }
 
-    snprintf(script, (size_t)needed + 1, script_fmt, lang, texts_json);
-    free(texts_json);
+    snprintf(script, (size_t)needed + 1, script_fmt, lang, safe_texts_json);
+    free(safe_texts_json);
 
     esp_err_t ret = httpd_resp_sendstr_chunk(req, script);
     free(script);
@@ -80,6 +455,10 @@ static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
 // Nota: questa funzione è usata da diverse pagine; non è più `static` perché
 // sarà condivisa tra i file del componente web_ui dopo lo split.
 esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style, bool show_nav) {
+    const char *safe_title = title ? title : "";
+    const char *safe_extra_style = extra_style ? extra_style : "";
+    const char *req_uri = req ? req->uri : "";
+
     // Get current time
     time_t now = time(NULL);
     struct tm timeinfo;
@@ -93,20 +472,32 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
     }
 
     const bool is_emulator_page =
-        (req && strncmp(req->uri, "/emulator", 9) == 0 &&
-         (req->uri[9] == '\0' || req->uri[9] == '?'));
+        (strncmp(req_uri, "/emulator", 9) == 0 &&
+         (req_uri[9] == '\0' || req_uri[9] == '?'));
     char txt_home[32] = {0};
     char txt_emulator[32] = {0};
     device_config_get_ui_text_scoped("nav", "home", "Home", txt_home, sizeof(txt_home));
     device_config_get_ui_text_scoped("nav", "emulator", "Emulatore", txt_emulator, sizeof(txt_emulator));
 
-    char emu_button[256] = {0};
+    const char *emu_button_fmt_home =
+        "<a href='/' style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>%s</a>";
+    const char *emu_button_fmt_emu =
+        "<a href='#' onclick=\"return window.goProtectedPath('/emulator');\" style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>%s</a>";
+    const char *emu_fmt = is_emulator_page ? emu_button_fmt_home : emu_button_fmt_emu;
+    int emu_needed = snprintf(NULL, 0, emu_fmt, is_emulator_page ? txt_home : txt_emulator);
+    if (emu_needed < 0) {
+        return ESP_FAIL;
+    }
+    char *emu_button = malloc((size_t)emu_needed + 1);
+    if (!emu_button) {
+        return ESP_ERR_NO_MEM;
+    }
     if (is_emulator_page) {
-        snprintf(emu_button, sizeof(emu_button),
+        snprintf(emu_button, (size_t)emu_needed + 1,
                  "<a href='/' style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>%s</a>",
                  txt_home);
     } else {
-        snprintf(emu_button, sizeof(emu_button),
+        snprintf(emu_button, (size_t)emu_needed + 1,
                  "<a href='#' onclick=\"return window.goProtectedPath('/emulator');\" style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>%s</a>",
                  txt_emulator);
     }
@@ -136,8 +527,25 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
     if (show_test) {
         snprintf(nav_test, sizeof(nav_test), "<a href='/test'>🔧 %s</a>", txt_nav_test);
     }
-    char nav_html[768] = {0};
-    snprintf(nav_html, sizeof(nav_html),
+    int nav_needed = snprintf(NULL, 0,
+             "<nav><a href='/'>🏠 %s</a><a href='/config'>⚙️ %s</a><a href='/stats'>📈 %s</a>%s<a href='/logs'>📋 %s</a>%s<a href='/ota'>🔄 %s</a></nav>",
+             txt_nav_home,
+             txt_nav_config,
+             txt_nav_stats,
+             nav_tasks,
+             txt_nav_logs,
+             nav_test,
+             txt_nav_ota);
+    if (nav_needed < 0) {
+        free(emu_button);
+        return ESP_FAIL;
+    }
+    char *nav_html = malloc((size_t)nav_needed + 1);
+    if (!nav_html) {
+        free(emu_button);
+        return ESP_ERR_NO_MEM;
+    }
+    snprintf(nav_html, (size_t)nav_needed + 1,
              "<nav><a href='/'>🏠 %s</a><a href='/config'>⚙️ %s</a><a href='/stats'>📈 %s</a>%s<a href='/logs'>📋 %s</a>%s<a href='/ota'>🔄 %s</a></nav>",
              txt_nav_home,
              txt_nav_config,
@@ -166,13 +574,17 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "window.getAuthToken = function(){ return localStorage.getItem('httpservices_token'); };"
         "window.clearAuthToken = function(){ localStorage.removeItem('httpservices_token'); };"
         "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };"
-        "window.goProtectedPath=function(path){window.location.href=path;return false;};})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?nav_html:"");
+        "window.goProtectedPath=function(path){window.location.href=path;return false;};})();</script>", safe_title, show_nav?HTML_STYLE_NAV:"", safe_extra_style, safe_title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?nav_html:"");
     if (needed < 0) {
+        free(nav_html);
+        free(emu_button);
         return ESP_FAIL;
     }
 
     char *buf = malloc((size_t)needed + 1);
     if (!buf) {
+        free(nav_html);
+        free(emu_button);
         return ESP_ERR_NO_MEM;
     }
 
@@ -193,10 +605,23 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "window.getAuthToken = function(){ return localStorage.getItem('httpservices_token'); };"
         "window.clearAuthToken = function(){ localStorage.removeItem('httpservices_token'); };"
         "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };"
-        "window.goProtectedPath=function(path){window.location.href=path;return false;};})();</script>", title, show_nav?HTML_STYLE_NAV:"", extra_style?extra_style:"", title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?nav_html:"");
-    httpd_resp_sendstr_chunk(req, buf);
+        "window.goProtectedPath=function(path){window.location.href=path;return false;};})();</script>", safe_title, show_nav?HTML_STYLE_NAV:"", safe_extra_style, safe_title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav?nav_html:"");
+    esp_err_t send_ret = httpd_resp_sendstr_chunk(req, buf);
     free(buf);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_i18n_runtime_script(req));
+    free(nav_html);
+    free(emu_button);
+
+    if (send_ret != ESP_OK) {
+        if (send_ret != ESP_ERR_HTTPD_RESP_SEND) {
+            ESP_LOGW(TAG, "send_head: errore invio header: %s", esp_err_to_name(send_ret));
+        }
+        return ESP_OK;
+    }
+
+    esp_err_t i18n_ret = send_i18n_runtime_script(req);
+    if (i18n_ret != ESP_OK && i18n_ret != ESP_ERR_HTTPD_RESP_SEND) {
+        ESP_LOGW(TAG, "send_head: errore script i18n: %s", esp_err_to_name(i18n_ret));
+    }
     return ESP_OK;
 }
 

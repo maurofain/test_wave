@@ -389,9 +389,20 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
 
 static esp_err_t init_event_loop(void)
 {
-    // Nota: esp_netif_init() e esp_event_loop_create_default() vengono chiamati in start_ethernet()
-    // DOPO aver inizializzato il driver Ethernet, come nell'esempio funzionante
-    // Questa funzione ora è vuota perché tutto viene fatto in start_ethernet()
+    // Inizializza sempre netif/event loop prima di eventuali socket (HTTP server, etc.)
+    // per evitare assert lwIP "Invalid mbox" se Ethernet è disabilitato/non avviato.
+    esp_err_t ret = esp_netif_init();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        return ret;
+    }
+
+    ret = esp_event_loop_create_default();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        return ret;
+    }
+
     return ESP_OK;
 }
 
@@ -467,9 +478,7 @@ static esp_err_t start_ethernet(void)
     // Salva l'handle Ethernet per riferimento futuro
     s_eth_handle = eth_handle;
 
-    // Inizializza esp_netif e loop eventi DOPO aver installato il driver (come nell'esempio funzionante)
-    ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "esp_netif_init fallito");
-    ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG, "esp_event_loop_create_default fallito");
+    // esp_netif/event loop sono inizializzati in init_event_loop(); qui non li reinizializziamo.
 
     // Crea netif DOPO l'installazione del driver e l'inizializzazione di netif (come nell'esempio funzionante)
     esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();

@@ -44,6 +44,84 @@ typedef struct {
 static device_config_t s_config = {0};
 static bool s_initialized = false;
 
+static const char *_effective_lang(const char *language);
+
+static cJSON *s_i18n_lookup_cache = NULL;
+static char s_i18n_lookup_lang[8] = {0};
+
+static void _i18n_lookup_cache_clear(void)
+{
+    if (s_i18n_lookup_cache) {
+        cJSON_Delete(s_i18n_lookup_cache);
+        s_i18n_lookup_cache = NULL;
+    }
+    s_i18n_lookup_lang[0] = '\0';
+}
+
+static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
+{
+    const char *lang = _effective_lang(language);
+    if (s_i18n_lookup_cache && strcmp(s_i18n_lookup_lang, lang) == 0) {
+        return ESP_OK;
+    }
+
+    _i18n_lookup_cache_clear();
+
+    char *records_json = device_config_get_ui_texts_records_json(lang);
+    if (!records_json) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON *records = cJSON_Parse(records_json);
+    free(records_json);
+    if (!records || !cJSON_IsArray(records)) {
+        if (records) {
+            cJSON_Delete(records);
+        }
+        return ESP_FAIL;
+    }
+
+    cJSON *table = cJSON_CreateObject();
+    if (!table) {
+        cJSON_Delete(records);
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, records) {
+        if (!cJSON_IsObject(item)) {
+            continue;
+        }
+
+        cJSON *scope = cJSON_GetObjectItem(item, "scope");
+        cJSON *key = cJSON_GetObjectItem(item, "key");
+        cJSON *text = cJSON_GetObjectItem(item, "text");
+        if (!cJSON_IsString(scope) || !scope->valuestring ||
+            !cJSON_IsString(key) || !key->valuestring ||
+            !cJSON_IsString(text) || !text->valuestring) {
+            continue;
+        }
+
+        char scoped_key[96] = {0};
+        snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope->valuestring, key->valuestring);
+
+        if (!cJSON_GetObjectItemCaseSensitive(table, scoped_key)) {
+            cJSON_AddStringToObject(table, scoped_key, text->valuestring);
+        }
+
+        if (!cJSON_GetObjectItemCaseSensitive(table, key->valuestring)) {
+            cJSON_AddStringToObject(table, key->valuestring, text->valuestring);
+        }
+    }
+
+    cJSON_Delete(records);
+
+    s_i18n_lookup_cache = table;
+    strncpy(s_i18n_lookup_lang, lang, sizeof(s_i18n_lookup_lang) - 1);
+    s_i18n_lookup_lang[sizeof(s_i18n_lookup_lang) - 1] = '\0';
+    return ESP_OK;
+}
+
 static bool _is_iso2_lang(const char *language)
 {
     return language && strlen(language) == 2;
@@ -452,6 +530,10 @@ esp_err_t device_config_init(void)
         ESP_LOGW(TAG, "[I18N] Tabella lingua '%s' non disponibile all'avvio, uso fallback IT", _effective_lang(s_config.ui.language));
     }
 
+    if (_i18n_lookup_cache_build_for_lang(s_config.ui.language) == ESP_OK) {
+        ESP_LOGI(TAG, "[I18N] Cache lookup lingua '%s' precaricata", _effective_lang(s_config.ui.language));
+    }
+
     return ESP_OK;
 }
 
@@ -663,6 +745,11 @@ esp_err_t device_config_load(device_config_t *config)
                     }
                 }
 
+                cJSON *ui_lang_flat = cJSON_GetObjectItem(root, "ui_language");
+                if (ui_lang_flat && cJSON_IsString(ui_lang_flat) && ui_lang_flat->valuestring) {
+                    strncpy(config->ui.language, ui_lang_flat->valuestring, sizeof(config->ui.language) - 1);
+                }
+
             cJSON_Delete(root);
             ESP_LOGD(TAG, "[C] Configurazione caricata correttamente da %s", source_is_eeprom ? "EEPROM" : "NVS");
         } else {
@@ -806,6 +893,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON *ui_obj = cJSON_CreateObject();
     cJSON_AddStringToObject(ui_obj, "language", config->ui.language);
     cJSON_AddItemToObject(root, "ui", ui_obj);
+    cJSON_AddStringToObject(root, "ui_language", config->ui.language);
 
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -982,7 +1070,11 @@ char* device_config_get_ui_texts_records_json(const char *language)
 
 esp_err_t device_config_set_ui_texts_records_json(const char *language, const char *records_json)
 {
-    return _write_i18n_file(language, records_json);
+    esp_err_t ret = _write_i18n_file(language, records_json);
+    if (ret == ESP_OK) {
+        _i18n_lookup_cache_clear();
+    }
+    return ret;
 }
 
 esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, const char *fallback, char *out, size_t out_len)
@@ -991,8 +1083,7 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
         return ESP_ERR_INVALID_ARG;
     }
 
-    char *records_json = device_config_get_ui_texts_records_json(NULL);
-    if (!records_json) {
+    if (_i18n_lookup_cache_build_for_lang(NULL) != ESP_OK || !s_i18n_lookup_cache) {
         if (fallback) {
             strncpy(out, fallback, out_len - 1);
             out[out_len - 1] = '\0';
@@ -1002,45 +1093,19 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
         return ESP_ERR_INVALID_STATE;
     }
 
-    cJSON *root = cJSON_Parse(records_json);
-    free(records_json);
-    if (!root || !cJSON_IsArray(root)) {
-        if (root) {
-            cJSON_Delete(root);
-        }
-        if (fallback) {
-            strncpy(out, fallback, out_len - 1);
-            out[out_len - 1] = '\0';
-        } else {
-            out[0] = '\0';
-        }
-        return ESP_ERR_INVALID_STATE;
-    }
+    char scoped_key[96] = {0};
+    snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope, key);
 
-    const char *lang = _effective_lang(NULL);
     esp_err_t ret = ESP_ERR_NOT_FOUND;
-    cJSON *item = NULL;
-    cJSON_ArrayForEach(item, root) {
-        cJSON *rec_lang = cJSON_GetObjectItem(item, "lang");
-        cJSON *rec_scope = cJSON_GetObjectItem(item, "scope");
-        cJSON *rec_key = cJSON_GetObjectItem(item, "key");
-        cJSON *rec_text = cJSON_GetObjectItem(item, "text");
+    cJSON *val = cJSON_GetObjectItemCaseSensitive(s_i18n_lookup_cache, scoped_key);
+    if (!cJSON_IsString(val) || !val->valuestring) {
+        val = cJSON_GetObjectItemCaseSensitive(s_i18n_lookup_cache, key);
+    }
 
-        if (!cJSON_IsString(rec_lang) || !rec_lang->valuestring ||
-            !cJSON_IsString(rec_scope) || !rec_scope->valuestring ||
-            !cJSON_IsString(rec_key) || !rec_key->valuestring ||
-            !cJSON_IsString(rec_text) || !rec_text->valuestring) {
-            continue;
-        }
-
-        if (strcmp(rec_lang->valuestring, lang) == 0 &&
-            strcmp(rec_scope->valuestring, scope) == 0 &&
-            strcmp(rec_key->valuestring, key) == 0) {
-            strncpy(out, rec_text->valuestring, out_len - 1);
-            out[out_len - 1] = '\0';
-            ret = ESP_OK;
-            break;
-        }
+    if (cJSON_IsString(val) && val->valuestring) {
+        strncpy(out, val->valuestring, out_len - 1);
+        out[out_len - 1] = '\0';
+        ret = ESP_OK;
     }
 
     if (ret != ESP_OK) {
@@ -1052,7 +1117,6 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
         }
     }
 
-    cJSON_Delete(root);
     return ret;
 }
 

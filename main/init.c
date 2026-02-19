@@ -322,37 +322,44 @@ esp_err_t init_sync_ntp(void)
 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     (void)arg;
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    static bool config_initialized = false;
+    if ((event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) ||
+        (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP))
     {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        ESP_LOGI(TAG, "[M] STA Wi-Fi ha ottenuto IP: %s", ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.ip));
-    }
-    if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP)
-    {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        const esp_netif_ip_info_t *ip_info = &event->ip_info;
-        ESP_LOGI(TAG, "[M] Ethernet ha ottenuto l'indirizzo IP");
-        ESP_LOGI(TAG, "[M] ~~~~~~~~~~~");
-        ESP_LOGI(TAG, "[M] ETH IP:" IPSTR, IP2STR(&ip_info->ip));
-        ESP_LOGI(TAG, "[M] ETH MASCHERA:" IPSTR, IP2STR(&ip_info->netmask));
-        ESP_LOGI(TAG, "[M] ETH GATEWAY:" IPSTR, IP2STR(&ip_info->gw));
-        ESP_LOGI(TAG, "[M] ~~~~~~~~~~~");
-
-        if (s_netif_eth)
-        {
-            struct netif *lwip_netif = (struct netif *)esp_netif_get_netif_impl(s_netif_eth);
-            if (lwip_netif)
-            {
-                etharp_gratuitous(lwip_netif);
-                ESP_LOGI(TAG, "[M] Gratuitous ARP inviato");
-            }
+        if (!config_initialized) {
+            ESP_LOGI(TAG, "[INIT] Inizializzo configurazione device dopo DHCP");
+            ESP_ERROR_CHECK(device_config_init());
+            config_initialized = true;
         }
+        if (event_id == IP_EVENT_STA_GOT_IP) {
+            ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+            ESP_LOGI(TAG, "[M] STA Wi-Fi ha ottenuto IP: %s", ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.ip));
+        } else if (event_id == IP_EVENT_ETH_GOT_IP) {
+            ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+            const esp_netif_ip_info_t *ip_info = &event->ip_info;
+            ESP_LOGI(TAG, "[M] Ethernet ha ottenuto l'indirizzo IP");
+            ESP_LOGI(TAG, "[M] ~~~~~~~~~~~");
+            ESP_LOGI(TAG, "[M] ETH IP:" IPSTR, IP2STR(&ip_info->ip));
+            ESP_LOGI(TAG, "[M] ETH MASCHERA:" IPSTR, IP2STR(&ip_info->netmask));
+            ESP_LOGI(TAG, "[M] ETH GATEWAY:" IPSTR, IP2STR(&ip_info->gw));
+            ESP_LOGI(TAG, "[M] ~~~~~~~~~~~");
 
-        // Check internet and init NTP after getting IP
-        device_config_t *cfg = device_config_get();
-        if (cfg->ntp_enabled && check_internet_access())
-        {
-            init_sntp();
+            if (s_netif_eth)
+            {
+                struct netif *lwip_netif = (struct netif *)esp_netif_get_netif_impl(s_netif_eth);
+                if (lwip_netif)
+                {
+                    etharp_gratuitous(lwip_netif);
+                    ESP_LOGI(TAG, "[M] Gratuitous ARP inviato");
+                }
+            }
+
+            // Check internet and init NTP after getting IP
+            device_config_t *cfg = device_config_get();
+            if (cfg->ntp_enabled && check_internet_access())
+            {
+                init_sntp();
+            }
         }
     }
 }
@@ -391,7 +398,20 @@ static esp_err_t init_event_loop(void)
 {
     // Nota: esp_netif_init() e esp_event_loop_create_default() vengono chiamati in start_ethernet()
     // DOPO aver inizializzato il driver Ethernet, come nell'esempio funzionante
-    // Questa funzione ora è vuota perché tutto viene fatto in start_ethernet()
+    // Inizializza sempre netif/event loop prima di eventuali socket (HTTP server, etc.)
+    // per evitare assert lwIP "Invalid mbox" se Ethernet è disabilitato/non avviato.
+    esp_err_t ret = esp_netif_init();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        return ret;
+    }
+
+    ret = esp_event_loop_create_default();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+    {
+        return ret;
+    }
+
     return ESP_OK;
 }
 
@@ -467,9 +487,7 @@ static esp_err_t start_ethernet(void)
     // Salva l'handle Ethernet per riferimento futuro
     s_eth_handle = eth_handle;
 
-    // Inizializza esp_netif e loop eventi DOPO aver installato il driver (come nell'esempio funzionante)
-    ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "esp_netif_init fallito");
-    ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG, "esp_event_loop_create_default fallito");
+    // esp_netif/event loop sono inizializzati in init_event_loop(); qui non li reinizializziamo.
 
     // Crea netif DOPO l'installazione del driver e l'inizializzazione di netif (come nell'esempio funzionante)
     esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
@@ -677,6 +695,8 @@ esp_err_t init_run_factory(void)
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
 
+
+
     // Inizializza GPIO ausiliari
     aux_gpio_init();
 
@@ -719,7 +739,13 @@ esp_err_t init_run_factory(void)
     serial_test_init();
 
     // Inizializza e avvia Web UI (Server + Handler)
-    ESP_ERROR_CHECK(web_ui_init());
+    esp_err_t web_ret = web_ui_init();
+    if (web_ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "[M] web_ui_init fallita: %s", esp_err_to_name(web_ret));
+        return web_ret;
+    }
+    ESP_LOGI(TAG, "[M] Web UI avviata correttamente");
 
     // Inizializza Remote Logging
     ESP_ERROR_CHECK(remote_logging_init());
@@ -734,16 +760,18 @@ esp_err_t init_run_factory(void)
         esp_err_t exp_ret = io_expander_init();
         if (exp_ret != ESP_OK) {
             ESP_LOGW(TAG, "I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
-            return;
+            cfg->sensors.io_expander_enabled = false;
         }
-        // Controllo GPIO3 solo se expander disponibile
-        while (true) {
-            int gpio3_value = io_get_pin(3) ? 1 : 0;
-            ESP_LOGI(TAG, "Valore GPIO3: %d", gpio3_value);
-            if (gpio3_value == 1) {
-                break;
+        if (exp_ret == ESP_OK) {
+            // Controllo GPIO3 solo se expander disponibile
+            while (true) {
+                int gpio3_value = io_get_pin(3) ? 1 : 0;
+                ESP_LOGI(TAG, "Valore GPIO3: %d", gpio3_value);
+                if (gpio3_value == 1) {
+                    break;
+                }
+                vTaskDelay(pdMS_TO_TICKS(1000));
             }
-            vTaskDelay(pdMS_TO_TICKS(1000));
         }
 #endif
     }

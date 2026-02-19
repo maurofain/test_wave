@@ -11,6 +11,7 @@
 #include "bsp/esp32_p4_nano.h"
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 #include <time.h>
 #include <stdint.h>
 #include "usb_cdc_scanner.h"
@@ -59,6 +60,82 @@
 // Handle dei task di test per Serial Blink Test
 TaskHandle_t s_rs232_test_handle = NULL;
 TaskHandle_t s_rs485_test_handle = NULL;
+
+static bool web_ui_extract_lang_from_filename(const char *name, char *out_lang, size_t out_len)
+{
+    if (!name || !out_lang || out_len < 3) {
+        return false;
+    }
+
+    const char *prefix = "i18n_";
+    const char *suffix = ".json";
+    const size_t prefix_len = 5;
+    const size_t suffix_len = 5;
+    const size_t name_len = strlen(name);
+    if (name_len <= (prefix_len + suffix_len)) {
+        return false;
+    }
+    if (strncmp(name, prefix, prefix_len) != 0) {
+        return false;
+    }
+    if (strcmp(name + name_len - suffix_len, suffix) != 0) {
+        return false;
+    }
+
+    const size_t lang_len = name_len - prefix_len - suffix_len;
+    if (lang_len < 2 || lang_len >= out_len || lang_len > 7) {
+        return false;
+    }
+
+    for (size_t i = 0; i < lang_len; ++i) {
+        char c = name[prefix_len + i];
+        bool valid = ((c >= 'a' && c <= 'z') ||
+                      (c >= 'A' && c <= 'Z') ||
+                      (c >= '0' && c <= '9') ||
+                      c == '_' || c == '-');
+        if (!valid) {
+            return false;
+        }
+        if (c >= 'A' && c <= 'Z') {
+            c = (char)(c - 'A' + 'a');
+        }
+        out_lang[i] = c;
+    }
+    out_lang[lang_len] = '\0';
+    return true;
+}
+
+static void web_ui_lang_label_from_code(const char *lang, char *label, size_t label_len)
+{
+    if (!label || label_len == 0) {
+        return;
+    }
+    if (!lang || !lang[0]) {
+        snprintf(label, label_len, "Unknown");
+        return;
+    }
+
+    if (strcmp(lang, "it") == 0) {
+        snprintf(label, label_len, "Italiano (IT)");
+    } else if (strcmp(lang, "en") == 0) {
+        snprintf(label, label_len, "English (EN)");
+    } else {
+        char upper[16] = {0};
+        size_t n = strlen(lang);
+        if (n >= sizeof(upper)) {
+            n = sizeof(upper) - 1;
+        }
+        for (size_t i = 0; i < n; ++i) {
+            char c = lang[i];
+            if (c >= 'a' && c <= 'z') {
+                c = (char)(c - 'a' + 'A');
+            }
+            upper[i] = c;
+        }
+        upper[n] = '\0';
+        snprintf(label, label_len, "%s", upper);
+    }
+}
 
 // TEST UART: 0x55, 0xAA, 0x01, 0x07 (periodico)
 void uart_test_task(void *arg) {
@@ -419,17 +496,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "const res=await r.json();"
         "if(r.ok) alert('✅ '+res.message); else alert('❌ '+res.message);"
         "}catch(e){alert('❌ Errore: '+e);}}"
-        "/* Fallback robusto per i collapsible della pagina /config: assicura che i titoli .section>h2 siano cliccabili */"
-        "document.addEventListener('DOMContentLoaded', function(){"
-        "  document.querySelectorAll('.section>h2').forEach(function(h){"
-        "    h.tabIndex = 0;"
-        "    h.addEventListener('click', function(){"
-        "      var s = this.parentElement; s.classList.toggle('collapsed');"
-        "      var ic = this.querySelector('.section-toggle-icon'); if(ic) ic.innerText = s.classList.contains('collapsed') ? '▸' : '▾';"
-        "    });"
-        "    h.addEventListener('keydown', function(e){ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); this.click(); } });"
-        "  });"
-        "});"        "function updateCurrentTime(){const now=new Date();document.getElementById('current_time').innerText=now.toLocaleString('it-IT');}"
+        "function updateCurrentTime(){const now=new Date();document.getElementById('current_time').innerText=now.toLocaleString('it-IT');}"
         "document.getElementById('ntp_en').addEventListener('change',function(){if(this.checked){syncNTP();}});"
         "document.getElementById('remote_log_broadcast').addEventListener('change',function(){"
         "const ipField=document.getElementById('remote_log_ip');"
@@ -455,14 +522,68 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "pwd.insertAdjacentElement('afterend',prg);"
         "}"
         "ensureFactorySections();"
+        "window.__configOriginalLang='it';"
         "window.addEventListener('load',loadConfig);"
+        "function indexI18nRecords(records){"
+        "const byScoped={};const byKey={};"
+        "if(!Array.isArray(records)) return {byScoped,byKey};"
+        "for(const item of records){"
+        "if(!item||typeof item!=='object') continue;"
+        "const scope=(item.scope!=null)?String(item.scope):'';"
+        "const key=(item.key!=null)?String(item.key):'';"
+        "const text=(item.text!=null)?String(item.text):'';"
+        "if(!scope||!key) continue;"
+        "const sk=scope+'.'+key;"
+        "byScoped[sk]=text;"
+        "if(byKey[key]===undefined) byKey[key]=text;"
+        "}"
+        "return {byScoped,byKey};"
+        "}"
+        "function buildI18nTableFromRecords(targetRecords, baseRecords){"
+        "const table={};"
+        "const t=indexI18nRecords(targetRecords);"
+        "const b=indexI18nRecords(baseRecords);"
+        "for(const sk in t.byScoped){"
+        "const targetText=t.byScoped[sk];"
+        "table[sk]=targetText;"
+        "const key=sk.includes('.')?sk.substring(sk.indexOf('.')+1):sk;"
+        "if(table[key]===undefined){const tk=t.byKey[key];table[key]=(tk!==undefined?tk:targetText);}"
+        "const baseText=b.byScoped[sk];"
+        "if(baseText&&baseText!==targetText){table[baseText]=targetText;const bt=baseText.trim();if(bt&&bt!==baseText)table[bt]=targetText;}"
+        "}"
+        "return table;"
+        "}"
+        "async function reloadLanguageTables(lang){"
+        "const target=(lang?String(lang):'it').toLowerCase();"
+        "const r=await fetch('/api/ui/texts?lang='+encodeURIComponent(target));"
+        "if(!r.ok) throw new Error('HTTP '+r.status);"
+        "const data=await r.json();"
+        "let baseRecords=[];"
+        "try{const rb=await fetch('/api/ui/texts?lang=it');if(rb.ok){const db=await rb.json();if(Array.isArray(db.records)) baseRecords=db.records;}}catch(_e){}"
+        "const table=buildI18nTableFromRecords(data.records,baseRecords);"
+        "if(window.uiI18n){window.uiI18n.language=target;window.uiI18n.table=table;if(typeof window.uiI18n.apply==='function'){window.uiI18n.apply(document.body);}}"
+        "}"
+        "async function loadUiLanguages(selectedLang){"
+        "const uiLangEl=document.getElementById('ui_language');"
+        "if(!uiLangEl) return;"
+        "const target=(selectedLang?String(selectedLang):'it').toLowerCase();"
+        "let list=[];"
+        "try{const r=await fetch('/api/ui/languages');if(r.ok){const data=await r.json();if(Array.isArray(data.languages))list=data.languages;}}catch(e){console.warn('ui languages fetch failed',e);}"
+        "if(!Array.isArray(list)||!list.length){list=[{code:'it',label:'Italiano (IT)'}];}"
+        "uiLangEl.innerHTML='';"
+        "const seen={};"
+        "for(const item of list){if(!item||!item.code)continue;const code=String(item.code).toLowerCase();if(seen[code])continue;seen[code]=true;const opt=document.createElement('option');opt.value=code;opt.textContent=item.label?String(item.label):code.toUpperCase();uiLangEl.appendChild(opt);}"
+        "if(!seen.it){const opt=document.createElement('option');opt.value='it';opt.textContent='Italiano (IT)';uiLangEl.appendChild(opt);}"
+        "uiLangEl.value=target;"
+        "if(!uiLangEl.value)uiLangEl.value='it';"
+        "}"
         "async function loadConfig(){"
         "ensureFactorySections();"
         "try{const r=await fetch('/api/config');if(!r.ok)throw new Error('HTTP '+r.status);"
         "const c=await r.json();"
         "document.getElementById('dev_name').value=c.device_name || '';"
         "const uiLangEl=document.getElementById('ui_language');"
-        "if(uiLangEl){const lang=(c.ui&&c.ui.language)?String(c.ui.language).toLowerCase():'it';uiLangEl.value=lang;if(!uiLangEl.value)uiLangEl.value='it';}"
+        "if(uiLangEl){const lang=(c.ui&&c.ui.language)?String(c.ui.language).toLowerCase():'it';await loadUiLanguages(lang);window.__configOriginalLang=lang;}"
         "document.getElementById('eth_en').checked=c.eth.enabled;"
         "document.getElementById('eth_dhcp').checked=c.eth.dhcp_enabled;"
         "document.getElementById('eth_ip').value=c.eth.ip;"
@@ -535,6 +656,10 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "try{const r=await fetch('/api/security/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:current.value,new_password:next.value})});const t=await r.text();if(r.ok){alert('✅ Password aggiornata');current.value='';next.value='';confirm.value='';}else{alert('❌ '+(t||('HTTP '+r.status)));}}catch(e){alert('❌ Errore: '+e);}"
         "}"
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
+        "const prevLang=(window.__configOriginalLang?String(window.__configOriginalLang):'it').toLowerCase();"
+        "const newLang=(document.getElementById('ui_language').value?String(document.getElementById('ui_language').value):'it').toLowerCase();"
+        "const langChanged=(prevLang!==newLang);"
+        "if(langChanged&&!confirm('Confermi il cambio lingua? Verranno ricaricate le tabelle di traduzione.')) return;"
         "const cfg={"
         "device_name:document.getElementById('dev_name').value,"
         "ui:{language:document.getElementById('ui_language').value},"
@@ -554,12 +679,18 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "gpio33:{mode:parseInt(document.getElementById('g33_mode').value),state:document.getElementById('g33_state').checked}}"
         "};"
         "const r=await fetch('/api/config/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});"
-        "if(r.ok) alert('✅ Configurazione salvata!'); else alert('❌ Errore durante il salvataggio!');"
+        "if(r.ok){"
+        "try{if(langChanged){await reloadLanguageTables(newLang);window.__configOriginalLang=newLang;}}catch(err){console.warn('reloadLanguageTables failed',err);}"
+        "if(langChanged){alert('✅ Configurazione salvata. Lingua aggiornata!');const u=new URL(window.location.href);u.pathname='/config';u.searchParams.set('lang',newLang);u.searchParams.set('_ts',String(Date.now()));window.location.replace(u.toString());return;}"
+        "alert('✅ Configurazione salvata!');"
+        "} else alert('❌ Errore durante il salvataggio!');"
         "}"
 
         "// Rendiamo collassabili tutte le sezioni: init robusta (immediata + fallback su load)\n"
         "function initCollapsibleSections(){\n"
-        "  document.querySelectorAll('.section').forEach(s => {\n"
+        "  const sections = Array.from(document.querySelectorAll('.section')).filter(s => s.querySelector('h2'));\n"
+        "  sections.forEach((s, idx) => {\n"
+        "    if (idx === 0) s.classList.remove('collapsed'); else s.classList.add('collapsed');\n"
         "    const h = s.querySelector('h2'); if(!h) return;\n"
         "    if (h.dataset.collapsibleReady === '1') return;\n"
         "    h.dataset.collapsibleReady = '1';\n"
@@ -568,6 +699,8 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "    if (h.hasAttribute('onclick')) { h.removeAttribute('onclick'); }\n"
         "    if (!h.querySelector('.section-toggle-icon')) {\n"
         "      const ic = document.createElement('span'); ic.className = 'section-toggle-icon'; ic.innerText = s.classList.contains('collapsed') ? '▸' : '▾'; h.appendChild(ic);\n"
+        "    } else {\n"
+        "      const ic = h.querySelector('.section-toggle-icon'); ic.innerText = s.classList.contains('collapsed') ? '▸' : '▾';\n"
         "    }\n"
         "    const toggle = () => {\n"
         "      s.classList.toggle('collapsed');\n"
@@ -811,6 +944,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddStringToObject(ui, "language", cfg->ui.language);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
+    cJSON_AddStringToObject(root, "ui_language", cfg->ui.language);
     
     char *json = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -863,6 +997,79 @@ esp_err_t api_ui_texts_get(httpd_req_t *req)
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
 
+    if (!json) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "{\"error\":\"json_build_failed\"}", -1);
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, strlen(json));
+    free(json);
+    return ret;
+}
+
+// Handler API GET /api/ui/languages
+esp_err_t api_ui_languages_get(httpd_req_t *req)
+{
+    cJSON *root = cJSON_CreateObject();
+    cJSON *languages = cJSON_CreateArray();
+    cJSON_AddItemToObject(root, "languages", languages);
+
+    bool has_it = false;
+    DIR *dir = opendir("/spiffs");
+    if (dir) {
+        struct dirent *entry = NULL;
+        while ((entry = readdir(dir)) != NULL) {
+            char lang[8] = {0};
+            if (!web_ui_extract_lang_from_filename(entry->d_name, lang, sizeof(lang))) {
+                continue;
+            }
+
+            bool duplicate = false;
+            int count = cJSON_GetArraySize(languages);
+            for (int i = 0; i < count; ++i) {
+                cJSON *it = cJSON_GetArrayItem(languages, i);
+                cJSON *code = cJSON_GetObjectItem(it, "code");
+                if (cJSON_IsString(code) && code->valuestring && strcmp(code->valuestring, lang) == 0) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) {
+                continue;
+            }
+
+            char label[32] = {0};
+            web_ui_lang_label_from_code(lang, label, sizeof(label));
+
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "code", lang);
+            cJSON_AddStringToObject(item, "label", label);
+
+            char file_path[64] = {0};
+            snprintf(file_path, sizeof(file_path), "/spiffs/i18n_%s.json", lang);
+            cJSON_AddStringToObject(item, "file", file_path);
+            cJSON_AddItemToArray(languages, item);
+
+            if (strcmp(lang, "it") == 0) {
+                has_it = true;
+            }
+        }
+        closedir(dir);
+    } else {
+        ESP_LOGW(TAG, "Impossibile aprire /spiffs per scansione lingue");
+    }
+
+    if (!has_it) {
+        cJSON *it_item = cJSON_CreateObject();
+        cJSON_AddStringToObject(it_item, "code", "it");
+        cJSON_AddStringToObject(it_item, "label", "Italiano (IT)");
+        cJSON_AddStringToObject(it_item, "file", "/spiffs/i18n_it.json");
+        cJSON_AddItemToArray(languages, it_item);
+    }
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
     if (!json) {
         httpd_resp_set_status(req, "500 Internal Server Error");
         return httpd_resp_send(req, "{\"error\":\"json_build_failed\"}", -1);
@@ -960,6 +1167,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddStringToObject(ui, "language", cfg->ui.language);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
+    cJSON_AddStringToObject(root, "ui_language", cfg->ui.language);
 
     char *json = cJSON_Print(root);
     esp_err_t err = sd_card_write_file("/sdcard/config.jsn", json);
@@ -1196,9 +1404,15 @@ esp_err_t api_config_save(httpd_req_t *req)
             char *records_json = cJSON_PrintUnformatted(records);
             if (records_json) {
                 device_config_set_ui_texts_records_json(cfg->ui.language, records_json);
+                web_ui_i18n_cache_invalidate();
                 free(records_json);
             }
         }
+    }
+
+    cJSON *ui_lang_flat = cJSON_GetObjectItem(root, "ui_language");
+    if (ui_lang_flat && cJSON_IsString(ui_lang_flat) && ui_lang_flat->valuestring) {
+        strncpy(cfg->ui.language, ui_lang_flat->valuestring, sizeof(cfg->ui.language) - 1);
     }
     
     cfg->updated = true;
@@ -1234,6 +1448,7 @@ esp_err_t api_tasks_get(httpd_req_t *req)
     char response[4096] = "[";
     bool first = true;
     bool skip_header = true;
+    bool has_http_server = false;
     
     while (fgets(line, sizeof(line), f)) {
         // Rimuovi newline
@@ -1251,6 +1466,9 @@ esp_err_t api_tasks_get(httpd_req_t *req)
         
         if (sscanf(line, "%63[^,],%15[^,],%d,%d,%d,%d", 
                    name, state, &priority, &core, &period_ms, &stack_words) == 6) {
+            if (strcmp(name, "http_server") == 0) {
+                has_http_server = true;
+            }
             
             char task_json[256];
             snprintf(task_json, sizeof(task_json),
@@ -1260,6 +1478,15 @@ esp_err_t api_tasks_get(httpd_req_t *req)
             strcat(response, task_json);
             first = false;
         }
+    }
+
+    if (!has_http_server) {
+        char task_json[256];
+        snprintf(task_json, sizeof(task_json),
+                 "%s{\"name\":\"http_server\",\"state\":\"run\",\"priority\":5,\"core\":0,\"period_ms\":1000,\"stack_words\":2048}",
+                 first ? "" : ",");
+        strcat(response, task_json);
+        first = false;
     }
     
     strcat(response, "]");
@@ -1460,6 +1687,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 
     httpd_uri_t uri_api_ui_texts = {.uri = "/api/ui/texts", .method = HTTP_GET, .handler = api_ui_texts_get};
     httpd_register_uri_handler(server, &uri_api_ui_texts);
+
+    httpd_uri_t uri_api_ui_languages = {.uri = "/api/ui/languages", .method = HTTP_GET, .handler = api_ui_languages_get};
+    httpd_register_uri_handler(server, &uri_api_ui_languages);
     
     httpd_uri_t uri_api_save = {.uri = "/api/config/save", .method = HTTP_POST, .handler = api_config_save};
     httpd_register_uri_handler(server, &uri_api_save);

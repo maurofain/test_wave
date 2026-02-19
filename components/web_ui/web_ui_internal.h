@@ -22,6 +22,7 @@ esp_err_t logs_page_handler(httpd_req_t *req);
 
 // Helper di registrazione (usato da web_ui_server.c)
 esp_err_t web_ui_register_handlers(httpd_handle_t server);
+bool web_ui_is_running(void);
 
 // Pagine e handler esposti per la registrazione (moduli runtime + test)
 esp_err_t root_get_handler(httpd_req_t *req);
@@ -63,6 +64,7 @@ esp_err_t api_config_get(httpd_req_t *req);
 esp_err_t api_config_save(httpd_req_t *req);
 esp_err_t api_config_backup(httpd_req_t *req);
 esp_err_t api_ui_texts_get(httpd_req_t *req);
+esp_err_t api_ui_languages_get(httpd_req_t *req);
 esp_err_t api_config_reset(httpd_req_t *req);
 esp_err_t api_ntp_sync(httpd_req_t *req);
 esp_err_t api_tasks_get(httpd_req_t *req);
@@ -92,6 +94,7 @@ esp_err_t perform_ota(const char *url);
 // Profilo/UI feature flags (factory/app) per visibilità e accessibilità endpoint
 bool web_ui_feature_enabled(web_ui_feature_t feature);
 const char *web_ui_profile_view_label(void);
+void web_ui_i18n_cache_invalidate(void);
 
 // Error handler esposto per la registrazione (moved to pages)
 esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error);

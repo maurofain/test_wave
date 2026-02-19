@@ -16,7 +16,7 @@ static const char *TAG = "APP";
  */
 static void apply_boot_log_policy(void)
 {
-    esp_log_level_set("*", ESP_LOG_ERROR);
+    esp_log_level_set("*", ESP_LOG_INFO);
 
     /* Stack USB/CDC: forza ERROR al boot per evitare flood */
     esp_log_level_set("usb", ESP_LOG_ERROR);

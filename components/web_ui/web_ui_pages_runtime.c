@@ -148,11 +148,13 @@ esp_err_t status_get_handler(httpd_req_t *req)
 
     snprintf(resp, 4096,
              "{\"partition_running\":\"%s\",\"partition_boot\":\"%s\",\"ip_ap\":\"%s\",\"ip_sta\":\"%s\",\"ip_eth\":\"%s\","
+             "\"web\":{\"running\":%s},"
              "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%lu},"
              "\"sd\":{\"mounted\":%s,\"present\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"},"
              "\"env\":{\"temp\":%.1f,\"hum\":%.1f},"
              "\"config\":%s}",
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,
+             web_ui_is_running() ? "true" : "false",
              mdb->coin.is_online ? "true" : "false", mdb->coin.state, mdb->coin.credit_cents,
              sd_card_is_mounted() ? "true" : "false", sd_card_is_present() ? "true" : "false",
              sd_card_get_total_size(), sd_card_get_used_size(),
@@ -261,6 +263,7 @@ esp_err_t tasks_page_handler(httpd_req_t *req)
     const char *body =
         "<div class='container'>"
         "<div class='section'><h2>📋 Configurazione Task</h2>"
+        "<p style='margin:8px 0 14px 0;color:#566573;'>Questa tabella modifica solo i task applicativi da <code>tasks.csv</code>. I task di sistema FreeRTOS (es. HTTP server, lwIP, idle) non sono mostrati qui.</p>"
         "<div id='status'></div>"
         "<table id='tasksTable'><thead><tr>"
         "<th>Nome</th><th>Stato</th><th>Priorità</th><th>Core</th><th>Periodo (ms)</th><th>Stack Words</th>"
