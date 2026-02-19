@@ -111,6 +111,14 @@ Il task chiama `POST /ota?url=<firmware_url>` e il device scarica il firmware in
 - Ethernet driver uses the internal EMAC + RMII (LAN8720 by default); adjust pins/PHY type as needed or disable via Kconfig if not present.
 - OTA over plain HTTP is allowed by default for lab convenience; change to HTTPS in production and provide the server certificate in Kconfig.
 
+## Regola testi UI (multilingua)
+- Tutti i testi mostrati all'utente (Web UI e LVGL) devono essere generati tramite tabella i18n su SPIFFS, con file per lingua: `/spiffs/i18n_<lang>.json`.
+- Formato record obbligatorio: `{ "lang": "it", "scope": "nav", "key": "home", "text": "Home" }`.
+- `key` deve essere univoca all'interno dello stesso `scope`.
+- Evitare nuove stringhe hardcoded nelle pagine: usare `scope+key` con fallback minimo.
+- Ogni nuova stringa UI aggiunta nel codice deve essere contestualmente tabellata nel set IT in `data/i18n_it.json`.
+- Lingua corrente: `device_config.ui.language` (solo selezione lingua; i testi non sono salvati in NVS/EEPROM).
+
 ## Documentazione Hardware
 Per note specifiche su limitazioni hardware e pinout, vedi [docs/NOTES_HW.md](docs/NOTES_HW.md).
 

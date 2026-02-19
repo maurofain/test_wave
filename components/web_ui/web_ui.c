@@ -298,10 +298,12 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "<div id='alert'></div>"
         "<form id='configForm'>"
         
-        "<div class='section' style='background:#f1f4f6; border-left:5px solid #3498db;'>"
-        "<h2>🆔 Identità Dispositivo</h2>"
+        "<div class='section collapsed' style='background:#f1f4f6; border-left:5px solid #3498db;'>"
+        "<h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🆔 Identità Dispositivo<span class='section-toggle-icon'>▸</span></h2>"
         "<div class='form-group'><label>Nome Dispositivo</label>"
         "<input type='text' id='dev_name' name='dev_name' placeholder='es: TestWave-01' style='font-size:1.1em; font-weight:bold;'></div>"
+        "<div class='form-group'><label>Lingua UI</label>"
+        "<select id='ui_language' name='ui_language' style='width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;'><option value='it'>Italiano (IT)</option></select></div>"
         "</div>"
 
         "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🌐 Ethernet<span class='section-toggle-icon'>▸</span></h2>"
@@ -459,6 +461,8 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "try{const r=await fetch('/api/config');if(!r.ok)throw new Error('HTTP '+r.status);"
         "const c=await r.json();"
         "document.getElementById('dev_name').value=c.device_name || '';"
+        "const uiLangEl=document.getElementById('ui_language');"
+        "if(uiLangEl){const lang=(c.ui&&c.ui.language)?String(c.ui.language).toLowerCase():'it';uiLangEl.value=lang;if(!uiLangEl.value)uiLangEl.value='it';}"
         "document.getElementById('eth_en').checked=c.eth.enabled;"
         "document.getElementById('eth_dhcp').checked=c.eth.dhcp_enabled;"
         "document.getElementById('eth_ip').value=c.eth.ip;"
@@ -533,6 +537,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
         "const cfg={"
         "device_name:document.getElementById('dev_name').value,"
+        "ui:{language:document.getElementById('ui_language').value},"
         "eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},"
         "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
         "ntp_enabled:document.getElementById('ntp_en').checked,"
@@ -560,6 +565,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "    h.dataset.collapsibleReady = '1';\n"
         "    h.setAttribute('role', 'button');\n"
         "    h.setAttribute('tabindex', '0');\n"
+        "    if (h.hasAttribute('onclick')) { h.removeAttribute('onclick'); }\n"
         "    if (!h.querySelector('.section-toggle-icon')) {\n"
         "      const ic = document.createElement('span'); ic.className = 'section-toggle-icon'; ic.innerText = s.classList.contains('collapsed') ? '▸' : '▾'; h.appendChild(ic);\n"
         "    }\n"
@@ -799,6 +805,12 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(scanner, "pid", cfg->scanner.pid);
     cJSON_AddNumberToObject(scanner, "dual_pid", cfg->scanner.dual_pid);
     cJSON_AddItemToObject(root, "scanner", scanner);
+
+    // UI multilingua
+    cJSON *ui = cJSON_CreateObject();
+    cJSON_AddStringToObject(ui, "language", cfg->ui.language);
+    cJSON_AddStringToObject(ui, "storage", "spiffs");
+    cJSON_AddItemToObject(root, "ui", ui);
     
     char *json = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -806,6 +818,60 @@ esp_err_t api_config_get(httpd_req_t *req)
     free(json);
     cJSON_Delete(root);
     return ESP_OK;
+}
+
+// Handler API GET /api/ui/texts
+esp_err_t api_ui_texts_get(httpd_req_t *req)
+{
+    device_config_t *cfg = device_config_get();
+    char language[8] = {0};
+    strncpy(language, cfg->ui.language, sizeof(language) - 1);
+
+    char query[128] = {0};
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char lang_q[8] = {0};
+        if (httpd_query_key_value(query, "lang", lang_q, sizeof(lang_q)) == ESP_OK && strlen(lang_q) == 2) {
+            strncpy(language, lang_q, sizeof(language) - 1);
+        }
+    }
+
+    char *records_json = device_config_get_ui_texts_records_json(language);
+    if (!records_json) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "{\"error\":\"i18n_load_failed\"}", -1);
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "language", language);
+    cJSON_AddStringToObject(root, "storage", "spiffs");
+
+    char path[64] = {0};
+    snprintf(path, sizeof(path), "/spiffs/i18n_%s.json", language);
+    cJSON_AddStringToObject(root, "file", path);
+
+    cJSON *records = cJSON_Parse(records_json);
+    free(records_json);
+    if (records && cJSON_IsArray(records)) {
+        cJSON_AddItemToObject(root, "records", records);
+    } else {
+        if (records) {
+            cJSON_Delete(records);
+        }
+        cJSON_AddItemToObject(root, "records", cJSON_CreateArray());
+    }
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+
+    if (!json) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "{\"error\":\"json_build_failed\"}", -1);
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, strlen(json));
+    free(json);
+    return ret;
 }
 
 // Handler API POST /api/config/backup
@@ -888,6 +954,12 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddNumberToObject(mdb_s, "rx_buf", cfg->mdb_serial.rx_buf_size);
     cJSON_AddNumberToObject(mdb_s, "tx_buf", cfg->mdb_serial.tx_buf_size);
     cJSON_AddItemToObject(root, "mdb_serial", mdb_s);
+
+    // UI multilingua
+    cJSON *ui = cJSON_CreateObject();
+    cJSON_AddStringToObject(ui, "language", cfg->ui.language);
+    cJSON_AddStringToObject(ui, "storage", "spiffs");
+    cJSON_AddItemToObject(root, "ui", ui);
 
     char *json = cJSON_Print(root);
     esp_err_t err = sd_card_write_file("/sdcard/config.jsn", json);
@@ -1105,6 +1177,27 @@ esp_err_t api_config_save(httpd_req_t *req)
         if (sdual) {
             if (cJSON_IsNumber(sdual)) cfg->scanner.dual_pid = (uint16_t)sdual->valueint;
             else if (cJSON_IsString(sdual) && sdual->valuestring) cfg->scanner.dual_pid = (uint16_t)strtoul(sdual->valuestring, NULL, 0);
+        }
+    }
+
+    // UI multilingua
+    cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
+    if (ui_obj) {
+        cJSON *language = cJSON_GetObjectItem(ui_obj, "language");
+        if (language && cJSON_IsString(language) && language->valuestring) {
+            strncpy(cfg->ui.language, language->valuestring, sizeof(cfg->ui.language) - 1);
+        }
+
+        cJSON *records = cJSON_GetObjectItem(ui_obj, "records");
+        if (!records) {
+            records = cJSON_GetObjectItem(ui_obj, "texts");
+        }
+        if (records && cJSON_IsArray(records)) {
+            char *records_json = cJSON_PrintUnformatted(records);
+            if (records_json) {
+                device_config_set_ui_texts_records_json(cfg->ui.language, records_json);
+                free(records_json);
+            }
         }
     }
     
@@ -1364,6 +1457,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     // API
     httpd_uri_t uri_api_get = {.uri = "/api/config", .method = HTTP_GET, .handler = api_config_get};
     httpd_register_uri_handler(server, &uri_api_get);
+
+    httpd_uri_t uri_api_ui_texts = {.uri = "/api/ui/texts", .method = HTTP_GET, .handler = api_ui_texts_get};
+    httpd_register_uri_handler(server, &uri_api_ui_texts);
     
     httpd_uri_t uri_api_save = {.uri = "/api/config/save", .method = HTTP_POST, .handler = api_config_save};
     httpd_register_uri_handler(server, &uri_api_save);

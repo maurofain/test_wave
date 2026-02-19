@@ -47,6 +47,8 @@ esp_err_t programs_page_handler(httpd_req_t *req)
         "</div></div>"
         "<script>"
         "let programs=[];"
+        "function maskToHex(v){const n=(Number(v)||0)>>>0;return '0x'+n.toString(16).toUpperCase();}"
+        "function parseRelayMaskHex(raw){let s=String(raw||'').trim();if(!s)return 0;if(s.startsWith('0x')||s.startsWith('0X'))s=s.slice(2);const n=parseInt(s,16);if(Number.isNaN(n)||n<0)return 0;return n;}"
         "function showStatus(msg,ok){const s=document.getElementById('status');s.textContent=msg;s.className='status '+(ok?'ok':'err');}"
         "function rowHtml(p,idx){"
         "return `<tr>`+"
@@ -56,12 +58,12 @@ esp_err_t programs_page_handler(httpd_req_t *req)
         "`<td><input type='number' min='0' max='65535' value='${p.price_units||0}' onchange='programs[${idx}].price_units=parseInt(this.value||0,10)'></td>`+"
         "`<td><input type='number' min='0' max='65535' value='${p.duration_sec||0}' onchange='programs[${idx}].duration_sec=parseInt(this.value||0,10)'></td>`+"
         "`<td><input type='number' min='0' max='65535' value='${p.pause_max_suspend_sec||0}' onchange='programs[${idx}].pause_max_suspend_sec=parseInt(this.value||0,10)'></td>`+"
-        "`<td><input type='number' min='0' max='65535' value='${p.relay_mask||0}' onchange='programs[${idx}].relay_mask=parseInt(this.value||0,10)'></td>`+"
+        "`<td><input type='text' value='${maskToHex(p.relay_mask||0)}' onchange='const v=parseRelayMaskHex(this.value);programs[${idx}].relay_mask=v;this.value=maskToHex(v);'></td>`+"
         "`</tr>`;"
         "}"
         "function render(){const b=document.getElementById('programRows');b.innerHTML='';programs.forEach((p,i)=>{b.insertAdjacentHTML('beforeend',rowHtml(p,i));});}"
         "async function loadPrograms(){try{const r=await fetch('/api/programs');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();programs=data.programs||[];render();showStatus('Tabella programmi caricata',true);}catch(e){showStatus('Errore caricamento: '+e.message,false);}}"
-        "async function savePrograms(){try{const r=await fetch('/api/programs/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({programs})});if(!r.ok){const t=await r.text();throw new Error(t||('HTTP '+r.status));}showStatus('Tabella programmi salvata',true);}catch(e){showStatus('Errore salvataggio: '+e.message,false);}}"
+        "async function savePrograms(){try{programs=programs.map(p=>({...p,relay_mask:parseRelayMaskHex(p.relay_mask)}));const r=await fetch('/api/programs/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({programs})});if(!r.ok){const t=await r.text();throw new Error(t||('HTTP '+r.status));}showStatus('Tabella programmi salvata',true);render();}catch(e){showStatus('Errore salvataggio: '+e.message,false);}}"
         "window.addEventListener('load',loadPrograms);"
         "</script></body></html>";
 

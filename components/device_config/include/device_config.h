@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include <stdbool.h>
+#include <stddef.h>
 
 /**
  * @brief Struttura di configurazione Ethernet
@@ -130,6 +131,14 @@ typedef struct {
 } device_remote_log_config_t;
 
 /**
+ * @brief Configurazione testi UI per multilingua
+ */
+typedef struct {
+    char language[8];        ///< Lingua corrente (es: "it", "en")
+    char texts_json[512];    ///< Deprecated: non usato (i18n ora su SPIFFS per lingua)
+} device_ui_texts_config_t;
+
+/**
  * @brief Struttura di configurazione generale device
  */
 typedef struct {
@@ -149,6 +158,7 @@ typedef struct {
     device_serial_config_t rs485;       ///< Configurazione RS485
     device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB
     device_gpios_config_t gpios;        ///< Configurazione GPIO extra
+    device_ui_texts_config_t ui;        ///< Configurazione testi UI multilingua
 } device_config_t;
 
 /**
@@ -229,3 +239,49 @@ void device_config_reboot_ota1(void);
  * @brief Ritorna una stringa descrittiva dell'app attualmente avviata
  */
 const char* device_config_get_running_app_name(void);
+
+/**
+ * @brief Restituisce la lingua UI corrente
+ */
+const char* device_config_get_ui_language(void);
+
+/**
+ * @brief Restituisce il JSON della tabella testi UI
+ */
+const char* device_config_get_ui_texts_json(void);
+
+/**
+ * @brief Restituisce la tabella i18n (array record) della lingua richiesta, letta da SPIFFS
+ * @param language Codice lingua ISO 2 caratteri (NULL = lingua corrente)
+ * @return JSON allocato dinamicamente (free() a carico chiamante), oppure NULL su errore
+ */
+char* device_config_get_ui_texts_records_json(const char *language);
+
+/**
+ * @brief Salva la tabella i18n (array record) su SPIFFS nel file della lingua indicata
+ * @param language Codice lingua ISO 2 caratteri
+ * @param records_json JSON array di record {lang,scope,key,text}
+ * @return ESP_OK se salvato correttamente
+ */
+esp_err_t device_config_set_ui_texts_records_json(const char *language, const char *records_json);
+
+/**
+ * @brief Recupera testo i18n da scope+key per la lingua corrente
+ * @param scope Ambito (es. nav, lvgl, p_config)
+ * @param key Chiave univoca nello scope
+ * @param fallback Testo fallback
+ * @param out Buffer destinazione
+ * @param out_len Dimensione buffer destinazione
+ * @return ESP_OK se trovata, ESP_ERR_NOT_FOUND se usa fallback
+ */
+esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, const char *fallback, char *out, size_t out_len);
+
+/**
+ * @brief Recupera un testo UI dalla tabella in base alla chiave
+ * @param key Chiave testuale
+ * @param fallback Testo fallback se chiave non trovata
+ * @param out Buffer destinazione
+ * @param out_len Dimensione buffer destinazione
+ * @return ESP_OK se trovata, ESP_ERR_NOT_FOUND se usa fallback
+ */
+esp_err_t device_config_get_ui_text(const char *key, const char *fallback, char *out, size_t out_len);

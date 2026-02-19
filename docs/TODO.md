@@ -65,6 +65,7 @@
 35. ✅ Riportare lo schermo in verticale (video portrait)
 36. ✅ Clear monitor seriale: pulizia aree testo + formato output (senza TX/RX testuale, TEXT compatto, HEX con prefisso '.')
 37. ✅ Emulatore: pagina web /emulator con layout pannello utente (tasti programmi, credito, messaggi, gauge, coin virtuali e indicatori relay) e predisposizione comandi hardware
+38. ✅ Creata tabella testi UI salvata in NVS/EEPROM + codice di recupero testi per funzione multilingua nell'interfaccia utente
 
 # ⏸️ RITARDATI
 
@@ -79,7 +80,8 @@
  0. Fare valutazione per le funzioni di caricamento da remoto su chiamata degli artei immagini, tabelle testi e del firmware stesso. Considerare che questi contenuti possono essere salvarti sia in SPIFFS che in SD
  1. Creare una FSM per la gestione del ciclo operativo della macchina (vedi FSM.md)
  2. implementa il salvataggio dei log degli errori su SD. Il log deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
- 3. Piano test endpoint e funzioni (da riprendere)
+ 3. modifica ad /emulator: la barra laterale non visualizza il credito ma il tempo rimanente, togliamo la scritta Stat Credito e mostriamo il tempo in minuti rimanenti 0-999. Il credito è visualizzato nel riquadro apposito e scende all'avvio del programma. il credito si gestisce in valori interi della unità di valuta interna  'coin'
+ 4. Piano test endpoint e funzioni (da riprendere)
 
     - Strutturare i test in 4 livelli:
       - Smoke: endpoint raggiungibile, status code atteso, JSON valido.
@@ -101,7 +103,7 @@
       - Smoke completo di tutte le route `/api/test/*` e `/api/config/*` usate dalla UI.
       - 3 flow critici: SD, seriale unificato, backup config su SD.
       - Report `junit.xml` + riepilogo markdown.
- 4. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
+ 5. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
 
     - Autenticazione/token
       - Generare sempre header `Date` runtime (ora è hardcoded in `http_services.c`).

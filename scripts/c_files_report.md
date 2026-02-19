@@ -2,12 +2,12 @@
 
 | File | Righe |
 |------|-------|
-| components/web_ui/web_ui.c | 1486 |
+| components/web_ui/web_ui.c | 1571 |
 | components/usb_host_cdc_acm/cdc_acm_host.c | 1117 |
+| main/init.c | 900 |
 | components/http_services/http_services.c | 900 |
-| main/init.c | 898 |
 | components/waveshare__esp32_p4_nano/esp32_p4_nano.c | 888 |
-| components/device_config/device_config.c | 765 |
+| components/device_config/device_config.c | 877 |
 | components/waveshare__esp_lcd_ili9881c/esp_lcd_ili9881c.c | 666 |
 | components/web_ui/web_ui_auth_emulator.c | 613 |
 | main/tasks.c | 560 |
@@ -23,11 +23,11 @@
 | components/remote_logging/remote_logging.c | 283 |
 | components/mdb/mdb.c | 278 |
 | components/waveshare__esp_lcd_ili9881c/test_apps/main/test_esp_lcd_ili9881c.c | 276 |
+| components/web_ui/web_ui_common.c | 272 |
 | components/web_ui/web_ui_programs_page.c | 247 |
 | components/usb_host_cdc_acm/test_app/main/usb_device.c | 223 |
 | components/usb_host_cdc_acm/cdc_host_descriptor_parsing.c | 218 |
 | components/serial_test/src/serial_test.c | 188 |
-| components/web_ui/web_ui_common.c | 167 |
 | components/eeprom_24lc16/eeprom_24lc16.c | 129 |
 | components/sht40/sht40.c | 127 |
 | components/io_expander/io_expander.c | 105 |

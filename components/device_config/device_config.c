@@ -15,6 +15,20 @@
 
 static const char *TAG = "DEVICE_CFG";
 static const char *NVS_NAMESPACE = "device_config";
+static const char *UI_LANG_DEFAULT = "it";
+static const char *UI_TEXTS_DEFAULT_IT_JSON =
+    "["
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"home\",\"text\":\"Home\"},"
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"config\",\"text\":\"Config\"},"
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"stats\",\"text\":\"Statistiche\"},"
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"tasks\",\"text\":\"Task\"},"
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"logs\",\"text\":\"Log\"},"
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"test\",\"text\":\"Test\"},"
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"ota\",\"text\":\"OTA\"},"
+    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"emulator\",\"text\":\"Emulatore\"},"
+    "{\"lang\":\"it\",\"scope\":\"header\",\"key\":\"time_not_set\",\"text\":\"Ora non impostata\"},"
+    "{\"lang\":\"it\",\"scope\":\"lvgl\",\"key\":\"time_not_available\",\"text\":\"Ora non disponibile\"}"
+    "]";
 
 #define EEPROM_MAGIC 0x57415645 // "WAVE"
 #define EEPROM_HEADER_ADDR 0
@@ -29,6 +43,145 @@ typedef struct {
 
 static device_config_t s_config = {0};
 static bool s_initialized = false;
+
+static bool _is_iso2_lang(const char *language)
+{
+    return language && strlen(language) == 2;
+}
+
+static const char *_effective_lang(const char *language)
+{
+    if (_is_iso2_lang(language)) {
+        return language;
+    }
+    if (_is_iso2_lang(s_config.ui.language)) {
+        return s_config.ui.language;
+    }
+    return UI_LANG_DEFAULT;
+}
+
+static void _build_i18n_path(const char *language, char *out, size_t out_len)
+{
+    snprintf(out, out_len, "/spiffs/i18n_%s.json", _effective_lang(language));
+}
+
+static bool _is_valid_i18n_records_json(const char *records_json)
+{
+    if (!records_json) {
+        return false;
+    }
+
+    cJSON *root = cJSON_Parse(records_json);
+    if (!root || !cJSON_IsArray(root)) {
+        if (root) {
+            cJSON_Delete(root);
+        }
+        return false;
+    }
+
+    bool valid = true;
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, root) {
+        if (!cJSON_IsObject(item)) {
+            valid = false;
+            break;
+        }
+        cJSON *lang = cJSON_GetObjectItem(item, "lang");
+        cJSON *scope = cJSON_GetObjectItem(item, "scope");
+        cJSON *key = cJSON_GetObjectItem(item, "key");
+        cJSON *text = cJSON_GetObjectItem(item, "text");
+        if (!cJSON_IsString(lang) || !lang->valuestring ||
+            !cJSON_IsString(scope) || !scope->valuestring ||
+            !cJSON_IsString(key) || !key->valuestring ||
+            !cJSON_IsString(text) || !text->valuestring) {
+            valid = false;
+            break;
+        }
+    }
+
+    cJSON_Delete(root);
+    return valid;
+}
+
+static esp_err_t _write_i18n_file(const char *language, const char *records_json)
+{
+    if (!_is_iso2_lang(language) || !_is_valid_i18n_records_json(records_json)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char path[64] = {0};
+    _build_i18n_path(language, path, sizeof(path));
+
+    FILE *file = fopen(path, "w");
+    if (!file) {
+        ESP_LOGE(TAG, "[I18N] Impossibile aprire %s in scrittura", path);
+        return ESP_FAIL;
+    }
+
+    size_t len = strlen(records_json);
+    size_t written = fwrite(records_json, 1, len, file);
+    fclose(file);
+
+    if (written != len) {
+        ESP_LOGE(TAG, "[I18N] Scrittura incompleta su %s", path);
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+static char *_read_i18n_file(const char *language)
+{
+    char path[64] = {0};
+    _build_i18n_path(language, path, sizeof(path));
+
+    FILE *file = fopen(path, "r");
+    if (!file) {
+        return NULL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    if (size <= 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    char *buffer = malloc((size_t)size + 1);
+    if (!buffer) {
+        fclose(file);
+        return NULL;
+    }
+
+    size_t read = fread(buffer, 1, (size_t)size, file);
+    fclose(file);
+    if (read != (size_t)size) {
+        free(buffer);
+        return NULL;
+    }
+    buffer[size] = '\0';
+
+    if (!_is_valid_i18n_records_json(buffer)) {
+        free(buffer);
+        return NULL;
+    }
+
+    return buffer;
+}
+
+static void _ensure_default_i18n_it_file(void)
+{
+    char *existing = _read_i18n_file(UI_LANG_DEFAULT);
+    if (existing) {
+        free(existing);
+        return;
+    }
+    esp_err_t err = _write_i18n_file(UI_LANG_DEFAULT, UI_TEXTS_DEFAULT_IT_JSON);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "[I18N] Creazione default i18n it fallita: %s", esp_err_to_name(err));
+    }
+}
 
 // Configurazione predefinita
 static void _set_defaults(device_config_t *config)
@@ -129,6 +282,10 @@ static void _set_defaults(device_config_t *config)
     config->scanner.vid = (uint16_t)CONFIG_USB_CDC_SCANNER_VID;
     config->scanner.pid = (uint16_t)CONFIG_USB_CDC_SCANNER_PID;
     config->scanner.dual_pid = (uint16_t)CONFIG_USB_CDC_SCANNER_DUAL_PID;
+
+    // Default testi UI / lingua
+    strncpy(config->ui.language, UI_LANG_DEFAULT, sizeof(config->ui.language) - 1);
+    config->ui.texts_json[0] = '\0';
 }
 
 static uint32_t _calculate_crc(const char *json_str)
@@ -174,7 +331,7 @@ static char* _read_from_eeprom(bool *out_modified)
         return NULL;
     }
 
-    if (header.length == 0 || header.length > 1500) {
+    if (header.length == 0 || header.length > 2000) {
         ESP_LOGW(TAG, "[C] Lunghezza JSON EEPROM non valida (%lu)", (unsigned long)header.length);
         return NULL;
     }
@@ -280,7 +437,22 @@ esp_err_t device_config_init(void)
     ESP_LOGI(TAG, "[C] Inizializzazione sistema configurazione");
     _set_defaults(&s_config);
     s_initialized = true;
-    return device_config_load(&s_config);
+    esp_err_t err = device_config_load(&s_config);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    _ensure_default_i18n_it_file();
+
+    char *startup_i18n = _read_i18n_file(s_config.ui.language);
+    if (startup_i18n) {
+        ESP_LOGI(TAG, "[I18N] Tabella lingua '%s' caricata da SPIFFS all'avvio", _effective_lang(s_config.ui.language));
+        free(startup_i18n);
+    } else {
+        ESP_LOGW(TAG, "[I18N] Tabella lingua '%s' non disponibile all'avvio, uso fallback IT", _effective_lang(s_config.ui.language));
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t device_config_load(device_config_t *config)
@@ -482,6 +654,15 @@ esp_err_t device_config_load(device_config_t *config)
                     }
                 }
 
+                // Analisi tabella UI (solo lingua corrente; i testi sono su SPIFFS)
+                cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
+                if (ui_obj) {
+                    cJSON *language = cJSON_GetObjectItem(ui_obj, "language");
+                    if (language && cJSON_IsString(language) && language->valuestring) {
+                        strncpy(config->ui.language, language->valuestring, sizeof(config->ui.language) - 1);
+                    }
+                }
+
             cJSON_Delete(root);
             ESP_LOGD(TAG, "[C] Configurazione caricata correttamente da %s", source_is_eeprom ? "EEPROM" : "NVS");
         } else {
@@ -620,6 +801,11 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddBoolToObject(g33_obj, "state", config->gpios.gpio33.initial_state);
     cJSON_AddItemToObject(gpios_obj, "gpio33", g33_obj);
     cJSON_AddItemToObject(root, "gpios", gpios_obj);
+
+    // UI multilingua (solo lingua; tabelle su SPIFFS per file lingua)
+    cJSON *ui_obj = cJSON_CreateObject();
+    cJSON_AddStringToObject(ui_obj, "language", config->ui.language);
+    cJSON_AddItemToObject(root, "ui", ui_obj);
 
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -762,4 +948,139 @@ const char* device_config_get_running_app_name(void)
         return "OTA1";
     }
     return "UNKNOWN";
+}
+
+const char* device_config_get_ui_language(void)
+{
+    return s_config.ui.language;
+}
+
+const char* device_config_get_ui_texts_json(void)
+{
+    return s_config.ui.texts_json;
+}
+
+char* device_config_get_ui_texts_records_json(const char *language)
+{
+    _ensure_default_i18n_it_file();
+
+    const char *lang = _effective_lang(language);
+    char *json = _read_i18n_file(lang);
+    if (json) {
+        return json;
+    }
+
+    if (strcmp(lang, UI_LANG_DEFAULT) != 0) {
+        json = _read_i18n_file(UI_LANG_DEFAULT);
+        if (json) {
+            return json;
+        }
+    }
+
+    return strdup(UI_TEXTS_DEFAULT_IT_JSON);
+}
+
+esp_err_t device_config_set_ui_texts_records_json(const char *language, const char *records_json)
+{
+    return _write_i18n_file(language, records_json);
+}
+
+esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, const char *fallback, char *out, size_t out_len)
+{
+    if (!scope || !key || !out || out_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char *records_json = device_config_get_ui_texts_records_json(NULL);
+    if (!records_json) {
+        if (fallback) {
+            strncpy(out, fallback, out_len - 1);
+            out[out_len - 1] = '\0';
+        } else {
+            out[0] = '\0';
+        }
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    cJSON *root = cJSON_Parse(records_json);
+    free(records_json);
+    if (!root || !cJSON_IsArray(root)) {
+        if (root) {
+            cJSON_Delete(root);
+        }
+        if (fallback) {
+            strncpy(out, fallback, out_len - 1);
+            out[out_len - 1] = '\0';
+        } else {
+            out[0] = '\0';
+        }
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    const char *lang = _effective_lang(NULL);
+    esp_err_t ret = ESP_ERR_NOT_FOUND;
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, root) {
+        cJSON *rec_lang = cJSON_GetObjectItem(item, "lang");
+        cJSON *rec_scope = cJSON_GetObjectItem(item, "scope");
+        cJSON *rec_key = cJSON_GetObjectItem(item, "key");
+        cJSON *rec_text = cJSON_GetObjectItem(item, "text");
+
+        if (!cJSON_IsString(rec_lang) || !rec_lang->valuestring ||
+            !cJSON_IsString(rec_scope) || !rec_scope->valuestring ||
+            !cJSON_IsString(rec_key) || !rec_key->valuestring ||
+            !cJSON_IsString(rec_text) || !rec_text->valuestring) {
+            continue;
+        }
+
+        if (strcmp(rec_lang->valuestring, lang) == 0 &&
+            strcmp(rec_scope->valuestring, scope) == 0 &&
+            strcmp(rec_key->valuestring, key) == 0) {
+            strncpy(out, rec_text->valuestring, out_len - 1);
+            out[out_len - 1] = '\0';
+            ret = ESP_OK;
+            break;
+        }
+    }
+
+    if (ret != ESP_OK) {
+        if (fallback) {
+            strncpy(out, fallback, out_len - 1);
+            out[out_len - 1] = '\0';
+        } else {
+            out[0] = '\0';
+        }
+    }
+
+    cJSON_Delete(root);
+    return ret;
+}
+
+esp_err_t device_config_get_ui_text(const char *key, const char *fallback, char *out, size_t out_len)
+{
+    if (!key || !out || out_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *sep = strchr(key, '_');
+    if (!sep || sep == key || *(sep + 1) == '\0') {
+        if (fallback) {
+            strncpy(out, fallback, out_len - 1);
+            out[out_len - 1] = '\0';
+        } else {
+            out[0] = '\0';
+        }
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    char scope[32] = {0};
+    size_t scope_len = (size_t)(sep - key);
+    if (scope_len >= sizeof(scope)) {
+        scope_len = sizeof(scope) - 1;
+    }
+    memcpy(scope, key, scope_len);
+    scope[scope_len] = '\0';
+    const char *subkey = sep + 1;
+
+    return device_config_get_ui_text_scoped(scope, subkey, fallback, out, out_len);
 }

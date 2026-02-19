@@ -541,7 +541,9 @@ static void update_time_display(lv_timer_t *timer)
     
     time_t now = time(NULL);
     if (now == (time_t)-1) {
-        lv_label_set_text(time_label, "Ora non disponibile");
+        char lvgl_time_not_available[48] = {0};
+        device_config_get_ui_text_scoped("lvgl", "time_not_available", "Ora non disponibile", lvgl_time_not_available, sizeof(lvgl_time_not_available));
+        lv_label_set_text(time_label, lvgl_time_not_available);
         return;
     }
     
