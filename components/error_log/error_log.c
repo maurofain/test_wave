@@ -7,10 +7,23 @@
 #include <string.h>
 #include <time.h>
 #include <inttypes.h>
+#include <unistd.h>
 
 static const char *TAG = "ERROR_LOG";
 static FILE *s_error_file = NULL;
 static bool s_sd_available = false; // indica se la SD è montata con successo
+
+static void flush_log_file(FILE *f)
+{
+    if (!f) {
+        return;
+    }
+    fflush(f);
+    int fd = fileno(f);
+    if (fd >= 0) {
+        fsync(fd);
+    }
+}
 
 
 // generatore nome file basato su timestamp (UTC/boot se non disponibile)
@@ -40,13 +53,21 @@ static int vprintf_wrapper(const char *fmt, va_list args)
     int len = vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
 
+    int safe_len = len;
+    if (safe_len < 0) {
+        safe_len = 0;
+    } else if ((size_t)safe_len >= sizeof(msg)) {
+        safe_len = (int)sizeof(msg) - 1;
+    }
+
     // forward to original output
     int res = vprintf(fmt, args);
 
-    if (len > 0) {
+    if (safe_len > 0) {
         // se l'output è un errore che inizia con "E (" crea nuovo file
         if (strncmp(msg, "E (", 3) == 0) {
             if (s_error_file) {
+                flush_log_file(s_error_file);
                 fclose(s_error_file);
                 s_error_file = NULL;
             }
@@ -55,11 +76,12 @@ static int vprintf_wrapper(const char *fmt, va_list args)
             s_error_file = fopen(fname, "w");
             if (s_error_file) {
                 fprintf(s_error_file, "--- error log start ---\n");
+                flush_log_file(s_error_file);
             }
         }
         if (s_error_file) {
-            fwrite(msg, 1, len, s_error_file);
-            fflush(s_error_file);
+            fwrite(msg, 1, (size_t)safe_len, s_error_file);
+            flush_log_file(s_error_file);
         }
     }
     return res;
@@ -90,10 +112,11 @@ void error_log_write_msg(const char *msg)
         s_error_file = fopen(fname, "w");
         if (s_error_file) {
             fprintf(s_error_file, "--- error log start ---\n");
+            flush_log_file(s_error_file);
         }
     }
     if (s_error_file) {
         fputs(msg, s_error_file);
-        fflush(s_error_file);
+        flush_log_file(s_error_file);
     }
 }

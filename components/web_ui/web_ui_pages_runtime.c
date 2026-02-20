@@ -55,11 +55,18 @@ esp_err_t root_get_handler(httpd_req_t *req)
     const char *programs_link = show_programs
         ? "<a href='/config/programs' class='btn-link'><span class='icon'>📊</span><span>Tabella Programmi</span></a>"
         : "";
+    const char *reboot_factory_crash_link = is_factory_view
+        ? "<a href='#' onclick=\"if(confirm('Confermi crash intenzionale?')){fetch('/api/debug/crash',{method:'POST'});setTimeout(()=>location.reload(),600);} return false;\" class='btn-reboot' style='background:#e74c3c;'>Crash</a>"
+        : "";
+    const char *reboot_app_restore_link = !is_factory_view
+        ? "<a href='#' onclick=\"if(confirm('Confermi il ripristino di OTA_x con la versione Factory?')){fetch('/api/debug/restore',{method:'POST'}).then(r=>r.text()).then(t=>alert(t)).catch(()=>alert('Errore restore'));} return false;\" class='btn-reboot' style='background:#f39c12;'>Restore</a>"
+        : "";
 
     int body_len = snprintf(NULL, 0,
         "<div class='container'><div class='grid'>"
         "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
+        "<a href='/files' class='btn-link'><span class='icon'>📁</span><span>File Manager</span></a>"
         "%s%s%s%s%s"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
@@ -73,14 +80,19 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/reboot/app_last' class='btn-reboot' style='background:#27ae60;'>APP LAST</a>"
         "<a href='/reboot/ota0' class='btn-reboot' style='background:#2980b9;'>OTA0</a>"
         "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
+        "<div style='margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;'>"
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
+        "%s%s"
+        "</div>"
         "</div></div></div></div></body></html>",
         test_link,
         tasks_link,
         httpservices_link,
         emulator_link,
         programs_link,
-        profile_label);
+        profile_label,
+        reboot_factory_crash_link,
+        reboot_app_restore_link);
 
     if (body_len < 0) {
         httpd_resp_send_500(req);
@@ -97,6 +109,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<div class='container'><div class='grid'>"
         "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
+        "<a href='/files' class='btn-link'><span class='icon'>📁</span><span>File Manager</span></a>"
         "%s%s%s%s%s"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
@@ -110,14 +123,19 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/reboot/app_last' class='btn-reboot' style='background:#27ae60;'>APP LAST</a>"
         "<a href='/reboot/ota0' class='btn-reboot' style='background:#2980b9;'>OTA0</a>"
         "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
+        "<div style='margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;'>"
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
+        "%s%s"
+        "</div>"
         "</div></div></div></div></body></html>",
         test_link,
         tasks_link,
         httpservices_link,
         emulator_link,
         programs_link,
-        profile_label);
+        profile_label,
+        reboot_factory_crash_link,
+        reboot_app_restore_link);
 
     httpd_resp_sendstr_chunk(req, body);
     free(body);
@@ -446,40 +464,110 @@ esp_err_t api_index_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /api (index)");
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "API Endpoints", NULL, true);
+    const char *extra_style =
+        "table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}"
+        "th{background:#f8fafc;position:sticky;top:0}"
+        ".api-btn{padding:6px 10px;border:0;border-radius:6px;cursor:pointer;background:#3498db;color:#fff;font-weight:bold}"
+        ".api-btn:hover{background:#2d7fb8}.mono{font-family:monospace}"
+        ".hint{color:#6b7280;font-size:12px}";
+    send_head(req, "API Endpoints", extra_style, true);
 
     const char *body =
         "<div class='container'><div class='card'><h2>📡 API Endpoints</h2>"
-        "<table style='width:100%;border-collapse:collapse'>"
-        "<tr><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>Method</th><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>URI</th><th style='text-align:left;padding:8px;border-bottom:1px solid #ddd'>Description</th></tr>"
-        "<tr><td>GET</td><td><a href='/status'>/status</a></td><td>Device status JSON</td></tr>"
-        "<tr><td>GET</td><td><a href='/api/config'>/api/config</a></td><td>Current configuration</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/config/save'>/api/config/save</a></td><td>Save configuration</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/config/backup'>/api/config/backup</a></td><td>Backup configuration</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/config/reset'>/api/config/reset</a></td><td>Factory reset</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/ntp/sync'>/api/ntp/sync</a></td><td>Force NTP sync</td></tr>"
-        "<tr><td>GET</td><td><a href='/api/tasks'>/api/tasks</a></td><td>Tasks CSV</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/tasks/save'>/api/tasks/save</a></td><td>Save tasks</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/tasks/apply'>/api/tasks/apply</a></td><td>Apply tasks</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/test/*'>/api/test/*</a></td><td>Run internal tests</td></tr>"
-        "<tr><td>GET</td><td><a href='/api/logs'>/api/logs</a></td><td>Stored logs</td></tr>"
-        "<tr><td>GET</td><td><a href='/api/logs/levels'>/api/logs/levels</a></td><td>Log levels</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/logs/level'>/api/logs/level</a></td><td>Set log level</td></tr>"
-        "<tr><td>GET</td><td><a href='/api/debug/usb/enumerate'>/api/debug/usb/enumerate</a></td><td>USB enumerate</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/debug/usb/restart'>/api/debug/usb/restart</a></td><td>Restart USB host</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/login'>/api/login</a></td><td>Authenticate (remote)</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/getconfig'>/api/getconfig</a></td><td>Get remote config</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/getimages'>/api/getimages</a></td><td>Fetch images</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/gettranslations'>/api/gettranslations</a></td><td>Fetch translations</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/getfirmware'>/api/getfirmware</a></td><td>Fetch firmware</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/payment'>/api/payment</a></td><td>Payment request</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/paymentoffline'>/api/paymentoffline</a></td><td>Offline payment</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/serviceused'>/api/serviceused</a></td><td>Service used</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/getcustomers'>/api/getcustomers</a></td><td>Get customers</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/getoperators'>/api/getoperators</a></td><td>Get operators</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/activity'>/api/activity</a></td><td>Activity</td></tr>"
-        "<tr><td>POST</td><td><a href='/api/keepalive'>/api/keepalive</a></td><td>Keepalive</td></tr>"
-        "</table></div></div></body></html>";
+        "<p class='hint'>Tutte le API sono azionabili. Per endpoint con parametri viene richiesto un popup (query o JSON).</p>"
+        "<table>"
+        "<tr><th>Method</th><th>URI</th><th>Description</th><th>Action</th></tr>"
+        "<tr><td>GET</td><td class='mono'>/api</td><td>API index</td><td><a class='api-btn' href='/api'>Apri</a></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/status</td><td>Device status JSON</td><td><a class='api-btn' href='/status'>Apri</a></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/config</td><td>Current configuration</td><td><a class='api-btn' href='/api/config'>Apri</a></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/ui/texts</td><td>UI texts</td><td><a class='api-btn' href='/api/ui/texts'>Apri</a></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/ui/languages</td><td>UI languages</td><td><a class='api-btn' href='/api/ui/languages'>Apri</a></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/config/save</td><td>Save configuration (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/config/save',false,true,'{}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/config/backup</td><td>Backup configuration</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/config/backup',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/config/reset</td><td>Factory reset</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/config/reset',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/ntp/sync</td><td>Force NTP sync</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/ntp/sync',false,false,'')\">Invia</button></td></tr>"
+
+        "<tr><td>GET</td><td class='mono'>/api/files/list</td><td>File list (query: storage)</td><td><button class='api-btn' onclick=\"apiCall('GET','/api/files/list',true,false,'','storage=spiffs')\">Apri</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/files/upload</td><td>Upload raw (usa /files per body binario)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/files/upload',true,false,'','storage=spiffs&name=test.txt')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/files/delete</td><td>Delete file (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/files/delete',false,true,'{\\\"storage\\\":\\\"spiffs\\\",\\\"name\\\":\\\"activity.json\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/files/download</td><td>Download file (query)</td><td><button class='api-btn' onclick=\"apiCall('GET','/api/files/download',true,false,'','storage=spiffs&name=activity.json')\">Apri</button></td></tr>"
+
+        "<tr><td>GET</td><td class='mono'>/api/programs</td><td>Programs table</td><td><a class='api-btn' href='/api/programs'>Apri</a></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/programs/save</td><td>Save programs (JSON, feature-gated)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/programs/save',false,true,'[]')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/security/password</td><td>Set UI password (JSON, feature-gated)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/security/password',false,true,'{\\\"password\\\":\\\"1234\\\"}')\">Invia</button></td></tr>"
+
+        "<tr><td>POST</td><td class='mono'>/api/emulator/relay</td><td>Emulator relay control (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/emulator/relay',false,true,'{\\\"id\\\":1,\\\"on\\\":true}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/emulator/coin</td><td>Emulator coin event (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/emulator/coin',false,true,'{\\\"value\\\":100}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/emulator/program/start</td><td>Program start (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/emulator/program/start',false,true,'{\\\"program\\\":1}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/emulator/program/stop</td><td>Program stop</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/emulator/program/stop',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/emulator/program/pause_toggle</td><td>Program pause toggle</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/emulator/program/pause_toggle',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/emulator/fsm/messages</td><td>FSM queue/snapshot</td><td><a class='api-btn' href='/api/emulator/fsm/messages'>Apri</a></td></tr>"
+
+        "<tr><td>GET</td><td class='mono'>/api/tasks</td><td>Tasks CSV</td><td><a class='api-btn' href='/api/tasks'>Apri</a></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/tasks/save</td><td>Save tasks (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/tasks/save',false,true,'[]')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/tasks/apply</td><td>Apply tasks</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/tasks/apply',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/test/*</td><td>Run internal tests</td><td><button class='api-btn' onclick=\"alert('Endpoint wildcard: usare la pagina /test')\">Info</button></td></tr>"
+
+        "<tr><td>GET</td><td class='mono'>/api/logs</td><td>Stored logs</td><td><a class='api-btn' href='/api/logs'>Apri</a></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/logs/receive</td><td>Receive external logs (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/logs/receive',false,true,'{\\\"level\\\":\\\"I\\\",\\\"tag\\\":\\\"EXT\\\",\\\"msg\\\":\\\"test\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/logs/levels</td><td>Log levels</td><td><a class='api-btn' href='/api/logs/levels'>Apri</a></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/logs/level</td><td>Set log level (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/logs/level',false,true,'{\\\"tag\\\":\\\"*\\\",\\\"level\\\":\\\"INFO\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>OPTIONS</td><td class='mono'>/api/logs/*</td><td>CORS preflight</td><td><button class='api-btn' onclick=\"apiCall('OPTIONS','/api/logs/receive',false,false,'')\">Invia</button></td></tr>"
+
+        "<tr><td>GET</td><td class='mono'>/api/debug/usb/enumerate</td><td>USB enumerate</td><td><a class='api-btn' href='/api/debug/usb/enumerate'>Apri</a></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/debug/usb/restart</td><td>Restart USB host</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/debug/usb/restart',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/debug/crash</td><td>Crash intenzionale (Factory)</td><td><button class='api-btn' onclick=\"if(confirm('Confermi crash intenzionale?')) apiCall('POST','/api/debug/crash',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/debug/restore</td><td>Restore factory su OTA inattiva (APP)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/debug/restore',false,false,'')\">Invia</button></td></tr>"
+
+        "<tr><td>POST</td><td class='mono'>/api/login</td><td>Authenticate remote (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/login',false,true,'{\\\"serial\\\":\\\"AD-34-DFG-333\\\",\\\"password\\\":\\\"md5...\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/getconfig</td><td>Get remote config</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/getconfig',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/getimages</td><td>Fetch images</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/getimages',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/gettranslations</td><td>Fetch translations</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/gettranslations',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/getfirmware</td><td>Fetch firmware</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/getfirmware',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/payment</td><td>Payment request (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/payment',false,true,'{\\\"amount\\\":100}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/paymentoffline</td><td>Offline payment (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/paymentoffline',false,true,'{\\\"amount\\\":100}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/serviceused</td><td>Service used (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/serviceused',false,true,'{\\\"service\\\":\\\"test\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/getcustomers</td><td>Get customers (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/getcustomers',false,true,'{\\\"Code\\\":\\\"*\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/getoperators</td><td>Get operators</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/getoperators',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/activity</td><td>Activity (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/activity',false,true,'{\\\"action\\\":\\\"test\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/deviceactivity</td><td>Device activity (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/deviceactivity',false,true,'{\\\"activityid\\\":999,\\\"status\\\":\\\"CRASH\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/keepalive</td><td>Keepalive (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/keepalive',false,true,'{\\\"status\\\":\\\"OK\\\"}')\">Invia</button></td></tr>"
+
+        "<tr><td>GET</td><td class='mono'>/api/remote/files/list</td><td>Remote file list (query)</td><td><button class='api-btn' onclick=\"apiCall('GET','/api/remote/files/list',true,false,'','storage=spiffs')\">Apri</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/remote/files/upload</td><td>Remote upload raw (usa /files per body binario)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/remote/files/upload',true,false,'','storage=spiffs&name=test.txt')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/remote/files/delete</td><td>Remote delete file (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/remote/files/delete',false,true,'{\\\"storage\\\":\\\"spiffs\\\",\\\"name\\\":\\\"activity.json\\\"}')\">Invia</button></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/remote/files/download</td><td>Remote download (query)</td><td><button class='api-btn' onclick=\"apiCall('GET','/api/remote/files/download',true,false,'','storage=spiffs&name=activity.json')\">Apri</button></td></tr>"
+
+        "<tr><td>—</td><td>Note</td><td>Alcuni endpoint sono disponibili solo per profilo runtime (Factory/App) o feature flag.</td><td>—</td></tr>"
+        "</table>"
+        "<script>"
+        "async function apiCall(method,path,needsQuery,needsBody,defaultBody,defaultQuery){"
+        "  let url=path;"
+        "  if(needsQuery){"
+        "    const q=prompt('Inserisci query string (senza ?)',defaultQuery||'');"
+        "    if(q===null) return;"
+        "    const qq=(q||'').trim();"
+        "    if(qq) url += (url.indexOf('?')>=0 ? '&' : '?') + qq;"
+        "  }"
+        "  let body=null;"
+        "  const headers={};"
+        "  if(needsBody){"
+        "    const input=prompt('Inserisci JSON body',defaultBody||'{}');"
+        "    if(input===null) return;"
+        "    try{ JSON.parse(input||'{}'); }catch(e){ alert('JSON non valido'); return; }"
+        "    body=input||'{}';"
+        "    headers['Content-Type']='application/json';"
+        "  }"
+        "  try{"
+        "    const r=await fetch(url,{method:method,headers:headers,body:body});"
+        "    const t=await r.text();"
+        "    alert('HTTP '+r.status+'\\n'+(t||''));"
+        "  }catch(e){"
+        "    alert('Errore chiamata: '+e);"
+        "  }"
+        "}"
+        "</script>"
+        "</div></div></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);

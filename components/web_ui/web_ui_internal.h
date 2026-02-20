@@ -40,6 +40,11 @@ esp_err_t api_emulator_program_stop(httpd_req_t *req);
 esp_err_t api_emulator_program_pause_toggle(httpd_req_t *req);
 esp_err_t api_emulator_fsm_messages_get(httpd_req_t *req);
 esp_err_t api_index_page_handler(httpd_req_t *req);
+esp_err_t files_page_handler(httpd_req_t *req);
+esp_err_t api_files_list_get(httpd_req_t *req);
+esp_err_t api_files_upload_post(httpd_req_t *req);
+esp_err_t api_files_delete_post(httpd_req_t *req);
+esp_err_t api_files_download_get(httpd_req_t *req);
 
 // Password UI protection helpers (web_ui_auth_emulator.c)
 bool web_ui_has_valid_password(httpd_req_t *req);
@@ -74,6 +79,8 @@ esp_err_t api_test_endpoints_handler(httpd_req_t *req);
 esp_err_t api_test_handler(httpd_req_t *req);
 esp_err_t api_debug_usb_enumerate(httpd_req_t *req);
 esp_err_t api_debug_usb_restart(httpd_req_t *req);
+esp_err_t api_debug_crash(httpd_req_t *req);
+esp_err_t api_debug_restore(httpd_req_t *req);
 
 // Reboot handlers
 esp_err_t reboot_factory_handler(httpd_req_t *req);

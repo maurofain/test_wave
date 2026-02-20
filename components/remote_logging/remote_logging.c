@@ -16,7 +16,7 @@
 #define TAG "REMOTE_LOG"
 #define LOG_QUEUE_SIZE 50
 #define LOG_MESSAGE_MAX_LEN 512
-#define LOG_TASK_STACK_SIZE 4096
+#define LOG_TASK_STACK_SIZE 6144
 #define LOG_TASK_PRIORITY 5
 
 // Struttura per i messaggi di log
@@ -33,6 +33,7 @@ static TaskHandle_t log_task_handle = NULL;
 static int sock_fd = -1;
 static bool initialized = false;
 static vprintf_like_t original_vprintf = NULL; // Per salvare la funzione originale
+static volatile bool s_in_custom_vprintf = false;
 
 // Per limitare i log di errore UDP
 static int udp_error_count = 0;
@@ -70,13 +71,29 @@ static int custom_vprintf(const char *fmt, va_list args)
     /* Chiama la funzione originale per l'output su console/uart */
     int result = original_vprintf ? original_vprintf(fmt, args) : vprintf(fmt, args);
 
+    if (!initialized || log_queue == NULL) {
+        return result;
+    }
+
+    /* Evita ricorsione quando il task sender genera log interni. */
+    if (log_task_handle != NULL && xTaskGetCurrentTaskHandle() == log_task_handle) {
+        return result;
+    }
+
+    /* Guard globale anti-ricorsione (es. coda piena, errori interni, ecc.). */
+    if (s_in_custom_vprintf) {
+        return result;
+    }
+
     /* Invia al server remoto usando la copia già formattata */
     if (remote_logging_is_enabled()) {
+        s_in_custom_vprintf = true;
         size_t len = strlen(buffer);
         if (len > 0 && buffer[len-1] == '\n') {
             buffer[len-1] = '\0';
         }
         remote_logging_send("INFO", "ESP_LOG", buffer);
+        s_in_custom_vprintf = false;
     }
 
     return result;
@@ -89,8 +106,6 @@ static void log_sender_task(void *pvParameters)
 {
     log_message_t log_msg;
     device_config_t *cfg = device_config_get();
-
-    ESP_LOGI(TAG, "Task di invio log avviato");
 
     while (true) {
         // Ricevi messaggio dalla coda
@@ -128,8 +143,6 @@ static void log_sender_task(void *pvParameters)
             server_addr.sin_port = htons(cfg->remote_log.server_port);
             server_addr.sin_addr.s_addr = INADDR_BROADCAST;
             
-            ESP_LOGD(TAG, "Invio in broadcast UDP alla porta %d", cfg->remote_log.server_port);
-
             if (sendto(sock_fd, formatted_msg, strlen(formatted_msg), 0,
                       (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
                 // Limita i log di errore per evitare spam
@@ -139,15 +152,12 @@ static void log_sender_task(void *pvParameters)
                 // Logga solo ogni 10 errori o ogni 30 secondi
                 if (udp_error_count >= 10 || 
                     (now - last_udp_error_time) > pdMS_TO_TICKS(30000)) {
-                    ESP_LOGW(TAG, "Errore invio UDP (%d errori totali): %s", 
-                            udp_error_count, strerror(errno));
                     udp_error_count = 0; // Reset contatore
                     last_udp_error_time = now;
                 }
             } else {
                 // Reset contatore se invio riuscito
                 if (udp_error_count > 0) {
-                    ESP_LOGI(TAG, "Invio UDP riuscito dopo %d errori precedenti", udp_error_count);
                     udp_error_count = 0;
                 }
             }
@@ -229,18 +239,20 @@ esp_err_t remote_logging_init(void)
 
 esp_err_t remote_logging_send(const char *level, const char *tag, const char *message)
 {
-    if (!initialized) {
+    if (!initialized || log_queue == NULL) {
         return ESP_OK; // Non è un errore se non inizializzato
     }
 
     log_message_t log_msg;
     strncpy(log_msg.level, level, sizeof(log_msg.level) - 1);
+    log_msg.level[sizeof(log_msg.level) - 1] = '\0';
     strncpy(log_msg.tag, tag, sizeof(log_msg.tag) - 1);
+    log_msg.tag[sizeof(log_msg.tag) - 1] = '\0';
     strncpy(log_msg.message, message, sizeof(log_msg.message) - 1);
+    log_msg.message[sizeof(log_msg.message) - 1] = '\0';
     log_msg.timestamp = time(NULL);
 
     if (xQueueSend(log_queue, &log_msg, 0) != pdTRUE) {
-        ESP_LOGW(TAG, "Coda log piena, messaggio perso");
         return ESP_FAIL;
     }
 

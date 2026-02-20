@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script per il flash della sola partizione Factory (App principale)
+# Script per il flash della sola partizione FACTORY (modalità COMPILE_APP=0)
 # Utilizzo: ./scripts/flash_factory.sh [-p /dev/ttyPORT] [-b BAUD] [-m]
 
 PORT="/dev/ttyACM0"
@@ -14,6 +14,35 @@ while getopts "p:b:m" opt; do
     \?) echo "Utilizzo: $0 [-p port] [-b baud] [-m]" >&2; exit 1 ;;
   esac
 done
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_VER="$ROOT_DIR/app_version.h"
+MAIN_VER="$ROOT_DIR/main/app_version.h"
+
+get_compile_app() {
+  local file="$1"
+  awk '/^#define[[:space:]]+COMPILE_APP[[:space:]]+[01]/{print $3; exit}' "$file"
+}
+
+if [ ! -f "$ROOT_VER" ] || [ ! -f "$MAIN_VER" ]; then
+  echo "❌ File versione non trovati (app_version.h / main/app_version.h)."
+  exit 1
+fi
+
+ROOT_MODE="$(get_compile_app "$ROOT_VER")"
+MAIN_MODE="$(get_compile_app "$MAIN_VER")"
+
+if [ -z "$ROOT_MODE" ] || [ -z "$MAIN_MODE" ] || [ "$ROOT_MODE" != "$MAIN_MODE" ]; then
+  echo "❌ COMPILE_APP incoerente tra root e main (root=$ROOT_MODE, main=$MAIN_MODE)."
+  echo "   Esegui: ./scripts/switch_to_factory.sh"
+  exit 1
+fi
+
+if [ "$ROOT_MODE" != "0" ]; then
+  echo "❌ Modalità corrente APP (COMPILE_APP=$ROOT_MODE). Per flash FACTORY imposta COMPILE_APP=0."
+  echo "   Esegui: ./scripts/switch_to_factory.sh"
+  exit 1
+fi
 
 CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0x10000 build/test_wave.bin"
 

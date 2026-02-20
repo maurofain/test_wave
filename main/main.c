@@ -1,5 +1,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stdio.h>
 #include "esp_log.h"
 #include "init.h"
 #include "tasks.h"
@@ -17,6 +18,12 @@ static const char *TAG = "APP";
  */
 #define BOOT_COUNTER_RESET_DELAYED 1
 #define BOOT_COUNTER_STABLE_WINDOW_MS (30000)
+
+/*
+ * Debug: forza un crash subito al boot per validare il flusso crash-log/boot-guard.
+ * 0 = disattivo, 1 = attivo
+ */
+#define DEBUG_FORCE_CRASH_AT_BOOT 0
 
 /*
  * Policy log runtime iniziale: minima verbosità al boot.
@@ -52,6 +59,46 @@ static void apply_post_boot_log_policy(void)
     esp_log_level_set("cdc_acm", ESP_LOG_WARN);
 }
 
+static void maybe_force_crash_at_boot(void)
+{
+#if DEBUG_FORCE_CRASH_AT_BOOT
+    char debug_msg[192];
+    snprintf(debug_msg,
+             sizeof(debug_msg),
+             "[DEBUG_FORCE_CRASH_AT_BOOT] trigger requested | mode=%s version=%s date=%s\n",
+             COMPILE_MODE_LABEL,
+             APP_VERSION,
+             APP_DATE);
+    error_log_write_msg(debug_msg);
+
+    ESP_LOGE(TAG,
+             LOG_CTX_PREFIX " DEBUG_FORCE_CRASH_AT_BOOT attivo: crash intenzionale in corso | mode=%s version=%s date=%s",
+             COMPILE_MODE_LABEL,
+             APP_VERSION,
+             APP_DATE);
+
+    snprintf(debug_msg,
+             sizeof(debug_msg),
+             "[DEBUG_FORCE_CRASH_AT_BOOT] forcing panic fault now | mode=%s version=%s date=%s\n",
+             COMPILE_MODE_LABEL,
+             APP_VERSION,
+             APP_DATE);
+    error_log_write_msg(debug_msg);
+
+    error_log_write_msg("[DEBUG_FORCE_CRASH_AT_BOOT] stack/backtrace completo non viene scritto in error_*.log; verra' salvato nel coredump su SD al boot successivo\n");
+
+    esp_err_t mark_ret = init_mark_forced_crash_request();
+    if (mark_ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " impossibile registrare marker force_crash: %s", esp_err_to_name(mark_ret));
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(150));
+    volatile uint32_t *bad_ptr = (volatile uint32_t *)0x0;
+    *bad_ptr = 0xDEADCAFE;
+#endif
+}
+
 void app_main(void)
 {
     apply_boot_log_policy();
@@ -80,6 +127,8 @@ void app_main(void)
         }
     }
     ESP_ERROR_CHECK(init_ret);
+
+    maybe_force_crash_at_boot();
 
     /*
      * Riapplica la policy dopo le init: alcuni componenti possono alterare

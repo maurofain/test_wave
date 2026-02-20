@@ -41,7 +41,7 @@
           3. 3. alla modifica dei parametri (tasto save in configurazione) salviamo i dati nella EEProm e sempre nella eeprom  settiamo flag di modificato 
           4. al successivo riavvio salviamo i dati (se validi) in NVS - se non validi li riprendiamo da NVS e settiamo il flag di modificato
 12. Driver PWM
-13. Duplicazione codice main in cartella app per sviluppo produzione
+13. ✅ Unificazione codice APP/FACTORY con flag `COMPILE_APP` (eliminata duplicazione cartelle)
 14. ✅ Driver RS485 e ricezione dati (timeout hardware 10ms)
 15. ✅ Test EEprom: tasto "Leggi JSON" e visualizzazione CRC/Updated nell'interfaccia web
 16. ✅ Implementata la scheda SD
@@ -100,10 +100,9 @@
      2. ERROR.log che  deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
      3. ✅ In caso di indisponibilità del SD (assente, guasta o piena) per ambedue i tipi di log si eseguirà solo l'invio al server remoto.
      4. ✅ nella chiamata api/deviceactivity: tabella JSON `activity.json` salvata in SPIFFS e caricata in PSRAM al boot; fornita API `device_activity_find()` con ID/descrizioni (id es. 1=Start,2=Stop,3=Pause,4=Resume).
- 2. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
+ 2. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare scaricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
  3. modifica ad /emulator: la barra laterale non visualizza il credito ma il tempo rimanente, togliamo la scritta Stat Credito e mostriamo il tempo in secondi rimanenti 0-999 partendo dal tempo previsto dal programma. Il rateo di discesa della varra va calcolato in base al tempo previsto per il programma . Il credito è visualizzato nel riquadro apposito e scende all'avvio del programma. il credito si gestisce in valori interi della unità di valuta interna  'coin'
-
- 3. Analisi criticità (riferita al punto 2 - coda eventi FSM):
+ 4. Analisi criticità (riferita al punto 2 - coda eventi FSM):
       1. Modello coda non compatibile con destinatari multipli: la FIFO con receive distruttivo non supporta la logica `To[10]` + rimozione destinatario + eliminazione messaggio a somma destinatari zero.
         - Azione (SCELTA DECISIVA): introdurre mailbox condivisa con lock e stato destinatari per messaggio.
       2. Mancano i campi strutturali del messaggio: `from_agn_id`, `to_agn_id[10]`, `action_id`.
@@ -117,11 +116,11 @@
       6. Tracciabilità log non completa: non sono sempre presenti agente sorgente/destinazione/azione.
         - Azione: standardizzare il formato log evento includendo sempre `from`, `to`, `action_id`, `timestamp` e risultato gestione.
       7. Duplicazione main/factory: rischio drift tra implementazioni FSM/eventi.
-        - Azione: estrarre la logica comune in componente condiviso o mantenere patch parallele con checklist obbligatoria.
+        - Azione: ✅ risolto con base codice unica e selezione modalità via `COMPILE_APP`.
       8. Strategia migrazione API: servono API di claim/ack per agente mantenendo compatibilità con publish/receive attuali.
         - Azione: introdurre nuove API (`publish_ex`, `claim_for_agent`, `ack_for_agent`) mantenendo le API correnti come wrapper.
 
- 4. Piano test endpoint e funzioni (da riprendere)
+ 5. Piano test endpoint e funzioni (da riprendere)
 
     - Strutturare i test in 4 livelli:
       - Smoke: endpoint raggiungibile, status code atteso, JSON valido.
@@ -143,7 +142,7 @@
       - Smoke completo di tutte le route `/api/test/*` e `/api/config/*` usate dalla UI.
       - 3 flow critici: SD, seriale unificato, backup config su SD.
       - Report `junit.xml` + riepilogo markdown.
- 5. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
+ 6. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
 
     - Autenticazione/token
       - Generare sempre header `Date` runtime (ora è hardcoded in `http_services.c`).
@@ -270,18 +269,13 @@ Please enable CONFIG_ESP_SYSTEM_USE_FRAME_POINTER option to have a full backtrac
     
     
   - Display 1.44 
-    
-  - Chiedere : 
-    
+   - Chiedere : 
     - problema alimentazione doppia (scheda e espansione) 
-    
     - Porte USB sul p4?
-    
     - Alimentazione display
-    
     - tasto SERVICE su GPIO per boot + reset P4
-    
     - Interrupt su cambio stato I/O Expander
+    - dimensioni massime stringhe in activitydevice
 - USB
   - letto lo scanner con il sorgente di test in /home/mauro/esp/esp-idf/examples/peripherals/usb/host/cdc/cdc_acm_host/main/usb_cdc_example_main.c
 

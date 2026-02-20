@@ -2,6 +2,30 @@
 
 Richiesta token per chiamate successive 
 
+## Endpoint remoti file manager (local device)
+
+Questi endpoint eseguono sul device le stesse azioni della pagina `/files` e sono utili per client remoti (script, integrazioni, tool esterni).
+
+- `GET /api/remote/files/list?storage=spiffs|sdcard`
+  - Risposta: JSON con `storage` e array `files` (`name`, `size`).
+
+- `POST /api/remote/files/upload?storage=spiffs|sdcard&name=<filename>`
+  - Header: `Content-Type: application/octet-stream`
+  - Body: contenuto binario del file.
+  - Risposta: testo `ok` o errore.
+
+- `POST /api/remote/files/delete`
+  - Header: `Content-Type: application/json`
+  - Body: `{"storage":"spiffs|sdcard","name":"<filename>"}`
+  - Risposta: testo `ok` o errore.
+
+- `GET /api/remote/files/download?storage=spiffs|sdcard&name=<filename>`
+  - Risposta: stream binario con header `Content-Disposition` per download.
+
+Note:
+- `name` accetta solo filename semplici (niente path separator `/` o `\\`).
+- `storage` supportato: `spiffs`, `sd`, `sdcard`.
+
 ## Schema di autenticazione — ottenimento dell'access_token 🔐
 
 - Header richiesti

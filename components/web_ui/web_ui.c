@@ -7,6 +7,7 @@
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
 #include "esp_netif.h"
+#include "esp_partition.h"
 #include "bsp/display.h"
 #include "bsp/esp32_p4_nano.h"
 #include <stdio.h>
@@ -1623,6 +1624,111 @@ esp_err_t api_ntp_sync(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t api_debug_crash(httpd_req_t *req)
+{
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Endpoint disponibile solo in Factory", -1);
+    }
+
+    ESP_LOGW(TAG, "[C] POST /api/debug/crash (factory)");
+    httpd_resp_set_type(req, "application/json");
+    const char *ok_resp = "{\"status\":\"ok\",\"message\":\"Crash intenzionale in corso\"}";
+    httpd_resp_send(req, ok_resp, strlen(ok_resp));
+
+    vTaskDelay(pdMS_TO_TICKS(120));
+    volatile uint32_t *bad_ptr = (volatile uint32_t *)0x0;
+    *bad_ptr = 0xC0DEFACE;
+    return ESP_OK;
+}
+
+esp_err_t api_debug_restore(httpd_req_t *req)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (!running || running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Restore disponibile solo in APP", -1);
+    }
+
+    const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP,
+                                                              ESP_PARTITION_SUBTYPE_APP_FACTORY,
+                                                              NULL);
+    if (!factory) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Partizione Factory non trovata", -1);
+    }
+
+    esp_partition_subtype_t target_subtype = ESP_PARTITION_SUBTYPE_APP_OTA_0;
+    if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0) {
+        target_subtype = ESP_PARTITION_SUBTYPE_APP_OTA_1;
+    } else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1) {
+        target_subtype = ESP_PARTITION_SUBTYPE_APP_OTA_0;
+    }
+
+    const esp_partition_t *target = esp_partition_find_first(ESP_PARTITION_TYPE_APP,
+                                                             target_subtype,
+                                                             NULL);
+    if (!target) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Partizione OTA target non trovata", -1);
+    }
+
+    if (target->size < factory->size) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Dimensione OTA target insufficiente", -1);
+    }
+
+    ESP_LOGW(TAG, "[C] POST /api/debug/restore running=%s target=%s source=%s", running->label, target->label, factory->label);
+
+    esp_err_t err = esp_partition_erase_range(target, 0, target->size);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Erase OTA target fallita", -1);
+    }
+
+    uint8_t *buf = malloc(4096);
+    if (!buf) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Memoria insufficiente per restore", -1);
+    }
+
+    size_t copied = 0;
+    while (copied < factory->size) {
+        size_t chunk = factory->size - copied;
+        if (chunk > 4096) {
+            chunk = 4096;
+        }
+
+        err = esp_partition_read(factory, copied, buf, chunk);
+        if (err != ESP_OK) {
+            free(buf);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            return httpd_resp_send(req, "Lettura Factory fallita", -1);
+        }
+
+        err = esp_partition_write(target, copied, buf, chunk);
+        if (err != ESP_OK) {
+            free(buf);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            return httpd_resp_send(req, "Scrittura OTA target fallita", -1);
+        }
+
+        copied += chunk;
+    }
+
+    free(buf);
+
+    char resp[160];
+    snprintf(resp,
+             sizeof(resp),
+             "Restore completato: Factory (%s) copiata in %s (%u bytes)",
+             factory->label,
+             target->label,
+             (unsigned)factory->size);
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    return httpd_resp_send(req, resp, -1);
+}
+
 
 esp_err_t web_ui_register_handlers(httpd_handle_t server)
 {
@@ -1667,6 +1773,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
         httpd_register_uri_handler(server, &uri_test);
     }
 
+    httpd_uri_t uri_files = {.uri = "/files", .method = HTTP_GET, .handler = files_page_handler};
+    httpd_register_uri_handler(server, &uri_files);
+
     httpd_uri_t uri_httpservices = {.uri = "/httpservices", .method = HTTP_GET, .handler = httpservices_page_handler};
     httpd_register_uri_handler(server, &uri_httpservices);
     
@@ -1702,6 +1811,30 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 
     httpd_uri_t uri_api_ntp_sync = {.uri = "/api/ntp/sync", .method = HTTP_POST, .handler = api_ntp_sync};
     httpd_register_uri_handler(server, &uri_api_ntp_sync);
+
+    httpd_uri_t uri_api_files_list = {.uri = "/api/files/list", .method = HTTP_GET, .handler = api_files_list_get};
+    httpd_register_uri_handler(server, &uri_api_files_list);
+
+    httpd_uri_t uri_api_files_upload = {.uri = "/api/files/upload", .method = HTTP_POST, .handler = api_files_upload_post};
+    httpd_register_uri_handler(server, &uri_api_files_upload);
+
+    httpd_uri_t uri_api_files_delete = {.uri = "/api/files/delete", .method = HTTP_POST, .handler = api_files_delete_post};
+    httpd_register_uri_handler(server, &uri_api_files_delete);
+
+    httpd_uri_t uri_api_files_download = {.uri = "/api/files/download", .method = HTTP_GET, .handler = api_files_download_get};
+    httpd_register_uri_handler(server, &uri_api_files_download);
+
+    httpd_uri_t uri_api_remote_files_list = {.uri = "/api/remote/files/list", .method = HTTP_GET, .handler = api_files_list_get};
+    httpd_register_uri_handler(server, &uri_api_remote_files_list);
+
+    httpd_uri_t uri_api_remote_files_upload = {.uri = "/api/remote/files/upload", .method = HTTP_POST, .handler = api_files_upload_post};
+    httpd_register_uri_handler(server, &uri_api_remote_files_upload);
+
+    httpd_uri_t uri_api_remote_files_delete = {.uri = "/api/remote/files/delete", .method = HTTP_POST, .handler = api_files_delete_post};
+    httpd_register_uri_handler(server, &uri_api_remote_files_delete);
+
+    httpd_uri_t uri_api_remote_files_download = {.uri = "/api/remote/files/download", .method = HTTP_GET, .handler = api_files_download_get};
+    httpd_register_uri_handler(server, &uri_api_remote_files_download);
 
     if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TASKS)) {
         httpd_uri_t uri_api_tasks = {.uri = "/api/tasks", .method = HTTP_GET, .handler = api_tasks_get};
@@ -1781,6 +1914,14 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_api_debug_usb_restart = {.uri = "/api/debug/usb/restart", .method = HTTP_POST, .handler = api_debug_usb_restart};
     httpd_register_uri_handler(server, &uri_api_debug_usb_restart);
     ESP_LOGI(TAG, "Registered POST /api/debug/usb/restart handler (Sperimentali)");
+
+    httpd_uri_t uri_api_debug_crash = {.uri = "/api/debug/crash", .method = HTTP_POST, .handler = api_debug_crash};
+    httpd_register_uri_handler(server, &uri_api_debug_crash);
+    ESP_LOGI(TAG, "Registered POST /api/debug/crash handler");
+
+    httpd_uri_t uri_api_debug_restore = {.uri = "/api/debug/restore", .method = HTTP_POST, .handler = api_debug_restore};
+    httpd_register_uri_handler(server, &uri_api_debug_restore);
+    ESP_LOGI(TAG, "Registered POST /api/debug/restore handler");
 
     // Register API handlers from http_services component
     http_services_register_handlers(server);

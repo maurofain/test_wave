@@ -15,6 +15,35 @@ while getopts "p:b:m" opt; do
   esac
 done
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_VER="$ROOT_DIR/app_version.h"
+MAIN_VER="$ROOT_DIR/main/app_version.h"
+
+get_compile_app() {
+  local file="$1"
+  awk '/^#define[[:space:]]+COMPILE_APP[[:space:]]+[01]/{print $3; exit}' "$file"
+}
+
+if [ ! -f "$ROOT_VER" ] || [ ! -f "$MAIN_VER" ]; then
+  echo "❌ File versione non trovati (app_version.h / main/app_version.h)."
+  exit 1
+fi
+
+ROOT_MODE="$(get_compile_app "$ROOT_VER")"
+MAIN_MODE="$(get_compile_app "$MAIN_VER")"
+
+if [ -z "$ROOT_MODE" ] || [ -z "$MAIN_MODE" ] || [ "$ROOT_MODE" != "$MAIN_MODE" ]; then
+  echo "❌ COMPILE_APP incoerente tra root e main (root=$ROOT_MODE, main=$MAIN_MODE)."
+  echo "   Esegui: ./scripts/switch_to_production.sh"
+  exit 1
+fi
+
+if [ "$ROOT_MODE" != "1" ]; then
+  echo "❌ Modalità corrente FACTORY (COMPILE_APP=$ROOT_MODE). Per flash OTA_0 imposta COMPILE_APP=1."
+  echo "   Esegui: ./scripts/switch_to_production.sh"
+  exit 1
+fi
+
 CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0x310000 build/test_wave.bin"
 
 echo "🚀 Avvio flash partizione OTA_0"

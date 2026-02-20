@@ -3,6 +3,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -23,6 +24,8 @@
 #include "esp_spiffs.h"
 #include "esp_sntp.h"
 #include "esp_http_client.h"
+#include "esp_partition.h"
+#include "esp_core_dump.h"
 #include "nvs.h"
 #include "driver/i2c.h"
 #include "driver/gpio.h"
@@ -55,12 +58,16 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #include "sd_card.h"
 #include "sht40.h"
 #include "device_activity.h"
+#include "error_log.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 static const char *TAG = "INIT";
+
+/* Debug: inibisce i POST verso server cloud durante il bootstrap */
+#define DEBUG_DISABLE_SERVER_POST 1
 
 /*
  * Forzatura temporanea: disabilita SEMPRE la parte video (LVGL + LCD + touch + backlight).
@@ -82,7 +89,10 @@ static uint32_t s_consecutive_reboots = 0;
 #define BOOT_GUARD_KEY_CONSEC "consecutive"
 #define BOOT_GUARD_KEY_CRASH_PENDING "crash_pending"
 #define BOOT_GUARD_KEY_CRASH_REASON "crash_reason"
+#define BOOT_GUARD_KEY_FORCE_CRASH "force_crash"
 #define BOOT_GUARD_REBOOT_LIMIT 3
+
+#define COREDUMP_MIN_FREE_MARGIN_BYTES (64 * 1024)
 
 static bool is_unclean_reset_reason(esp_reset_reason_t reason)
 {
@@ -111,6 +121,7 @@ static esp_err_t update_boot_reboot_guard(void)
     }
 
     uint32_t consecutive = 0;
+    uint32_t force_crash = 0;
     ret = nvs_get_u32(handle, BOOT_GUARD_KEY_CONSEC, &consecutive);
     if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND)
     {
@@ -119,8 +130,16 @@ static esp_err_t update_boot_reboot_guard(void)
         return ret;
     }
 
+    ret = nvs_get_u32(handle, BOOT_GUARD_KEY_FORCE_CRASH, &force_crash);
+    if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND)
+    {
+        ESP_LOGE(TAG, "[M] Lettura marker force_crash fallita: %s", esp_err_to_name(ret));
+        nvs_close(handle);
+        return ret;
+    }
+
     esp_reset_reason_t reason = esp_reset_reason();
-    if (is_unclean_reset_reason(reason))
+    if (is_unclean_reset_reason(reason) || (force_crash == 1))
     {
         consecutive++;
     }
@@ -130,6 +149,10 @@ static esp_err_t update_boot_reboot_guard(void)
     }
 
     ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CONSEC, consecutive);
+    if (ret == ESP_OK && force_crash == 1)
+    {
+        ret = nvs_set_u32(handle, BOOT_GUARD_KEY_FORCE_CRASH, 0);
+    }
     if (ret == ESP_OK)
     {
         ret = nvs_commit(handle);
@@ -145,8 +168,11 @@ static esp_err_t update_boot_reboot_guard(void)
     s_consecutive_reboots = consecutive;
     s_error_lock_active = (consecutive >= BOOT_GUARD_REBOOT_LIMIT);
 
-    ESP_LOGW(TAG, "[M] boot_guard: reset_reason=%d consecutive_reboots=%lu limit=%d",
-             (int)reason, (unsigned long)s_consecutive_reboots, BOOT_GUARD_REBOOT_LIMIT);
+    ESP_LOGW(TAG, "[M] boot_guard: reset_reason=%d force_crash=%lu consecutive_reboots=%lu limit=%d",
+             (int)reason,
+             (unsigned long)force_crash,
+             (unsigned long)s_consecutive_reboots,
+             BOOT_GUARD_REBOOT_LIMIT);
 
     if (s_error_lock_active)
     {
@@ -190,6 +216,7 @@ static esp_err_t update_crash_pending_record(void)
     return ret;
 }
 
+#if !DEBUG_DISABLE_SERVER_POST
 static void build_deviceactivity_url(char *out, size_t out_len, const char *base_url)
 {
     if (!out || out_len == 0)
@@ -212,9 +239,14 @@ static void build_deviceactivity_url(char *out, size_t out_len, const char *base
         snprintf(out, out_len, "%s/api/deviceactivity", base_url);
     }
 }
+#endif
 
 static esp_err_t try_send_pending_crash_record(void)
 {
+#if DEBUG_DISABLE_SERVER_POST
+    ESP_LOGW(TAG, "[M] [C] preboot crash send disabilitato da DEBUG_DISABLE_SERVER_POST");
+    return ESP_OK;
+#else
     nvs_handle_t handle;
     esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
     if (ret != ESP_OK)
@@ -297,6 +329,211 @@ static esp_err_t try_send_pending_crash_record(void)
 
     ESP_LOGW(TAG, "[M] [C] preboot crash send fallito (err=%s status=%d), pending mantenuto",
              esp_err_to_name(http_ret), status);
+    return ESP_OK;
+#endif
+}
+
+static bool has_sd_free_space(size_t bytes_needed)
+{
+    if (!sd_card_is_mounted())
+    {
+        return false;
+    }
+
+    uint64_t total_kb = sd_card_get_total_size();
+    uint64_t used_kb = sd_card_get_used_size();
+    if (total_kb <= used_kb)
+    {
+        return false;
+    }
+
+    uint64_t free_bytes = (total_kb - used_kb) * 1024ULL;
+    uint64_t required = (uint64_t)bytes_needed + (uint64_t)COREDUMP_MIN_FREE_MARGIN_BYTES;
+    return free_bytes > required;
+}
+
+static esp_err_t transfer_coredump_flash_to_sd(void)
+{
+    const esp_partition_t *core_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                                                ESP_PARTITION_SUBTYPE_DATA_COREDUMP,
+                                                                NULL);
+    if (!core_part)
+    {
+        ESP_LOGI(TAG, "[M] [C] partizione coredump assente: skip trasferimento coredump");
+        return ESP_OK;
+    }
+
+    uint32_t raw_size = 0;
+    esp_err_t err = esp_partition_read(core_part, 0, &raw_size, sizeof(raw_size));
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "[M] [C] lettura header coredump fallita: %s", esp_err_to_name(err));
+        return ESP_OK;
+    }
+
+    /* Partizione vergine/non usata: nessun coredump disponibile */
+    if (raw_size == 0xFFFFFFFF || raw_size == 0)
+    {
+        return ESP_OK;
+    }
+
+    /* Header invalido (tipico dopo cambio layout): pulizia silenziosa e skip */
+    if (raw_size < sizeof(uint32_t) || raw_size > core_part->size)
+    {
+        ESP_LOGW(TAG, "[M] [C] header coredump invalido (size=%lu, part_size=%lu): pulizia partizione",
+                 (unsigned long)raw_size,
+                 (unsigned long)core_part->size);
+        (void)esp_partition_erase_range(core_part, 0, core_part->size);
+        return ESP_OK;
+    }
+
+    size_t image_addr = 0;
+    size_t image_size = 0;
+    err = esp_core_dump_image_get(&image_addr, &image_size);
+    if (err == ESP_ERR_NOT_FOUND)
+    {
+        return ESP_OK;
+    }
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "[M] [C] core dump non disponibile: %s", esp_err_to_name(err));
+        return ESP_OK;
+    }
+
+    if (!sd_card_is_mounted())
+    {
+        ESP_LOGW(TAG, "[M] [C] SD non montata: coredump mantenuto in partizione");
+        return ESP_OK;
+    }
+
+    if (!has_sd_free_space(image_size))
+    {
+        ESP_LOGW(TAG, "[M] [C] spazio SD insufficiente per coredump (%u byte)", (unsigned)image_size);
+        return ESP_OK;
+    }
+
+    if (image_addr < core_part->address)
+    {
+        ESP_LOGW(TAG, "[M] [C] indirizzo coredump non valido");
+        return ESP_OK;
+    }
+
+    size_t part_offset = image_addr - core_part->address;
+    if ((part_offset + image_size) > core_part->size)
+    {
+        ESP_LOGW(TAG, "[M] [C] size coredump oltre i limiti partizione");
+        return ESP_OK;
+    }
+
+    time_t now = time(NULL);
+    struct tm tm_now = {0};
+    localtime_r(&now, &tm_now);
+
+    char dst_path[192];
+    snprintf(dst_path,
+             sizeof(dst_path),
+             "/sdcard/coredump_%04d%02d%02d_%02d%02d%02d_%s_v%s.elf",
+             tm_now.tm_year + 1900,
+             tm_now.tm_mon + 1,
+             tm_now.tm_mday,
+             tm_now.tm_hour,
+             tm_now.tm_min,
+             tm_now.tm_sec,
+             COMPILE_MODE_LABEL,
+             APP_VERSION);
+
+    FILE *out = fopen(dst_path, "wb");
+    if (!out)
+    {
+        ESP_LOGE(TAG, "[M] [C] creazione file coredump su SD fallita");
+        return ESP_OK;
+    }
+
+    uint8_t buf[1024];
+    size_t written = 0;
+    while (written < image_size)
+    {
+        size_t chunk = image_size - written;
+        if (chunk > sizeof(buf))
+        {
+            chunk = sizeof(buf);
+        }
+
+        err = esp_partition_read(core_part, part_offset + written, buf, chunk);
+        if (err != ESP_OK)
+        {
+            fclose(out);
+            remove(dst_path);
+            ESP_LOGE(TAG, "[M] [C] lettura coredump da flash fallita: %s", esp_err_to_name(err));
+            return ESP_OK;
+        }
+
+        if (fwrite(buf, 1, chunk, out) != chunk)
+        {
+            fclose(out);
+            remove(dst_path);
+            ESP_LOGE(TAG, "[M] [C] copia coredump flash->SD fallita");
+            return ESP_OK;
+        }
+
+        written += chunk;
+    }
+    fclose(out);
+
+    char report_path[192];
+    snprintf(report_path,
+             sizeof(report_path),
+             "/sdcard/coredump_%04d%02d%02d_%02d%02d%02d_%s_v%s.txt",
+             tm_now.tm_year + 1900,
+             tm_now.tm_mon + 1,
+             tm_now.tm_mday,
+             tm_now.tm_hour,
+             tm_now.tm_min,
+             tm_now.tm_sec,
+             COMPILE_MODE_LABEL,
+             APP_VERSION);
+
+    FILE *report = fopen(report_path, "w");
+    if (report)
+    {
+        fprintf(report,
+            "Coredump trasferito su SD\nmode=%s\nversion=%s\ndate=%s\nsource=flash_coredump_partition\nsize=%u\n",
+                COMPILE_MODE_LABEL,
+                APP_VERSION,
+                APP_DATE,
+                (unsigned)image_size);
+
+        fprintf(report,
+            "note=lo stack/backtrace completo e' nel file ELF coredump; error_*.log contiene solo marker applicativi\n");
+
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH && CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF
+        char panic_reason[200] = {0};
+        if (esp_core_dump_get_panic_reason(panic_reason, sizeof(panic_reason)) == ESP_OK)
+        {
+            fprintf(report, "panic_reason=%s\n", panic_reason);
+        }
+#endif
+
+        fclose(report);
+    }
+
+    err = esp_core_dump_image_erase();
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "[M] [C] coredump scritto su SD ma erase partizione fallita: %s", esp_err_to_name(err));
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG, "[M] [C] coredump trasferito su SD e cancellato da partizione: %s", dst_path);
+
+    char errorlog_note[320];
+    snprintf(errorlog_note,
+             sizeof(errorlog_note),
+             "[COREDUMP] stack/backtrace completo salvato in %s (size=%u). Questo error_*.log non contiene lo stack completo.\n",
+             dst_path,
+             (unsigned)image_size);
+    error_log_write_msg(errorlog_note);
+
     return ESP_OK;
 }
 
@@ -549,15 +786,9 @@ esp_err_t init_sync_ntp(void)
 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     (void)arg;
-    static bool config_initialized = false;
     if ((event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) ||
         (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP))
     {
-        if (!config_initialized) {
-            ESP_LOGI(TAG, "[INIT] Inizializzo configurazione device dopo DHCP");
-            ESP_ERROR_CHECK(device_config_init());
-            config_initialized = true;
-        }
         if (event_id == IP_EVENT_STA_GOT_IP) {
             ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
             ESP_LOGI(TAG, "[M] STA Wi-Fi ha ottenuto IP: %s", ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.ip));
@@ -1130,6 +1361,10 @@ esp_err_t init_run_factory(void)
             ESP_LOGE(TAG, "[M] Inizializzazione SD Card fallita (%s): periferica disabilitata a runtime", esp_err_to_name(sd_ret));
             cfg->sensors.sd_card_enabled = false;
         }
+        else
+        {
+            (void)transfer_coredump_flash_to_sd();
+        }
     }
     else
     {
@@ -1208,5 +1443,29 @@ esp_err_t init_mark_boot_completed(void)
         ESP_LOGI(TAG, "[M] [C] boot completato: contatore reboot consecutivi azzerato");
     }
 
+    return ret;
+}
+
+esp_err_t init_mark_forced_crash_request(void)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "[M] [C] apertura NVS force_crash fallita: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = nvs_set_u32(handle, BOOT_GUARD_KEY_FORCE_CRASH, 1);
+    if (ret == ESP_OK)
+    {
+        ret = nvs_commit(handle);
+    }
+    nvs_close(handle);
+
+    if (ret == ESP_OK)
+    {
+        ESP_LOGW(TAG, "[M] [C] marker force_crash registrato");
+    }
     return ret;
 }

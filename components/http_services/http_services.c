@@ -20,6 +20,9 @@ extern void web_ui_add_log(const char *level, const char *tag, const char *messa
 
 static const char *TAG = "HTTP_SERVICES";
 
+/* Debug: inibisce i POST verso il server remoto/cloud */
+#define DEBUG_DISABLE_SERVER_POST 1
+
 // Global variable to store the token
 char g_auth_token[256] = {0};
 
@@ -27,12 +30,6 @@ char g_auth_token[256] = {0};
 bool validate_token(const char *token) {
     // Add actual token validation logic here
     return token != NULL && strlen(token) > 0;
-}
-
-/* Helper: compute MD5 hex (lowercase) of input */
-static void md5_hex(const unsigned char *input, size_t ilen, char *out_hex, size_t out_hex_len)
-{
-    // Implementation of md5_hex function
 }
 
 /* Read the whole request body into a NUL-terminated buffer (caller frees) */
@@ -58,15 +55,6 @@ static char *read_request_body(httpd_req_t *req)
     return buf;
 }
 
-/* Format date used by services_http.md: MMYYYYdd (month 2 digits, year 4 digits, day 2 digits) */
-static void format_date_mm_yyyy_dd(char *out, size_t len)
-{
-    time_t now = time(NULL);
-    struct tm tm;
-    localtime_r(&now, &tm);
-    snprintf(out, len, "%02d%04d%02d", tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_mday);
-}
-
 /* Format full date-time string in ISO format */
 static void format_full_datetime(char *out, size_t len)
 {
@@ -74,50 +62,6 @@ static void format_full_datetime(char *out, size_t len)
     struct tm tm;
     gmtime_r(&now, &tm); /* use UTC for the "Z" suffix */
     strftime(out, len, "%Y-%m-%dT%H:%M:%S.000Z", &tm);
-}
-
-/* Format ISO8601 with microseconds and local timezone offset.
-   Example: 2026-01-23T13:25:13.218763+01:00
-   Falls back to UTC Z format on error. */
-static void format_iso8601_local_us_tz(char *out, size_t len)
-{
-    struct timeval tv;
-    if (gettimeofday(&tv, NULL) != 0) {
-        /* fallback to UTC Z format */
-        format_full_datetime(out, len);
-        return;
-    }
-
-    time_t sec = tv.tv_sec;
-    struct tm local_tm;
-    if (!localtime_r(&sec, &local_tm)) {
-        format_full_datetime(out, len);
-        return;
-    }
-
-    /* compute offset between local time and UTC robustly using tm fields */
-    struct tm utc_tm;
-    gmtime_r(&sec, &utc_tm);
-
-    /* day difference (handles day/year roll-over) */
-    int year_diff = local_tm.tm_year - utc_tm.tm_year;
-    long day_diff = year_diff * 365L + (local_tm.tm_yday - utc_tm.tm_yday);
-
-    long offset_seconds = day_diff * 86400L
-                        + (local_tm.tm_hour - utc_tm.tm_hour) * 3600L
-                        + (local_tm.tm_min  - utc_tm.tm_min)  * 60L
-                        + (local_tm.tm_sec  - utc_tm.tm_sec);
-
-    char sign = '+';
-    if (offset_seconds < 0) { sign = '-'; offset_seconds = -offset_seconds; }
-    int off_h = (int)(offset_seconds / 3600);
-    int off_m = (int)((offset_seconds % 3600) / 60);
-    int usec = (int)tv.tv_usec;
-
-    snprintf(out, len, "%04d-%02d-%02dT%02d:%02d:%02d.%06d%c%02d:%02d",
-             local_tm.tm_year + 1900, local_tm.tm_mon + 1, local_tm.tm_mday,
-             local_tm.tm_hour, local_tm.tm_min, local_tm.tm_sec, usec,
-             sign, off_h, off_m);
 }
 
 /*
@@ -153,7 +97,9 @@ static void webui_log_chunked(const char *level, const char *tag, const char *la
 #endif
 
 /* small accumulator type used by the http client event handler */
+#if !DEBUG_DISABLE_SERVER_POST
 typedef struct { char *buf; size_t len; size_t cap; } http_acc_t;
+#endif
 
 /* Helper: log incoming httpd request (method/uri, selected headers and body) */
 static void log_httpd_request(httpd_req_t *req, const char *body)
@@ -222,6 +168,7 @@ static void log_httpd_request(httpd_req_t *req, const char *body)
 
 /* --- Proxy implementations forwarding to remote server (uses device_config.server.url + credentials) --- */
 
+#if !DEBUG_DISABLE_SERVER_POST
 /* HTTP client event handler accumulator: collects HTTP_EVENT_ON_DATA into a dynamic buffer
    so responses delivered via the event path (chunked or already-copied-perform) are not lost.
 */
@@ -247,11 +194,27 @@ static esp_err_t http_client_event_accumulator(esp_http_client_event_t *evt)
     }
     return ESP_OK;
 }
+#endif
 
 /* Helper: perform HTTP POST to remote server (returns dynamically allocated response in out_resp)
    and reports the number of bytes read via out_len (may differ from strlen when binary/NULs are present). */
 static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header, char **out_resp, int *out_status, size_t *out_len)
 {
+#if DEBUG_DISABLE_SERVER_POST
+    (void)body;
+    (void)auth_header;
+    if (out_resp) {
+        *out_resp = strdup("{\"iserror\":true,\"codeerror\":503,\"deserror\":\"debug_post_disabled\"}");
+    }
+    if (out_status) {
+        *out_status = 503;
+    }
+    if (out_len) {
+        *out_len = 0;
+    }
+    ESP_LOGW(TAG, "POST remoto inibito da DEBUG_DISABLE_SERVER_POST (path=%s)", remote_path ? remote_path : "(null)");
+    return ESP_ERR_NOT_SUPPORTED;
+#else
     if (!remote_path) return ESP_ERR_INVALID_ARG;
     device_config_t *cfg = device_config_get();
     if (!cfg || strlen(cfg->server.url) == 0) return ESP_ERR_INVALID_STATE;
@@ -311,7 +274,6 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
         esp_http_client_set_header(client, "Content-Type", hdr_content_type);
 
         char date_hdr[64] = "2026-01-23T13:25:13.218763+01:00";
-        //format_iso8601_local_us_tz(date_hdr, sizeof(date_hdr));
         esp_http_client_set_header(client, "Date", date_hdr);
 
         if (use_fallback_headers) {
@@ -541,6 +503,7 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
     if (out_resp) *out_resp = resp; else if (resp) free(resp);
     if (out_status) *out_status = status;
     return err;
+#endif
 }
 
 /* Helper: forward incoming POST to remote_path (uses request body or config credentials for login) */

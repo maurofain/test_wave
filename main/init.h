@@ -41,3 +41,8 @@ uint32_t init_get_consecutive_reboots(void);
  * @brief Marca il boot come completato e azzera il contatore reboot consecutivi.
  */
 esp_err_t init_mark_boot_completed(void);
+
+/**
+ * @brief Registra in NVS una richiesta di crash forzato da consumare al boot successivo.
+ */
+esp_err_t init_mark_forced_crash_request(void);

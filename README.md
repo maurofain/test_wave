@@ -1,6 +1,6 @@
 # ESP-IDF starter for ESP32-P4 Waveshare module
 
-This project targets the Waveshare ESP32-P4 Module Dev Kit and an expansion board wired as described below. It initializes the basic peripherals (I2C bus, WS2812 strip, RS232/RS485/MDB UARTs, PWM outputs, BOOT button) and adds a **factory app** that exposes Wi-Fi AP (+optional STA), optional Ethernet, HTTP endpoints, and OTA to recover/refresh the main firmware in `ota_0`.
+This project targets the Waveshare ESP32-P4 Module Dev Kit and an expansion board wired as described below. It initializes the basic peripherals (I2C bus, WS2812 strip, RS232/RS485/MDB UARTs, PWM outputs, BOOT button) and supports both **APP** and **FACTORY** modes from a single codebase (`main/`) using the compile-time flag `COMPILE_APP`.
 
 | [Specifiche](docs/specifiche.md) |[PinOut](docs/PINOUT.md) |
 | [RULES](docs/RULES.md) | [TODO](docs/TODO.md) |
@@ -16,11 +16,11 @@ This project targets the Waveshare ESP32-P4 Module Dev Kit and an expansion boar
 
 ## Partitions
 The provided custom table in [partitions.csv](partitions.csv) is used by default:
-- `factory` (3 MB): recovery firmware (this app).
-- `ota_0` (10 MB): main application slot.
+- `factory` (3 MB): recovery/test image when compiled with `COMPILE_APP=0`.
+- `ota_0` (10 MB): main application slot when compiled with `COMPILE_APP=1`.
 - `nvs`, `phy_init`, `otadata`, `storage` (SPIFFS) as support partitions.
 
-## Factory networking
+## Networking (Factory mode)
 - Wi-Fi AP always on: SSID `factory-setup`, password `factory123` (open if empty), channel configurable.
 - Wi-Fi STA optional (enable and set credentials in `idf.py menuconfig`).
 - Ethernet optional (RMII PHY pins configurable; disabled by default).
@@ -66,7 +66,7 @@ Esempi rapidi:
 
 ### Codice unificato APP/FACTORY
 - Il progetto usa una singola base sorgente in `main/`.
-- La modalità di compilazione è selezionata con `COMPILE_APP` in `app_version.h` (e `main/app_version.h`):
+- La modalità di compilazione è selezionata con `COMPILE_APP` in `app_version.h` (file sorgente unico per la scelta modalità):
    - `COMPILE_APP=1` → APP
    - `COMPILE_APP=0` → FACTORY
 - Le differenze operative sono condizionate da macro, evitando drift tra cartelle duplicate.
