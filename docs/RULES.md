@@ -1,4 +1,5 @@
-- il progetto si basa su 2 eseguibili : main è l'applicazione completa, factory è il software di base per il recovery, il test e il fash di main. Ogni app ha la sua partizione.
+- il progetto si basa su 2 eseguibili : main è l'applicazione completa, factory è il software di base per il recovery, il test e il fash di main. Ogni app ha la sua partizione e ci sono 2 copie per eseguire un OTA sicuro.
+- La app è multilingua e carica la tabella stringhe dai file in SPIFFS i18n_XX.json dove XX è il cofice lingua. Ogni tsto che appare nell'interfaccia web o nel pannello touch va tabellata
 - per il sourcing di ESP-IDF si può usare get_idf 
 - per la compilazione usare 'idfc -b', flash  'idfc -f', per flash solo factory 'idfc -f -o f' per monitor 'idfc -m'
 - per analizzare il funzionamento di idfc chiamare 'idfc -h'

@@ -59,21 +59,23 @@ __attribute__((unused)) static const char* esp_log_level_to_string(esp_log_level
  */
 static int custom_vprintf(const char *fmt, va_list args)
 {
-    // Prima chiama la funzione originale per output su console/uart
-    int result = original_vprintf(fmt, args);
+    /* Copia args per il formatting locale: original_vprintf potrebbe consumare la
+       va_list e quindi non possiamo riutilizzarla. */
+    char buffer[LOG_MESSAGE_MAX_LEN] = {0};
+    va_list ap;
+    va_copy(ap, args);
+    vsnprintf(buffer, sizeof(buffer), fmt, ap);
+    va_end(ap);
 
-    // Se il remote logging è abilitato, invia anche al server remoto
+    /* Chiama la funzione originale per l'output su console/uart */
+    int result = original_vprintf ? original_vprintf(fmt, args) : vprintf(fmt, args);
+
+    /* Invia al server remoto usando la copia già formattata */
     if (remote_logging_is_enabled()) {
-        char buffer[LOG_MESSAGE_MAX_LEN];
-        vsnprintf(buffer, sizeof(buffer), fmt, args);
-
-        // Rimuovi newline finale se presente
         size_t len = strlen(buffer);
         if (len > 0 && buffer[len-1] == '\n') {
             buffer[len-1] = '\0';
         }
-
-        // Invia al server remoto (usa livello INFO come default)
         remote_logging_send("INFO", "ESP_LOG", buffer);
     }
 

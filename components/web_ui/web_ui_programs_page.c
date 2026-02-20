@@ -40,9 +40,12 @@ esp_err_t programs_page_handler(httpd_req_t *req)
         "<p>Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.</p>"
         "<div id='status' class='status'></div>"
         "<table><thead><tr><th>ID</th><th>Nome</th><th>Abilitato</th><th>Prezzo</th><th>Durata (s)</th><th>Pausa Max (s)</th><th>Relay mask</th></tr></thead><tbody id='programRows'></tbody></table>"
-        "<div style='display:flex;gap:10px;margin-top:14px;'>"
+        "<div style='display:flex;align-items:center;gap:10px;margin-top:14px;'>"
         "<button onclick='savePrograms()'>💾 Salva tabella</button>"
         "<button class='btn-secondary' onclick='loadPrograms()'>🔄 Ricarica</button>"
+        "<span>Secondi pausa:</span>"
+        "<input type='number' id='pauseAll' min='0' max='65535' value='0' style='width:80px;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box'>"
+        "<button onclick='setAllPauses()'>Set</button>"
         "</div>"
         "</div></div>"
         "<script>"
@@ -62,7 +65,8 @@ esp_err_t programs_page_handler(httpd_req_t *req)
         "`</tr>`;"
         "}"
         "function render(){const b=document.getElementById('programRows');b.innerHTML='';programs.forEach((p,i)=>{b.insertAdjacentHTML('beforeend',rowHtml(p,i));});}"
-        "async function loadPrograms(){try{const r=await fetch('/api/programs');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();programs=data.programs||[];render();showStatus('Tabella programmi caricata',true);}catch(e){showStatus('Errore caricamento: '+e.message,false);}}"
+        // set pause value for all programs
+        "function setAllPauses(){const v=parseInt(document.getElementById('pauseAll').value||0,10);programs.forEach(p=>{p.pause_max_suspend_sec=v;});render();showStatus('Pausa impostata a '+v+'s per tutti i programmi',true);}"        "async function loadPrograms(){try{const r=await fetch('/api/programs');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();programs=data.programs||[];render();showStatus('Tabella programmi caricata',true);}catch(e){showStatus('Errore caricamento: '+e.message,false);}}"
         "async function savePrograms(){try{programs=programs.map(p=>({...p,relay_mask:parseRelayMaskHex(p.relay_mask)}));const r=await fetch('/api/programs/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({programs})});if(!r.ok){const t=await r.text();throw new Error(t||('HTTP '+r.status));}showStatus('Tabella programmi salvata',true);render();}catch(e){showStatus('Errore salvataggio: '+e.message,false);}}"
         "window.addEventListener('load',loadPrograms);"
         "</script></body></html>";

@@ -52,6 +52,7 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #include "remote_logging.h"
 #include "sd_card.h"
 #include "sht40.h"
+#include "device_activity.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -746,6 +747,9 @@ esp_err_t init_run_factory(void)
         return web_ret;
     }
     ESP_LOGI(TAG, "[M] Web UI avviata correttamente");
+
+    // Carica la tabella activity da SPIFFS
+    ESP_ERROR_CHECK(device_activity_init());
 
     // Inizializza Remote Logging
     ESP_ERROR_CHECK(remote_logging_init());

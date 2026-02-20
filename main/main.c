@@ -5,6 +5,7 @@
 #include "tasks.h"
 #include "app_version.h"
 #include "device_config.h"
+#include "error_log.h"
 
 static const char *TAG = "APP";
 
@@ -41,6 +42,8 @@ static void apply_post_boot_log_policy(void)
 void app_main(void)
 {
     apply_boot_log_policy();
+    // inizializza logging errori su SD (dopo montare la SD)
+    error_log_init();
 
     ESP_LOGI(TAG, "==========================================");
     ESP_LOGI(TAG, "  MODO: %s", device_config_get_running_app_name());

@@ -998,6 +998,18 @@
   {
     "lang": "en",
     "scope": "p_programs",
+    "key": "pause_all_seconds",
+    "text": "Seconds pause (all)"
+  },
+  {
+    "lang": "en",
+    "scope": "p_programs",
+    "key": "set_pause_all",
+    "text": "Set"
+  },
+  {
+    "lang": "en",
+    "scope": "p_programs",
     "key": "payload_non_valido",
     "text": "Invalid payload"
   },

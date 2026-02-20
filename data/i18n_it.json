@@ -998,6 +998,18 @@
   {
     "lang": "it",
     "scope": "p_programs",
+    "key": "secondi_pausa_tutti",
+    "text": "Secondi pausa (tutti)"
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "imposta_pausa_tutti",
+    "text": "Imposta"
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
     "key": "payload_non_valido",
     "text": "Payload non valido"
   },
