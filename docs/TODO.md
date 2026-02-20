@@ -78,28 +78,50 @@
 
 - Factory 
 
- 0. Fare valutazione per le funzioni di caricamento da remoto su chiamata degli artei immagini, tabelle testi e del firmware stesso. Considerare che questi contenuti possono essere salvarti sia in SPIFFS che in SD
+ 0. Fare valutazione per le funzioni di caricamento da remoto su chiamata degli artefatti immagini, tabelle testi e del firmware stesso. Considerare che questi contenuti possono essere salvarti sia in SPIFFS che in SD
  1. Creare una FSM per la gestione del ciclo operativo della macchina (vedi FSM.md)
- 2. definizione della Coda di eventi da utilizzare nell FSM e nei moduli di controllo: 
-    1. partendo dalla definizione attuale di fsm_input_event_t definiamo che ogni agente (task o funzione di origine o destinazione di un messaggio) deve possedere un suo id unico chiamato agn_id di tipo uint8_t, quindi aggiungiamo dei campi alla dtruttura:
+ 2. modifica della Coda di eventi da utilizzare nell FSM e nei moduli di controllo: 
+    1. partendo dalla definizione attuale di fsm_input_event_t definiamo che ogni agente (task o funzione di origine o destinazione di un messaggio) deve possedere un suo id unico chiamato agn_id di tipo uint8_t, quindi aggiungiamo dei campi alla struttura:
        1. From : agente che ha generato il messaggio
        2. To : destinatari del messaggio rappresentati da un array di 10 agn_id;
-       3. (esistente) Timestamp da riportare nei log
-       4. (esistente) value_i32 : valore signed 
-       5. (esistente) value_u32 : valore unsigned 
-       6. (esistente) aux_u32 : valore unsigned 
-       7. (esistente) text[64] : testo libero
-    2. ogni task analizza sotto mutex la lista dei messaggi per verificare se nei destinari ci sia il suo agn_id, se lo trova  lo toglie dalla lista , sblocca il mutex ed esegue quanto previsto dal messaggio e se somma di tutti i valori dell'array =0 elinima il messaggio dalla queue
-   
- 3. ✅ implementa il salvataggio dei log degli errori su SD. ci servono 2 log separati : 
+       3. action: campo uint8_t action_id con la definizione delle azioni da effettuare con il messaggio
+       4. (esistente) Timestamp da riportare nei log
+       5. (esistente) value_i32 : valore signed 
+       6. (esistente) value_u32 : valore unsigned 
+       7. (esistente) aux_u32 : valore unsigned 
+       8. (esistente) text[64] : testo libero
+    2. ogni task analizza sotto mutex la lista dei messaggi per verificare se nei destinari ci sia il suo agn_id, se lo trova  lo toglie dalla lista , sblocca il mutex, e se somma di tutti i valori dell'array destinatari=0 elinima il messaggio dalla queue. Infine esegue quanto previsto dal messaggio 
+    3. venno identificati tutti gli agenti, metterli in una tabella ed assegnare gli agn_id
+    4. preparare una tabella con tutte le azioni ed assegnare gli action_id
+    5. tutti i messaggi includono automaticamente l'agente per i log
+
+ 1. ✅ implementa il salvataggio dei log degli errori su SD. ci servono 2 log separati : 
      1. app.log con il log di ogni operazione (eventi legati al credito es azioni su tasti e touch) eseguita dal cliente e la relativa azione, su file giornaliero di tipo circolare con memorizzazione massima di 30 gg, e i dati andranno inviati al server tramite api/deviceactivity (se lo swich Invia Log nella sezione Server Remoto è attivo - lo switch e il parametroon in config va creato)
      2. ERROR.log che  deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
      3. ✅ In caso di indisponibilità del SD (assente, guasta o piena) per ambedue i tipi di log si eseguirà solo l'invio al server remoto.
      4. ✅ nella chiamata api/deviceactivity: tabella JSON `activity.json` salvata in SPIFFS e caricata in PSRAM al boot; fornita API `device_activity_find()` con ID/descrizioni (id es. 1=Start,2=Stop,3=Pause,4=Resume).
- 4. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
- 5. modifica ad /emulator: la barra laterale non visualizza il credito ma il tempo rimanente, togliamo la scritta Stat Credito e mostriamo il tempo in secondi rimanenti 0-999 partendo dal tempo previsto dal programma. Il rateo di discesa della varra va calcolato in base al tempo previsto per il programma . Il credito è visualizzato nel riquadro apposito e scende all'avvio del programma. il credito si gestisce in valori interi della unità di valuta interna  'coin'
- 
- 6. Piano test endpoint e funzioni (da riprendere)
+ 2. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
+ 3. modifica ad /emulator: la barra laterale non visualizza il credito ma il tempo rimanente, togliamo la scritta Stat Credito e mostriamo il tempo in secondi rimanenti 0-999 partendo dal tempo previsto dal programma. Il rateo di discesa della varra va calcolato in base al tempo previsto per il programma . Il credito è visualizzato nel riquadro apposito e scende all'avvio del programma. il credito si gestisce in valori interi della unità di valuta interna  'coin'
+
+ 3. Analisi criticità (riferita al punto 2 - coda eventi FSM):
+      1. Modello coda non compatibile con destinatari multipli: la FIFO con receive distruttivo non supporta la logica `To[10]` + rimozione destinatario + eliminazione messaggio a somma destinatari zero.
+        - Azione (SCELTA DECISIVA): introdurre mailbox condivisa con lock e stato destinatari per messaggio.
+      2. Mancano i campi strutturali del messaggio: `from_agn_id`, `to_agn_id[10]`, `action_id`.
+        - Azione: estendere `fsm_input_event_t` con i nuovi campi e fornire wrapper di compatibilità per i publisher esistenti.
+      3. Assenza tabella agenti e tabella azioni: non esiste mapping centralizzato e stabile per `agn_id` e `action_id`.
+        - Azione: creare una tabella unificata agenti/azioni in header condiviso, con ID fissi e descrizioni per log/debug.
+      4. Rischio race in inizializzazione coda/eventi: init richiamata da più contesti (task + HTTP) senza protezione one-time robusta.
+        - Azione: centralizzare init al boot o proteggere `fsm_event_queue_init` con mutex/call-once atomico.
+      5. Rischio saturazione/perdita eventi: publisher multipli su coda corta, con timeout ridotti, aumentano drop e timeout sotto burst.
+        - Azione: aggiungere metriche (`drop_count`, `queue_high_watermark`), rate-limit per sorgente e policy priorità eventi.
+      6. Tracciabilità log non completa: non sono sempre presenti agente sorgente/destinazione/azione.
+        - Azione: standardizzare il formato log evento includendo sempre `from`, `to`, `action_id`, `timestamp` e risultato gestione.
+      7. Duplicazione main/factory: rischio drift tra implementazioni FSM/eventi.
+        - Azione: estrarre la logica comune in componente condiviso o mantenere patch parallele con checklist obbligatoria.
+      8. Strategia migrazione API: servono API di claim/ack per agente mantenendo compatibilità con publish/receive attuali.
+        - Azione: introdurre nuove API (`publish_ex`, `claim_for_agent`, `ack_for_agent`) mantenendo le API correnti come wrapper.
+
+ 4. Piano test endpoint e funzioni (da riprendere)
 
     - Strutturare i test in 4 livelli:
       - Smoke: endpoint raggiungibile, status code atteso, JSON valido.
@@ -121,7 +143,7 @@
       - Smoke completo di tutte le route `/api/test/*` e `/api/config/*` usate dalla UI.
       - 3 flow critici: SD, seriale unificato, backup config su SD.
       - Report `junit.xml` + riepilogo markdown.
- 7. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
+ 5. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
 
     - Autenticazione/token
       - Generare sempre header `Date` runtime (ora è hardcoded in `http_services.c`).

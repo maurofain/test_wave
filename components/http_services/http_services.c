@@ -849,6 +849,12 @@ static esp_err_t api_activity_post(httpd_req_t *req)
     return forward_post(req, "/api/activity", NULL, false);
 }
 
+static esp_err_t api_deviceactivity_post(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "POST /api/deviceactivity -> proxy to remote server");
+    return forward_post(req, "/api/deviceactivity", NULL, false);
+}
+
 
 esp_err_t http_services_register_handlers(httpd_handle_t server)
 {
@@ -878,6 +884,7 @@ esp_err_t http_services_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_getcustomers = { .uri = "/api/getcustomers", .method = HTTP_POST, .handler = api_getcustomers_post, .user_ctx = NULL };
     httpd_uri_t uri_getoperators = { .uri = "/api/getoperators", .method = HTTP_POST, .handler = api_getoperators_post, .user_ctx = NULL };
     httpd_uri_t uri_activity = { .uri = "/api/activity", .method = HTTP_POST, .handler = api_activity_post, .user_ctx = NULL };
+    httpd_uri_t uri_deviceactivity = { .uri = "/api/deviceactivity", .method = HTTP_POST, .handler = api_deviceactivity_post, .user_ctx = NULL };
 
     httpd_register_uri_handler(server, &uri_login);
     httpd_register_uri_handler(server, &uri_keepalive);
@@ -894,6 +901,7 @@ esp_err_t http_services_register_handlers(httpd_handle_t server)
     httpd_register_uri_handler(server, &uri_getcustomers);
     httpd_register_uri_handler(server, &uri_getoperators);
     httpd_register_uri_handler(server, &uri_activity);
+    httpd_register_uri_handler(server, &uri_deviceactivity);
 
     ESP_LOGI(TAG, "Registered POST /api/* handlers (http_services)");
     return ESP_OK;
