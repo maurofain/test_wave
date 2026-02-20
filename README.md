@@ -64,10 +64,12 @@ Esempi rapidi:
    idf.py -p <PORT> flash monitor
    ```
 
-### Single source for init
-- `main/init.c` è la sorgente unica della sequenza di inizializzazione runtime.
-- Anche il profilo `factory/` riusa `main/init.c` (evita divergenze tra due copie).
-- Se devi modificare boot/network/web server init, fallo solo in `main/init.c`.
+### Codice unificato APP/FACTORY
+- Il progetto usa una singola base sorgente in `main/`.
+- La modalità di compilazione è selezionata con `COMPILE_APP` in `app_version.h` (e `main/app_version.h`):
+   - `COMPILE_APP=1` → APP
+   - `COMPILE_APP=0` → FACTORY
+- Le differenze operative sono condizionate da macro, evitando drift tra cartelle duplicate.
 
 ## Flash OTA da VS Code
 

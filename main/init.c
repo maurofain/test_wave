@@ -33,6 +33,7 @@
 #include "lwip/ip_addr.h"
 #include "init.h"
 #include "tasks.h"
+#include "app_version.h"
 #include "aux_gpio.h"
 #include "led.h"
 #include "device_config.h"
@@ -984,8 +985,10 @@ esp_err_t init_run_factory(void)
     }
     ESP_LOGI(TAG, "[M] Web UI avviata correttamente");
 
-    // Carica la tabella activity da SPIFFS
+#if COMPILE_APP
+    // Carica la tabella activity da SPIFFS (solo build APP)
     ESP_ERROR_CHECK(device_activity_init());
+#endif
 
     // Inizializza Remote Logging
     ESP_ERROR_CHECK(remote_logging_init());
@@ -1000,7 +1003,11 @@ esp_err_t init_run_factory(void)
         esp_err_t exp_ret = io_expander_init();
         if (exp_ret != ESP_OK) {
             ESP_LOGW(TAG, "I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
+#if COMPILE_APP
             cfg->sensors.io_expander_enabled = false;
+#else
+            return exp_ret;
+#endif
         }
         if (exp_ret == ESP_OK) {
             // Controllo GPIO3 solo se expander disponibile

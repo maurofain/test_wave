@@ -1,1 +1,0 @@
-/home/mauro/Progetti/0.Clienti/MicroHard/test_wave/app_version.h

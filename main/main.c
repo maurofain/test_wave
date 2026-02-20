@@ -8,6 +8,7 @@
 #include "error_log.h"
 
 static const char *TAG = "APP";
+#define LOG_CTX_PREFIX "[" COMPILE_LOG_PREFIX "]"
 
 /*
  * Policy azzeramento contatore reboot consecutivi.
@@ -25,7 +26,11 @@ static const char *TAG = "APP";
  */
 static void apply_boot_log_policy(void)
 {
+#if COMPILE_APP
     esp_log_level_set("*", ESP_LOG_INFO);
+#else
+    esp_log_level_set("*", ESP_LOG_ERROR);
+#endif
 
     /* Stack USB/CDC: forza ERROR al boot per evitare flood */
     esp_log_level_set("usb", ESP_LOG_ERROR);
@@ -54,7 +59,8 @@ void app_main(void)
     error_log_init();
 
     ESP_LOGI(TAG, "==========================================");
-    ESP_LOGI(TAG, "  MODO: %s", device_config_get_running_app_name());
+    ESP_LOGI(TAG, "  MODO COMPILE: %s", COMPILE_MODE_LABEL);
+    ESP_LOGI(TAG, "  MODO RUNNING: %s", device_config_get_running_app_name());
     ESP_LOGI(TAG, "  App Test Wave - Versione: %s", APP_VERSION);
     ESP_LOGI(TAG, "  Data Compilazione: %s", APP_DATE);
     ESP_LOGI(TAG, "==========================================");
@@ -66,7 +72,7 @@ void app_main(void)
     esp_err_t init_ret = init_run_factory();
     if (init_ret == ESP_ERR_INVALID_STATE && init_is_error_lock_active())
     {
-        ESP_LOGE(TAG, "[M] ERROR_LOCK attivo: avvio task inibito (reboot consecutivi=%lu)",
+        ESP_LOGE(TAG, LOG_CTX_PREFIX " ERROR_LOCK attivo: avvio task inibito (reboot consecutivi=%lu)",
                  (unsigned long)init_get_consecutive_reboots());
         while (1)
         {
@@ -85,21 +91,21 @@ void app_main(void)
     tasks_start_all();
     if (BOOT_COUNTER_RESET_DELAYED)
     {
-        ESP_LOGI(TAG, "[M] reset contatore reboot posticipato di %d ms", BOOT_COUNTER_STABLE_WINDOW_MS);
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " reset contatore reboot posticipato di %d ms", BOOT_COUNTER_STABLE_WINDOW_MS);
         vTaskDelay(pdMS_TO_TICKS(BOOT_COUNTER_STABLE_WINDOW_MS));
     }
 
     esp_err_t boot_done_ret = init_mark_boot_completed();
     if (boot_done_ret != ESP_OK)
     {
-        ESP_LOGW(TAG, "[M] impossibile azzerare contatore reboot consecutivi: %s", esp_err_to_name(boot_done_ret));
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " impossibile azzerare contatore reboot consecutivi: %s", esp_err_to_name(boot_done_ret));
     }
-    ESP_LOGI(TAG, "[M] App factory pronta: endpoint HTTP /status e /ota disponibili");
+    ESP_LOGI(TAG, LOG_CTX_PREFIX " App pronta: endpoint HTTP /status e /ota disponibili");
 
     // Loop principale: segnala attività periodicamente
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(5000)); // Attesa
-        ESP_LOGI(TAG, "[M] Device in funzione ✓");
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " Device in funzione ✓");
     }
 }
