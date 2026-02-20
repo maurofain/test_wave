@@ -26,3 +26,18 @@ led_strip_handle_t init_get_ws2812_handle(void);
 esp_err_t init_sync_ntp(void);
 
 void init_i2c_and_io_expander(void); // Inizializza I2C e I/O Expander e controlla GPIO3
+
+/**
+ * @brief Ritorna true se il sistema è entrato in ERROR_LOCK per reboot consecutivi.
+ */
+bool init_is_error_lock_active(void);
+
+/**
+ * @brief Ritorna il numero di reboot consecutivi registrati.
+ */
+uint32_t init_get_consecutive_reboots(void);
+
+/**
+ * @brief Marca il boot come completato e azzera il contatore reboot consecutivi.
+ */
+esp_err_t init_mark_boot_completed(void);

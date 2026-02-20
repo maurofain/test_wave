@@ -23,6 +23,7 @@
 #include "esp_spiffs.h"
 #include "esp_sntp.h"
 #include "esp_http_client.h"
+#include "nvs.h"
 #include "driver/i2c.h"
 #include "driver/gpio.h"
 #include "led_strip.h"
@@ -73,6 +74,230 @@ static esp_netif_t *s_netif_sta;
 static esp_netif_t *s_netif_eth;
 static esp_eth_handle_t s_eth_handle;
 static esp_lcd_touch_handle_t s_touch_handle;
+static bool s_error_lock_active = false;
+static uint32_t s_consecutive_reboots = 0;
+
+#define BOOT_GUARD_NAMESPACE "boot_guard"
+#define BOOT_GUARD_KEY_CONSEC "consecutive"
+#define BOOT_GUARD_KEY_CRASH_PENDING "crash_pending"
+#define BOOT_GUARD_KEY_CRASH_REASON "crash_reason"
+#define BOOT_GUARD_REBOOT_LIMIT 3
+
+static bool is_unclean_reset_reason(esp_reset_reason_t reason)
+{
+    switch (reason)
+    {
+        case ESP_RST_PANIC:
+        case ESP_RST_INT_WDT:
+        case ESP_RST_TASK_WDT:
+        case ESP_RST_WDT:
+        case ESP_RST_BROWNOUT:
+        case ESP_RST_UNKNOWN:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static esp_err_t update_boot_reboot_guard(void)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "[M] Apertura NVS boot guard fallita: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    uint32_t consecutive = 0;
+    ret = nvs_get_u32(handle, BOOT_GUARD_KEY_CONSEC, &consecutive);
+    if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND)
+    {
+        ESP_LOGE(TAG, "[M] Lettura counter reboot fallita: %s", esp_err_to_name(ret));
+        nvs_close(handle);
+        return ret;
+    }
+
+    esp_reset_reason_t reason = esp_reset_reason();
+    if (is_unclean_reset_reason(reason))
+    {
+        consecutive++;
+    }
+    else
+    {
+        consecutive = 0;
+    }
+
+    ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CONSEC, consecutive);
+    if (ret == ESP_OK)
+    {
+        ret = nvs_commit(handle);
+    }
+    nvs_close(handle);
+
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "[M] Salvataggio counter reboot fallito: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    s_consecutive_reboots = consecutive;
+    s_error_lock_active = (consecutive >= BOOT_GUARD_REBOOT_LIMIT);
+
+    ESP_LOGW(TAG, "[M] boot_guard: reset_reason=%d consecutive_reboots=%lu limit=%d",
+             (int)reason, (unsigned long)s_consecutive_reboots, BOOT_GUARD_REBOOT_LIMIT);
+
+    if (s_error_lock_active)
+    {
+        ESP_LOGE(TAG, "[M] ERROR_LOCK attivo: troppi reboot consecutivi");
+    }
+
+    return ESP_OK;
+}
+
+static esp_err_t update_crash_pending_record(void)
+{
+    esp_reset_reason_t reason = esp_reset_reason();
+    if (!is_unclean_reset_reason(reason))
+    {
+        return ESP_OK;
+    }
+
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "[M] [C] apertura NVS crash record fallita: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CRASH_PENDING, 1);
+    if (ret == ESP_OK)
+    {
+        ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CRASH_REASON, (uint32_t)reason);
+    }
+    if (ret == ESP_OK)
+    {
+        ret = nvs_commit(handle);
+    }
+    nvs_close(handle);
+
+    if (ret == ESP_OK)
+    {
+        ESP_LOGW(TAG, "[M] [C] crash pending registrato: reason=%d", (int)reason);
+    }
+    return ret;
+}
+
+static void build_deviceactivity_url(char *out, size_t out_len, const char *base_url)
+{
+    if (!out || out_len == 0)
+    {
+        return;
+    }
+    out[0] = '\0';
+    if (!base_url || base_url[0] == '\0')
+    {
+        return;
+    }
+
+    size_t bl = strlen(base_url);
+    if (bl > 0 && base_url[bl - 1] == '/')
+    {
+        snprintf(out, out_len, "%sapi/deviceactivity", base_url);
+    }
+    else
+    {
+        snprintf(out, out_len, "%s/api/deviceactivity", base_url);
+    }
+}
+
+static esp_err_t try_send_pending_crash_record(void)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "[M] [C] apertura NVS preboot send fallita: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    uint32_t pending = 0;
+    uint32_t crash_reason = 0;
+    if (nvs_get_u32(handle, BOOT_GUARD_KEY_CRASH_PENDING, &pending) != ESP_OK || pending == 0)
+    {
+        nvs_close(handle);
+        return ESP_OK;
+    }
+
+    (void)nvs_get_u32(handle, BOOT_GUARD_KEY_CRASH_REASON, &crash_reason);
+    nvs_close(handle);
+
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->server.enabled || cfg->server.url[0] == '\0')
+    {
+        ESP_LOGW(TAG, "[M] [C] preboot crash send saltato: server non configurato");
+        return ESP_OK;
+    }
+
+    char url[192];
+    build_deviceactivity_url(url, sizeof(url), cfg->server.url);
+    if (url[0] == '\0')
+    {
+        ESP_LOGW(TAG, "[M] [C] preboot crash send saltato: URL non valida");
+        return ESP_OK;
+    }
+
+    char body[320];
+    snprintf(body, sizeof(body),
+             "{\"activityid\":999,\"status\":\"CRASH\",\"serial\":\"%s\",\"reason\":%lu,\"reboots\":%lu}",
+             cfg->server.serial,
+             (unsigned long)crash_reason,
+             (unsigned long)s_consecutive_reboots);
+
+    esp_http_client_config_t http_cfg = {
+        .url = url,
+        .method = HTTP_METHOD_POST,
+        .timeout_ms = 3000,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&http_cfg);
+    if (!client)
+    {
+        ESP_LOGE(TAG, "[M] [C] preboot crash send: client init fallita");
+        return ESP_FAIL;
+    }
+
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, body, (int)strlen(body));
+
+    esp_err_t http_ret = esp_http_client_perform(client);
+    int status = esp_http_client_get_status_code(client);
+    esp_http_client_cleanup(client);
+
+    if (http_ret == ESP_OK && status >= 200 && status < 300)
+    {
+        ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
+        if (ret == ESP_OK)
+        {
+            ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CRASH_PENDING, 0);
+            if (ret == ESP_OK)
+            {
+                ret = nvs_commit(handle);
+            }
+            nvs_close(handle);
+        }
+        if (ret == ESP_OK)
+        {
+            ESP_LOGI(TAG, "[M] [C] preboot crash send OK (status=%d), pending cleared", status);
+        }
+        return ret;
+    }
+
+    ESP_LOGW(TAG, "[M] [C] preboot crash send fallito (err=%s status=%d), pending mantenuto",
+             esp_err_to_name(http_ret), status);
+    return ESP_OK;
+}
 
 // -----------------------------------------------------------------------------
 // Rete + HTTP + OTA (factory)
@@ -677,6 +902,9 @@ static esp_err_t init_display_lvgl_minimal(void)
 esp_err_t init_run_factory(void)
 {
     ESP_ERROR_CHECK(init_nvs());
+    ESP_ERROR_CHECK(update_boot_reboot_guard());
+    ESP_ERROR_CHECK(update_crash_pending_record());
+
     ESP_ERROR_CHECK(init_spiffs());
     log_partitions();
     ESP_ERROR_CHECK(init_event_loop());
@@ -695,6 +923,14 @@ esp_err_t init_run_factory(void)
 
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
+
+    // Tentativo rapido pre-boot di invio crash (best-effort, timeout corto)
+    ESP_ERROR_CHECK(try_send_pending_crash_record());
+
+    if (s_error_lock_active)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
 
 
 
@@ -929,4 +1165,41 @@ void init_i2c_and_io_expander(void) {
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+}
+
+bool init_is_error_lock_active(void)
+{
+    return s_error_lock_active;
+}
+
+uint32_t init_get_consecutive_reboots(void)
+{
+    return s_consecutive_reboots;
+}
+
+esp_err_t init_mark_boot_completed(void)
+{
+    nvs_handle_t handle;
+    esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "[M] [C] apertura NVS boot_completed fallita: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CONSEC, 0);
+    if (ret == ESP_OK)
+    {
+        ret = nvs_commit(handle);
+    }
+    nvs_close(handle);
+
+    if (ret == ESP_OK)
+    {
+        s_consecutive_reboots = 0;
+        s_error_lock_active = false;
+        ESP_LOGI(TAG, "[M] [C] boot completato: contatore reboot consecutivi azzerato");
+    }
+
+    return ret;
 }
