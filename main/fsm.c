@@ -8,7 +8,7 @@
 #define FSM_DEFAULT_PAUSE_MAX_MS (60000U)
 #define FSM_DEFAULT_EVENT_QUEUE_LEN (32U)
 
-static QueueHandle_t s_fsm_event_queue = NULL;
+/* mailbox-based event bus replaces the old FreeRTOS queue */
 static SemaphoreHandle_t s_fsm_pending_lock = NULL;
 static SemaphoreHandle_t s_fsm_runtime_lock = NULL;
 static fsm_ctx_t s_fsm_runtime_ctx = {0};
@@ -16,6 +16,40 @@ static bool s_fsm_runtime_valid = false;
 static char s_fsm_pending_msgs[FSM_DEFAULT_EVENT_QUEUE_LEN][FSM_EVENT_TEXT_MAX_LEN] = {{0}};
 static size_t s_fsm_pending_head = 0;
 static size_t s_fsm_pending_count = 0;
+
+#define FSM_MAILBOX_SIZE 32
+
+typedef struct {
+    fsm_input_event_t ev;
+    uint32_t to_mask;
+} mailbox_slot_t;
+
+static mailbox_slot_t s_mailbox[FSM_MAILBOX_SIZE];
+static size_t s_mb_head = 0;
+static size_t s_mb_tail = 0;
+static SemaphoreHandle_t s_mb_mutex = NULL;
+
+static uint32_t to_mask_from_event(const fsm_input_event_t *e);
+
+static uint32_t to_mask_from_event(const fsm_input_event_t *e)
+{
+    uint32_t mask = 0;
+    if (!e) {
+        return 0;
+    }
+    for (int i = 0; i < 10; ++i) {
+        if (e->to[i] != AGN_ID_NONE) {
+            mask |= (1u << e->to[i]);
+        } else {
+            break;
+        }
+    }
+    if (mask == 0) {
+        /* backwards compatibility: deliver to FSM when no recipient given */
+        mask = (1u << AGN_ID_FSM);
+    }
+    return mask;
+}
 
 static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type)
 {
@@ -309,19 +343,21 @@ const char *fsm_state_to_string(fsm_state_t state)
 
 bool fsm_event_queue_init(size_t queue_len)
 {
-    if (s_fsm_event_queue) {
-        return true;
+    (void)queue_len; /* size is fixed by mailbox implementation */
+
+    if (s_mb_mutex) {
+        return true; /* already initialised */
     }
 
-    if (queue_len == 0) {
-        queue_len = FSM_DEFAULT_EVENT_QUEUE_LEN;
-    }
-
-    s_fsm_event_queue = xQueueCreate((UBaseType_t)queue_len, sizeof(fsm_input_event_t));
-    if (!s_fsm_event_queue) {
+    s_mb_mutex = xSemaphoreCreateMutex();
+    if (!s_mb_mutex) {
         return false;
     }
 
+    s_mb_head = s_mb_tail = 0;
+    memset(s_mailbox, 0, sizeof(s_mailbox));
+
+    /* legacy locks still required for pending/runtime helpers */
     if (!s_fsm_pending_lock) {
         s_fsm_pending_lock = xSemaphoreCreateMutex();
         if (!s_fsm_pending_lock) {
@@ -341,11 +377,33 @@ bool fsm_event_queue_init(size_t queue_len)
 
 bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks)
 {
-    if (!s_fsm_event_queue || !event) {
+    if (!s_mb_mutex || !event) {
         return false;
     }
 
-    bool ok = (xQueueSend(s_fsm_event_queue, event, timeout_ticks) == pdTRUE);
+    bool ok = false;
+    TickType_t start = xTaskGetTickCount();
+    while (true) {
+        if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            size_t next = (s_mb_tail + 1) % FSM_MAILBOX_SIZE;
+            if (next != s_mb_head) {
+                s_mailbox[s_mb_tail].ev = *event;
+                s_mailbox[s_mb_tail].to_mask = to_mask_from_event(event);
+                s_mb_tail = next;
+                ok = true;
+            }
+            xSemaphoreGive(s_mb_mutex);
+            break;
+        }
+        if (timeout_ticks == 0) {
+            break;
+        }
+        if ((xTaskGetTickCount() - start) >= timeout_ticks) {
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
     if (ok) {
         fsm_pending_push(event);
     }
@@ -354,25 +412,70 @@ bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks)
 
 bool fsm_event_publish_from_isr(const fsm_input_event_t *event, BaseType_t *task_woken)
 {
-    if (!s_fsm_event_queue || !event) {
+    if (!s_mb_mutex || !event) {
         return false;
     }
 
-    return xQueueSendFromISR(s_fsm_event_queue, event, task_woken) == pdTRUE;
+    BaseType_t higher = pdFALSE;
+    if (xSemaphoreTakeFromISR(s_mb_mutex, &higher) == pdTRUE) {
+        size_t next = (s_mb_tail + 1) % FSM_MAILBOX_SIZE;
+        if (next != s_mb_head) {
+            s_mailbox[s_mb_tail].ev = *event;
+            s_mailbox[s_mb_tail].to_mask = to_mask_from_event(event);
+            s_mb_tail = next;
+            if (task_woken) *task_woken = higher;
+            xSemaphoreGiveFromISR(s_mb_mutex, &higher);
+            fsm_pending_push(event);
+            return true;
+        }
+        xSemaphoreGiveFromISR(s_mb_mutex, &higher);
+    }
+    return false;
 }
 
 bool fsm_event_receive(fsm_input_event_t *event, TickType_t timeout_ticks)
 {
-    if (!s_fsm_event_queue || !event) {
+    if (!s_mb_mutex || !event) {
         return false;
     }
 
-    return (xQueueReceive(s_fsm_event_queue, event, timeout_ticks) == pdTRUE);
+    TickType_t start = xTaskGetTickCount();
+    uint32_t mybit = (1u << AGN_ID_FSM);
+
+    while (true) {
+        if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
+                if (s_mailbox[i].to_mask & mybit) {
+                    *event = s_mailbox[i].ev;
+                    s_mailbox[i].to_mask &= ~mybit;
+                    if (s_mailbox[i].to_mask == 0) {
+                        s_mb_head = (s_mb_head + 1) % FSM_MAILBOX_SIZE;
+                    }
+                    xSemaphoreGive(s_mb_mutex);
+                    return true;
+                }
+            }
+            xSemaphoreGive(s_mb_mutex);
+        }
+        if (timeout_ticks == 0) {
+            break;
+        }
+        if ((xTaskGetTickCount() - start) >= timeout_ticks) {
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+    return false;
 }
 
 bool fsm_publish_simple_event(fsm_input_event_type_t type, int32_t value_i32, const char *text, TickType_t timeout_ticks)
 {
+    /* helper for legacy callers; populate mailbox fields, defaulting to FSM */
     fsm_input_event_t event = {
+        .from = AGN_ID_NONE,
+        .to = {AGN_ID_FSM}, /* deliver to FSM by default */
+        .action = ACTION_ID_NONE,
+
         .type = type,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
         .value_i32 = value_i32,

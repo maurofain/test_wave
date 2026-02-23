@@ -319,10 +319,24 @@ esp_err_t api_emulator_coin_event(httpd_req_t *req)
     int value = coin->valueint;
     cJSON_Delete(root);
 
-    if (!fsm_publish_simple_event(FSM_INPUT_EVENT_COIN, value, "coin_from_emulator", pdMS_TO_TICKS(20))) {
-        ESP_LOGW(TAG, "Queue FSM piena/non disponibile per coin=%d", value);
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        return httpd_resp_send(req, "Coda FSM piena", -1);
+    {
+        fsm_input_event_t ev = {
+            .from = AGN_ID_WEB_UI,
+            .to = {AGN_ID_FSM},
+            .action = ACTION_ID_NONE,
+            .type = FSM_INPUT_EVENT_COIN,
+            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+            .value_i32 = value,
+            .value_u32 = 0,
+            .aux_u32 = 0,
+            .text = {0},
+        };
+        strncpy(ev.text, "coin_from_emulator", sizeof(ev.text)-1);
+        if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
+            ESP_LOGW(TAG, "Queue FSM piena/non disponibile per coin=%d", value);
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            return httpd_resp_send(req, "Coda FSM piena", -1);
+        }
     }
 
     char response[96];
@@ -473,6 +487,10 @@ esp_err_t api_emulator_program_start(httpd_req_t *req)
     }
 
     fsm_input_event_t event = {
+        .from = AGN_ID_WEB_UI,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_NONE,
+
         .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
         .value_i32 = (int32_t)entry->price_units,
@@ -535,6 +553,10 @@ esp_err_t api_emulator_program_stop(httpd_req_t *req)
     }
 
     fsm_input_event_t event = {
+        .from = AGN_ID_WEB_UI,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_NONE,
+
         .type = FSM_INPUT_EVENT_PROGRAM_STOP,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
         .value_i32 = 0,
@@ -585,6 +607,10 @@ esp_err_t api_emulator_program_pause_toggle(httpd_req_t *req)
     }
 
     fsm_input_event_t event = {
+        .from = AGN_ID_WEB_UI,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_NONE,
+
         .type = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
         .value_i32 = 0,

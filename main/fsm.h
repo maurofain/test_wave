@@ -26,6 +26,133 @@ typedef enum {
     FSM_EVENT_CREDIT_ENDED,
 } fsm_event_t;
 
+/* --------------------------------------------------------------------------
+ * Agent / action identifiers for the new event bus
+ *
+ * Each task, driver or module that generates or consumes messages on the
+ * application event bus must be assigned a unique ``agn_id`` value.  These
+ * constants are used in the ``from`` and ``to`` fields of the extended
+ * ``fsm_input_event_t`` (see below).  Additional agents should be added here
+ * as the migration proceeds.
+ */
+typedef enum {
+    AGN_ID_NONE = 0,
+    AGN_ID_FSM,               /* finite state machine core */
+    AGN_ID_WEB_UI,            /* web interface / emulator */
+    AGN_ID_TOUCH,             /* touch driver */
+    AGN_ID_TOKEN,             /* token reader */
+
+    /* hardware/peripheral agents */
+    AGN_ID_AUX_GPIO,          /* aux gpio (GPIO33 etc) */
+    AGN_ID_IO_EXPANDER,       /* I/O expander component */
+    AGN_ID_PWM1,              /* PWM output driver */
+    AGN_ID_PWM2,              /* PWM output driver */
+    AGN_ID_LED,               /* LED controller */
+    AGN_ID_SHT40,             /* temperature/humidity sensor */
+    AGN_ID_CCTALK,            /* CCtalk bus */
+    AGN_ID_RS232,             /* RS-232 UART */
+    AGN_ID_RS485,             /* RS-485 UART */
+    AGN_ID_MDB,               /* MDB bus */
+    AGN_ID_USB_CDC_SCANNER,   /* USB CDC barcode scanner */
+    AGN_ID_USB_HOST,          /* USB host CDC-ACM */
+    AGN_ID_SD_CARD,           /* SD card interface */
+    AGN_ID_EEPROM,            /* external EEPROM */
+    AGN_ID_REMOTE_LOGGING,    /* network log sender */
+    AGN_ID_HTTP_SERVICES,     /* internal HTTP services */
+    AGN_ID_DEVICE_CONFIG,     /* configuration manager */
+    AGN_ID_DEVICE_ACTIVITY,   /* activity logging service */
+    AGN_ID_ERROR_LOG,         /* error/crash logger */
+    AGN_ID_LVGL,              /* LVGL graphics engine */
+    AGN_ID_WAVESHARE_LCD,     /* display driver */
+    /* add more agents as components are introduced */
+} agn_id_t;
+
+/* Actions describe the intent of a message.  They are orthogonal to the old
+ * ``fsm_input_event_type_t`` enums and will gradually replace them.  Define
+ * new action codes here as you refactor components.
+ */
+typedef enum {
+    ACTION_ID_NONE = 0,
+    ACTION_ID_USER_ACTIVITY,
+    ACTION_ID_PAYMENT_ACCEPTED,
+    ACTION_ID_PROGRAM_SELECTED,
+    ACTION_ID_PROGRAM_STOP,
+    ACTION_ID_PROGRAM_PAUSE_TOGGLE,
+    ACTION_ID_CREDIT_ENDED,
+    ACTION_ID_BUTTON_PRESSED,    /* new event requested */
+    ACTION_ID_SYSTEM_IDLE,       /* new event requested */
+    ACTION_ID_SYSTEM_RUN,        /* added per request */
+    ACTION_ID_SYSTEM_ERROR,      /* added per request */
+
+    /* GPIO peripheral actions */
+    ACTION_ID_GPIO_READ_PORT,     /* read a single GPIO port */
+    ACTION_ID_GPIO_READ_ALL,      /* read all ports */
+    ACTION_ID_GPIO_WRITE_PORT,    /* write a single port */
+    ACTION_ID_GPIO_WRITE_ALL,     /* write all ports */
+    ACTION_ID_GPIO_RESET_ALL,     /* reset/clear all ports */
+
+    /* serial/bus peripherals */
+    ACTION_ID_CCTALK_RX_DATA,     /* data received on CCtalk */
+    ACTION_ID_CCTALK_TX_DATA,     /* data transmitted on CCtalk */
+    ACTION_ID_CCTALK_CONFIG,      /* configuration change */
+    ACTION_ID_CCTALK_RESET,       /* reset command */
+
+    ACTION_ID_RS232_RX_DATA,
+    ACTION_ID_RS232_TX_DATA,
+    ACTION_ID_RS232_CONFIG,
+    ACTION_ID_RS232_RESET,
+
+    ACTION_ID_RS485_RX_DATA,
+    ACTION_ID_RS485_TX_DATA,
+    ACTION_ID_RS485_CONFIG,
+    ACTION_ID_RS485_RESET,
+
+    ACTION_ID_MDB_RX_DATA,
+    ACTION_ID_MDB_TX_DATA,
+    ACTION_ID_MDB_CONFIG,
+    ACTION_ID_MDB_RESET,
+
+    /* IO expander events */
+    ACTION_ID_IOEXP_READ_PORT,
+    ACTION_ID_IOEXP_WRITE_PORT,
+    ACTION_ID_IOEXP_CONFIG,
+    ACTION_ID_IOEXP_RESET,
+
+    /* PWM output events */
+    ACTION_ID_PWM_SET_DUTY,
+    ACTION_ID_PWM_START,
+    ACTION_ID_PWM_STOP,
+    ACTION_ID_PWM_CONFIG,
+
+    /* LED control events */
+    ACTION_ID_LED_SET_RGBCOLOR,
+    ACTION_ID_LED_ALL_OFF,
+    ACTION_ID_LED_CONFIG,
+
+    /* Sensor SHT40 */
+    ACTION_ID_SHT40_MEASURE_READY,
+    ACTION_ID_SHT40_ERROR,
+
+    /* USB CDC scanner */
+    ACTION_ID_USB_CDC_SCANNER_RX,
+    ACTION_ID_USB_CDC_SCANNER_TX,
+    ACTION_ID_USB_CDC_SCANNER_CONNECT,
+    ACTION_ID_USB_CDC_SCANNER_DISCONNECT,
+
+    /* SD card operations */
+    ACTION_ID_SD_CARD_INSERT,
+    ACTION_ID_SD_CARD_REMOVE,
+    ACTION_ID_SD_CARD_READ,
+    ACTION_ID_SD_CARD_WRITE,
+    ACTION_ID_SD_CARD_DELETE,
+    ACTION_ID_SD_CARD_ERROR,
+
+    /* ... more actions ... */
+} action_id_t;
+
+/* legacy input event type used by the FSM; kept for compatibility during
+ * migration.  New code may ignore it or translate an ``action_id`` into it.
+ */
 typedef enum {
     FSM_INPUT_EVENT_NONE = 0,
     FSM_INPUT_EVENT_USER_ACTIVITY,
@@ -42,12 +169,23 @@ typedef enum {
     FSM_INPUT_EVENT_CREDIT_ENDED,
 } fsm_input_event_type_t;
 
+/* extended message structure that will circulate on the shared mailbox.
+ * ``from`` and ``to`` support multi‑recipient dispatch; ``action`` encodes the
+ * intended operation.  The old fields remain at the end for backward
+ * compatibility with existing consumers.
+ */
 typedef struct {
+    agn_id_t from;            /* sender agent identifier */
+    agn_id_t to[10];          /* recipient list, zero‑filled when unused */
+    action_id_t action;       /* action requested by the message */
+
+    /* legacy fields follow; they were the entire message in the old model */
     fsm_input_event_type_t type;
     uint32_t timestamp_ms;
     int32_t value_i32;
     uint32_t value_u32;
     uint32_t aux_u32;
+    void * data_ptr;
     char text[FSM_EVENT_TEXT_MAX_LEN];
 } fsm_input_event_t;
 

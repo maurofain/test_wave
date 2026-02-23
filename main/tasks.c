@@ -205,7 +205,20 @@ static void touchscreen_task(void *arg)
             if (significant) {
                 ESP_LOGI("TOUCH", "Touch detected: x=%d, y=%d, strength=%d, track_id=%d", 
                          touch_data[0].x, touch_data[0].y, touch_data[0].strength, touch_data[0].track_id);
-                (void)fsm_publish_simple_event(FSM_INPUT_EVENT_TOUCH, 0, NULL, 0);
+                {
+                    fsm_input_event_t ev = {
+                        .from = AGN_ID_TOUCH,
+                        .to = {AGN_ID_FSM},
+                        .action = ACTION_ID_NONE,
+                        .type = FSM_INPUT_EVENT_TOUCH,
+                        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+                        .value_i32 = 0,
+                        .value_u32 = 0,
+                        .aux_u32 = 0,
+                        .text = {0},
+                    };
+                    (void)fsm_event_publish(&ev, 0);
+                }
                 prev = touch_data[0];
                 prev_present = true;
             }
@@ -261,7 +274,21 @@ static void scanner_on_barcode_cb(const char *barcode)
     ESP_LOGI("SCANNER", "Barcode: %s", barcode);
     /* Barcode readings: use distinct tag so UI can display readings separately */
     web_ui_add_log("INFO", "SCANNER_DATA", barcode);
-    (void)fsm_publish_simple_event(FSM_INPUT_EVENT_QR_SCANNED, 0, barcode, 0);
+    {
+        fsm_input_event_t ev = {
+            .from = AGN_ID_USB_CDC_SCANNER,
+            .to = {AGN_ID_FSM},
+            .action = ACTION_ID_NONE,
+            .type = FSM_INPUT_EVENT_QR_SCANNED,
+            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+            .value_i32 = 0,
+            .value_u32 = 0,
+            .aux_u32 = 0,
+            .text = {0},
+        };
+        strncpy(ev.text, barcode, sizeof(ev.text)-1);
+        (void)fsm_event_publish(&ev, 0);
+    }
 }
 
 static void usb_scanner_task_wrapper(void *arg)
