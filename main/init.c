@@ -726,6 +726,9 @@ static void ntp_sync_callback(struct timeval *tv)
     ESP_LOGI(TAG, "[NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)");
 }
 
+/* forward declarations */
+static void init_sntp(void);
+
 /* helper task spawned from event handler to avoid blocking the loop */
 static void netcheck_task(void *arg)
 {

@@ -162,6 +162,11 @@ static void fsm_task(void *arg)
         }
 
         fsm_runtime_publish(&fsm);
+
+        /* give other tasks/idle a chance – prevent task watchdog trigger when
+         * mailbox is busy or FSM has a burst of events. 100 ms period may not
+         * be enough to break the CPU monopoly. */
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 
