@@ -733,9 +733,21 @@ static void init_sntp(void);
 static void netcheck_task(void *arg)
 {
     (void)arg;
-    if (check_internet_access()) {
+
+    /* perform the potentially slow network check; insert small delays so
+     * other tasks (especially IDLE) can run even if HTTP waits. */
+    bool ok = false;
+    for (int retry = 0; retry < 3 && !ok; ++retry) {
+        if (check_internet_access()) {
+            ok = true;
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+    if (ok) {
         init_sntp();
     }
+
     vTaskDelete(NULL);
 }
 
@@ -830,7 +842,10 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
              * outside of the event handler context so we don't block the loop.
              */
             if (device_config_get()->ntp_enabled) {
-                xTaskCreate(netcheck_task, "netcheck", 4096, NULL, 5, NULL);
+                /* create the helper with low priority so it cannot starve the idle or
+                 * higher‑priority system tasks while performing the blocking HTTP
+                 * request (which may take several seconds). */
+                xTaskCreate(netcheck_task, "netcheck", 4096, NULL, 1, NULL);
             }
         }
     }
