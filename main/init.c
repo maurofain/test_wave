@@ -5,6 +5,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -725,6 +726,16 @@ static void ntp_sync_callback(struct timeval *tv)
     ESP_LOGI(TAG, "[NTP] Intervallo di sync impostato a 1 ora (ora sincronizzata)");
 }
 
+/* helper task spawned from event handler to avoid blocking the loop */
+static void netcheck_task(void *arg)
+{
+    (void)arg;
+    if (check_internet_access()) {
+        init_sntp();
+    }
+    vTaskDelete(NULL);
+}
+
 static void init_sntp(void)
 {
     device_config_t *cfg = device_config_get();
@@ -812,11 +823,11 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
                 }
             }
 
-            // Check internet and init NTP after getting IP
-            device_config_t *cfg = device_config_get();
-            if (cfg->ntp_enabled && check_internet_access())
-            {
-                init_sntp();
+            /* spawn a short-lived task to verify internet access and start NTP
+             * outside of the event handler context so we don't block the loop.
+             */
+            if (device_config_get()->ntp_enabled) {
+                xTaskCreate(netcheck_task, "netcheck", 4096, NULL, 5, NULL);
             }
         }
     }
