@@ -76,6 +76,7 @@ static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type)
         case FSM_INPUT_EVENT_PROGRAM_STOP: return "program_stop";
         case FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE: return "program_pause_toggle";
         case FSM_INPUT_EVENT_CREDIT_ENDED: return "credit_ended";
+        case FSM_INPUT_EVENT_PROGRAM_SWITCH: return "program_switch";
         case FSM_INPUT_EVENT_NONE:
         default:
             return "none";
@@ -127,6 +128,10 @@ void fsm_init(fsm_ctx_t *ctx)
 
     ctx->state = FSM_STATE_IDLE;
     ctx->credit_cents = 0;
+    ctx->ecd_coins = 0;
+    ctx->vcd_coins = 0;
+    ctx->ecd_used  = 0;
+    ctx->vcd_used  = 0;
     ctx->program_running = false;
     ctx->running_elapsed_ms = 0;
     ctx->pause_elapsed_ms = 0;
@@ -169,6 +174,10 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
             } else if (event == FSM_EVENT_TIMEOUT) {
                 ctx->state = FSM_STATE_IDLE;
                 ctx->credit_cents = 0;
+                ctx->ecd_coins = 0;
+                ctx->vcd_coins = 0;
+                ctx->ecd_used  = 0;
+                ctx->vcd_used  = 0;
                 ctx->program_running = false;
                 ctx->running_elapsed_ms = 0;
                 ctx->pause_elapsed_ms = 0;
@@ -262,12 +271,29 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_COIN:
         case FSM_INPUT_EVENT_TOKEN:
-        case FSM_INPUT_EVENT_CARD_CREDIT:
         case FSM_INPUT_EVENT_QR_CREDIT:
+            /* ecd: monete, gettoni, QR — credito definitivo non rimborsabile */
             if (event->value_i32 > 0) {
+                ctx->ecd_coins    += event->value_i32;
                 ctx->credit_cents += event->value_i32;
+                ESP_LOGI(TAG, "[ADD_COIN] type=ecd value=%ld ecd=%ld credit=%ld",
+                         (long)event->value_i32, (long)ctx->ecd_coins, (long)ctx->credit_cents);
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
+
+        case FSM_INPUT_EVENT_CARD_CREDIT: {
+            /* vcd: tessera — virtuale; il 1° coin addebitato → ecd, resto → vcd */
+            if (event->value_i32 > 0) {
+                int32_t ecd_add = (event->value_i32 >= 1) ? 1 : 0;
+                int32_t vcd_add = event->value_i32 - ecd_add;
+                ctx->ecd_coins    += ecd_add;
+                if (vcd_add > 0) ctx->vcd_coins += vcd_add;
+                ctx->credit_cents += event->value_i32;
+                ESP_LOGI(TAG, "[ADD_COIN] type=vcd value=%ld ecd=%ld vcd=%ld credit=%ld",
+                         (long)event->value_i32, (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+            }
+            return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
+        }
 
         case FSM_INPUT_EVENT_PROGRAM_SELECTED:
             if (ctx->state != FSM_STATE_CREDIT) {
@@ -290,7 +316,20 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                     fsm_append_message("Credito insufficiente per avvio programma");
                     return false;
                 }
-                ctx->credit_cents -= ctx->running_price_units;
+                {
+                    /* Scala prima da ecd, poi da vcd se ecd insufficiente */
+                    int32_t cost  = ctx->running_price_units;
+                    int32_t f_ecd = (ctx->ecd_coins >= cost) ? cost : ctx->ecd_coins;
+                    int32_t f_vcd = cost - f_ecd;
+                    ctx->ecd_coins    -= f_ecd;
+                    ctx->vcd_coins    -= f_vcd;
+                    ctx->ecd_used     += f_ecd;
+                    ctx->vcd_used     += f_vcd;
+                    ctx->credit_cents -= cost;
+                    ESP_LOGI(TAG, "[USE_COIN] cost=%ld from_ecd=%ld from_vcd=%ld ecd_rem=%ld vcd_rem=%ld credit=%ld",
+                             (long)cost, (long)f_ecd, (long)f_vcd,
+                             (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+                }
             }
 
             return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_SELECTED);
@@ -309,7 +348,45 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_CREDIT_ENDED:
             ctx->credit_cents = 0;
+            ctx->ecd_coins = 0;
+            ctx->vcd_coins = 0;
+            ctx->ecd_used  = 0;
+            ctx->vcd_used  = 0;
             return fsm_handle_event(ctx, FSM_EVENT_CREDIT_ENDED);
+
+        case FSM_INPUT_EVENT_PROGRAM_SWITCH: {
+            /* cambio programma a macchina running/paused:
+             * NON cambia stato, scala il tempo residuo al rateo del nuovo programma */
+            if (ctx->state != FSM_STATE_RUNNING && ctx->state != FSM_STATE_PAUSED) {
+                return false;
+            }
+            uint32_t new_dur_ms  = event->aux_u32;   /* duration_sec * 1000 nuovo prg */
+            uint32_t old_dur_ms  = ctx->running_target_ms;
+            uint32_t elapsed     = ctx->running_elapsed_ms;
+            uint32_t rem_old_ms  = (old_dur_ms > elapsed) ? (old_dur_ms - elapsed) : 0;
+            /* scala per rateo: rem_new = rem_old * (new_dur/new_price) / (old_dur/old_price)
+             * = rem_old * new_dur * old_price / (old_dur * new_price) */
+            int32_t old_price = (ctx->running_price_units > 0) ? ctx->running_price_units : 1;
+            int32_t new_price = (event->value_i32 > 0) ? event->value_i32 : 1;
+            uint32_t rem_new_ms  = (old_dur_ms > 0 && new_dur_ms > 0)
+                                   ? (uint32_t)((uint64_t)rem_old_ms * new_dur_ms * (uint32_t)old_price
+                                                / ((uint64_t)old_dur_ms * (uint32_t)new_price))
+                                   : new_dur_ms;
+            /* log prima di sovrascrivere il nome vecchio */
+            ESP_LOGI(TAG, "[SWITCH_PRG] %.20s/%ldc/%lus -> %.20s/%ldc/%lus (rem %lus->%lus)",
+                     ctx->running_program_name[0] ? ctx->running_program_name : "prg",
+                     (long)old_price, (unsigned long)(old_dur_ms / 1000),
+                     event->text[0] ? event->text : "prg",
+                     (long)new_price, (unsigned long)(new_dur_ms / 1000),
+                     (unsigned long)(rem_old_ms / 1000),
+                     (unsigned long)(rem_new_ms / 1000));
+            ctx->running_target_ms    = elapsed + rem_new_ms;
+            ctx->running_price_units  = (event->value_i32 > 0) ? event->value_i32 : ctx->running_price_units;
+            if (event->value_u32 > 0) ctx->pause_max_ms = event->value_u32;
+            snprintf(ctx->running_program_name, sizeof(ctx->running_program_name),
+                     "%s", event->text[0] ? event->text : "programma");
+            return false; /* nessun cambio di stato */
+        }
 
         case FSM_INPUT_EVENT_NONE:
         default:
@@ -459,7 +536,7 @@ bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks)
         s_mb_tail = next;
         ok = true;
 #ifdef LOG_QUEUE
-        ESP_LOGD(TAG, "ENQUEUE[%zu] type=%s action=%d from=%d to_mask=0x%08lx",
+        ESP_LOGI(TAG, "ENQUEUE[%zu] type=%s action=%d from=%d to_mask=0x%08lx",
                  slot, fsm_input_event_type_to_string(event->type),
                  (int)event->action, (int)event->from,
                  (unsigned long)s_mailbox[slot].to_mask);
@@ -533,7 +610,7 @@ bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_
             if (s_mailbox[i].to_mask & mybit) {
                 *event = s_mailbox[i].ev;
 #ifdef LOG_QUEUE
-                ESP_LOGD(TAG, "DEQUEUE[%zu] type=%s action=%d from=%d receiver=%d",
+                ESP_LOGI(TAG, "DEQUEUE[%zu] type=%s action=%d from=%d receiver=%d",
                          i, fsm_input_event_type_to_string(event->type),
                          (int)event->action, (int)event->from, (int)receiver_id);
 #endif

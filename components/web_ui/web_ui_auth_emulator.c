@@ -144,27 +144,35 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         ".emu-layout{height:100%;display:flex;gap:14px}"
         ".emu-left{width:30%;display:grid;grid-template-rows:repeat(8,1fr);gap:10px}"
         ".prog-btn{border:none;border-radius:10px;background:#2c3e50;color:#fff;font-size:20px;font-weight:bold;cursor:pointer}"
-        ".prog-btn.active{background:#3498db}"
+        ".prog-btn.active{background:#e74c3c}"
         ".prog-btn:disabled{opacity:.45;cursor:not-allowed}"
         ".emu-main{width:60%;display:flex;flex-direction:column;gap:14px}"
         ".credit-box{background:#fdfdfd;border-radius:12px;padding:20px;flex:0 0 38%;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:background .2s,color .2s}"
         ".credit-box.state-credit{background:#f1c40f;color:#1f2937}"
         ".credit-box.state-running{background:#e74c3c;color:#fff}"
+        ".credit-box.state-paused{background:#e67e22;color:#fff}"
         ".credit-label{font-size:22px;color:#2c3e50}"
         ".credit-value{font-size:110px;font-weight:bold;line-height:1;color:#111}"
+        ".secs-value{font-size:110px;font-weight:bold;line-height:1;color:#111;display:none}"
+        ".credit-value-small{font-size:33px;font-weight:bold;line-height:1.2;color:#111;margin-top:6px;display:block}"
         ".elapsed-value{margin-top:10px;font-size:22px;font-weight:600}"
         ".pause-value{margin-top:4px;font-size:18px;font-weight:500}"
         ".msg-box{background:#fdfdfd;border-radius:12px;padding:16px;flex:1;font-size:18px;color:#2c3e50;display:block;overflow:auto;line-height:1.35}"
         ".emu-gauge{width:10%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}"
         ".gauge-title{color:#fff;font-weight:bold;font-size:18px;text-align:center}"
         ".gauge-track{position:relative;width:100%;height:92%;border-radius:12px;overflow:hidden;border:2px solid #d9d9d9;background:linear-gradient(to top,#c0392b 0%,#c0392b 20%,#27ae60 20%,#27ae60 100%)}"
-        ".gauge-mask{position:absolute;left:0;top:0;width:100%;height:0%;background:#111;transition:height .25s linear}"
+        ".gauge-mask{position:absolute;left:0;top:0;width:100%;height:100%;background:#111;transition:height .25s linear}"
         ".gauge-text{color:#fff;font-size:20px;font-weight:bold}"
         ".emu-electrical{flex:1;min-width:280px;background:#ffffff;border-radius:16px;padding:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12);box-sizing:border-box}"
         ".side-title{margin:0 0 10px 0;color:#2c3e50;font-size:22px}"
         ".coin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}"
+        ".coin-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}"
         ".coin-btn{border:none;border-radius:8px;background:#27ae60;color:#fff;padding:12px 8px;font-size:18px;font-weight:bold;cursor:pointer}"
         ".coin-btn:hover{background:#219150}"
+        ".coin-btn.coin-btn-card{background:#2980b9}"
+        ".coin-btn.coin-btn-card:hover{background:#1f6fa0}"
+        ".coin-btn.coin-btn-cash{background:#e67e22}"
+        ".coin-btn.coin-btn-cash:hover{background:#c96a12}"
         ".relay-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}"
         ".relay{border-radius:8px;background:#d5d8dc;color:#2c3e50;padding:10px 4px;text-align:center;font-weight:bold;font-size:14px}"
         ".relay.on{background:#f39c12;color:#fff}"
@@ -188,7 +196,7 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "<button class='prog-btn' data-id='8'>Programma 8</button>"
         "</div>"
         "<div class='emu-main'>"
-        "<div id='creditBox' class='credit-box'><div class='credit-label'>Credito (coin)</div><div id='credit' class='credit-value'>0</div><div id='elapsed' class='elapsed-value'>Tempo: 00:00</div><div id='pauseElapsed' class='pause-value'>In pausa: 00:00</div></div>"
+        "<div id='creditBox' class='credit-box'><div id='creditLabel' class='credit-label'>Credito (coin)</div><div id='secsDisplay' class='secs-value'>--</div><div id='credit' class='credit-value'>0</div><div id='elapsed' class='elapsed-value'>Tempo: 00:00</div><div id='pauseElapsed' class='pause-value'>In pausa: 00:00</div></div>"
         "<div id='msg' class='msg-box'>Nessun evento in coda</div>"
         "</div>"
         "<div class='emu-gauge'>"
@@ -198,11 +206,22 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "</div></div>"
         "<div class='emu-electrical'>"
         "<h2 class='side-title'>Quadro elettrico</h2>"
-        "<h3 class='side-title' style='font-size:18px;margin-top:4px;'>Ricarica Coin</h3>"
+        "<h3 class='side-title' style='font-size:18px;margin-top:4px;'>&#128247; Crediti QR</h3>"
         "<div class='coin-grid'>"
-        "<button class='coin-btn' data-coin='1'>+1</button>"
-        "<button class='coin-btn' data-coin='5'>+5</button>"
-        "<button class='coin-btn' data-coin='10'>+10</button>"
+        "<button class='coin-btn' data-coin='1' data-source='qr'>+1</button>"
+        "<button class='coin-btn' data-coin='5' data-source='qr'>+5</button>"
+        "<button class='coin-btn' data-coin='10' data-source='qr'>+10</button>"
+        "</div>"
+        "<h3 class='side-title' style='font-size:18px;margin-top:4px;'>&#128190; Crediti Tessera</h3>"
+        "<div class='coin-grid'>"
+        "<button class='coin-btn coin-btn-card' data-coin='1' data-source='card'>+1</button>"
+        "<button class='coin-btn coin-btn-card' data-coin='5' data-source='card'>+5</button>"
+        "<button class='coin-btn coin-btn-card' data-coin='10' data-source='card'>+10</button>"
+        "</div>"
+        "<h3 class='side-title' style='font-size:18px;margin-top:4px;'>&#129689; Monete</h3>"
+        "<div class='coin-grid-2'>"
+        "<button class='coin-btn coin-btn-cash' data-coin='1' data-source='cash'>1 coin</button>"
+        "<button class='coin-btn coin-btn-cash' data-coin='2' data-source='cash'>2 coin</button>"
         "</div>"
         "<h3 class='side-title' style='font-size:18px;'>Relay</h3>"
         "<div id='relayGrid' class='relay-grid'>"
@@ -227,12 +246,14 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "const relays=[...document.querySelectorAll('.relay')];"
         "const creditBox=document.getElementById('creditBox');"
         "const creditEl=document.getElementById('credit');"
+        "const creditLabel=document.getElementById('creditLabel');"
+        "const secsDisplay=document.getElementById('secsDisplay');"
         "const elapsedEl=document.getElementById('elapsed');"
         "const pauseElapsedEl=document.getElementById('pauseElapsed');"
         "const msgEl=document.getElementById('msg');"
         "const maskEl=document.getElementById('gmask');"
         "const gaugeText=document.getElementById('gtext');"
-        "let credit=0;"
+        "let credit=0,ecd=0,vcd=0;"
         "let activeProgram=0;"
         "let fsmState='unknown';"
         "let runningElapsedMs=0;"
@@ -241,16 +262,19 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "let pauseElapsedSyncAt=0;"
         "let programsById={};"
         "let programMetaByButton={};"
+        "let pendingStart=false;"
+        "let runningTargetMs=0;"
         "function escapeHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}"
         "function renderQueueMessages(messages){if(!Array.isArray(messages)||messages.length===0){msgEl.textContent='Nessun evento in coda';return;}msgEl.innerHTML=messages.map(function(m){return '<div>• '+escapeHtml(m)+'</div>';}).join('');}"
         "function applyRelayIndicators(relayItems){if(!Array.isArray(relayItems))return;const byRelay={};relayItems.forEach(function(item){if(item&&typeof item.relay_number==='number'){byRelay[item.relay_number]=!!item.status;}});relays.forEach(function(relay){const relayNumber=parseInt(relay.dataset.relay||'0',10);if(!relayNumber)return;if(Object.prototype.hasOwnProperty.call(byRelay,relayNumber)){relay.classList.toggle('on',!!byRelay[relayNumber]);}});}"
         "function formatElapsed(ms){const t=Math.max(0,Math.floor(ms/1000));const mm=String(Math.floor(t/60)).padStart(2,'0');const ss=String(t%60).padStart(2,'0');return mm+':'+ss;}"
-        "function updateCreditStateUi(){if(!creditBox)return;creditBox.classList.remove('state-credit','state-running');if(fsmState==='credit')creditBox.classList.add('state-credit');if(fsmState==='running')creditBox.classList.add('state-running');}"
-        /* updateElapsedUi: aggiorna timer E gauge (tempo rimanente interpolato a 200ms).
-         * La barra scende da piena (avvio programma) a vuota (fine programma).
-         * Il testo mostra i secondi rimanenti 0-999. */
-        "function updateElapsedUi(){if(!elapsedEl)return;let shown=runningElapsedMs;if(fsmState==='running'&&runningElapsedSyncAt){shown += (Date.now()-runningElapsedSyncAt);}elapsedEl.textContent='Tempo: '+formatElapsed(shown);if(pauseElapsedEl){let pauseShown=pauseElapsedMs;if(fsmState==='paused'&&pauseElapsedSyncAt){pauseShown += (Date.now()-pauseElapsedSyncAt);}pauseElapsedEl.textContent='In pausa: '+formatElapsed(pauseShown);}if((fsmState==='running'||fsmState==='paused')&&activeProgram){const p=programMetaByButton[activeProgram];const dur=(p&&p.duration_sec)?p.duration_sec:0;if(dur>0){const elSec=Math.max(0,shown/1000);const remSec=Math.max(0,Math.min(999,Math.round(dur-elSec)));const pct=Math.max(0,Math.min(100,(remSec/dur)*100));if(gaugeText)gaugeText.textContent=remSec+'s';if(maskEl)maskEl.style.height=(100-pct)+'%';}}}"
-        "function syncFromFsm(js){if(js&&typeof js.credit_cents==='number'){credit=Math.max(0,Math.floor(js.credit_cents));}if(js&&typeof js.state==='string'){fsmState=js.state;}if(js&&typeof js.running_elapsed_ms==='number'){runningElapsedMs=Math.max(0,Math.floor(js.running_elapsed_ms));runningElapsedSyncAt=Date.now();}if(js&&typeof js.pause_elapsed_ms==='number'){pauseElapsedMs=Math.max(0,Math.floor(js.pause_elapsed_ms));pauseElapsedSyncAt=Date.now();}if(fsmState!=='running'&&fsmState!=='paused'){activeProgram=0;buttons.forEach(function(b){b.classList.remove('active');});runningElapsedSyncAt=0;pauseElapsedSyncAt=0;}if(js&&Array.isArray(js.relays)){applyRelayIndicators(js.relays);}updateCreditStateUi();updateElapsedUi();render();renderQueueMessages(js&&js.messages?js.messages:[]);}"
+        "function updateCreditStateUi(){if(!creditBox)return;creditBox.classList.remove('state-credit','state-running','state-paused');if(fsmState==='credit')creditBox.classList.add('state-credit');if(fsmState==='running')creditBox.classList.add('state-running');if(fsmState==='paused')creditBox.classList.add('state-paused');}"
+        /* updateElapsedUi: aggiorna timer E gauge con formula tick.
+         * total_ticks = price_units*60; rdu = total_ticks/dur (tick/s).
+         * Gauge% = (total_ticks - rdu*elapsed) / total_ticks = (dur-elapsed)/dur.
+         * Testo gauge e secsDisplay mostrano i secondi rimanenti. */
+        "function updateElapsedUi(){if(!elapsedEl)return;let shown=runningElapsedMs;if(fsmState==='running'&&runningElapsedSyncAt){shown+=(Date.now()-runningElapsedSyncAt);}elapsedEl.textContent='Tempo: '+formatElapsed(shown);if(pauseElapsedEl){let pauseShown=pauseElapsedMs;if(fsmState==='paused'&&pauseElapsedSyncAt){pauseShown+=(Date.now()-pauseElapsedSyncAt);}pauseElapsedEl.textContent='In pausa: '+formatElapsed(pauseShown);}if((fsmState==='running'||fsmState==='paused')&&activeProgram&&runningTargetMs>0){const remMs=Math.max(0,runningTargetMs-shown);const remSec=Math.round(remMs/1000);const pct=Math.max(0,Math.min(100,(remMs/runningTargetMs)*100));if(secsDisplay)secsDisplay.textContent=remSec+'s';if(gaugeText)gaugeText.textContent=remSec+'s';if(maskEl)maskEl.style.height=(100-pct)+'%';}}"
+        "function syncFromFsm(js){if(js&&typeof js.credit_cents==='number'){credit=Math.max(0,Math.floor(js.credit_cents));}if(js&&typeof js.ecd_coins==='number'){ecd=Math.max(0,Math.floor(js.ecd_coins));}if(js&&typeof js.vcd_coins==='number'){vcd=Math.max(0,Math.floor(js.vcd_coins));}if(js&&typeof js.state==='string'){fsmState=js.state;}if(fsmState==='running'||fsmState==='paused'){pendingStart=false;}if(js&&typeof js.running_elapsed_ms==='number'){runningElapsedMs=Math.max(0,Math.floor(js.running_elapsed_ms));runningElapsedSyncAt=Date.now();}if(js&&typeof js.running_target_ms==='number'&&js.running_target_ms>0){runningTargetMs=Math.max(0,Math.floor(js.running_target_ms));}if(js&&typeof js.pause_elapsed_ms==='number'){pauseElapsedMs=Math.max(0,Math.floor(js.pause_elapsed_ms));pauseElapsedSyncAt=Date.now();}if(!pendingStart&&fsmState!=='running'&&fsmState!=='paused'){activeProgram=0;runningTargetMs=0;buttons.forEach(function(b){b.classList.remove('active');});runningElapsedSyncAt=0;pauseElapsedSyncAt=0;}if(js&&Array.isArray(js.relays)){applyRelayIndicators(js.relays);}updateCreditStateUi();updateElapsedUi();render();renderQueueMessages(js&&js.messages?js.messages:[]);}"
         "async function refreshQueueMessages(){try{const r=await fetch('/api/emulator/fsm/messages');if(!r.ok)return;const js=await r.json();syncFromFsm(js);}catch(e){console.warn('fsm messages fetch failed',e);}}"
         "async function loadProgramsMeta(){try{const r=await fetch('/api/programs');if(!r.ok)return;const js=await r.json();const arr=Array.isArray(js.programs)?js.programs:[];programsById={};programMetaByButton={};arr.forEach(function(p){if(!p||typeof p.program_id!=='number')return;programsById[p.program_id]=p;});buttons.forEach(function(btn){const id=parseInt(btn.dataset.id||'0',10);const p=programsById[id];if(!p){btn.disabled=true;btn.textContent='Programma '+id;return;}programMetaByButton[id]=p;btn.textContent=p.name||('Programma '+id);btn.dataset.price=String(p.price_units||0);btn.dataset.enabled=p.enabled?'1':'0';});render();}catch(e){console.warn('load programs failed',e);}}"
         "function dispatchHardwareCommand(type,payload){"
@@ -264,11 +288,14 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "function updateVirtualRelay(relayNumber,status,duration){"
         "  fetch('/api/emulator/relay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({relay_number:relayNumber,status:status,duration:duration||0})}).catch(function(e){console.warn('virtual relay update failed',e);});"
         "}"
-        /* render: mostra credito in coin interi; il gauge tempo rimanente
-         * viene aggiornato da updateElapsedUi con interpolazione a 200ms. */
-        "function render(){creditEl.textContent=String(Math.max(0,credit));if(!(fsmState==='running'||fsmState==='paused')||!activeProgram){if(gaugeText)gaugeText.textContent='--';if(maskEl)maskEl.style.height='100%';}updateProgramAvailability();}"
-        "buttons.forEach(function(btn){btn.addEventListener('click',async function(){const programId=parseInt(btn.dataset.id||'0',10);if(!programId)return;try{if(activeProgram===programId&&(fsmState==='running'||fsmState==='paused')){dispatchHardwareCommand('program_pause_toggle',{program:programId,current_credit:credit,state:fsmState});const rp=await fetch('/api/emulator/program/pause_toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({program_id:programId})});const jp=await rp.json().catch(function(){return {};});if(!rp.ok){msgEl.textContent=(jp&&jp.error)?jp.error:('Errore pausa/ripresa: HTTP '+rp.status);return;}msgEl.textContent=(jp&&jp.state==='paused')?('Programma '+programId+' in pausa'):('Programma '+programId+' ripreso');await refreshQueueMessages();return;}dispatchHardwareCommand('program_start',{program:programId,current_credit:credit});const r=await fetch('/api/emulator/program/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({program_id:programId})});const js=await r.json().catch(function(){return {};});if(!r.ok){msgEl.textContent=(js&&js.error)?js.error:('Errore avvio programma: HTTP '+r.status);return;}buttons.forEach(function(b){b.classList.remove('active');});btn.classList.add('active');activeProgram=programId;msgEl.textContent='Programma '+programId+' in running';await refreshQueueMessages();}catch(e){msgEl.textContent='Errore programma: '+(e&&e.message?e.message:e);}});});"
-        "coinButtons.forEach(function(btn){btn.addEventListener('click',async function(){const delta=parseInt(btn.dataset.coin||'0',10);dispatchHardwareCommand('coin_add',{value:delta,current_credit:credit});try{const r=await fetch('/api/emulator/coin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({coin:delta})});if(!r.ok){msgEl.textContent='Errore invio coin: HTTP '+r.status;return;}await refreshQueueMessages();}catch(e){msgEl.textContent='Errore invio coin: '+(e&&e.message?e.message:e);}});});"
+        /* render: visualizzazione credit box secondo spec TODO#5:
+         * - fase credit: credito in coin a carattere grande (100%);
+         * - running/paused: secondi disponibili grandi (100%), credito
+         *   piccolo (30%) se > 0 oppure nascosto se == 0;
+         * - gauge: aggiornato da updateElapsedUi (interpolato a 200ms). */
+        "function render(){const inProgram=(fsmState==='running'||fsmState==='paused')&&activeProgram;if(inProgram){if(creditLabel)creditLabel.textContent='Secondi / Coin';if(secsDisplay)secsDisplay.style.display='block';creditEl.className=credit>0?'credit-value credit-value-small':'credit-value';creditEl.style.display=credit>0?'block':'none';creditEl.textContent=credit>0?String(credit):'';}else{if(creditLabel){const lbl=(ecd>0||vcd>0)?('E:'+ecd+' V:'+vcd):'Credito (coin)';creditLabel.textContent=lbl;}if(secsDisplay){secsDisplay.style.display='none';secsDisplay.textContent='--';}creditEl.className='credit-value';creditEl.style.display='block';creditEl.textContent=String(Math.max(0,credit));if(gaugeText)gaugeText.textContent='--';if(maskEl)maskEl.style.height='100%';}updateProgramAvailability();}"
+        "buttons.forEach(function(btn){btn.addEventListener('click',async function(){const programId=parseInt(btn.dataset.id||'0',10);if(!programId)return;try{if(activeProgram===programId&&(fsmState==='running'||fsmState==='paused')){dispatchHardwareCommand('program_pause_toggle',{program:programId,current_credit:credit,state:fsmState});const rp=await fetch('/api/emulator/program/pause_toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({program_id:programId})});const jp=await rp.json().catch(function(){return {};});if(!rp.ok){msgEl.textContent=(jp&&jp.error)?jp.error:('Errore pausa/ripresa: HTTP '+rp.status);return;}const wasPaused=(fsmState==='paused');fsmState=wasPaused?'running':'paused';if(!wasPaused){pauseElapsedMs=0;pauseElapsedSyncAt=0;}updateCreditStateUi();render();msgEl.textContent=(fsmState==='paused')?('Programma '+programId+' in pausa'):('Programma '+programId+' ripreso');await new Promise(function(r){setTimeout(r,250);});await refreshQueueMessages();return;}dispatchHardwareCommand('program_start',{program:programId,current_credit:credit});const r=await fetch('/api/emulator/program/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({program_id:programId})});const js=await r.json().catch(function(){return {};});if(!r.ok){msgEl.textContent=(js&&js.error)?js.error:('Errore avvio programma: HTTP '+r.status);return;}buttons.forEach(function(b){b.classList.remove('active');});btn.classList.add('active');activeProgram=programId;fsmState='running';runningElapsedMs=0;runningElapsedSyncAt=Date.now();const newP=programMetaByButton[programId];runningTargetMs=newP&&newP.duration_sec?newP.duration_sec*1000:0;pendingStart=true;updateCreditStateUi();render();msgEl.textContent='Programma '+programId+' in running';await new Promise(function(r){setTimeout(r,250);});await refreshQueueMessages();}catch(e){msgEl.textContent='Errore programma: '+(e&&e.message?e.message:e);}});});"
+        "coinButtons.forEach(function(btn){btn.addEventListener('click',async function(){const delta=parseInt(btn.dataset.coin||'0',10);const src=btn.dataset.source||'qr';const srcLabel={'qr':'QR','card':'Tessera','cash':'Monete'}[src]||src;dispatchHardwareCommand('coin_add',{value:delta,source:src,current_credit:credit});try{const r=await fetch('/api/emulator/coin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({coin:delta,source:src})});if(!r.ok){msgEl.textContent='Errore invio coin: HTTP '+r.status;return;}msgEl.textContent=srcLabel+' +'+delta+' coin';await refreshQueueMessages();}catch(e){msgEl.textContent='Errore invio coin: '+(e&&e.message?e.message:e);}});});"
         "relays.forEach(function(relay){relay.addEventListener('click',async function(){const relayNumber=parseInt(relay.dataset.relay||'0',10);const nextState=!relay.classList.contains('on');updateVirtualRelay(relayNumber,nextState,0);msgEl.textContent='Comando Relay R'+relayNumber+' '+(nextState?'ON':'OFF');dispatchHardwareCommand('relay_toggle',{relay:relayNumber,status:nextState});await refreshQueueMessages();});});"
         "render();"
         "loadProgramsMeta();"
@@ -321,21 +348,39 @@ esp_err_t api_emulator_coin_event(httpd_req_t *req)
     }
 
     int value = coin->valueint;
+
+    /* campo source opzionale: 'qr', 'card', 'cash' */
+    char source[16] = "qr";
+    cJSON *jsource = cJSON_GetObjectItem(root, "source");
+    if (cJSON_IsString(jsource) && jsource->valuestring) {
+        strncpy(source, jsource->valuestring, sizeof(source)-1);
+        source[sizeof(source)-1] = '\0';
+    }
     cJSON_Delete(root);
 
     {
+        /* testo evento: '<source>_coin_emulator' per tracciabilità */
+        char ev_text[FSM_EVENT_TEXT_MAX_LEN];
+        snprintf(ev_text, sizeof(ev_text), "%s_coin_emulator", source);
+
+        /* tipo evento in base alla sorgente del pagamento */
+        fsm_input_event_type_t ev_type =
+            (strcmp(source, "card") == 0) ? FSM_INPUT_EVENT_CARD_CREDIT :
+            (strcmp(source, "qr")   == 0) ? FSM_INPUT_EVENT_QR_CREDIT   :
+                                             FSM_INPUT_EVENT_TOKEN;
+
         fsm_input_event_t ev = {
             .from = AGN_ID_WEB_UI,
             .to = {AGN_ID_FSM},
             .action = ACTION_ID_PAYMENT_ACCEPTED,
-            .type = FSM_INPUT_EVENT_COIN,
+            .type = ev_type,
             .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
             .value_i32 = value,
             .value_u32 = 0,
             .aux_u32 = 0,
             .text = {0},
         };
-        strncpy(ev.text, "coin_from_emulator", sizeof(ev.text)-1);
+        strncpy(ev.text, ev_text, sizeof(ev.text)-1);
         if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
             ESP_LOGW(TAG, "Queue FSM piena/non disponibile per coin=%d", value);
             httpd_resp_set_status(req, "503 Service Unavailable");
@@ -343,8 +388,8 @@ esp_err_t api_emulator_coin_event(httpd_req_t *req)
         }
     }
 
-    char response[96];
-    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"coin\":%d}", value);
+    char response[128];
+    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"coin\":%d,\"source\":\"%s\"}", value, source);
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, response, -1);
 }
@@ -377,8 +422,11 @@ esp_err_t api_emulator_fsm_messages_get(httpd_req_t *req)
     }
     cJSON_AddNumberToObject(root, "count", (double)count);
     cJSON_AddNumberToObject(root, "credit_cents", has_snapshot ? (double)snapshot.credit_cents : 0.0);
+    cJSON_AddNumberToObject(root, "ecd_coins", has_snapshot ? (double)snapshot.ecd_coins : 0.0);
+    cJSON_AddNumberToObject(root, "vcd_coins", has_snapshot ? (double)snapshot.vcd_coins : 0.0);
     cJSON_AddStringToObject(root, "state", has_snapshot ? fsm_state_to_string(snapshot.state) : "unknown");
     cJSON_AddNumberToObject(root, "running_elapsed_ms", has_snapshot ? (double)snapshot.running_elapsed_ms : 0.0);
+    cJSON_AddNumberToObject(root, "running_target_ms",  has_snapshot ? (double)snapshot.running_target_ms  : 0.0);
     cJSON_AddNumberToObject(root, "pause_elapsed_ms", has_snapshot ? (double)snapshot.pause_elapsed_ms : 0.0);
 
     cJSON *relays = cJSON_CreateArray();
@@ -490,24 +538,43 @@ esp_err_t api_emulator_program_start(httpd_req_t *req)
         (void)web_ui_virtual_relay_control(relay, on, (uint32_t)entry->duration_sec * 1000U);
     }
 
-    fsm_input_event_t event = {
-        .from = AGN_ID_WEB_UI,
-        .to = {AGN_ID_FSM},
-        .action = ACTION_ID_PROGRAM_SELECTED,
-
-        .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
-        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-        .value_i32 = (int32_t)entry->price_units,
-        .value_u32 = (uint32_t)entry->pause_max_suspend_sec * 1000U,
-        .aux_u32 = (uint32_t)entry->duration_sec * 1000U,
-        .text = {0},
-    };
-    snprintf(event.text, sizeof(event.text), "%s", entry->name);
-
-    if (!fsm_event_publish(&event, pdMS_TO_TICKS(20))) {
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        httpd_resp_set_type(req, "application/json");
-        return httpd_resp_send(req, "{\"error\":\"Coda FSM piena\"}", -1);
+    if (snapshot.state == FSM_STATE_RUNNING || snapshot.state == FSM_STATE_PAUSED) {
+        /* cambio programma a macchina accesa: scala il tempo residuo, non fermare */
+        fsm_input_event_t sw_ev = {
+            .from = AGN_ID_WEB_UI,
+            .to = {AGN_ID_FSM},
+            .action = ACTION_ID_PROGRAM_SELECTED,
+            .type = FSM_INPUT_EVENT_PROGRAM_SWITCH,
+            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+            .value_i32 = (int32_t)entry->price_units,
+            .value_u32 = (uint32_t)entry->pause_max_suspend_sec * 1000U,
+            .aux_u32   = (uint32_t)entry->duration_sec * 1000U,
+            .text = {0},
+        };
+        snprintf(sw_ev.text, sizeof(sw_ev.text), "%s", entry->name);
+        if (!fsm_event_publish(&sw_ev, pdMS_TO_TICKS(20))) {
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_send(req, "{\"error\":\"Coda FSM piena\"}", -1);
+        }
+    } else {
+        fsm_input_event_t event = {
+            .from = AGN_ID_WEB_UI,
+            .to = {AGN_ID_FSM},
+            .action = ACTION_ID_PROGRAM_SELECTED,
+            .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
+            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+            .value_i32 = (int32_t)entry->price_units,
+            .value_u32 = (uint32_t)entry->pause_max_suspend_sec * 1000U,
+            .aux_u32   = (uint32_t)entry->duration_sec * 1000U,
+            .text = {0},
+        };
+        snprintf(event.text, sizeof(event.text), "%s", entry->name);
+        if (!fsm_event_publish(&event, pdMS_TO_TICKS(20))) {
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_send(req, "{\"error\":\"Coda FSM piena\"}", -1);
+        }
     }
 
     char response[256];

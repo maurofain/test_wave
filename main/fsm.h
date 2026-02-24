@@ -167,6 +167,7 @@ typedef enum {
     FSM_INPUT_EVENT_PROGRAM_STOP,
     FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE,
     FSM_INPUT_EVENT_CREDIT_ENDED,
+    FSM_INPUT_EVENT_PROGRAM_SWITCH,  /* cambio programma a macchina running: scala il tempo residuo */
 } fsm_input_event_type_t;
 
 /* extended message structure that will circulate on the shared mailbox.
@@ -192,6 +193,10 @@ typedef struct {
 typedef struct {
     fsm_state_t state;
     int32_t credit_cents;
+    int32_t ecd_coins;          /* credito effettivo (monete+QR), definitivo */
+    int32_t vcd_coins;          /* credito virtuale (tessera), scalato alla selezione */
+    int32_t ecd_used;           /* quota ecd consumata nei cicli avviati */
+    int32_t vcd_used;           /* quota vcd consumata nei cicli avviati */
     bool program_running;
     uint32_t running_elapsed_ms;
     uint32_t pause_elapsed_ms;

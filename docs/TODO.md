@@ -100,8 +100,33 @@
     4. preparare una tabella con tutte le azioni ed assegnare gli action_id
     5. tutti i messaggi includono automaticamente l'agente per i log
  3. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare scaricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
- 4. modifica ad /emulator: la barra laterale non visualizza il credito ma il tempo rimanente, togliamo la scritta Stat Credito e mostriamo il tempo in secondi rimanenti 0-999 partendo dal tempo previsto dal programma. Il rateo di discesa della varra va calcolato in base al tempo previsto per il programma . Il credito è visualizzato nel riquadro apposito e scende all'avvio del programma. il credito si gestisce in valori interi della unità di valuta interna  'coin'
- 5. Analisi criticità (riferita al punto 2 - coda eventi FSM):
+ 4. ✅ aggiungiamo altri tasti di pagamento all'emulatore : quelli attuali li definiamo come 'Crediti QR', mettiamo nella linea sotto una serie uguale con gli stessi valori come 'Crediti Tessera', poi sotto 2 tasti 'Monete' con valore 1 coin e 2 coins
+ 5. funzionamento macchina 
+    1. credito: il credito è espresso in coin ed ha una corrispondenza economica di un dato valore (per ora assumiamo 1€ per coin). Il programma ha come unità il tempo (in secondi) e un prezzo indivisibile (per ora consideriamo 1 programma = 1 coin ma potrebbe essere un valore qualsiasi). 
+       1. il credito può arrivare da 
+          1. 1 o più gettoni/monete (non è previsto resto o restituzzione di monete inserite nella gettoniera)
+          2. tessera precaricata in coin
+          3. codice QR precaricato in coin
+       2. Funzionamento generale pay before use
+          1. il cliente inserisce monete o presenta la tessara o mostra il qrcode. 
+          2. la macchina acquisisce il credito disponibile distinguendo due tipi: **ecd** (credito effettivo definitivo, non rimborsabile) e **vcd** (credito virtuale, scalato alla selezione del programma). QR (1 coin per volta) e monete contribuiscono all'ecd; la tessera contribuisce al vcd. Sistemi misti sono ammessi. All'inserimento della tessera viene comunque addebitato 1 coin che passa immediatamente a ecd.
+          3. il cliente sceglie un programma e la macchina scarica dai vcd e la macchina calcola i secondi di utilizzo corrispndenti in base alla tabella programmi ottenendo un rateo di utilizzo (rdu) in 1/60 di coin (chiamato tick) (es. programma da 1 coin per 30 secondi : rdu = 60/30 = 2 tick)) : dopo 10 secondi avrò un residuo di 60-(10*2) =40 tick.
+          4. Il programma può essere selezionato per solo 1 ciclo alla volta (non si può premotare ad esempio 3 cicli tipo 1)
+          5. il cliente usa la macchina per il tempo previsto dal programma che partirà dal momento in cui il cliente seleziona il programma
+          6. durante l'utilizzo il cliente può sospendere il ciclo e la macchina interrompe l'erogazione del servizio (ad esempio ferma l'aspiratore). La macchina ferma il conteggio del tempo per una durata massima trascorso il quale il conteggio riprende.
+          7. durante l'utilizzo di un programma il cliente può selezionare un altro programma e la macchina adegua il rdu alla tariffa del nuovo programma.
+          8. al raggiungimento della durata programmata la macchina si ferma e se c'è ancora credito vcd attende l'avvio di un altro programma.
+          9. se il cliente ha caricato tramite :
+             1.  gettoni : il credito rimane disponibile e se il cliente se ne va verrà usato dal cliente successivo
+             2.  tessera : se la tessera è ancora inserirtanel lettore sll'avvio del duccessivo programma scala una altro coin, se è stata tolata il cliente deve ripresentare la tessera al lettore
+             3.  se ha usato il QR deve ripresentarlo
+    2. Visualizzazione
+       1. nella fase di carica del punto 5.1.1 il box centrale mostra il credito totale disponibile **ecd + vcd** (carattere grande 100%): monete/gettoni e QR (1 coin per volta) contribuiscono all'ecd; la tessera contribuisce al vcd (1 coin se tolta, totale se lasciata nel lettore). Il valore mostrato è sempre la somma ecd+vcd.
+       2. all'avvio del programma il numero crediti scompare se era 1 oppure appare in basso con carattere grandezza 30% ed appare il numero dei secondi disponibili carattere 100%.
+       3. la barra laterale (con replica sulla striscia LED) mostra la progressione del consumo del cliente in percentuale (ticks totali - ticks usati) * 100 7 ticks totali.
+   
+       4.  viene inserito un certo credito (es. 20€) - il valore viene mostrato nel riquadro centrale. Quando viene scelto un programma si calcola il tempo massimo di uso del programma (crediti / costo ciclo * tempo ciclo). L'indicatore del tempo disponibile si aggiorna in base a questo valore. La barra va al 100% e comincia a scendere (percentuale = (tempo totale - tempo trascorso)/tempo totale ). Il credito viene scalato di 1 unità (es. 1€) che varrà in base al 
+ 6. Analisi criticità (riferita al punto 2 - coda eventi FSM):
       1. Modello coda non compatibile con destinatari multipli: la FIFO con receive distruttivo non supporta la logica `To[10]` + rimozione destinatario + eliminazione messaggio a somma destinatari zero.
         - Azione (SCELTA DECISIVA): introdurre mailbox condivisa con lock e stato destinatari per messaggio.
       2. Mancano i campi strutturali del messaggio: `from_agn_id`, `to_agn_id[10]`, `action_id`.
@@ -119,7 +144,7 @@
       8. Strategia migrazione API: servono API di claim/ack per agente mantenendo compatibilità con publish/receive attuali.
         - Azione: introdurre nuove API (`publish_ex`, `claim_for_agent`, `ack_for_agent`) mantenendo le API correnti come wrapper.
 
- 6. Piano test endpoint e funzioni (da riprendere)
+ 7. Piano test endpoint e funzioni (da riprendere)
 
     - Strutturare i test in 4 livelli:
       - Smoke: endpoint raggiungibile, status code atteso, JSON valido.
@@ -141,7 +166,7 @@
       - Smoke completo di tutte le route `/api/test/*` e `/api/config/*` usate dalla UI.
       - 3 flow critici: SD, seriale unificato, backup config su SD.
       - Report `junit.xml` + riepilogo markdown.
- 7. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
+ 8. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
 
     - Autenticazione/token
       - Generare sempre header `Date` runtime (ora è hardcoded in `http_services.c`).
