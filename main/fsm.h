@@ -213,7 +213,7 @@ const char *fsm_state_to_string(fsm_state_t state);
 bool fsm_event_queue_init(size_t queue_len);
 bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks);
 bool fsm_event_publish_from_isr(const fsm_input_event_t *event, BaseType_t *task_woken);
-bool fsm_event_receive(fsm_input_event_t *event, TickType_t timeout_ticks);
+bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_t timeout_ticks);
 bool fsm_publish_simple_event(fsm_input_event_type_t type, int32_t value_i32, const char *text, TickType_t timeout_ticks);
 size_t fsm_pending_messages_copy(char out[][FSM_EVENT_TEXT_MAX_LEN], size_t max_count);
 void fsm_append_message(const char *message);

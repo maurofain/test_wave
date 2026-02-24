@@ -67,6 +67,11 @@
 37. ✅ Emulatore: pagina web /emulator con layout pannello utente (tasti programmi, credito, messaggi, gauge, coin virtuali e indicatori relay) e predisposizione comandi hardware
 38. ✅ Creata tabella testi UI salvata in NVS/EEPROM + codice di recupero testi per funzione multilingua nell'interfaccia utente
 39. ✅ Inserire in Config / tabella Programmi un campo di edit numerico per il tempo massimo di pausa in un ciclo
+40. ✅ implementa il salvataggio dei log degli errori su SD. ci servono 2 log separati : 
+     1. app.log con il log di ogni operazione (eventi legati al credito es azioni su tasti e touch) eseguita dal cliente e la relativa azione, su file giornaliero di tipo circolare con memorizzazione massima di 30 gg, e i dati andranno inviati al server tramite api/deviceactivity (se lo swich Invia Log nella sezione Server Remoto è attivo - lo switch e il parametroon in config va creato)
+     2. ERROR.log che  deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
+     3. ✅ In caso di indisponibilità del SD (assente, guasta o piena) per ambedue i tipi di log si eseguirà solo l'invio al server remoto.
+     4. ✅ nella chiamata api/deviceactivity: tabella JSON `activity.json` salvata in SPIFFS e caricata in PSRAM al boot; fornita API `device_activity_find()` con ID/descrizioni (id es. 1=Start,2=Stop,3=Pause,4=Resume).
 
 # ⏸️ RITARDATI
 
@@ -94,15 +99,9 @@
     3. venno identificati tutti gli agenti, metterli in una tabella ed assegnare gli agn_id
     4. preparare una tabella con tutte le azioni ed assegnare gli action_id
     5. tutti i messaggi includono automaticamente l'agente per i log
-
- 1. ✅ implementa il salvataggio dei log degli errori su SD. ci servono 2 log separati : 
-     1. app.log con il log di ogni operazione (eventi legati al credito es azioni su tasti e touch) eseguita dal cliente e la relativa azione, su file giornaliero di tipo circolare con memorizzazione massima di 30 gg, e i dati andranno inviati al server tramite api/deviceactivity (se lo swich Invia Log nella sezione Server Remoto è attivo - lo switch e il parametroon in config va creato)
-     2. ERROR.log che  deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
-     3. ✅ In caso di indisponibilità del SD (assente, guasta o piena) per ambedue i tipi di log si eseguirà solo l'invio al server remoto.
-     4. ✅ nella chiamata api/deviceactivity: tabella JSON `activity.json` salvata in SPIFFS e caricata in PSRAM al boot; fornita API `device_activity_find()` con ID/descrizioni (id es. 1=Start,2=Stop,3=Pause,4=Resume).
- 2. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare scaricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
- 3. modifica ad /emulator: la barra laterale non visualizza il credito ma il tempo rimanente, togliamo la scritta Stat Credito e mostriamo il tempo in secondi rimanenti 0-999 partendo dal tempo previsto dal programma. Il rateo di discesa della varra va calcolato in base al tempo previsto per il programma . Il credito è visualizzato nel riquadro apposito e scende all'avvio del programma. il credito si gestisce in valori interi della unità di valuta interna  'coin'
- 4. Analisi criticità (riferita al punto 2 - coda eventi FSM):
+ 3. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare scaricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
+ 4. modifica ad /emulator: la barra laterale non visualizza il credito ma il tempo rimanente, togliamo la scritta Stat Credito e mostriamo il tempo in secondi rimanenti 0-999 partendo dal tempo previsto dal programma. Il rateo di discesa della varra va calcolato in base al tempo previsto per il programma . Il credito è visualizzato nel riquadro apposito e scende all'avvio del programma. il credito si gestisce in valori interi della unità di valuta interna  'coin'
+ 5. Analisi criticità (riferita al punto 2 - coda eventi FSM):
       1. Modello coda non compatibile con destinatari multipli: la FIFO con receive distruttivo non supporta la logica `To[10]` + rimozione destinatario + eliminazione messaggio a somma destinatari zero.
         - Azione (SCELTA DECISIVA): introdurre mailbox condivisa con lock e stato destinatari per messaggio.
       2. Mancano i campi strutturali del messaggio: `from_agn_id`, `to_agn_id[10]`, `action_id`.
@@ -120,7 +119,7 @@
       8. Strategia migrazione API: servono API di claim/ack per agente mantenendo compatibilità con publish/receive attuali.
         - Azione: introdurre nuove API (`publish_ex`, `claim_for_agent`, `ack_for_agent`) mantenendo le API correnti come wrapper.
 
- 5. Piano test endpoint e funzioni (da riprendere)
+ 6. Piano test endpoint e funzioni (da riprendere)
 
     - Strutturare i test in 4 livelli:
       - Smoke: endpoint raggiungibile, status code atteso, JSON valido.
@@ -142,7 +141,7 @@
       - Smoke completo di tutte le route `/api/test/*` e `/api/config/*` usate dalla UI.
       - 3 flow critici: SD, seriale unificato, backup config su SD.
       - Report `junit.xml` + riepilogo markdown.
- 6. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
+ 7. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
 
     - Autenticazione/token
       - Generare sempre header `Date` runtime (ora è hardcoded in `http_services.c`).

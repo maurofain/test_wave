@@ -205,10 +205,10 @@ Per poter decodificare un crash in modo affidabile (anche mesi dopo), conservare
 - `app_version.h` e `main/app_version.h`
 - `docs/COMPILE_FLAGS.md`
 
-## 13) Bundle automatico in `./crash`
+## 13) Bundle automatico in `./versions`
 
 È disponibile lo script:
-- `scripts/crash_bundle.sh`
+- `scripts/Version_bundle.sh`
 
 Scopo:
 - creare una cartella versionata in `./crash` con tutti i file utili alla post-analisi;
@@ -220,19 +220,19 @@ Esempi:
 
 ```bash
 # crea bundle senza coredump esplicito
-./scripts/crash_bundle.sh
+./scripts/Version_bundle.sh
 
 # crea bundle includendo un coredump specifico
-./scripts/crash_bundle.sh /percorso/coredump_YYYYMMDD_HHMMSS_MODE_vX.Y.Z.elf
+./scripts/Version_bundle.sh /percorso/coredump_YYYYMMDD_HHMMSS_MODE_vX.Y.Z.elf
 
-# flash dal bundle (dentro la cartella creata in ./crash)
-cd crash/vX.Y.Z_MODE_YYYYMMDD_HHMMSS
+# flash dal bundle (dentro la cartella creata in ./versions)
+cd versions/vX.Y.Z_MODE_YYYYMMDD_HHMMSS
 ./flash_from_bundle.sh -p /dev/ttyACM0           # solo APP
 ./flash_from_bundle.sh -p /dev/ttyACM0 --all     # flash completo
 ```
 
 Output:
-- `./crash/v<version>_<MODE>_<timestamp>/...`
+- `./versions/v<version>_<MODE>_<timestamp>/...`
 
 ## 14) Strategia branch per versioni in produzione
 

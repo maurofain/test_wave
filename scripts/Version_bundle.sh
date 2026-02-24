@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CRASH_ROOT="${ROOT_DIR}/crash"
+# directory dove vengono salvati i bundle versionati
+VERSIONS_ROOT="${ROOT_DIR}/versions"
 BUILD_DIR="${ROOT_DIR}/build"
 
 COREDUMP_SRC="${1:-}"
@@ -21,7 +22,7 @@ if [[ "${COMPILE_APP_VAL}" == "0" ]]; then
 fi
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
-DEST_DIR="${CRASH_ROOT}/v${APP_VERSION}_${MODE}_${STAMP}"
+DEST_DIR="${VERSIONS_ROOT}/v${APP_VERSION}_${MODE}_${STAMP}"
 mkdir -p "${DEST_DIR}/build" "${DEST_DIR}/meta" "${DEST_DIR}/config"
 
 copy_if_exists() {
@@ -36,7 +37,7 @@ copy_if_exists() {
   fi
 }
 
-echo "[INFO] Creo bundle crash in: ${DEST_DIR}"
+echo "[INFO] Creo bundle versione in: ${DEST_DIR}"
 
 # File principali per simbolizzazione coredump
 copy_if_exists "${BUILD_DIR}/test_wave.elf" "${DEST_DIR}/build/test_wave.elf"
@@ -186,5 +187,5 @@ flash_app_command=./flash_from_bundle.sh -p /dev/ttyACM0
 flash_all_command=./flash_from_bundle.sh -p /dev/ttyACM0 --all
 EOF
 
-echo "[DONE] Bundle crash pronto: ${DEST_DIR}"
-echo "[NEXT] Commit consigliato: git add crash && git commit -m \"v${APP_VERSION} crash bundle\""
+echo "[DONE] Bundle versione pronto: ${DEST_DIR}"
+echo "[NEXT] Commit consigliato: git add versions && git commit -m \"v${APP_VERSION} version bundle\""

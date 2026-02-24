@@ -1,0 +1,23 @@
+-aux_gpio – controllo GPIO ausiliari (GPIO33 ecc.)
+-cctalk – driver per bus CC‑Talk (monete, bill validator)
+device_activity – gestione dei log “attività dispositivo”
+device_config – accesso e salvataggio della configurazione hardware/software
+eeprom_24lc16 – driver EEPROM I²C
+error_log – memorizzazione crash/errore
+http_services – servizi REST interni
+io_expander – gestione expander I/O
+led – controllo LED
+lvgl – libreria grafica
+-mdb – driver MDB (monede/lettori)
+pwm – output PWM
+remote_logging – invio log via rete
+-rs232 – driver UART RS‑232
+-rs485 – driver UART RS‑485
+sd_card – accesso scheda SD
+serial_test – utility test seriali
+sht40 – driver sensore SHT40 (umidità/temperatura)
+usb_cdc_scanner – scanner a CDC USB
+usb_host_cdc_acm – host USB CDC-ACM support
+waveshare__esp32_p4_nano – board support package
+waveshare__esp_lcd_ili9881c – driver display
+web_ui – interfaccia web/emulatore

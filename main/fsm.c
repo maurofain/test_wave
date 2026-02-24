@@ -1,8 +1,15 @@
 #include "fsm.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "esp_log.h"
 #include <string.h>
 #include <stdio.h>
+
+static const char *TAG = "FSM_MB";
+
+/* Abilita il logging dettagliato delle operazioni sulla mailbox (ENQUEUE/DEQUEUE).
+ * Di default disabilitato: abilitare per debug della coda messaggi. */
+#define LOG_QUEUE
 
 #define FSM_DEFAULT_SPLASH_TIMEOUT_MS (30000U)
 #define FSM_DEFAULT_PAUSE_MAX_MS (60000U)
@@ -28,6 +35,9 @@ static mailbox_slot_t s_mailbox[FSM_MAILBOX_SIZE];
 static size_t s_mb_head = 0;
 static size_t s_mb_tail = 0;
 static SemaphoreHandle_t s_mb_mutex = NULL;
+/* #7 fix: counting semaphore — segnala ai receiver che c'è almeno un
+ * messaggio in coda, eliminando il polling ogni 1ms. */
+static SemaphoreHandle_t s_mb_signal = NULL;
 
 static uint32_t to_mask_from_event(const fsm_input_event_t *e);
 
@@ -149,7 +159,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
             break;
 
         case FSM_STATE_CREDIT:
-            if (event == FSM_EVENT_PROGRAM_SELECTED && ctx->credit_cents > 0) {
+            if (event == FSM_EVENT_PROGRAM_SELECTED && ctx->credit_cents >= 0) {  /* BUG2 fix: >= 0 perché il credito è già stato scalato prima di chiamare handle_event */
                 ctx->state = FSM_STATE_RUNNING;
                 ctx->program_running = true;
                 ctx->running_elapsed_ms = 0;
@@ -225,7 +235,25 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
         return false;
     }
 
-    switch (event->type) {
+    /* #12 fix: bridge action_id → fsm_input_event_type per i nuovi produttori
+     * che impostano .action invece di (o in aggiunta a) .type.
+     * Se .type è già impostato, ha priorità; .action viene usato solo come
+     * fallback, permettendo la migrazione graduale senza rompere i caller
+     * esistenti. */
+    fsm_input_event_type_t etype = event->type;
+    if (etype == FSM_INPUT_EVENT_NONE && event->action != ACTION_ID_NONE) {
+        switch (event->action) {
+            case ACTION_ID_USER_ACTIVITY:          etype = FSM_INPUT_EVENT_USER_ACTIVITY;        break;
+            case ACTION_ID_PAYMENT_ACCEPTED:       etype = FSM_INPUT_EVENT_COIN;                 break;
+            case ACTION_ID_PROGRAM_SELECTED:       etype = FSM_INPUT_EVENT_PROGRAM_SELECTED;     break;
+            case ACTION_ID_PROGRAM_STOP:           etype = FSM_INPUT_EVENT_PROGRAM_STOP;         break;
+            case ACTION_ID_PROGRAM_PAUSE_TOGGLE:   etype = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE; break;
+            case ACTION_ID_CREDIT_ENDED:           etype = FSM_INPUT_EVENT_CREDIT_ENDED;         break;
+            default: break;
+        }
+    }
+
+    switch (etype) {
         case FSM_INPUT_EVENT_USER_ACTIVITY:
         case FSM_INPUT_EVENT_TOUCH:
         case FSM_INPUT_EVENT_KEY:
@@ -298,6 +326,12 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
     }
 
     ctx->inactivity_ms += elapsed_ms;
+    /* #11 fix: cap inactivity_ms per evitare overflow uint32_t dopo ~49gg
+     * in stato IDLE; il tetto è leggermente sopra il timeout splash così
+     * la logica di timeout continua a funzionare correttamente. */
+    if (ctx->inactivity_ms > ctx->splash_screen_time_ms + 5000U) {
+        ctx->inactivity_ms = ctx->splash_screen_time_ms + 5000U;
+    }
 
     if (ctx->state == FSM_STATE_RUNNING) {
         ctx->running_elapsed_ms += elapsed_ms;
@@ -314,6 +348,10 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
             ctx->pause_elapsed_ms += elapsed_ms;
             if (ctx->pause_elapsed_ms >= ctx->pause_max_ms) {
                 ctx->pause_limit_reached = true;
+                /* #5 fix: pausa scaduta → ripresa automatica così il credito
+                 * torna a scalare (si rientra in RUNNING). */
+                fsm_append_message("Pausa scaduta: ripresa automatica");
+                return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_RESUME);
             }
         }
     }
@@ -343,35 +381,57 @@ const char *fsm_state_to_string(fsm_state_t state)
 
 bool fsm_event_queue_init(size_t queue_len)
 {
-    (void)queue_len; /* size is fixed by mailbox implementation */
+    /* mailbox size is fixed, ignore parameter */
+    (void)queue_len;
 
-    if (s_mb_mutex) {
-        return true; /* already initialised */
+    static bool inited = false;
+    if (inited) {
+        return true;
     }
 
-    s_mb_mutex = xSemaphoreCreateMutex();
-    if (!s_mb_mutex) {
+    /* #9 fix: crea tutti i semafori PRIMA della sezione critica.
+     * xSemaphoreCreate* usa l'heap allocator che acquisisce internamente un
+     * lock FreeRTOS — annidarlo dentro portENTER_CRITICAL su RISC-V
+     * multi-core può causare assert o deadlock. */
+    SemaphoreHandle_t pre_mb_mutex  = xSemaphoreCreateMutex();
+    SemaphoreHandle_t pre_mb_signal = xSemaphoreCreateCounting(FSM_MAILBOX_SIZE, 0);
+    SemaphoreHandle_t pre_pend_lock = xSemaphoreCreateMutex();
+    SemaphoreHandle_t pre_runt_lock = xSemaphoreCreateMutex();
+
+    if (!pre_mb_mutex || !pre_mb_signal || !pre_pend_lock || !pre_runt_lock) {
+        if (pre_mb_mutex)  vSemaphoreDelete(pre_mb_mutex);
+        if (pre_mb_signal) vSemaphoreDelete(pre_mb_signal);
+        if (pre_pend_lock) vSemaphoreDelete(pre_pend_lock);
+        if (pre_runt_lock) vSemaphoreDelete(pre_runt_lock);
+        ESP_LOGE(TAG, "Allocazione semafori fallita");
         return false;
     }
+
+    /* use a dedicated mux for startup; we can't rely on taskENTER_CRITICAL()
+     * without an argument on RISCV multi‑core builds. */
+    static portMUX_TYPE init_mux = portMUX_INITIALIZER_UNLOCKED;
+    portENTER_CRITICAL(&init_mux);
+    if (inited) {
+        portEXIT_CRITICAL(&init_mux);
+        /* già inizializzato da un altro core: libera i semafori extra */
+        vSemaphoreDelete(pre_mb_mutex);
+        vSemaphoreDelete(pre_mb_signal);
+        vSemaphoreDelete(pre_pend_lock);
+        vSemaphoreDelete(pre_runt_lock);
+        return true;
+    }
+
+    s_mb_mutex         = pre_mb_mutex;
+    s_mb_signal        = pre_mb_signal;
+    s_fsm_pending_lock = pre_pend_lock;
+    s_fsm_runtime_lock = pre_runt_lock;
 
     s_mb_head = s_mb_tail = 0;
     memset(s_mailbox, 0, sizeof(s_mailbox));
 
-    /* legacy locks still required for pending/runtime helpers */
-    if (!s_fsm_pending_lock) {
-        s_fsm_pending_lock = xSemaphoreCreateMutex();
-        if (!s_fsm_pending_lock) {
-            return false;
-        }
-    }
-
-    if (!s_fsm_runtime_lock) {
-        s_fsm_runtime_lock = xSemaphoreCreateMutex();
-        if (!s_fsm_runtime_lock) {
-            return false;
-        }
-    }
-
+    inited = true;
+    portEXIT_CRITICAL(&init_mux);
+    ESP_LOGI(TAG, "Mailbox inizializzata (size=%d)", FSM_MAILBOX_SIZE);
     return true;
 }
 
@@ -381,31 +441,42 @@ bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks)
         return false;
     }
 
-    bool ok = false;
-    TickType_t start = xTaskGetTickCount();
-    while (true) {
-        if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            size_t next = (s_mb_tail + 1) % FSM_MAILBOX_SIZE;
-            if (next != s_mb_head) {
-                s_mailbox[s_mb_tail].ev = *event;
-                s_mailbox[s_mb_tail].to_mask = to_mask_from_event(event);
-                s_mb_tail = next;
-                ok = true;
-            }
-            xSemaphoreGive(s_mb_mutex);
-            break;
-        }
-        if (timeout_ticks == 0) {
-            break;
-        }
-        if ((xTaskGetTickCount() - start) >= timeout_ticks) {
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(1));
+    /* take the mailbox mutex with the caller-supplied timeout. the old
+     * implementation tried to implement its own polling/timeout loop; that
+     * was chewing CPU time during bursts and made the callers harder to
+     * reason about. the native FreeRTOS API handles the wait for us.
+     */
+    if (xSemaphoreTake(s_mb_mutex, timeout_ticks) != pdTRUE) {
+        return false;
     }
+
+    bool ok = false;
+    size_t next = (s_mb_tail + 1) % FSM_MAILBOX_SIZE;
+    if (next != s_mb_head) {
+        size_t slot = s_mb_tail;
+        s_mailbox[slot].ev = *event;
+        s_mailbox[slot].to_mask = to_mask_from_event(event);
+        s_mb_tail = next;
+        ok = true;
+#ifdef LOG_QUEUE
+        ESP_LOGD(TAG, "ENQUEUE[%zu] type=%s action=%d from=%d to_mask=0x%08lx",
+                 slot, fsm_input_event_type_to_string(event->type),
+                 (int)event->action, (int)event->from,
+                 (unsigned long)s_mailbox[slot].to_mask);
+#endif
+    } else {
+#ifdef LOG_QUEUE
+        ESP_LOGW(TAG, "ENQUEUE FULL type=%s from=%d",
+                 fsm_input_event_type_to_string(event->type), (int)event->from);
+#endif
+    }
+
+    xSemaphoreGive(s_mb_mutex);
 
     if (ok) {
         fsm_pending_push(event);
+        /* #7 fix: segnala ai receiver che c'è un nuovo messaggio */
+        xSemaphoreGive(s_mb_signal);
     }
     return ok;
 }
@@ -423,9 +494,16 @@ bool fsm_event_publish_from_isr(const fsm_input_event_t *event, BaseType_t *task
             s_mailbox[s_mb_tail].ev = *event;
             s_mailbox[s_mb_tail].to_mask = to_mask_from_event(event);
             s_mb_tail = next;
-            if (task_woken) *task_woken = higher;
             xSemaphoreGiveFromISR(s_mb_mutex, &higher);
-            fsm_pending_push(event);
+            /* BUG4 fix: task_woken va letto DOPO xSemaphoreGiveFromISR */
+            if (task_woken) *task_woken = higher;
+            /* BUG3 fix: NON chiamare fsm_pending_push() da ISR */
+            /* #7 fix: sblocca receiver in attesa sul signal semaforo */
+            if (s_mb_signal) {
+                BaseType_t sig_woken = pdFALSE;
+                xSemaphoreGiveFromISR(s_mb_signal, &sig_woken);
+                if (sig_woken == pdTRUE && task_woken) *task_woken = pdTRUE;
+            }
             return true;
         }
         xSemaphoreGiveFromISR(s_mb_mutex, &higher);
@@ -433,37 +511,42 @@ bool fsm_event_publish_from_isr(const fsm_input_event_t *event, BaseType_t *task
     return false;
 }
 
-bool fsm_event_receive(fsm_input_event_t *event, TickType_t timeout_ticks)
+bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_t timeout_ticks)
 {
-    if (!s_mb_mutex || !event) {
+    /* #8 fix: receiver_id parametrico — qualunque agent può ricevere messaggi
+     * dalla mailbox, non solo AGN_ID_FSM.
+     * #7 fix: attesa sul signal semaphore invece del polling ogni 1ms. */
+    if (!s_mb_mutex || !s_mb_signal || !event) {
         return false;
     }
 
-    TickType_t start = xTaskGetTickCount();
-    uint32_t mybit = (1u << AGN_ID_FSM);
+    uint32_t mybit = (1u << (uint32_t)receiver_id);
 
-    while (true) {
-        if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
-                if (s_mailbox[i].to_mask & mybit) {
-                    *event = s_mailbox[i].ev;
-                    s_mailbox[i].to_mask &= ~mybit;
-                    if (s_mailbox[i].to_mask == 0) {
-                        s_mb_head = (s_mb_head + 1) % FSM_MAILBOX_SIZE;
-                    }
-                    xSemaphoreGive(s_mb_mutex);
-                    return true;
+    /* blocca efficientemente finché almeno un messaggio è disponibile;
+     * timeout_ticks == 0 → non-blocking, portMAX_DELAY → attesa infinita */
+    if (xSemaphoreTake(s_mb_signal, timeout_ticks) != pdTRUE) {
+        return false;
+    }
+
+    if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
+            if (s_mailbox[i].to_mask & mybit) {
+                *event = s_mailbox[i].ev;
+#ifdef LOG_QUEUE
+                ESP_LOGD(TAG, "DEQUEUE[%zu] type=%s action=%d from=%d receiver=%d",
+                         i, fsm_input_event_type_to_string(event->type),
+                         (int)event->action, (int)event->from, (int)receiver_id);
+#endif
+                s_mailbox[i].to_mask &= ~mybit;
+                /* BUG1 fix: avanzare head solo se lo slot è alla testa */
+                if (s_mailbox[i].to_mask == 0 && i == s_mb_head) {
+                    s_mb_head = (s_mb_head + 1) % FSM_MAILBOX_SIZE;
                 }
+                xSemaphoreGive(s_mb_mutex);
+                return true;
             }
-            xSemaphoreGive(s_mb_mutex);
         }
-        if (timeout_ticks == 0) {
-            break;
-        }
-        if ((xTaskGetTickCount() - start) >= timeout_ticks) {
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(1));
+        xSemaphoreGive(s_mb_mutex);
     }
     return false;
 }

@@ -141,7 +141,17 @@ void app_main(void)
     if (BOOT_COUNTER_RESET_DELAYED)
     {
         ESP_LOGI(TAG, LOG_CTX_PREFIX " reset contatore reboot posticipato di %d ms", BOOT_COUNTER_STABLE_WINDOW_MS);
-        vTaskDelay(pdMS_TO_TICKS(BOOT_COUNTER_STABLE_WINDOW_MS));
+        const uint32_t step_ms = 5000;
+        uint32_t remaining_ms = BOOT_COUNTER_STABLE_WINDOW_MS;
+        while (remaining_ms > 0) {
+            uint32_t this_step = (remaining_ms > step_ms) ? step_ms : remaining_ms;
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita': attendo ancora %lu ms (heap=%lu)",
+                     (unsigned long)remaining_ms,
+                     (unsigned long)esp_get_free_heap_size());
+            vTaskDelay(pdMS_TO_TICKS(this_step));
+            remaining_ms -= this_step;
+        }
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' completata (%d ms)", BOOT_COUNTER_STABLE_WINDOW_MS);
     }
 
     esp_err_t boot_done_ret = init_mark_boot_completed();

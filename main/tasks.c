@@ -1,6 +1,7 @@
 #include "tasks.h"
 #include "init.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "led_strip.h"
 #include "device_config.h"
 #include "sht40.h"
@@ -136,19 +137,38 @@ static void fsm_task(void *arg)
     ESP_LOGI(TAG, "[FSM] Task started in state=%s", fsm_state_to_string(fsm.state));
     fsm_runtime_publish(&fsm);
 
+    /* contatore per il log "alive" ogni 10 secondi */
+    uint32_t alive_ms = 0;
+    static const uint32_t ALIVE_INTERVAL_MS = 10000;
+
     while (true) {
         fsm_input_event_t event;
         bool changed = false;
         fsm_state_t state_before = fsm.state;
+
+        /* #6 fix: receive first (blocca fino a period_ticks = 100ms), poi
+         * misura l'elapsed così l'attesa è inclusa nel delta. In questo modo
+         * fsm_tick() riceve il tempo realmente trascorso, non quello
+         * dell'iterazione *precedente*. */
+        if (fsm_event_receive(&event, AGN_ID_FSM, param->period_ticks)) {
+            changed = fsm_handle_input_event(&fsm, &event);
+        }
+
         TickType_t now_tick = xTaskGetTickCount();
         uint32_t elapsed_ms = (uint32_t)pdTICKS_TO_MS(now_tick - prev_tick);
         prev_tick = now_tick;
 
-        if (fsm_event_receive(&event, param->period_ticks)) {
-            changed = fsm_handle_input_event(&fsm, &event);
-        }
-
         changed = fsm_tick(&fsm, elapsed_ms) || changed;
+
+        /* log alive ogni ALIVE_INTERVAL_MS */
+        alive_ms += elapsed_ms;
+        if (alive_ms >= ALIVE_INTERVAL_MS) {
+            alive_ms = 0;
+            ESP_LOGI(TAG, "[FSM] Alive: state=%s credit=%ldc heap=%lu",
+                     fsm_state_to_string(fsm.state),
+                     (long)fsm.credit_cents,
+                     (unsigned long)esp_get_free_heap_size());
+        }
 
         if ((state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) && fsm.state == FSM_STATE_CREDIT) {
             for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {

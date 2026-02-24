@@ -60,6 +60,7 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #include "sht40.h"
 #include "device_activity.h"
 #include "error_log.h"
+#include "fsm.h"  // needed for fsm_event_queue_init()
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -673,17 +674,20 @@ static void log_partitions(void)
 
 static bool check_internet_access(void)
 {
-    ESP_LOGI(TAG, "[NTP] Checking internet access by HTTP request to http://www.google.com...");
+    /* Evita dipendenza dal DNS: su reti senza DNS valido la risoluzione puo' bloccare piu' del timeout HTTP.
+     * 1.1.1.1 risponde tipicamente con redirect (301) verso HTTPS: per noi va bene, significa che il routing funziona.
+     */
+    ESP_LOGI(TAG, "[M] [NTP] Verifica accesso internet via HTTP HEAD a http://1.1.1.1/");
 
     esp_http_client_config_t config = {
-        .url = "http://www.google.com",
-        .timeout_ms = 5000,
+        .url = "http://1.1.1.1/",
+        .timeout_ms = 1500,
         .method = HTTP_METHOD_HEAD,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client) {
-        ESP_LOGW(TAG, "[NTP] Failed to initialize HTTP client");
+        ESP_LOGW(TAG, "[M] [NTP] Impossibile inizializzare HTTP client");
         return false;
     }
 
@@ -692,11 +696,14 @@ static bool check_internet_access(void)
 
     esp_http_client_cleanup(client);
 
-    if (err == ESP_OK && status_code == 200) {
-        ESP_LOGI(TAG, "[NTP] Internet access confirmed (HTTP status: %d)", status_code);
+    /* Consideriamo OK qualunque risposta HTTP valida (2xx/3xx).
+     * Su captive portal potremmo vedere 30x/40x: comunque indica connettivita' IP.
+     */
+    if (err == ESP_OK && status_code >= 200 && status_code < 400) {
+        ESP_LOGI(TAG, "[M] [NTP] Accesso internet OK (HTTP status: %d)", status_code);
         return true;
     } else {
-        ESP_LOGW(TAG, "[NTP] No internet access detected (err: %s, status: %d)", esp_err_to_name(err), status_code);
+        ESP_LOGW(TAG, "[M] [NTP] Accesso internet NON disponibile (err: %s, status: %d)", esp_err_to_name(err), status_code);
         return false;
     }
 }
@@ -734,18 +741,31 @@ static void netcheck_task(void *arg)
 {
     (void)arg;
 
+    ESP_LOGI(TAG, "[M] [NTP] netcheck_task avviata (priority=%d, free_heap=%u)",
+             (int)uxTaskPriorityGet(NULL), (unsigned)esp_get_free_heap_size());
+
     /* perform the potentially slow network check; insert small delays so
      * other tasks (especially IDLE) can run even if HTTP waits. */
     bool ok = false;
-    for (int retry = 0; retry < 3 && !ok; ++retry) {
+    const int max_retries = 2;           /* fewer attempts to shorten boot */
+    const TickType_t retry_delay = pdMS_TO_TICKS(100);
+
+    for (int retry = 0; retry < max_retries && !ok; ++retry) {
+        ESP_LOGI(TAG, "[M] [NTP] netcheck tentativo %d/%d", retry + 1, max_retries);
         if (check_internet_access()) {
             ok = true;
+            ESP_LOGI(TAG, "[M] [NTP] accesso internet confermato");
             break;
         }
-        vTaskDelay(pdMS_TO_TICKS(200));
+        ESP_LOGW(TAG, "[M] [NTP] netcheck fallito (tentativo %d), attendo %u ms",
+                 retry + 1, (unsigned)pdTICKS_TO_MS(retry_delay));
+        vTaskDelay(retry_delay);
     }
+
     if (ok) {
         init_sntp();
+    } else {
+        ESP_LOGW(TAG, "[M] [NTP] netcheck: rinuncio dopo %d tentativi", max_retries);
     }
 
     vTaskDelete(NULL);
@@ -835,7 +855,18 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
                 {
                     etharp_gratuitous(lwip_netif);
                     ESP_LOGI(TAG, "[M] Gratuitous ARP inviato");
+                    ESP_LOGI(TAG, "[M] Post-ARP: ntp_enabled=%d free_heap=%u",
+                             (int)device_config_get()->ntp_enabled,
+                             (unsigned)esp_get_free_heap_size());
                 }
+                else
+                {
+                    ESP_LOGW(TAG, "[M] Post-ARP: lwip_netif NULL (impossibile inviare gratuitous ARP)");
+                }
+            }
+            else
+            {
+                ESP_LOGW(TAG, "[M] Post-ARP: s_netif_eth NULL");
             }
 
             /* spawn a short-lived task to verify internet access and start NTP
@@ -845,7 +876,15 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
                 /* create the helper with low priority so it cannot starve the idle or
                  * higher‑priority system tasks while performing the blocking HTTP
                  * request (which may take several seconds). */
-                xTaskCreate(netcheck_task, "netcheck", 4096, NULL, 1, NULL);
+                BaseType_t res = xTaskCreate(netcheck_task, "netcheck", 4096, NULL, 1, NULL);
+                if (res != pdPASS) {
+                    ESP_LOGE(TAG, "[M] [NTP] xTaskCreate(netcheck) FALLITA (free_heap=%u)",
+                             (unsigned)esp_get_free_heap_size());
+                } else {
+                    ESP_LOGI(TAG, "[M] [NTP] netcheck_task creata");
+                }
+            } else {
+                ESP_LOGI(TAG, "[M] [NTP] NTP disabilitato da config: skip netcheck_task");
             }
         }
     }
@@ -1001,7 +1040,7 @@ static esp_err_t start_ethernet(void)
     // Registra i gestori di eventi DOPO la creazione del netif (come nel progetto factory)
     ESP_RETURN_ON_ERROR(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL), TAG, "registrazione ETH_EVENT fallita");
     ESP_RETURN_ON_ERROR(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ip_event_handler, NULL), TAG, "registrazione IP_EVENT fallita");
-
+    ESP_LOGI(TAG, "[M] EXIT from ip_event_handlers");
     // Applica configurazione IP statica se DHCP è disabilitato
     device_config_t *cfg = device_config_get();
     if (!cfg->eth.dhcp_enabled && strlen(cfg->eth.ip) > 0)
@@ -1184,6 +1223,16 @@ esp_err_t init_run_factory(void)
 
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
+
+    /* prepare the FSM mailbox early so that any code executing during
+     * initialization (event handlers, helper tasks, etc.) can publish
+     * events without races or drops. the call is idempotent thanks to the
+     * improved fsm_event_queue_init above. this was the main cause of the
+     * mysterious "boot slower/blocked" behaviour: some pieces attempted to
+     * send an event before the daemon task had started and our old init
+     * reentrant logic would reset the mailbox repeatedly.
+     */
+    (void)fsm_event_queue_init(0);
 
     // Tentativo rapido pre-boot di invio crash (best-effort, timeout corto)
     ESP_ERROR_CHECK(try_send_pending_crash_record());

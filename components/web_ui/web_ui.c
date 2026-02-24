@@ -1444,57 +1444,86 @@ esp_err_t api_tasks_get(httpd_req_t *req)
         httpd_resp_send(req, resp_str, strlen(resp_str));
         return ESP_FAIL;
     }
-    
+
+    /* NOTA: prima usavamo un buffer su stack da 4096 con strcat() non protetti.
+     * Con molte righe o valori lunghi si andava in overflow -> corruzione stack
+     * e panic "Stack protection fault" nel task HTTP durante printf/vfprintf.
+     * Costruiamo ora la risposta via cJSON (heap) in modo sicuro.
+     */
+    cJSON *arr = cJSON_CreateArray();
+    if (!arr) {
+        fclose(f);
+        httpd_resp_set_status(req, "500");
+        return httpd_resp_send(req, "{\"error\":\"No mem\"}", -1);
+    }
+
     char line[256];
-    char response[4096] = "[";
-    bool first = true;
     bool skip_header = true;
     bool has_http_server = false;
-    
+
     while (fgets(line, sizeof(line), f)) {
-        // Rimuovi newline
         line[strcspn(line, "\r\n")] = 0;
-        
-        // Salta header
         if (skip_header) {
             skip_header = false;
             continue;
         }
-        
-        // Parse CSV: name,state,priority,core,period_ms,stack_words
-        char name[64], state[16];
-        int priority, core, period_ms, stack_words;
-        
-        if (sscanf(line, "%63[^,],%15[^,],%d,%d,%d,%d", 
-                   name, state, &priority, &core, &period_ms, &stack_words) == 6) {
-            if (strcmp(name, "http_server") == 0) {
-                has_http_server = true;
-            }
-            
-            char task_json[256];
-            snprintf(task_json, sizeof(task_json),
-                     "%s{\"name\":\"%s\",\"state\":\"%s\",\"priority\":%d,\"core\":%d,\"period_ms\":%d,\"stack_words\":%d}",
-                     first ? "" : ",", name, state, priority, core, period_ms, stack_words);
-            
-            strcat(response, task_json);
-            first = false;
+
+        char name[64] = {0};
+        char state[16] = {0};
+        int priority = 0;
+        int core = 0;
+        int period_ms = 0;
+        int stack_words = 0;
+
+        if (sscanf(line, "%63[^,],%15[^,],%d,%d,%d,%d",
+                   name, state, &priority, &core, &period_ms, &stack_words) != 6) {
+            continue;
+        }
+
+        if (strcmp(name, "http_server") == 0) {
+            has_http_server = true;
+        }
+
+        cJSON *obj = cJSON_CreateObject();
+        if (!obj) {
+            continue;
+        }
+        cJSON_AddStringToObject(obj, "name", name);
+        cJSON_AddStringToObject(obj, "state", state);
+        cJSON_AddNumberToObject(obj, "priority", priority);
+        cJSON_AddNumberToObject(obj, "core", core);
+        cJSON_AddNumberToObject(obj, "period_ms", period_ms);
+        cJSON_AddNumberToObject(obj, "stack_words", stack_words);
+        cJSON_AddItemToArray(arr, obj);
+    }
+
+    fclose(f);
+
+    if (!has_http_server) {
+        /* default più sicuro: 3072 words = 12KB stack per il task httpd */
+        cJSON *obj = cJSON_CreateObject();
+        if (obj) {
+            cJSON_AddStringToObject(obj, "name", "http_server");
+            cJSON_AddStringToObject(obj, "state", "run");
+            cJSON_AddNumberToObject(obj, "priority", 5);
+            cJSON_AddNumberToObject(obj, "core", 0);
+            cJSON_AddNumberToObject(obj, "period_ms", 1000);
+            cJSON_AddNumberToObject(obj, "stack_words", 3072);
+            cJSON_AddItemToArray(arr, obj);
         }
     }
 
-    if (!has_http_server) {
-        char task_json[256];
-        snprintf(task_json, sizeof(task_json),
-                 "%s{\"name\":\"http_server\",\"state\":\"run\",\"priority\":5,\"core\":0,\"period_ms\":1000,\"stack_words\":2048}",
-                 first ? "" : ",");
-        strcat(response, task_json);
-        first = false;
+    char *json_str = cJSON_PrintUnformatted(arr);
+    cJSON_Delete(arr);
+    if (!json_str) {
+        httpd_resp_set_status(req, "500");
+        return httpd_resp_send(req, "{\"error\":\"JSON encode failed\"}", -1);
     }
-    
-    strcat(response, "]");
-    fclose(f);
-    
+
     httpd_resp_set_type(req, "application/json");
-    return httpd_resp_send(req, response, strlen(response));
+    esp_err_t ret = httpd_resp_send(req, json_str, strlen(json_str));
+    free(json_str);
+    return ret;
 }
 
 // Handler API POST /api/tasks/save

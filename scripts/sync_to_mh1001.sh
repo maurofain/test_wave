@@ -41,20 +41,32 @@ if command -v git >/dev/null 2>&1 && git -C "${SRC_DIR}" rev-parse --is-inside-w
   git -C "${SRC_DIR}" ls-files --others --ignored --exclude-standard --directory >> "${EXCLUDE_FILE}" || true
 fi
 
-RSYNC_FLAGS=(-a --delete --prune-empty-dirs)
+RSYNC_FLAGS=(-a --delete --prune-empty-dirs --stats)
+# include statistics so we can report total files and transferred/updated files
 if [[ ${DRY_RUN} -eq 1 ]]; then
   RSYNC_FLAGS+=(--dry-run --itemize-changes)
 fi
 
-rsync "${RSYNC_FLAGS[@]}" \
-  --include='docs/' \
-  --include='docs/doxygen/' \
-  --include='docs/doxygen/***' \
-  --exclude-from="${EXCLUDE_FILE}" \
-  "${SRC_DIR}/" "${DEST_DIR}/"
+# run rsync and capture its output so that we can show the stats later
+RSYNC_OUTPUT=$(
+  rsync "${RSYNC_FLAGS[@]}" \
+    --include='docs/' \
+    --include='docs/doxygen/' \
+    --include='docs/doxygen/***' \
+    --exclude-from="${EXCLUDE_FILE}" \
+    "${SRC_DIR}/" "${DEST_DIR}/" 2>&1
+)
+
+# print rsync output (includes stats)
+echo "$RSYNC_OUTPUT"
 
 if [[ ${DRY_RUN} -eq 1 ]]; then
   echo "Dry-run completato: ${SRC_DIR} -> ${DEST_DIR}"
 else
+  # extract summary lines from the stats (Number of files and transferred)
+  echo
+  echo "--- report finale ---"
+  echo "$RSYNC_OUTPUT" | grep -E 'Number of files|Number of files transferred' || true
+  echo
   echo "Sync completata: ${SRC_DIR} -> ${DEST_DIR}"
 fi

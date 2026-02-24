@@ -188,13 +188,12 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "<button class='prog-btn' data-id='8'>Programma 8</button>"
         "</div>"
         "<div class='emu-main'>"
-        "<div id='creditBox' class='credit-box'><div class='credit-label'>Credito</div><div id='credit' class='credit-value'>0</div><div id='elapsed' class='elapsed-value'>Tempo: 00:00</div><div id='pauseElapsed' class='pause-value'>In pausa: 00:00</div></div>"
+        "<div id='creditBox' class='credit-box'><div class='credit-label'>Credito (coin)</div><div id='credit' class='credit-value'>0</div><div id='elapsed' class='elapsed-value'>Tempo: 00:00</div><div id='pauseElapsed' class='pause-value'>In pausa: 00:00</div></div>"
         "<div id='msg' class='msg-box'>Nessun evento in coda</div>"
         "</div>"
         "<div class='emu-gauge'>"
-        "<div class='gauge-title'>Stato credito</div>"
         "<div class='gauge-track'><div id='gmask' class='gauge-mask'></div></div>"
-        "<div id='gtext' class='gauge-text'>0%</div>"
+        "<div id='gtext' class='gauge-text'>--</div>"
         "</div>"
         "</div></div>"
         "<div class='emu-electrical'>"
@@ -247,8 +246,11 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "function applyRelayIndicators(relayItems){if(!Array.isArray(relayItems))return;const byRelay={};relayItems.forEach(function(item){if(item&&typeof item.relay_number==='number'){byRelay[item.relay_number]=!!item.status;}});relays.forEach(function(relay){const relayNumber=parseInt(relay.dataset.relay||'0',10);if(!relayNumber)return;if(Object.prototype.hasOwnProperty.call(byRelay,relayNumber)){relay.classList.toggle('on',!!byRelay[relayNumber]);}});}"
         "function formatElapsed(ms){const t=Math.max(0,Math.floor(ms/1000));const mm=String(Math.floor(t/60)).padStart(2,'0');const ss=String(t%60).padStart(2,'0');return mm+':'+ss;}"
         "function updateCreditStateUi(){if(!creditBox)return;creditBox.classList.remove('state-credit','state-running');if(fsmState==='credit')creditBox.classList.add('state-credit');if(fsmState==='running')creditBox.classList.add('state-running');}"
-        "function updateElapsedUi(){if(!elapsedEl)return;let shown=runningElapsedMs;if(fsmState==='running'&&runningElapsedSyncAt){shown += (Date.now()-runningElapsedSyncAt);}elapsedEl.textContent='Tempo: '+formatElapsed(shown);if(pauseElapsedEl){let pauseShown=pauseElapsedMs;if(fsmState==='paused'&&pauseElapsedSyncAt){pauseShown += (Date.now()-pauseElapsedSyncAt);}pauseElapsedEl.textContent='In pausa: '+formatElapsed(pauseShown);}}"
-        "function syncFromFsm(js){if(js&&typeof js.credit_cents==='number'){credit=Math.max(0,Math.min(100,Math.floor(js.credit_cents)));}if(js&&typeof js.state==='string'){fsmState=js.state;}if(js&&typeof js.running_elapsed_ms==='number'){runningElapsedMs=Math.max(0,Math.floor(js.running_elapsed_ms));runningElapsedSyncAt=Date.now();}if(js&&typeof js.pause_elapsed_ms==='number'){pauseElapsedMs=Math.max(0,Math.floor(js.pause_elapsed_ms));pauseElapsedSyncAt=Date.now();}if(fsmState!=='running'&&fsmState!=='paused'){activeProgram=0;buttons.forEach(function(b){b.classList.remove('active');});runningElapsedSyncAt=0;pauseElapsedSyncAt=0;}if(js&&Array.isArray(js.relays)){applyRelayIndicators(js.relays);}updateCreditStateUi();updateElapsedUi();render();renderQueueMessages(js&&js.messages?js.messages:[]);}"
+        /* updateElapsedUi: aggiorna timer E gauge (tempo rimanente interpolato a 200ms).
+         * La barra scende da piena (avvio programma) a vuota (fine programma).
+         * Il testo mostra i secondi rimanenti 0-999. */
+        "function updateElapsedUi(){if(!elapsedEl)return;let shown=runningElapsedMs;if(fsmState==='running'&&runningElapsedSyncAt){shown += (Date.now()-runningElapsedSyncAt);}elapsedEl.textContent='Tempo: '+formatElapsed(shown);if(pauseElapsedEl){let pauseShown=pauseElapsedMs;if(fsmState==='paused'&&pauseElapsedSyncAt){pauseShown += (Date.now()-pauseElapsedSyncAt);}pauseElapsedEl.textContent='In pausa: '+formatElapsed(pauseShown);}if((fsmState==='running'||fsmState==='paused')&&activeProgram){const p=programMetaByButton[activeProgram];const dur=(p&&p.duration_sec)?p.duration_sec:0;if(dur>0){const elSec=Math.max(0,shown/1000);const remSec=Math.max(0,Math.min(999,Math.round(dur-elSec)));const pct=Math.max(0,Math.min(100,(remSec/dur)*100));if(gaugeText)gaugeText.textContent=remSec+'s';if(maskEl)maskEl.style.height=(100-pct)+'%';}}}"
+        "function syncFromFsm(js){if(js&&typeof js.credit_cents==='number'){credit=Math.max(0,Math.floor(js.credit_cents));}if(js&&typeof js.state==='string'){fsmState=js.state;}if(js&&typeof js.running_elapsed_ms==='number'){runningElapsedMs=Math.max(0,Math.floor(js.running_elapsed_ms));runningElapsedSyncAt=Date.now();}if(js&&typeof js.pause_elapsed_ms==='number'){pauseElapsedMs=Math.max(0,Math.floor(js.pause_elapsed_ms));pauseElapsedSyncAt=Date.now();}if(fsmState!=='running'&&fsmState!=='paused'){activeProgram=0;buttons.forEach(function(b){b.classList.remove('active');});runningElapsedSyncAt=0;pauseElapsedSyncAt=0;}if(js&&Array.isArray(js.relays)){applyRelayIndicators(js.relays);}updateCreditStateUi();updateElapsedUi();render();renderQueueMessages(js&&js.messages?js.messages:[]);}"
         "async function refreshQueueMessages(){try{const r=await fetch('/api/emulator/fsm/messages');if(!r.ok)return;const js=await r.json();syncFromFsm(js);}catch(e){console.warn('fsm messages fetch failed',e);}}"
         "async function loadProgramsMeta(){try{const r=await fetch('/api/programs');if(!r.ok)return;const js=await r.json();const arr=Array.isArray(js.programs)?js.programs:[];programsById={};programMetaByButton={};arr.forEach(function(p){if(!p||typeof p.program_id!=='number')return;programsById[p.program_id]=p;});buttons.forEach(function(btn){const id=parseInt(btn.dataset.id||'0',10);const p=programsById[id];if(!p){btn.disabled=true;btn.textContent='Programma '+id;return;}programMetaByButton[id]=p;btn.textContent=p.name||('Programma '+id);btn.dataset.price=String(p.price_units||0);btn.dataset.enabled=p.enabled?'1':'0';});render();}catch(e){console.warn('load programs failed',e);}}"
         "function dispatchHardwareCommand(type,payload){"
@@ -262,7 +264,9 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         "function updateVirtualRelay(relayNumber,status,duration){"
         "  fetch('/api/emulator/relay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({relay_number:relayNumber,status:status,duration:duration||0})}).catch(function(e){console.warn('virtual relay update failed',e);});"
         "}"
-        "function render(){const clamped=Math.max(0,Math.min(100,credit));creditEl.textContent=String(clamped);let gaugePct=clamped;if((fsmState==='running'||fsmState==='paused')&&activeProgram){const p=programMetaByButton[activeProgram];const dur=(p&&p.duration_sec)?p.duration_sec:0;if(dur>0){const elapsed=Math.max(0,runningElapsedMs/1000);const rem=Math.max(0,dur-elapsed);gaugePct=Math.max(0,Math.min(100,(rem/dur)*100));}}gaugeText.textContent=Math.round(gaugePct)+'%';maskEl.style.height=(100-gaugePct)+'%';updateProgramAvailability();}"
+        /* render: mostra credito in coin interi; il gauge tempo rimanente
+         * viene aggiornato da updateElapsedUi con interpolazione a 200ms. */
+        "function render(){creditEl.textContent=String(Math.max(0,credit));if(!(fsmState==='running'||fsmState==='paused')||!activeProgram){if(gaugeText)gaugeText.textContent='--';if(maskEl)maskEl.style.height='100%';}updateProgramAvailability();}"
         "buttons.forEach(function(btn){btn.addEventListener('click',async function(){const programId=parseInt(btn.dataset.id||'0',10);if(!programId)return;try{if(activeProgram===programId&&(fsmState==='running'||fsmState==='paused')){dispatchHardwareCommand('program_pause_toggle',{program:programId,current_credit:credit,state:fsmState});const rp=await fetch('/api/emulator/program/pause_toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({program_id:programId})});const jp=await rp.json().catch(function(){return {};});if(!rp.ok){msgEl.textContent=(jp&&jp.error)?jp.error:('Errore pausa/ripresa: HTTP '+rp.status);return;}msgEl.textContent=(jp&&jp.state==='paused')?('Programma '+programId+' in pausa'):('Programma '+programId+' ripreso');await refreshQueueMessages();return;}dispatchHardwareCommand('program_start',{program:programId,current_credit:credit});const r=await fetch('/api/emulator/program/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({program_id:programId})});const js=await r.json().catch(function(){return {};});if(!r.ok){msgEl.textContent=(js&&js.error)?js.error:('Errore avvio programma: HTTP '+r.status);return;}buttons.forEach(function(b){b.classList.remove('active');});btn.classList.add('active');activeProgram=programId;msgEl.textContent='Programma '+programId+' in running';await refreshQueueMessages();}catch(e){msgEl.textContent='Errore programma: '+(e&&e.message?e.message:e);}});});"
         "coinButtons.forEach(function(btn){btn.addEventListener('click',async function(){const delta=parseInt(btn.dataset.coin||'0',10);dispatchHardwareCommand('coin_add',{value:delta,current_credit:credit});try{const r=await fetch('/api/emulator/coin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({coin:delta})});if(!r.ok){msgEl.textContent='Errore invio coin: HTTP '+r.status;return;}await refreshQueueMessages();}catch(e){msgEl.textContent='Errore invio coin: '+(e&&e.message?e.message:e);}});});"
         "relays.forEach(function(relay){relay.addEventListener('click',async function(){const relayNumber=parseInt(relay.dataset.relay||'0',10);const nextState=!relay.classList.contains('on');updateVirtualRelay(relayNumber,nextState,0);msgEl.textContent='Comando Relay R'+relayNumber+' '+(nextState?'ON':'OFF');dispatchHardwareCommand('relay_toggle',{relay:relayNumber,status:nextState});await refreshQueueMessages();});});"
@@ -323,7 +327,7 @@ esp_err_t api_emulator_coin_event(httpd_req_t *req)
         fsm_input_event_t ev = {
             .from = AGN_ID_WEB_UI,
             .to = {AGN_ID_FSM},
-            .action = ACTION_ID_NONE,
+            .action = ACTION_ID_PAYMENT_ACCEPTED,
             .type = FSM_INPUT_EVENT_COIN,
             .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
             .value_i32 = value,
@@ -489,7 +493,7 @@ esp_err_t api_emulator_program_start(httpd_req_t *req)
     fsm_input_event_t event = {
         .from = AGN_ID_WEB_UI,
         .to = {AGN_ID_FSM},
-        .action = ACTION_ID_NONE,
+        .action = ACTION_ID_PROGRAM_SELECTED,
 
         .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
@@ -555,7 +559,7 @@ esp_err_t api_emulator_program_stop(httpd_req_t *req)
     fsm_input_event_t event = {
         .from = AGN_ID_WEB_UI,
         .to = {AGN_ID_FSM},
-        .action = ACTION_ID_NONE,
+        .action = ACTION_ID_PROGRAM_STOP,
 
         .type = FSM_INPUT_EVENT_PROGRAM_STOP,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
@@ -609,7 +613,7 @@ esp_err_t api_emulator_program_pause_toggle(httpd_req_t *req)
     fsm_input_event_t event = {
         .from = AGN_ID_WEB_UI,
         .to = {AGN_ID_FSM},
-        .action = ACTION_ID_NONE,
+        .action = ACTION_ID_PROGRAM_PAUSE_TOGGLE,
 
         .type = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
