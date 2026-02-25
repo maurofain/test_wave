@@ -15,14 +15,7 @@ static bool s_sd_available = false; // indica se la SD è montata con successo
 
 static void flush_log_file(FILE *f)
 {
-    if (!f) {
-        return;
-    }
-    fflush(f);
-    int fd = fileno(f);
-    if (fd >= 0) {
-        fsync(fd);
-    }
+    sd_card_fflush(f);
 }
 
 
@@ -68,19 +61,20 @@ static int vprintf_wrapper(const char *fmt, va_list args)
         if (strncmp(msg, "E (", 3) == 0) {
             if (s_error_file) {
                 flush_log_file(s_error_file);
-                fclose(s_error_file);
+                sd_card_fclose(s_error_file);
                 s_error_file = NULL;
             }
             char fname[64];
             generate_file_name(fname, sizeof(fname));
-            s_error_file = fopen(fname, "w");
+            s_error_file = sd_card_fopen(fname, "w");
             if (s_error_file) {
-                fprintf(s_error_file, "--- error log start ---\n");
+                const char *header = "--- error log start ---\n";
+                sd_card_fwrite(s_error_file, header, strlen(header));
                 flush_log_file(s_error_file);
             }
         }
         if (s_error_file) {
-            fwrite(msg, 1, (size_t)safe_len, s_error_file);
+            sd_card_fwrite(s_error_file, msg, (size_t)safe_len);
             flush_log_file(s_error_file);
         }
     }
@@ -109,14 +103,15 @@ void error_log_write_msg(const char *msg)
     if (!s_error_file) {
         char fname[64];
         generate_file_name(fname, sizeof(fname));
-        s_error_file = fopen(fname, "w");
+        s_error_file = sd_card_fopen(fname, "w");
         if (s_error_file) {
-            fprintf(s_error_file, "--- error log start ---\n");
+            const char *header = "--- error log start ---\n";
+            sd_card_fwrite(s_error_file, header, strlen(header));
             flush_log_file(s_error_file);
         }
     }
     if (s_error_file) {
-        fputs(msg, s_error_file);
+        sd_card_fwrite(s_error_file, msg, strlen(msg));
         flush_log_file(s_error_file);
     }
 }

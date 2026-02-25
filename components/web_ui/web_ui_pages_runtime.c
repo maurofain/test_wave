@@ -84,7 +84,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
         "%s%s"
         "</div>"
-        "</div></div></div></div></body></html>",
+        "</div></div></div></div>",
         test_link,
         tasks_link,
         httpservices_link,
@@ -127,7 +127,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
         "%s%s"
         "</div>"
-        "</div></div></div></div></body></html>",
+        "</div></div></div></div>",
         test_link,
         tasks_link,
         httpservices_link,
@@ -139,6 +139,76 @@ esp_err_t root_get_handler(httpd_req_t *req)
 
     httpd_resp_sendstr_chunk(req, body);
     free(body);
+#if DNA_SYS_MONITOR == 0
+    static const char sysmon_widget[] =
+        "<div class='container'><div class='card' id='sm_card'>"
+        "<h2 id='sm_hdr' onclick='smToggle()' style='cursor:pointer;user-select:none;margin-bottom:0'>"
+          "\xf0\x9f\x92\xbb Sistema<span id='sm_icon' style='float:right;font-size:14px;margin-top:4px'>\xe2\x96\xb8</span></h2>"
+        "<div id='sm_body' style='display:none;margin-top:12px'>"
+        "<div class='sm-row'><span class='sm-lbl'>DRAM</span>"
+          "<div class='sm-bar'><div class='sm-fill' id='sm_dram'></div></div>"
+          "<span class='sm-val' id='sm_dram_v'>\xe2\x80\x94</span></div>"
+        "<div class='sm-row'><span class='sm-lbl'>SPIRAM</span>"
+          "<div class='sm-bar'><div class='sm-fill' id='sm_spi'></div></div>"
+          "<span class='sm-val' id='sm_spi_v'>\xe2\x80\x94</span></div>"
+        "<div class='sm-row' id='sm_cpu0_r' style='display:none'>"
+          "<span class='sm-lbl'>Core 0</span>"
+          "<div class='sm-bar'><div class='sm-fill sm-cpu' id='sm_c0'></div></div>"
+          "<span class='sm-val' id='sm_c0v'>\xe2\x80\x94</span></div>"
+        "<div class='sm-row' id='sm_cpu1_r' style='display:none'>"
+          "<span class='sm-lbl'>Core 1</span>"
+          "<div class='sm-bar'><div class='sm-fill sm-cpu' id='sm_c1'></div></div>"
+          "<span class='sm-val' id='sm_c1v'>\xe2\x80\x94</span></div>"
+        "<div class='sm-row'><span class='sm-lbl'>Uptime</span>"
+          "<div class='sm-bar'></div>"
+          "<span class='sm-val' id='sm_up'>\xe2\x80\x94</span></div>"
+        "</div>"
+        "<style>"
+        ".sm-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #ecf0f1}"
+        ".sm-lbl{width:60px;font-size:12px;font-weight:bold;color:#34495e;flex-shrink:0}"
+        ".sm-bar{flex:1;background:#ecf0f1;border-radius:4px;height:13px;overflow:hidden}"
+        ".sm-fill{height:100%;background:#3498db;border-radius:4px;width:0%;transition:width .4s}"
+        ".sm-cpu{background:#e67e22}"
+        ".sm-val{width:130px;font-size:12px;font-family:monospace;color:#555;text-align:right;flex-shrink:0}"
+        "</style>"
+        "<script>(function(){"
+        "var smOpen=false,smTimer=null;"
+        "function fb(n){return n>=1048576?(n/1048576).toFixed(1)+' MB':n>=1024?(n/1024).toFixed(0)+' KB':n+' B';}"
+        "function fu(s){var d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),ss=s%60;"
+        "return(d?d+'g ':'')+h+'h '+m+'m '+ss+'s';}"
+        "async function sm(){"
+        "try{var r=await fetch('/api/sysinfo');if(!r.ok)return;var d=await r.json();"
+        "var dp=Math.round((1-d.heap.dram_free/d.heap.dram_total)*100);"
+        "var sp=Math.round((1-d.heap.spiram_free/d.heap.spiram_total)*100);"
+        "document.getElementById('sm_dram').style.width=dp+'%';"
+        "document.getElementById('sm_dram_v').textContent=fb(d.heap.dram_free)+' lib ('+dp+'%)';"
+        "document.getElementById('sm_spi').style.width=sp+'%';"
+        "document.getElementById('sm_spi_v').textContent=fb(d.heap.spiram_free)+' lib ('+sp+'%)';"
+        "if(d.cpu.available&&d.cpu.core0_pct>=0){"
+        "  document.getElementById('sm_cpu0_r').style.display='';"
+        "  document.getElementById('sm_cpu1_r').style.display='';"
+        "  document.getElementById('sm_c0').style.width=d.cpu.core0_pct+'%';"
+        "  document.getElementById('sm_c0v').textContent=d.cpu.core0_pct+'%';"
+        "  document.getElementById('sm_c1').style.width=d.cpu.core1_pct+'%';"
+        "  document.getElementById('sm_c1v').textContent=d.cpu.core1_pct+'%';"
+        "}"
+        "document.getElementById('sm_up').textContent=fu(d.uptime_s);"
+        "}catch(e){}"
+        "}"
+        "window.smToggle=function(){"
+        "smOpen=!smOpen;"
+        "document.getElementById('sm_body').style.display=smOpen?'':'none';"
+        "document.getElementById('sm_icon').textContent=smOpen?'\xe2\x96\xbe':'\xe2\x96\xb8';"
+        "try{localStorage.setItem('sm_open',smOpen?'1':'0');}catch(e){}"
+        "if(smOpen){sm();smTimer=setInterval(sm,1000);}"
+        "else{clearInterval(smTimer);smTimer=null;}"
+        "};"
+        "try{if(localStorage.getItem('sm_open')==='1')window.smToggle();}catch(e){}"
+        "})();</script>"
+        "</div></div>";
+    httpd_resp_sendstr_chunk(req, sysmon_widget);
+#endif /* DNA_SYS_MONITOR == 0 */
+    httpd_resp_sendstr_chunk(req, "</body></html>");
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 }
@@ -284,7 +354,7 @@ esp_err_t tasks_page_handler(httpd_req_t *req)
         "<p style='margin:8px 0 14px 0;color:#566573;'>Questa tabella modifica solo i task applicativi da <code>tasks.csv</code>. I task di sistema FreeRTOS (es. HTTP server, lwIP, idle) non sono mostrati qui.</p>"
         "<div id='status'></div>"
         "<table id='tasksTable'><thead><tr>"
-        "<th>Nome</th><th>Stato</th><th>Priorità</th><th>Core</th><th>Periodo (ms)</th><th>Stack Words</th>"
+        "<th>Nome</th><th>Stato</th><th>Priorità</th><th>Core</th><th>Periodo (ms)</th><th>Stack Words</th><th>Stack Mem</th>"
         "</tr></thead><tbody id='tasksBody'>Caricamento...</tbody></table>"
         "<div style='display:flex; gap:10px;'>"
         "<button type='button' class='btn-add' onclick='addRow()'>➕ Aggiungi Task</button>"
@@ -309,9 +379,13 @@ esp_err_t tasks_page_handler(httpd_req_t *req)
         "<td><select onchange='tasks[${idx}].core=parseInt(this.value)'><option value='0' ${task.core==0?'selected':''}>0</option>"
         "<option value='1' ${task.core==1?'selected':''}>1</option></select></td>"
         "<td><input type='number' value='${task.period_ms}' min='1' onchange='tasks[${idx}].period_ms=parseInt(this.value)'></td>"
-        "<td><input type='number' value='${task.stack_words}' min='512' step='512' onchange='tasks[${idx}].stack_words=parseInt(this.value)'></td>`;});"
+        "<td><input type='number' value='${task.stack_words}' min='512' step='512' onchange='tasks[${idx}].stack_words=parseInt(this.value)'></td>"
+        "<td><select onchange='tasks[${idx}].stack_caps=this.value'>"
+        "<option value='spiram' ${(task.stack_caps||'spiram')==='spiram'?'selected':''}>SPIRAM</option>"
+        "<option value='internal' ${task.stack_caps==='internal'?'selected':''}>DRAM</option>"
+        "</select></td>`;});"
         "}"
-        "function addRow(){tasks.push({name:'new_task',state:'idle',priority:4,core:0,period_ms:100,stack_words:2048});renderTable();}"
+        "function addRow(){tasks.push({name:'new_task',state:'idle',priority:4,core:0,period_ms:100,stack_words:2048,stack_caps:'spiram'});renderTable();}"
         "async function saveTasks(){"
         "try{const r=await fetch('/api/tasks/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(tasks)});"
         "if(r.ok){showStatus('✅ Tasks salvate con successo!','success');}else{showStatus('❌ Errore durante il salvataggio','error');}}catch(e){showStatus('❌ Errore: '+e,'error');}}"

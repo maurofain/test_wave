@@ -1,5 +1,94 @@
 # SEQUENZA_BOOT
 
+> **Due sezioni distinte:**
+> 1. [Implementazione reale attuale](#sequenza-reale-attuale) — cosa accade oggi, con i tempi misurati e i problemi noti.
+> 2. [Architettura target](#architettura-target) — la sequenza ideale verso cui tendere.
+
+---
+
+## Sequenza reale attuale
+
+### Tempi misurati (log monitor)
+| T (ms) | Evento |
+|--------|--------|
+| ~0     | Avvio bootloader (verifica SHA256 app ~1 s) |
+| ~1029  | `esp_core_dump_flash: Init core dump to flash` — primo log IDF, prima di `app_main` |
+| ~1051  | `esp_core_dump_flash: Found core dump N bytes in flash` (se presente) |
+| ~1051–5763 | **`app_main()` + `init_run_factory()`** (dettaglio sotto) |
+| ~5763  | `TASKS: Avvio task ws2812` — `tasks_start_all()` completato |
+
+### Sequenza dettagliata `app_main()`
+
+**1. Policy log**
+- `apply_boot_log_policy()` — livello globale `INFO` (APP) o `ERROR` (FACTORY); USB/CDC forzati a `ERROR`
+
+**2. Storage errori early**
+- `error_log_init()` → `sd_card_mount()` — SD montata (o mock); file di log aperto
+
+**3. Banner versione**
+- Log: mode, running app, versione, data compilazione
+
+**4. Hardware minimo per decisione boot**
+- `init_i2c_and_io_expander()`:
+  - `bsp_i2c_init()` (se `CONFIG_BSP_I2C_NUM`)
+  - `io_expander_init()`
+  - loop GPIO3: `while (io_get_pin(3) == 0) vTaskDelay(1000ms)` — attende rilascio pulsante Service
+
+**5. `init_run_factory()`**
+```
+a. init_nvs()
+b. update_boot_reboot_guard()        — incrementa NVS consecutive_reboots se reset non pulito
+c. update_crash_pending_record()     — scrive NVS crash_pending=1 se reset non pulito
+d. init_spiffs()                     — mount SPIFFS (~500 ms)
+e. log_partitions()
+f. init_event_loop()
+g. device_config_init()              — deserializza config JSON da SPIFFS
+h. fsm_event_queue_init(0)
+i. try_send_pending_crash_record()   — ⚠️ PROBLEMA NOTO (vedi sotto)
+j. [check s_error_lock_active → blocco boot se >= REBOOT_LIMIT]
+k. aux_gpio_init()
+l. init_display_lvgl_minimal()       — solo se cfg->display.enabled
+m. start_ethernet()                  — solo se cfg->eth.enabled
+n. serial_test_init()
+o. web_ui_init()
+p. device_activity_init()            — solo COMPILE_APP
+q. remote_logging_init()
+r. io_expander_init() + loop GPIO3   — percorso legacy (senza BSP_I2C_NUM), se io_expander_enabled
+s. led_init()                        — se led_enabled
+t. rs232_init() + cctalk_driver_init() — se rs232_enabled
+u. rs485_init()                      — se rs485_enabled
+v. mdb_init() + mdb_start_engine()   — se mdb_enabled
+w. pwm_init()                        — se pwm1/pwm2 enabled
+x. sht40_init()                      — se temperature_enabled
+y. sd_card_init_monitor()            — sempre (hot-plug detection)
+z. sd_card_mount() + transfer_coredump_flash_to_sd() — se sd_card_enabled
+```
+
+**6. Post-init**
+- `maybe_force_crash_at_boot()` — no-op (`DEBUG_FORCE_CRASH_AT_BOOT=0`)
+- `apply_post_boot_log_policy()` — globale `INFO`, USB/CDC a `WARN`
+- `tasks_load_config("/spiffs/tasks.csv")`
+- `tasks_start_all()` ← **T ~5763 ms**
+
+**7. Finestra di stabilità (`BOOT_COUNTER_RESET_DELAYED=1`)**
+- loop 30 s in step da 5 s con log heap residuo
+- `init_mark_boot_completed()` — azzera NVS `consecutive_reboots`
+
+**8. Main loop**
+- `vTaskDelay(5000)` + log "Device in funzione ✓" ogni 5 s
+
+---
+
+### ⚠️ Problema noto: `try_send_pending_crash_record` prima di Ethernet
+
+**Passo `i`** chiama `esp_http_client_perform` con `timeout_ms=3000` **prima** che `start_ethernet()` (passo `m`) abbia inizializzato la rete. Se `crash_pending=1` (ovvero nel boot successivo a qualsiasi crash/panic), la funzione attende il timeout completo di **~3 s** prima di proseguire, causando il ritardo osservato tra T=1051 ms e T=5763 ms.
+
+**Fix previsto:** spostare `try_send_pending_crash_record()` dopo `start_ethernet()`, oppure verificare che almeno una netif abbia un IP prima di tentare il POST.
+
+---
+
+## Architettura target
+
 ## Obiettivo
 Definire una sequenza di avvio deterministica, senza race in inizializzazione, coerente con la scelta architetturale della coda eventi multi-destinatario (mailbox condivisa).
 

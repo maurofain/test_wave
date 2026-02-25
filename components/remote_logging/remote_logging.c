@@ -14,7 +14,7 @@
 #include <stdarg.h>
 
 #define TAG "REMOTE_LOG"
-#define LOG_QUEUE_SIZE 50
+#define LOG_QUEUE_SIZE 50  // default queue length; reduced dynamically if heap low
 #define LOG_MESSAGE_MAX_LEN 512
 #define LOG_TASK_STACK_SIZE 6144
 #define LOG_TASK_PRIORITY 5
@@ -29,6 +29,15 @@ typedef struct {
 
 // Variabili globali
 static QueueHandle_t log_queue = NULL;
+// Helper to log heap statistics at various points
+static void dump_heap(const char *ctx)
+{
+    size_t internal = heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
+    size_t dma = heap_caps_get_free_size(MALLOC_CAP_DMA);
+    size_t spiram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    ESP_LOGI(TAG, "[HEAP] %s - internal=%u, dma=%u, spiram=%u",
+             ctx, (unsigned)internal, (unsigned)dma, (unsigned)spiram);
+}
 static TaskHandle_t log_task_handle = NULL;
 static int sock_fd = -1;
 static bool initialized = false;
@@ -41,6 +50,11 @@ static TickType_t last_udp_error_time = 0;
 
 /**
  * @brief Converte il livello ESP_LOG in stringa
+ */
+/**
+ * @brief Converte un livello ESP_LOG in stringa
+ *
+ * Funzione di utilità usata internamente; non esportata.
  */
 __attribute__((unused)) static const char* esp_log_level_to_string(esp_log_level_t level)
 {
@@ -57,6 +71,13 @@ __attribute__((unused)) static const char* esp_log_level_to_string(esp_log_level
 
 /**
  * @brief Funzione di logging personalizzata che intercetta tutti i log ESP-IDF
+ */
+/**
+ * @brief Funzione di logging personalizzata interceptando esp_log
+ *
+ * Questa routine viene installata con esp_log_set_vprintf() e inoltra i
+ * messaggi al logger originale. Se il modulo è inizializzato inoltra anche
+ * i messaggi formattati alla coda di log per la trasmissione remota.
  */
 static int custom_vprintf(const char *fmt, va_list args)
 {
@@ -101,6 +122,13 @@ static int custom_vprintf(const char *fmt, va_list args)
 
 /**
  * @brief Task per l'invio dei log al server remoto
+ */
+/**
+ * @brief Task che invia i messaggi della coda al server remoto
+ *
+ * Estrae dalla coda log_message_t, copia i messaggi nella UI locale e
+ * invia i pacchetti UDP in broadcast se abilitato. Limita lo spam di errori
+ * tramite un contatore temporizzato.
  */
 static void log_sender_task(void *pvParameters)
 {
@@ -169,6 +197,12 @@ static void log_sender_task(void *pvParameters)
 /**
  * @brief Inizializza il socket UDP
  */
+/**
+ * @brief Inizializza il socket UDP per il broadcast dei log
+ *
+ * Restituisce ESP_OK se il socket è stato creato e configurato
+ * correttamente; in caso contrario ritorna ESP_FAIL.
+ */
 static esp_err_t init_socket(void)
 {
     device_config_t *cfg = device_config_get();
@@ -202,6 +236,20 @@ static esp_err_t init_socket(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Avvia il modulo di logging remoto
+ *
+ * Questo è il punto d'ingresso pubblico. Viene creata una coda di messaggi
+ * (ridimensionata automaticamente se necessario), un socket UDP per il
+ * broadcast ed un task di invio. Inoltre sostituisce il vprintf di ESP‑IDF
+ * per intercettare automaticamente tutti i log.
+ *
+ * La funzione è idempotente: se il modulo è già inizializzato ritorna ESP_OK
+ * immediatamente.
+ *
+ * @return ESP_OK se il modulo è pronto, ESP_FAIL in caso di errori critici
+ *         (ad esempio impossibilità di creare la coda e allocare socket).
+ */
 esp_err_t remote_logging_init(void)
 {
     if (initialized) {
@@ -209,11 +257,26 @@ esp_err_t remote_logging_init(void)
     }
 
     // Crea sempre la coda per i messaggi (logging locale sempre attivo)
-    log_queue = xQueueCreate(LOG_QUEUE_SIZE, sizeof(log_message_t));
-    if (log_queue == NULL) {
-        ESP_LOGE(TAG, "Errore creazione coda log");
-        return ESP_FAIL;
+    dump_heap("before queue alloc");
+    int queue_len = LOG_QUEUE_SIZE;
+    while (queue_len > 0) {
+        log_queue = xQueueCreate(queue_len, sizeof(log_message_t));
+        if (log_queue != NULL) break;
+        ESP_LOGW(TAG, "queue alloc (%d) fallita, heap dopo fallimento:", queue_len);
+        dump_heap("after failed alloc");
+        queue_len /= 2; // dimezza e riprova
     }
+    if (log_queue == NULL) {
+        ESP_LOGE(TAG, "Errore creazione coda log: memoria insufficiente, logging locale disabilitato");
+        /* Non è critico: continueremo comunque a funzionare senza coda.  Il
+           custom_vprintf e le funzioni di invio verificano log_queue==NULL
+           e semplicemente ignorano i messaggi in uscita.  Ritorniamo ESP_OK
+           così il chiamante può proseguire senza abort() e non blocchiamo il
+           boot per un problema di heap momentaneo. */
+        initialized = true; /* evita che la funzione venga ripetuta */
+        return ESP_OK;
+    }
+    dump_heap("after queue alloc");
 
     // Inizializza il socket
     if (init_socket() != ESP_OK) {
@@ -237,6 +300,18 @@ esp_err_t remote_logging_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Mette un messaggio nella coda per l'invio remoto
+ *
+ * Questa API è utilizzata internamente da custom_vprintf ma può essere
+ * chiamata direttamente da altri moduli per inviare messaggi personalizzati.
+ * Se la coda non esiste o il modulo non è inizializzato la chiamata è un no‑op.
+ *
+ * @param level  livello del log (es. "INFO")
+ * @param tag    tag associato al log
+ * @param message testo del log
+ * @return ESP_OK se il messaggio è stato accodato, ESP_FAIL in caso di errore
+ */
 esp_err_t remote_logging_send(const char *level, const char *tag, const char *message)
 {
     if (!initialized || log_queue == NULL) {

@@ -26,3 +26,22 @@
 - nei log ESP_LOGI/ESP_LOGW/ESP_LOGE va aggiunto un prefisso tra parentesi quadre all'inizio del messaggio per
 - identificare il contesto: [M] per main app, [F] per factory app, [C] per common/components
 
+- per simulare l'hardware senza alterare il codice "vero" utilizzare la tecnica dei
+  mockup:
+  1. definire un simbolo preprocessoriale (es. `DNA_SD_CARD`) in un header o
+     a livello di compilazione (menuconfig, CMake, ecc.);
+  2. lasciare intatte le funzioni originali e appendere **dopo di esse** una
+     sezione condizionale `#if defined(DNA_SD_CARD) && (DNA_SD_CARD==1)` che
+     contiene i dettagli del comportamento fittizio;
+  3. all'interno del blocco descrivere le operazioni previste e restituire
+     sempre valori che rappresentano un'operazione andata a buon fine (ESP_OK,
+     dimensioni non nulle, elenchi di file fittizi, ecc.); l'hardware reale non
+     viene mai toccato perché il codice reale è escluso dalla compilazione in
+     presenza del flag.
+  4. i mock devono essere auto‑confinati e non modificare lo stato del codice
+     reale.
+  5. Scrivere sempre le funzioni doppie: la versione reale e la versione mockup
+  Questo approccio permette di mantenere la logica originale intonsa e di
+  attivare/disattivare rapidamente il comportamento simulato cambiando il
+  valore del simbolo.
+

@@ -2,6 +2,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_heap_caps.h"
 
 typedef enum {
     TASK_STATE_RUN = 0,
@@ -17,6 +18,7 @@ typedef struct {
     TickType_t period_ticks;
     TaskFunction_t task_fn;
     uint32_t stack_words;
+    uint32_t stack_caps;   /* MALLOC_CAP_INTERNAL o MALLOC_CAP_SPIRAM */
     void *arg;
     TaskHandle_t handle;
 } task_param_t;

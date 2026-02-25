@@ -1,18 +1,30 @@
+#ifndef DNA_SHT40
+#define DNA_SHT40 0
+#endif
+
 #include "sht40.h"
-#include "bsp/esp-bsp.h"
 #include "esp_log.h"
-#include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include <stdbool.h>
 
 static const char *TAG = "SHT40";
+
+static bool s_sht40_ready = false;
+
+/* ============================================================
+ * Implementazione REALE (hardware I2C)
+ * Attiva quando DNA_SHT40 == 0
+ * ============================================================ */
+#if DNA_SHT40 == 0
+
+#include "bsp/esp-bsp.h"
+#include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define SHT40_ADDR          0x45  // 7-bit addr (8-bit: 0x8A W, 0x8B R)
 #define SHT40_CMD_MEAS      0xFD  // High precision measurement
 
 static i2c_master_dev_handle_t sht_dev;
-static bool s_sht40_ready = false;
 
 static uint8_t crc8(const uint8_t *data, size_t len) {
     uint8_t crc = 0xFF;
@@ -125,3 +137,41 @@ bool sht40_is_ready(void)
 {
     return s_sht40_ready;
 }
+
+#endif /* DNA_SHT40 == 0 */
+
+/* ============================================================
+ * Implementazione MOCK (nessun hardware)
+ * Attiva quando DNA_SHT40 == 1
+ * ============================================================ */
+#if defined(DNA_SHT40) && (DNA_SHT40 == 1)
+
+#define SHT40_MOCK_TEMP_C   25.0f
+#define SHT40_MOCK_HUM_PCT  50.0f
+
+esp_err_t sht40_init(void)
+{
+    s_sht40_ready = true;
+    ESP_LOGI(TAG, "[MOCK] SHT40 inizializzato (T=%.1f°C, H=%.1f%%)",
+             SHT40_MOCK_TEMP_C, SHT40_MOCK_HUM_PCT);
+    return ESP_OK;
+}
+
+esp_err_t sht40_read(float *temp, float *hum)
+{
+    if (!s_sht40_ready) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (temp) *temp = SHT40_MOCK_TEMP_C;
+    if (hum)  *hum  = SHT40_MOCK_HUM_PCT;
+    ESP_LOGI(TAG, "[MOCK] sht40_read → T=%.1f°C, H=%.1f%%",
+             SHT40_MOCK_TEMP_C, SHT40_MOCK_HUM_PCT);
+    return ESP_OK;
+}
+
+bool sht40_is_ready(void)
+{
+    return s_sht40_ready;
+}
+
+#endif /* DNA_SHT40 == 1 */

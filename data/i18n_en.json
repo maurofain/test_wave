@@ -1215,7 +1215,7 @@
     "lang": "en",
     "scope": "p_runtime",
     "key": "editor_csv",
-    "text": "CSV Editor"
+    "text": "Tasks CSV Editor"
   },
   {
     "lang": "en",
@@ -1647,7 +1647,7 @@
     "lang": "en",
     "scope": "p_runtime",
     "key": "stack_words",
-    "text": "Stack Words"
+    "text": "Stack bytes"
   },
   {
     "lang": "en",

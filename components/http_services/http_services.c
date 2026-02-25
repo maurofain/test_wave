@@ -21,7 +21,9 @@ extern void web_ui_add_log(const char *level, const char *tag, const char *messa
 static const char *TAG = "HTTP_SERVICES";
 
 /* Debug: inibisce i POST verso il server remoto/cloud */
-#define DEBUG_DISABLE_SERVER_POST 1
+#ifndef DNA_SERVER_POST
+#define DNA_SERVER_POST 0
+#endif
 
 // Global variable to store the token
 char g_auth_token[256] = {0};
@@ -97,7 +99,7 @@ static void webui_log_chunked(const char *level, const char *tag, const char *la
 #endif
 
 /* small accumulator type used by the http client event handler */
-#if !DEBUG_DISABLE_SERVER_POST
+#if !DNA_SERVER_POST
 typedef struct { char *buf; size_t len; size_t cap; } http_acc_t;
 #endif
 
@@ -168,7 +170,7 @@ static void log_httpd_request(httpd_req_t *req, const char *body)
 
 /* --- Proxy implementations forwarding to remote server (uses device_config.server.url + credentials) --- */
 
-#if !DEBUG_DISABLE_SERVER_POST
+#if !DNA_SERVER_POST
 /* HTTP client event handler accumulator: collects HTTP_EVENT_ON_DATA into a dynamic buffer
    so responses delivered via the event path (chunked or already-copied-perform) are not lost.
 */
@@ -200,7 +202,7 @@ static esp_err_t http_client_event_accumulator(esp_http_client_event_t *evt)
    and reports the number of bytes read via out_len (may differ from strlen when binary/NULs are present). */
 static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header, char **out_resp, int *out_status, size_t *out_len)
 {
-#if DEBUG_DISABLE_SERVER_POST
+#if DNA_SERVER_POST
     (void)body;
     (void)auth_header;
     if (out_resp) {
@@ -212,7 +214,7 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
     if (out_len) {
         *out_len = 0;
     }
-    ESP_LOGW(TAG, "POST remoto inibito da DEBUG_DISABLE_SERVER_POST (path=%s)", remote_path ? remote_path : "(null)");
+    ESP_LOGW(TAG, "POST remoto inibito da DNA_SERVER_POST (path=%s)", remote_path ? remote_path : "(null)");
     return ESP_ERR_NOT_SUPPORTED;
 #else
     if (!remote_path) return ESP_ERR_INVALID_ARG;

@@ -10,9 +10,20 @@
 #include "web_ui_programs.h"
 #include "fsm.h"
 #include "usb_cdc_scanner.h" // Scanner QR
+#include "freertos/idf_additions.h"
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+
+#ifndef DNA_LED_STRIP
+#define DNA_LED_STRIP 0
+#endif
+#ifndef DNA_SHT40
+#define DNA_SHT40 0
+#endif
+#ifndef DNA_IO_EXPANDER
+#define DNA_IO_EXPANDER 0
+#endif
 
 static const char *TAG = "TASKS";
 static float s_temperature = 0.0f;
@@ -21,7 +32,25 @@ static float s_humidity = 0.0f;
 float tasks_get_temperature(void) { return s_temperature; }
 float tasks_get_humidity(void) { return s_humidity; }
 
-static void ws2812_blink_task(void *arg)
+/* Wrapper: crea il task allocando lo stack in DRAM interna o PSRAM
+ * in base al campo stack_caps del descrittore. */
+static BaseType_t task_create(task_param_t *t)
+{
+    return xTaskCreatePinnedToCoreWithCaps(
+        t->task_fn, t->name, t->stack_words, t->arg,
+        t->priority, &t->handle, t->core_id, t->stack_caps);
+}
+
+/* ============================================================
+ * ws2812_task — implementazione REALE (hardware WS2812/RMT)
+ * Attiva quando DNA_LED_STRIP == 0
+ * ============================================================ */
+#ifndef DNA_LED_STRIP
+#define DNA_LED_STRIP 0
+#endif
+
+#if DNA_LED_STRIP == 0
+static void ws2812_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
     led_strip_handle_t strip = init_get_ws2812_handle();
@@ -30,15 +59,14 @@ static void ws2812_blink_task(void *arg)
 
     while (true) {
         if (!strip) {
-            // Se i LED sono disabilitati in config, evitiamo di spammare log
             if (!device_config_get()->sensors.led_enabled) {
                 vTaskDelay(pdMS_TO_TICKS(5000));
-                strip = init_get_ws2812_handle(); // Riprova a prenderlo in caso sia stato abilitato
+                strip = init_get_ws2812_handle();
                 continue;
             }
             ESP_LOGW(TAG, "[M] Handle WS2812 non pronto");
             vTaskDelay(pdMS_TO_TICKS(500));
-            strip = init_get_ws2812_handle(); 
+            strip = init_get_ws2812_handle();
             continue;
         }
         color += 25;
@@ -47,6 +75,22 @@ static void ws2812_blink_task(void *arg)
         vTaskDelayUntil(&last_wake, param->period_ticks);
     }
 }
+#endif /* DNA_LED_STRIP == 0 */
+
+/* ============================================================
+ * ws2812_task — implementazione MOCK (nessun hardware)
+ * Attiva quando DNA_LED_STRIP == 1
+ * ============================================================ */
+#if defined(DNA_LED_STRIP) && (DNA_LED_STRIP == 1)
+static void ws2812_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    ESP_LOGI(TAG, "[MOCK] ws2812_task avviata: DNA_LED_STRIP=1, nessun hardware RMT/WS2812");
+    while (true) {
+        vTaskDelay(param->period_ticks);
+    }
+}
+#endif /* DNA_LED_STRIP == 1 */
 
 // Task scheletro (solo struttura, logica da implementare)
 
@@ -269,16 +313,20 @@ static void lvgl_task(void *arg)
 static void ntp_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
-    TickType_t last_wake = xTaskGetTickCount();
-    
+
     ESP_LOGI(TAG, "[NTP] NTP task started, period: %d seconds", 600);
-    
+
+    /* Attende che la rete sia pronta prima del primo tentativo.
+     * L'Ethernet/Wi-Fi può impiegare alcuni secondi per ottenere un IP. */
+    vTaskDelay(pdMS_TO_TICKS(30000));
+
+    TickType_t last_wake = xTaskGetTickCount();
+
     while (true) {
         device_config_t *cfg = device_config_get();
-        
+
         if (cfg->ntp_enabled) {
             ESP_LOGI(TAG, "[NTP] Checking NTP sync...");
-            // Try to sync NTP
             esp_err_t ret = init_sync_ntp();
             if (ret == ESP_OK) {
                 ESP_LOGI(TAG, "[NTP] NTP sync successful");
@@ -288,7 +336,7 @@ static void ntp_task(void *arg)
         } else {
             ESP_LOGD(TAG, "[NTP] NTP disabled in configuration");
         }
-        
+
         vTaskDelayUntil(&last_wake, param->period_ticks);
     }
 }
@@ -326,13 +374,14 @@ static void usb_scanner_task_wrapper(void *arg)
 
 static task_param_t s_tasks[] = {
     {
-        .name = "ws2812_blink",
+        .name = "ws2812",
         .state = TASK_STATE_RUN,
         .priority = 5,
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(500),
-        .task_fn = ws2812_blink_task,
-        .stack_words = 8192,
+        .task_fn = ws2812_task,
+        .stack_words = 2048,                  /* RISC-V: StackType_t=1B; ~2KB reali */
+        .stack_caps = MALLOC_CAP_INTERNAL,
         .arg = NULL,
         .handle = NULL,
     },
@@ -343,7 +392,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(1000),
         .task_fn = eeprom_task,
-        .stack_words = 8192,
+        .stack_words = 2048,                  /* RISC-V: StackType_t=1B; ~2KB reali */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -354,7 +404,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(500),
         .task_fn = io_expander_task,
-        .stack_words = 8192,
+        .stack_words = 2048,                  /* RISC-V: StackType_t=1B; ~2KB reali */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -365,7 +416,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(2000),
         .task_fn = sht40_task,
-        .stack_words = 8192,
+        .stack_words = 8192,                  /* RISC-V: 8KB; driver I2C + float + ESP_LOG */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -376,7 +428,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = rs232_task,
-        .stack_words = 8192,
+        .stack_words = 4096,                  /* RISC-V: 4KB; skeleton con margine */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -387,7 +440,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = rs485_task,
-        .stack_words = 8192,
+        .stack_words = 4096,                  /* RISC-V: 4KB; skeleton con margine */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -398,7 +452,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = mdb_task,
-        .stack_words = 8192,
+        .stack_words = 4096,                  /* RISC-V: 4KB; skeleton con margine */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -409,7 +464,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(20),
         .task_fn = pwm_task,
-        .stack_words = 8192,
+        .stack_words = 2048,                  /* RISC-V: StackType_t=1B; ~2KB reali */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -420,7 +476,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(100),
         .task_fn = fsm_task,
-        .stack_words = 8192,
+        .stack_words = 32768,                 /* RISC-V: 32KB; logica FSM + ESP_LOG + cJSON */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -431,7 +488,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(20),
         .task_fn = touchscreen_task,
-        .stack_words = 8192,
+        .stack_words = 8192,                  /* RISC-V: 8KB; polling touch + event publish */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -442,7 +500,8 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(16),
         .task_fn = lvgl_task,
-        .stack_words = 8192,
+        .stack_words = 32768,                 /* RISC-V: 32KB; LVGL stack frame profondo */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -451,20 +510,22 @@ static task_param_t s_tasks[] = {
         .state = TASK_STATE_RUN,
         .priority = 3,
         .core_id = 0,
-        .period_ticks = pdMS_TO_TICKS(600000), // 600 secondi = 10 minuti
+        .period_ticks = pdMS_TO_TICKS(600000),
         .task_fn = ntp_task,
-        .stack_words = 8192,
+        .stack_words = 32768,                 /* RISC-V: 32KB; esp_http_client + TLS frame profondi */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
     {
         .name = "usb_scanner",
-        .state = TASK_STATE_IDLE, /* default: idle, abilita da /tasks o /config */
+        .state = TASK_STATE_IDLE,
         .priority = 4,
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(1000),
         .task_fn = usb_scanner_task_wrapper,
-        .stack_words = 8192,
+        .stack_words = 32768,                 /* RISC-V: 32KB; USB host stack profondo */
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },
@@ -517,7 +578,7 @@ void tasks_load_config(const char *path)
     }
 
     while (fgets(line, sizeof(line), f)) {
-        // name,state,priority,core,period_ms,stack_words
+        // name,state,priority,core,period_ms,stack_words,stack_caps
         char *save = NULL;
         char *name = strtok_r(line, ",\r\n", &save);
         char *state = strtok_r(NULL, ",\r\n", &save);
@@ -525,6 +586,7 @@ void tasks_load_config(const char *path)
         char *core = strtok_r(NULL, ",\r\n", &save);
         char *period = strtok_r(NULL, ",\r\n", &save);
         char *stack = strtok_r(NULL, ",\r\n", &save);
+        char *caps_str = strtok_r(NULL, ",\r\n", &save);
         if (!name) continue;
 
         task_param_t *t = find_task_by_name(name);
@@ -542,20 +604,51 @@ void tasks_load_config(const char *path)
         if (period) t->period_ticks = pdMS_TO_TICKS(atoi(period));
         if (stack) {
             uint32_t val = (uint32_t)atoi(stack);
-            if (val < 8192) val = 8192; // Forza minimo 8192 words (32KB) per sicurezza
+            if (val < 512) val = 512;   /* minimo FreeRTOS: non forzare 8192 */
             t->stack_words = val;
-        }
-    }
+        }        if (caps_str) {
+            if (strcasecmp(caps_str, "spiram") == 0) {
+                t->stack_caps = MALLOC_CAP_SPIRAM;
+            } else if (strcasecmp(caps_str, "internal") == 0) {
+                t->stack_caps = MALLOC_CAP_INTERNAL;
+            }
+        }    }
     fclose(f);
+}
+
+/* ============================================================
+ * tasks_set_state_idle_for_mocks
+ * Imposta IDLE le task dei moduli con mock DNA_* attivo (= 1).
+ * Va chiamata dopo tasks_load_config() e prima di tasks_start_all()
+ * in modo che il CSV non possa sovrascrivere la decisione.
+ * Aggiungere qui una riga per ogni nuovo mock DNA_*.
+ * ============================================================ */
+static void tasks_set_state_idle_for_mocks(void)
+{
+#if DNA_LED_STRIP == 1
+    task_param_t *t = find_task_by_name("ws2812");
+    if (t) { t->state = TASK_STATE_IDLE; }
+#endif
+    /* Nota: sht40_task e io_expander_task hanno mock passthrough
+     * (la funzione chiama le API del componente che risponde correttamente),
+     * quindi non vanno messi IDLE: la task gira e il mock risponde.
+     * Aggiungere qui solo i task che non hanno senso con il mock attivo.
+     */
 }
 
 void tasks_start_all(void)
 {
+    tasks_set_state_idle_for_mocks();
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
         // Rispetta la configurazione di display: se headless salta lvgl/touchscreen
         if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0) && !device_config_get()->display.enabled) {
             ESP_LOGI(TAG, "[M] Task saltato %s (display disabilitato da config)", t->name);
+            continue;
+        }
+        // Salta il task io_expander se il dispositivo non è abilitato in config
+        if (strcmp(t->name, "io_expander") == 0 && !device_config_get()->sensors.io_expander_enabled) {
+            ESP_LOGI(TAG, "[M] Task saltato %s (I/O expander disabilitato)", t->name);
             continue;
         }
         if (t->state != TASK_STATE_RUN) {
@@ -567,9 +660,10 @@ void tasks_start_all(void)
         if (t->arg == NULL) {
             t->arg = t;
         }
-        BaseType_t res = xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
+        BaseType_t res = task_create(t);
         if (res != pdPASS) {
-            ESP_LOGE(TAG, "[M] Fallimento avvio task %s", t->name);
+            ESP_LOGE(TAG, "[M] Fallimento avvio task %s (stack=%lu caps=0x%lx)",
+                     t->name, (unsigned long)t->stack_words, (unsigned long)t->stack_caps);
         }
     }
 }
@@ -589,6 +683,10 @@ void tasks_apply_n_run(void)
                 t->state = TASK_STATE_RUN; // display abilitato => assicuriamo che partano
             }
         }
+        // Forza stato idle su io_expander se il sensore è disabilitato
+        if (strcmp(t->name, "io_expander") == 0 && !cfg->sensors.io_expander_enabled) {
+            t->state = TASK_STATE_IDLE;
+        }
 
         if (t->state == TASK_STATE_RUN) {
             if (t->handle == NULL) {
@@ -597,7 +695,7 @@ void tasks_apply_n_run(void)
                 if (t->arg == NULL) {
                     t->arg = t;
                 }
-                xTaskCreatePinnedToCore(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id);
+                xTaskCreatePinnedToCoreWithCaps(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id, t->stack_caps);
             } else {
                 vTaskResume(t->handle);
             }

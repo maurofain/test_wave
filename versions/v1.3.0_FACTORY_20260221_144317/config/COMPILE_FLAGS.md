@@ -27,7 +27,7 @@ Quando viene aggiunto, rimosso o modificato un flag di compilazione, aggiornare 
 - **File:** `main/main.c`
 - **Impatto:** costante compile-time per la finestra di stabilizzazione del boot counter (se `BOOT_COUNTER_RESET_DELAYED=1`).
 
-### `DEBUG_DISABLE_SERVER_POST`
+### `DNA_SERVER_POST`
 - **File:** `main/init.c`, `components/http_services/http_services.c`
 - **Valori:** `1` inibisce i POST outbound al server, `0` comportamento normale.
 - **Impatto:**

@@ -6,6 +6,18 @@ Questo documento elenca i `#define` (e i `CONFIG_*` da `sdkconfig`) che influenz
 
 Quando viene aggiunto, rimosso o modificato un flag di compilazione, aggiornare questo file nella stessa modifica.
 
+## Flag DNA_* — posizione e gestione
+
+Tutti i flag `DNA_*` (DoNotActivate) sono definiti in **`CMakeLists.txt` radice**
+tramite `add_compile_definitions(...)` e sono propagati dal build system a
+**tutti** i componenti e a `main/` come flag `-D` del compilatore.
+
+Per attivare il mockup di un modulo: modificare il valore del flag corrispondente
+da `0` a `1` nel blocco `add_compile_definitions()` di `CMakeLists.txt`.
+
+Non occorre modificare `app_version.h`, né i `CMakeLists.txt` dei singoli
+componenti.
+
 ## Flag custom progetto
 
 ### `COMPILE_APP`
@@ -27,7 +39,7 @@ Quando viene aggiunto, rimosso o modificato un flag di compilazione, aggiornare 
 - **File:** `main/main.c`
 - **Impatto:** costante compile-time per la finestra di stabilizzazione del boot counter (se `BOOT_COUNTER_RESET_DELAYED=1`).
 
-### `DEBUG_DISABLE_SERVER_POST`
+### `DNA_SERVER_POST`
 - **File:** `main/init.c`, `components/http_services/http_services.c`
 - **Valori:** `1` inibisce i POST outbound al server, `0` comportamento normale.
 - **Impatto:**
@@ -43,6 +55,51 @@ Quando viene aggiunto, rimosso o modificato un flag di compilazione, aggiornare 
 - **File:** `components/http_services/http_services.c`
 - **Valori:** definito/non definito
 - **Impatto:** include/esclude il logging esteso verso `web_ui_add_log` nei percorsi HTTP services.
+
+### `DNA_SHT40`
+- **File:** `components/sht40/sht40.c`
+- **Valori:** `1` = mockup attivo (nessun hardware I2C/SHT40), `0` = driver reale
+- **Impatto:** quando impostato a `1`, le tre funzioni pubbliche del modulo
+  (`sht40_init`, `sht40_read`, `sht40_is_ready`) vengono sostituite da versioni
+  fittizie. `sht40_init` segna il sensore come pronto; `sht40_read` restituisce
+  sempre T=25.0°C e H=50.0% senza accedere all'I2C.
+
+### `DNA_IO_EXPANDER`
+- **File:** `main/app_version.h`, `components/io_expander/io_expander.c`
+- **Valori:** `1` = mockup attivo (nessun hardware I2C/FXL6408), `0` = driver reale
+- **Impatto:** quando impostato a `1`, nessun bus I2C viene toccato; le variabili
+  globali `io_output_state` / `io_input_state` vengono aggiornate localmente come
+  farebbe il driver reale. `io_input_state` inizia a `0xFF` (tutti i pin in alto,
+  come con pull-up attivi, incluso GPIO3). Utile per testare la logica applicativa
+  che legge i pin senza hardware collegato.
+  Per attivare, decommentare in `components/io_expander/CMakeLists.txt`:
+  `target_compile_definitions(__idf_io_expander PRIVATE DNA_IO_EXPANDER=1)`
+
+### `DNA_LED_STRIP`
+- **File:** `main/app_version.h`, `components/led/led.c`
+- **Valori:** `1` = mockup attivo (nessun hardware RMT/WS2812), `0` = driver reale
+- **Impatto:** quando impostato a `1`, tutte le funzioni pubbliche del modulo LED
+  vengono sostituite da versioni fittizie. `led_init` simula il conteggio LED da
+  `CONFIG_APP_WS2812_LEDS`; `led_fill_color/set_pixel/breathe/rainbow/fade_in/fade_out`
+  restituiscono ESP_OK senza toccare il bus RMT. `led_get_handle()` ritorna NULL.
+  Per attivare, decommentare in `components/led/CMakeLists.txt`:
+  `target_compile_definitions(__idf_led PRIVATE DNA_LED_STRIP=1)`
+
+### `DNA_SD_CARD`
+- **File:** `main/app_version.h`, `components/sd_card/sd_card.c`
+- **Valori:** `1` = mockup attivo (nessun hardware reale), `0` = driver SD reale
+- **Impatto:** quando impostato a `1`, tutte le funzioni pubbliche del modulo SD
+  vengono sostituite da versioni fittizie che simulano una scheda da 32 MB con
+  4 file di esempio (`mock1.txt`, `mock2.log`, `mock3.bin`, `mock4.cfg`).
+  Le API coinvolte coprono **tutto** l'accesso filesystem SD:
+  `sd_card_mount/unmount/read_file/write_file/list_dir/format`,
+  `sd_card_fopen/fclose/fwrite/fread/fflush`,
+  `sd_card_opendir/readdir/closedir/stat`,
+  `sd_card_get_total_size/used_size/is_mounted/is_present`.
+  I chiamanti (`init.c`, `error_log.c`, `web_ui_file_manager.c`) non devono
+  apportare modifiche: tutto l'I/O SD avviene esclusivamente tramite le API
+  del componente `sd_card`.
+
 
 ## Flag `CONFIG_*` usati nel codice applicativo
 

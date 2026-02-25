@@ -109,19 +109,43 @@
           3. codice QR precaricato in coin
        2. Funzionamento generale pay before use
           1. il cliente inserisce monete o presenta la tessara o mostra il qrcode. 
-          2. la macchina acquisisce il credito disponibile distinguendo due tipi: **ecd** (credito effettivo definitivo, non rimborsabile) e **vcd** (credito virtuale, scalato alla selezione del programma). QR (1 coin per volta) e monete contribuiscono all'ecd; la tessera contribuisce al vcd. Sistemi misti sono ammessi. All'inserimento della tessera viene comunque addebitato 1 coin che passa immediatamente a ecd.
-          3. il cliente sceglie un programma e la macchina scarica dai vcd e la macchina calcola i secondi di utilizzo corrispndenti in base alla tabella programmi ottenendo un rateo di utilizzo (rdu) in 1/60 di coin (chiamato tick) (es. programma da 1 coin per 30 secondi : rdu = 60/30 = 2 tick)) : dopo 10 secondi avrò un residuo di 60-(10*2) =40 tick.
-          4. Il programma può essere selezionato per solo 1 ciclo alla volta (non si può premotare ad esempio 3 cicli tipo 1)
-          5. il cliente usa la macchina per il tempo previsto dal programma che partirà dal momento in cui il cliente seleziona il programma
-          6. durante l'utilizzo il cliente può sospendere il ciclo e la macchina interrompe l'erogazione del servizio (ad esempio ferma l'aspiratore). La macchina ferma il conteggio del tempo per una durata massima trascorso il quale il conteggio riprende.
-          7. durante l'utilizzo di un programma il cliente può selezionare un altro programma e la macchina adegua il rdu alla tariffa del nuovo programma.
-          8. al raggiungimento della durata programmata la macchina si ferma e se c'è ancora credito vcd attende l'avvio di un altro programma.
-          9. se il cliente ha caricato tramite :
+          2. la macchina acquisisce il credito disponibile distinguendo due tipi: **ecd** (credito effettivo definitivo, non rimborsabile) e **vcd** (credito virtuale, scalato alla selezione del programma). QR (1 coin per volta) e monete contribuiscono all'ecd; la tessera contribuisce per 1 ecd all'inserzione e il credito rimanente al vcd. Sistemi misti sono ammessi. 
+          3. variabili da considerare nella gestione dell'erogazione:
+             1. vpp : valore prezzo programma indicato in tabella che indica i crediti utilizati alla pressione del tasto programma
+             2. vtp : valore tempo programma indicato in tabella 
+             3. vtt : valore di ticks totali = vpp * 60
+             4. rdu : rateo di utilizzo : numero di ticks scalati ogni secondo ricavato dal vpp * 60 / vtp
+             5. tts : time to stop : tempo rimanente alla fine del ciclo : si aggiorna ogni secondo 
+             6. vtr : tts/rdu : si aggiorna ogni secondo 
+             7. ttp : tempo pausa utilizzato
+             8. ecd : credito effettivo prelevato = vpp
+             9. vcd : credito virtuale disponibile usato solo con tessera se lasciata nel lettore
+          4. il cliente sceglie un programma e la macchina scarica dai vcd e la macchina calcola ogni secondo il valore di 
+             1. vpp
+             2. vtp
+             3. vtt
+             4. rdu
+             5. tts
+             6. vtr
+          5. la macchina visualizza :
+             1. evidenzia il programma scelto con sfondo rosso quando in run e giallo in pausa
+             2. cambia lo sfondo dell'area centrale in rosso  quando in run e giallo in pausa
+             3. Mostra nell'area centrale il valore principale vdp di ecd fino alla pressione del programma, poi il valore di vtp fino all'attivazione del servizio (es. accensione aspiratore ) , poi tts durante il run
+             4. sotto vdp mostra il tempo vtp fino all'attivazione del servizio , poi vtt-tts in run. Se in Pausa mostra ttp
+             5. la barra laterale mostra tts*100/vtp in forma grafica con colore verde da 100% a 30%, rosso da 29% a 0%
+          6. Il programma può essere selezionato per solo 1 ciclo alla volta (non si può premotare ad esempio 3 cicli tipo 1)
+          7. il cliente usa la macchina per il tempo previsto dal programma che partirà dal momento in cui il cliente seleziona il programma
+          8. durante l'utilizzo il cliente può sospendere il ciclo e la macchina interrompe l'erogazione del servizio (ad esempio ferma l'aspiratore). La macchina ferma il conteggio del tempo per una durata massima trascorso il quale il conteggio riprende.
+          9.  durante l'utilizzo di un programma il cliente può selezionare un altro programma e la macchina adegua tutte laviabili al nuovo rdu.
+             1. passaggio da P1(rdu=1) a P5(rdu=2) dopo 10 sec.: utilizzati 10 ticks , rimanenti 50 - nuovo tempo disponibile
+             2. al cambio di programma l'output hardware/sensori viene ricalcolato e riaggiornato in base alla maschera **Ralaty mask**, assicurando che i valori visualizzati e i comandi inviati riflettano il nuovo profilo di erogazione. 
+          10. al raggiungimento della durata programmata la macchina si ferma e se c'è ancora credito vcd attende l'avvio di un altro programma.
+          11. se il cliente ha caricato tramite :
              1.  gettoni : il credito rimane disponibile e se il cliente se ne va verrà usato dal cliente successivo
              2.  tessera : se la tessera è ancora inserirtanel lettore sll'avvio del duccessivo programma scala una altro coin, se è stata tolata il cliente deve ripresentare la tessera al lettore
              3.  se ha usato il QR deve ripresentarlo
     2. Visualizzazione
-       1. nella fase di carica del punto 5.1.1 il box centrale mostra il credito totale disponibile **ecd + vcd** (carattere grande 100%): monete/gettoni e QR (1 coin per volta) contribuiscono all'ecd; la tessera contribuisce al vcd (1 coin se tolta, totale se lasciata nel lettore). Il valore mostrato è sempre la somma ecd+vcd.
+       1. nella fase di carica del punto 5.1.1 il box centrale mostra il credito totale disponibile **ecd + vcd** (carattere grande 100%): monete/gettoni e QR (1 coin per volta) contribuiscono all'ecd; la tessera contribuisce al vcd (1 coin se tolta, totale se lasciata nel lettore). Il valore mostrato è sempre la somma ecd+vcd. Va mantenuto in memoria il valore delle singole sorgenti di ecd e vcd, e le quote utilizzate.
        2. all'avvio del programma il numero crediti scompare se era 1 oppure appare in basso con carattere grandezza 30% ed appare il numero dei secondi disponibili carattere 100%.
        3. la barra laterale (con replica sulla striscia LED) mostra la progressione del consumo del cliente in percentuale (ticks totali - ticks usati) * 100 7 ticks totali.
    

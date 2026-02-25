@@ -9,11 +9,19 @@
 #include "sdkconfig.h"
 #include "device_config.h"
 
+/* DNA_LED_STRIP: imposta a 1 nel CMakeLists del componente per attivare il
+ * mockup senza hardware reale (nessun RMT, nessun WS2812). Default: 0. */
+#ifndef DNA_LED_STRIP
+#define DNA_LED_STRIP 0
+#endif
+
 static const char *TAG = "LED_CTRL";
 
 static led_strip_handle_t s_led_strip = NULL;
 static uint32_t s_led_count = 0;
 static SemaphoreHandle_t s_led_mutex = NULL;
+
+#if DNA_LED_STRIP == 0  /* implementazioni reali — escluse se mockup attivo */
 
 #define LED_LOCK()   if (s_led_mutex) xSemaphoreTakeRecursive(s_led_mutex, portMAX_DELAY)
 #define LED_UNLOCK() if (s_led_mutex) xSemaphoreGiveRecursive(s_led_mutex)
@@ -314,3 +322,106 @@ esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms)
     
     return ESP_OK;
 }
+
+#endif /* DNA_LED_STRIP == 0 */
+
+/*
+ * Mockup section: se DNA_LED_STRIP==1 vengono fornite versioni fittizie di
+ * tutte le API pubbliche del modulo. Nessun hardware RMT/WS2812 viene
+ * toccato; le funzioni si comportano come se la striscia fosse presente e
+ * funzionante, restituendo ESP_OK e dati plausibili. Questo consente di
+ * compilare e testare la logica di livello superiore senza hardware reale.
+ */
+#if defined(DNA_LED_STRIP) && (DNA_LED_STRIP == 1)
+
+/* handle sentinella: la mock non alloca strutture RMT reali */
+static led_strip_handle_t s_mock_handle = NULL;
+static uint32_t           s_mock_count  = 8;   /* LED fittizi di default */
+static bool               s_mock_inited = false;
+
+esp_err_t led_init(void)
+{
+    s_mock_inited = true;
+    s_mock_count  = CONFIG_APP_WS2812_LEDS;
+    ESP_LOGI(TAG, "[C] [MOCK] led_init: %lu LED simulati su GPIO %d",
+             s_mock_count, CONFIG_APP_WS2812_GPIO);
+    return ESP_OK;
+}
+
+led_strip_handle_t led_get_handle(void)
+{
+    return s_mock_handle; /* NULL: i caller devono tollerare handle NULL */
+}
+
+uint32_t led_get_count(void)
+{
+    return s_mock_count;
+}
+
+esp_err_t led_clear(void)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    ESP_LOGD(TAG, "[C] [MOCK] led_clear");
+    return ESP_OK;
+}
+
+esp_err_t led_refresh(void)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    return ESP_OK;
+}
+
+esp_err_t led_fill_color(uint8_t red, uint8_t green, uint8_t blue)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    ESP_LOGD(TAG, "[C] [MOCK] led_fill_color RGB(%u,%u,%u)", red, green, blue);
+    return ESP_OK;
+}
+
+esp_err_t led_set_pixel(uint32_t index, uint8_t red, uint8_t green, uint8_t blue)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    if (index >= s_mock_count) return ESP_ERR_INVALID_ARG;
+    ESP_LOGD(TAG, "[C] [MOCK] led_set_pixel[%lu] RGB(%u,%u,%u)", index, red, green, blue);
+    return ESP_OK;
+}
+
+esp_err_t led_set_pixel_hsv(uint32_t index, uint16_t hue, uint8_t sat, uint8_t val)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    if (index >= s_mock_count) return ESP_ERR_INVALID_ARG;
+    ESP_LOGD(TAG, "[C] [MOCK] led_set_pixel_hsv[%lu] H=%u S=%u V=%u", index, hue, sat, val);
+    return ESP_OK;
+}
+
+esp_err_t led_breathe(uint8_t red, uint8_t green, uint8_t blue, uint32_t duration_ms)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    ESP_LOGI(TAG, "[C] [MOCK] led_breathe RGB(%u,%u,%u) %lums", red, green, blue, (unsigned long)duration_ms);
+    vTaskDelay(pdMS_TO_TICKS(10)); /* breve pausa simbolica */
+    return ESP_OK;
+}
+
+esp_err_t led_rainbow(uint32_t duration_ms)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    ESP_LOGI(TAG, "[C] [MOCK] led_rainbow %lums", (unsigned long)duration_ms);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    return ESP_OK;
+}
+
+esp_err_t led_fade_in(uint8_t red, uint8_t green, uint8_t blue, uint32_t steps, uint32_t step_duration_ms)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    ESP_LOGI(TAG, "[C] [MOCK] led_fade_in RGB(%u,%u,%u) steps=%lu", red, green, blue, (unsigned long)steps);
+    return ESP_OK;
+}
+
+esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms)
+{
+    if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
+    ESP_LOGI(TAG, "[C] [MOCK] led_fade_out steps=%lu", (unsigned long)steps);
+    return ESP_OK;
+}
+
+#endif /* DNA_LED_STRIP */

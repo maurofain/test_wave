@@ -1,7 +1,7 @@
 #ifndef APP_VERSION_H
 #define APP_VERSION_H
 
-#define APP_VERSION "1.3.2"
+#define APP_VERSION "1.3.3"
 #define APP_DATE    "2026-02-24"
 
 /* 1 = build APP, 0 = build FACTORY */
@@ -16,3 +16,9 @@
 #endif
 
 #endif // APP_VERSION_H
+
+
+// I flag DNA_* (DoNotActivate) sono definiti centralmente in CMakeLists.txt
+// (add_compile_definitions) e sono visibili a tutti i componenti e a main/.
+// NON ridefinirli qui.
+#define DNA_NFC 0

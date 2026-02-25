@@ -39,6 +39,12 @@
 #include "http_services.h"
 #include "web_ui_programs.h"
 
+#if DNA_SYS_MONITOR == 0
+#include "esp_heap_caps.h"
+#include "esp_timer.h"
+#include "freertos/task.h"
+#endif
+
 #define TAG "WEB_UI"
 #define MAX_STORED_LOGS 100
 
@@ -1474,11 +1480,14 @@ esp_err_t api_tasks_get(httpd_req_t *req)
         int core = 0;
         int period_ms = 0;
         int stack_words = 0;
+        char stack_caps[16] = {0};
 
-        if (sscanf(line, "%63[^,],%15[^,],%d,%d,%d,%d",
-                   name, state, &priority, &core, &period_ms, &stack_words) != 6) {
+        int n = sscanf(line, "%63[^,],%15[^,],%d,%d,%d,%d,%15[^,\r\n]",
+                       name, state, &priority, &core, &period_ms, &stack_words, stack_caps);
+        if (n < 6) {
             continue;
         }
+        if (n < 7) { strcpy(stack_caps, "spiram"); } /* retrocompat CSV senza colonna caps */
 
         if (strcmp(name, "http_server") == 0) {
             has_http_server = true;
@@ -1494,6 +1503,7 @@ esp_err_t api_tasks_get(httpd_req_t *req)
         cJSON_AddNumberToObject(obj, "core", core);
         cJSON_AddNumberToObject(obj, "period_ms", period_ms);
         cJSON_AddNumberToObject(obj, "stack_words", stack_words);
+        cJSON_AddStringToObject(obj, "stack_caps", stack_caps[0] ? stack_caps : "spiram");
         cJSON_AddItemToArray(arr, obj);
     }
 
@@ -1509,6 +1519,7 @@ esp_err_t api_tasks_get(httpd_req_t *req)
             cJSON_AddNumberToObject(obj, "core", 0);
             cJSON_AddNumberToObject(obj, "period_ms", 1000);
             cJSON_AddNumberToObject(obj, "stack_words", 3072);
+            cJSON_AddStringToObject(obj, "stack_caps", "internal");
             cJSON_AddItemToArray(arr, obj);
         }
     }
@@ -1559,7 +1570,7 @@ esp_err_t api_tasks_save(httpd_req_t *req)
     }
     
     // Scrivi header
-    fprintf(f, "name,state,priority,core,period_ms,stack_words\n");
+    fprintf(f, "name,state,priority,core,period_ms,stack_words,stack_caps\n");
     
     // Scrivi ogni task
     int count = cJSON_GetArraySize(root);
@@ -1573,15 +1584,18 @@ esp_err_t api_tasks_save(httpd_req_t *req)
         cJSON *core = cJSON_GetObjectItem(task, "core");
         cJSON *period_ms = cJSON_GetObjectItem(task, "period_ms");
         cJSON *stack_words = cJSON_GetObjectItem(task, "stack_words");
+        cJSON *stack_caps = cJSON_GetObjectItem(task, "stack_caps");
         
         if (name && state && priority && core && period_ms && stack_words) {
-            fprintf(f, "%s,%s,%d,%d,%d,%d\n",
+            const char *caps_val = (stack_caps && cJSON_IsString(stack_caps)) ? stack_caps->valuestring : "spiram";
+            fprintf(f, "%s,%s,%d,%d,%d,%d,%s\n",
                     name->valuestring,
                     state->valuestring,
                     priority->valueint,
                     core->valueint,
                     period_ms->valueint,
-                    stack_words->valueint);
+                    stack_words->valueint,
+                    caps_val);
         }
     }
     
@@ -1758,6 +1772,65 @@ esp_err_t api_debug_restore(httpd_req_t *req)
     return httpd_resp_send(req, resp, -1);
 }
 
+#if DNA_SYS_MONITOR == 0
+/* GET /api/sysinfo — heap DRAM/SPIRAM + CPU usage per core */
+static esp_err_t sysinfo_get_handler(httpd_req_t *req)
+{
+    size_t dram_free  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    size_t dram_total = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    size_t spi_free   = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    size_t spi_total  = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+    long long uptime_s = (long long)(esp_timer_get_time() / 1000000LL);
+
+    int core0_pct = -1, core1_pct = -1;
+    bool cpu_available = false;
+
+#ifdef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
+    cpu_available = true;
+    static uint32_t s_idle0 = 0, s_idle1 = 0, s_total = 0;
+    UBaseType_t ntasks = uxTaskGetNumberOfTasks();
+    TaskStatus_t *tbuf = heap_caps_malloc(ntasks * sizeof(TaskStatus_t),
+                                          MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (tbuf) {
+        uint32_t total_time = 0;
+        UBaseType_t got = uxTaskGetSystemState(tbuf, ntasks, &total_time);
+        uint32_t idle0 = 0, idle1 = 0;
+        for (UBaseType_t i = 0; i < got; i++) {
+            if (strcmp(tbuf[i].pcTaskName, "IDLE0") == 0) idle0 = tbuf[i].ulRunTimeCounter;
+            if (strcmp(tbuf[i].pcTaskName, "IDLE1") == 0) idle1 = tbuf[i].ulRunTimeCounter;
+        }
+        heap_caps_free(tbuf);
+        if (s_total != 0 && total_time > s_total) {
+            uint32_t dt = total_time - s_total;
+            uint32_t d0 = (idle0 >= s_idle0) ? (idle0 - s_idle0) : 0;
+            uint32_t d1 = (idle1 >= s_idle1) ? (idle1 - s_idle1) : 0;
+            /* total_time è un contatore wall-clock (esp_timer µs): ogni core
+             * accumula indipendentemente fino a dt µs — formula semplice. */
+            core0_pct = (int)(100 - (int64_t)d0 * 100 / dt);
+            core1_pct = (int)(100 - (int64_t)d1 * 100 / dt);
+            if (core0_pct < 0)   core0_pct = 0;
+            if (core1_pct < 0)   core1_pct = 0;
+            if (core0_pct > 100) core0_pct = 100;
+            if (core1_pct > 100) core1_pct = 100;
+        }
+        s_idle0 = idle0;  s_idle1 = idle1;  s_total = total_time;
+    }
+#endif /* CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS */
+
+    char resp[256];
+    snprintf(resp, sizeof(resp),
+        "{\"heap\":{\"dram_free\":%zu,\"dram_total\":%zu"
+        ",\"spiram_free\":%zu,\"spiram_total\":%zu}"
+        ",\"cpu\":{\"available\":%s,\"core0_pct\":%d,\"core1_pct\":%d}"
+        ",\"uptime_s\":%lld}",
+        dram_free, dram_total, spi_free, spi_total,
+        cpu_available ? "true" : "false",
+        core0_pct, core1_pct, uptime_s);
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, resp, -1);
+}
+#endif /* DNA_SYS_MONITOR == 0 */
+
 
 esp_err_t web_ui_register_handlers(httpd_handle_t server)
 {
@@ -1770,6 +1843,11 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     
     httpd_uri_t uri_status = {.uri = "/status", .method = HTTP_GET, .handler = status_get_handler};
     httpd_register_uri_handler(server, &uri_status);
+
+#if DNA_SYS_MONITOR == 0
+    httpd_uri_t uri_sysinfo = {.uri = "/api/sysinfo", .method = HTTP_GET, .handler = sysinfo_get_handler};
+    httpd_register_uri_handler(server, &uri_sysinfo);
+#endif
 
     httpd_uri_t uri_ota_get = {.uri = "/ota", .method = HTTP_GET, .handler = ota_get_handler};
     httpd_register_uri_handler(server, &uri_ota_get);

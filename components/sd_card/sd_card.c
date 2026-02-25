@@ -12,6 +12,13 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
+/* DNA_SD_CARD: passa come -DDNA_SD_CARD=1 nel CMakeLists del componente
+ * per attivare il mockup senza hardware reale. Default: 0 (driver reale). */
+#ifndef DNA_SD_CARD
+#define DNA_SD_CARD 0
+#endif
+
+
 static const char *TAG = "SD_CARD";
 static bool s_mounted = false;
 static sdmmc_card_t *s_card = NULL;
@@ -33,6 +40,15 @@ static bool s_is_formatting = false;
 
 static bool s_last_cd_state = true; // True = Estratta (Pull-up), False = Inserita (GND)
 
+#if DNA_SD_CARD == 0  /* implementazioni reali — escluse se mockup attivo */
+
+/**
+ * @brief Task di monitoraggio hot‑plug della scheda SD
+ *
+ * Viene eseguito a background e controlla il pin CARD_DETECT. Quando rileva
+ * un inserimento o una rimozione genera un log e aggiorna lo stato interno.
+ * Il task non termina mai.
+ */
 static void sd_monitor_task(void *pvParameters) {
     ESP_LOGI(TAG, "Avvio monitor hot-plug SD (GPIO %d)...", SD_CD_GPIO);
     gpio_config_t io_conf = {
@@ -64,6 +80,13 @@ static void sd_monitor_task(void *pvParameters) {
     }
 }
 
+/**
+ * @brief Inizializza e avvia il monitor hot‑plug
+ *
+ * Questa routine crea il task sd_monitor_task una sola volta, anche se
+ * richiamata più volte. Il monitor si occupa di rilevare inserimenti e
+ * rimozioni fisiche della scheda e tenerne traccia internamente.
+ */
 void sd_card_init_monitor(void) {
     static bool s_task_started = false;
     if (s_task_started) return;
@@ -72,10 +95,29 @@ void sd_card_init_monitor(void) {
     s_task_started = true;
 }
 
+/**
+ * @brief Restituisce l'ultimo messaggio di errore del modulo SD
+ *
+ * Il messaggio descrive l'ultimo fallimento (mount, write, format, ecc.)
+ * e può essere usato per diagnostica. La stringa è statica.
+ *
+ * @return puntatore all'ultima stringa d'errore.
+ */
 const char* sd_card_get_last_error(void) {
     return s_last_error;
 }
 
+/**
+ * @brief Tenta di montare il filesystem FAT sulla scheda SD
+ *
+ * Se la scheda è già montata questa funzione ritorna ESP_OK immediatamente.
+ * Viene effettuato un power‑cycle dell'alimentazione, configurato il
+ * controller SDMMC e infine eseguito il mount tramite esp_vfs_fat.
+ * In caso di errore il messaggio viene salvato in s_last_error.
+ *
+ * @return ESP_OK se il mount è andato a buon fine, altrimenti codice
+ *         di errore esp_err_t restituito dal driver.
+ */
 esp_err_t sd_card_mount(void) {
     if (s_mounted) {
         ESP_LOGI(TAG, "Tentativo di montaggio ignorato: scheda già montata.");
@@ -102,7 +144,10 @@ esp_err_t sd_card_mount(void) {
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = true, // Abilitiamo la formattazione automatica se il mount fallisce
         .max_files = 5,
-        .allocation_unit_size = 16 * 1024
+        /* usa un'unità di allocazione ridotta per diminuire la richiesta di
+           memoria DMA.  valori grandi (es. 16 kB) possono causare errori
+           "not enough mem" durante la scrittura se l'heap DMA è frammentato. */
+        .allocation_unit_size = 4 * 1024
     };
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
@@ -170,6 +215,15 @@ esp_err_t sd_card_mount(void) {
     return ESP_OK;
 }
 
+/**
+ * @brief Smonta il filesystem SD e libera le risorse
+ *
+ * Se la scheda non è montata la chiamata viene ignorata e viene
+ * restituito ESP_OK. In caso di errore la variabile s_mounted rimane false
+ * e viene registrato un messaggio in s_last_error.
+ *
+ * @return ESP_OK o errore esp_err_t.
+ */
 esp_err_t sd_card_unmount(void) {
     if (!s_mounted) {
         ESP_LOGW(TAG, "Tentativo di smontaggio ignorato: scheda non montata.");
@@ -190,10 +244,27 @@ esp_err_t sd_card_unmount(void) {
     return ret;
 }
 
+/**
+ * @brief Indica se il filesystem SD è attualmente montato
+ *
+ * Questa funzione controlla solo la flag interna s_mounted e non effettua
+ * alcuna operazione sul hardware.
+ *
+ * @return true se montata.
+ */
 bool sd_card_is_mounted(void) {
     return s_mounted;
 }
 
+/**
+ * @brief Legge il pin Card Detect per sapere se una scheda è inserita
+ *
+ * Restituisce true se il pin indica la presenza della scheda (livello basso).
+ * Non garantisce che il filesystem sia montato; serve solo per rilevazioni
+ * hardware.
+ *
+ * @return true se la scheda è fisicamente presente.
+ */
 bool sd_card_is_present(void) {
     return (gpio_get_level(SD_CD_GPIO) == 0);
 }
@@ -243,6 +314,14 @@ static void sd_format_worker_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+/**
+ * @brief Avvia la formattazione FAT della scheda in background
+ *
+ * Se la scheda non è montata ritorna ESP_ERR_INVALID_STATE. La formattazione
+ * viene eseguita in un task separato per non bloccare il chiamante.
+ *
+ * @return ESP_OK se il processo è stato avviato correttamente.
+ */
 esp_err_t sd_card_format(void) {
     if (!s_mounted || !s_card) {
         snprintf(s_last_error, sizeof(s_last_error), "Errore: SD non montata");
@@ -257,6 +336,48 @@ esp_err_t sd_card_format(void) {
     return ESP_OK;
 }
 
+/**
+ * @brief Legge l'intero contenuto di un file SD in memoria heap
+ *
+ * Allocates a buffer that must be freed by the caller.  The returned block
+ * is null‑terminated; the actual byte count is stored in *out_size if non-
+ * NULL.  Return NULL on any error (not mounted, cannot open, malloc failure).
+ */
+/*
+ * @brief Legge l'intero contenuto di un file SD in memoria heap
+ *
+ * Allocates a buffer that must be freed by the caller.  The returned block
+ * is null‑terminated; the actual byte count is stored in *out_size if non-
+ * NULL.  Return NULL on any error (not mounted, cannot open, malloc failure).
+ */
+void *sd_card_read_file(const char *path, size_t *out_size) {
+    if (!s_mounted) return NULL;
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); return NULL; }
+    rewind(f);
+    char *buf = malloc((size_t)sz + 1);
+    if (!buf) { fclose(f); return NULL; }
+    size_t rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[rd] = '\0';
+    if (out_size) *out_size = rd;
+    return buf;
+}
+
+/**
+ * @brief Elenca i file in una directory sulla scheda
+ *
+ * Il risultato viene scritto nel buffer fornito. Il filesystem deve essere
+ * montato; altrimenti la funzione ritorna ESP_ERR_INVALID_STATE.
+ *
+ * @param path directory da esplorare (es. "/sdcard")
+ * @param out_buf buffer di destinazione
+ * @param out_size dimensione del buffer
+ * @return ESP_OK se l'operazione è riuscita, altrimenti errore
+ */
 esp_err_t sd_card_list_dir(const char *path, char *out_buf, size_t out_size) {
     if (!s_mounted) return ESP_ERR_INVALID_STATE;
     DIR *dir = opendir(path);
@@ -282,6 +403,16 @@ esp_err_t sd_card_list_dir(const char *path, char *out_buf, size_t out_size) {
     return ESP_OK;
 }
 
+/**
+ * @brief Scrive una stringa in un file sulla scheda
+ *
+ * Viene usata fopen/fprintf; in caso di fallimento con errno==ENOMEM la
+ * scheda viene smontata automaticamente per risparmiare heap DMA.
+ *
+ * @param path percorso file (es. "/sdcard/test.txt")
+ * @param data stringa da scrivere
+ * @return ESP_OK se riuscito, ESP_FAIL altrimenti
+ */
 esp_err_t sd_card_write_file(const char *path, const char *data) {
     if (!s_mounted) return ESP_ERR_INVALID_STATE;
     FILE *f = fopen(path, "w");
@@ -289,11 +420,326 @@ esp_err_t sd_card_write_file(const char *path, const char *data) {
         snprintf(s_last_error, sizeof(s_last_error), "Write Error: %d", errno);
         ESP_LOGE(TAG, "Impossibile aprire il file per la scrittura: %s (errno: %d, %s)", 
                  path, errno, strerror(errno));
+        if (errno == ENOMEM) {
+            ESP_LOGW(TAG, "Heap DMA esaurito durante fopen, smonto la SD per evitare ulteriori tentativi");
+            sd_card_unmount();
+        }
         return ESP_FAIL;
     }
-    fprintf(f, "%s", data);
+    if (fprintf(f, "%s", data) < 0) {
+        int ferr = ferror(f);
+        ESP_LOGE(TAG, "Errore durante la scrittura su SD: %d", ferr);
+        if (ferr == ENOMEM) {
+            ESP_LOGW(TAG, "Heap DMA esaurito durante fprintf, smonto la SD per evitare ulteriori tentativi");
+            fclose(f);
+            sd_card_unmount();
+            return ESP_FAIL;
+        }
+    }
+    fflush(f);
+    if (ferror(f)) {
+        ESP_LOGE(TAG, "Errore post-flush su SD (errno=%d)", errno);
+    }
     fclose(f);
     snprintf(s_last_error, sizeof(s_last_error), "Scrittura OK");
     ESP_LOGI(TAG, "File scritto con successo: %s", path);
     return ESP_OK;
 }
+
+
+/**
+ * @brief Apre un file sulla scheda SD
+ *
+ * Controlla che la scheda sia montata prima di invocare fopen. In caso di
+ * errore ENOMEM la scheda viene smontata per liberare heap DMA.
+ *
+ * @param path percorso file
+ * @param mode modalit\u00e0 apertura (es. "rb", "wb", "a")
+ * @return FILE* valido o NULL
+ */
+FILE *sd_card_fopen(const char *path, const char *mode)
+{
+    if (!s_mounted) {
+        ESP_LOGE(TAG, "[C] sd_card_fopen: SD non montata (%s)", path);
+        return NULL;
+    }
+    FILE *f = fopen(path, mode);
+    if (!f) {
+        ESP_LOGE(TAG, "[C] sd_card_fopen: impossibile aprire %s (mode=%s, errno=%d %s)",
+                 path, mode, errno, strerror(errno));
+        if (errno == ENOMEM) {
+            ESP_LOGW(TAG, "[C] Heap DMA esaurito durante fopen, smonto la SD");
+            sd_card_unmount();
+        }
+    }
+    return f;
+}
+
+/**
+ * @brief Chiude un file aperto con sd_card_fopen
+ * @param f handle restituito da sd_card_fopen
+ */
+void sd_card_fclose(FILE *f)
+{
+    if (!f) return;
+    fclose(f);
+}
+
+/**
+ * @brief Scrive un blocco di byte su file SD
+ * @param f handle file
+ * @param buf dati da scrivere
+ * @param size byte da scrivere
+ * @return byte scritti effettivamente
+ */
+size_t sd_card_fwrite(FILE *f, const void *buf, size_t size)
+{
+    if (!f || !buf || size == 0) return 0;
+    return fwrite(buf, 1, size, f);
+}
+
+/**
+ * @brief Legge un blocco di byte da file SD
+ * @param f handle file
+ * @param buf buffer destinazione
+ * @param size byte da leggere
+ * @return byte letti (0 = EOF o errore)
+ */
+size_t sd_card_fread(FILE *f, void *buf, size_t size)
+{
+    if (!f || !buf || size == 0) return 0;
+    return fread(buf, 1, size, f);
+}
+
+/**
+ * @brief Flush + fsync su file SD
+ *
+ * Garantisce che i dati siano effettivamente scritti sul supporto fisico.
+ * @param f handle file
+ */
+void sd_card_fflush(FILE *f)
+{
+    if (!f) return;
+    fflush(f);
+    int fd = fileno(f);
+    if (fd >= 0) {
+        fsync(fd);
+    }
+}
+
+/**
+ * @brief Apre una directory sulla scheda SD
+ * @param path percorso directory (es. "/sdcard")
+ * @return DIR* valido o NULL se SD non montata o apertura fallita
+ */
+DIR *sd_card_opendir(const char *path)
+{
+    if (!s_mounted) {
+        ESP_LOGE(TAG, "[C] sd_card_opendir: SD non montata (%s)", path);
+        return NULL;
+    }
+    return opendir(path);
+}
+
+/**
+ * @brief Legge la prossima entry dalla directory SD
+ * @param dir handle restituito da sd_card_opendir
+ * @return puntatore a struct dirent o NULL a fine lista
+ */
+struct dirent *sd_card_readdir(DIR *dir)
+{
+    if (!dir) return NULL;
+    return readdir(dir);
+}
+
+/**
+ * @brief Chiude una directory aperta con sd_card_opendir
+ * @param dir handle restituito da sd_card_opendir
+ */
+void sd_card_closedir(DIR *dir)
+{
+    if (!dir) return;
+    closedir(dir);
+}
+
+/**
+ * @brief Wrapper di stat() per path SD
+ * @param path percorso file
+ * @param st struttura stat da riempire
+ * @return 0 se riuscito, -1 altrimenti
+ */
+int sd_card_stat(const char *path, struct stat *st)
+{
+    if (!path || !st) return -1;
+    return stat(path, st);
+}
+
+#endif /* DNA_SD_CARD == 0 */
+
+/*
+ * Mockup section: if DNA_SD_CARD is defined to 1, provide fake versions of all
+ * public SD APIs so the module can be linked without real hardware. The
+ * replacements behave as if the card were successfully mounted, returning
+ * ESP_OK and reasonable placeholder data; this allows higher‑level code to
+ * exercise logic without special casing errors.
+ */
+#if defined(DNA_SD_CARD) && (DNA_SD_CARD == 1)
+
+static bool s_mock_mounted = true;
+
+esp_err_t sd_card_mount(void) {
+    s_mock_mounted = true;
+    snprintf(s_last_error, sizeof(s_last_error), "mock mount");
+    return ESP_OK;
+}
+
+esp_err_t sd_card_unmount(void) {
+    s_mock_mounted = false;
+    snprintf(s_last_error, sizeof(s_last_error), "mock unmount");
+    return ESP_OK;
+}
+
+void sd_card_init_monitor(void) { /* no hardware, nothing to watch */ }
+
+bool sd_card_is_mounted(void) { return s_mock_mounted; }
+
+bool sd_card_is_present(void) { return s_mock_mounted; }
+
+uint64_t sd_card_get_total_size(void) { return s_mock_mounted ? (32UL * 1024UL) : 0; }
+
+uint64_t sd_card_get_used_size(void) { return s_mock_mounted ? (1UL * 1024UL) : 0; }
+
+const char* sd_card_get_last_error(void) { return "OK"; }
+
+esp_err_t sd_card_format(void) {
+    /* pretend format succeeds and leaves card mounted */
+    s_mock_mounted = true;
+    return ESP_OK;
+}
+
+esp_err_t sd_card_list_dir(const char *path, char *out_buf, size_t out_size) {
+    /* mockup operation:
+     * pretend that the directory contains four files; this allows higher-
+     * level code to see realistic output without touching real storage.
+     * The caller is responsible for providing a sufficiently large buffer.
+     */
+    if (!s_mock_mounted) return ESP_ERR_INVALID_STATE;
+    if (!out_buf || out_size == 0) return ESP_ERR_INVALID_ARG;
+
+    int written = snprintf(out_buf, out_size,
+        "Elenco file in %s:\n"
+        " - mock1.txt (1234 byte)\n"
+        " - mock2.log (5678 byte)\n"
+        " - mock3.bin (0 byte)\n"
+        " - mock4.cfg (42 byte)\n",
+        path);
+    return (written < 0 || (size_t)written >= out_size) ? ESP_FAIL : ESP_OK;
+}
+
+/* mock version of read_file placed at end of mock section */
+void *sd_card_read_file(const char *path, size_t *out_size) {
+    if (!s_mock_mounted) return NULL;
+    const char *data = "MockupData\n";
+    size_t len = strlen(data);
+    char *buf = malloc(len + 1);
+    if (buf) {
+        memcpy(buf, data, len + 1);
+        if (out_size) *out_size = len;
+    }
+    return buf;
+}
+
+esp_err_t sd_card_write_file(const char *path, const char *data) {
+    if (!s_mock_mounted) return ESP_ERR_INVALID_STATE;
+    return ESP_OK;
+}
+
+/* Indirizzo sentinella usato come FILE* fittizio nelle mock di streaming.
+ * Le funzioni sd_card_fwrite/fread/fclose/fflush riconoscono questo valore
+ * e non invocano mai file I/O reale; in questo modo il compilatore non
+ * genera chiamate a fclose(NULL) o accessi a strutture FILE invalide.
+ */
+static uint8_t s_mock_file_sentinel;
+
+FILE *sd_card_fopen(const char *path, const char *mode)
+{
+    if (!s_mock_mounted) return NULL;
+    ESP_LOGI(TAG, "[C] [MOCK] sd_card_fopen: %s (mode=%s) -> handle fittizio", path, mode);
+    return (FILE *)&s_mock_file_sentinel;
+}
+
+void sd_card_fclose(FILE *f)
+{
+    (void)f; /* handle fittizio: no-op */
+}
+
+size_t sd_card_fwrite(FILE *f, const void *buf, size_t size)
+{
+    (void)buf;
+    /* simula scrittura riuscita senza toccare hardware */
+    return (f == (FILE *)&s_mock_file_sentinel) ? size : 0;
+}
+
+size_t sd_card_fread(FILE *f, void *buf, size_t size)
+{
+    (void)f; (void)buf; (void)size;
+    return 0; /* EOF immediato in modalità mock */
+}
+
+void sd_card_fflush(FILE *f)
+{
+    (void)f; /* no-op */
+}
+
+/* --- Mock directory iterator --- */
+
+/* Dati fittizi: stessi 4 file usati da sd_card_list_dir mockup */
+static const char  *s_mock_dir_names[] = { "mock1.txt", "mock2.log", "mock3.bin", "mock4.cfg" };
+static const off_t  s_mock_dir_sizes[] = { 1234,        5678,        0,            42          };
+#define MOCK_DIR_COUNT 4
+
+static int           s_mock_dir_idx = 0;
+static struct dirent s_mock_dirent;
+
+DIR *sd_card_opendir(const char *path)
+{
+    if (!s_mock_mounted) return NULL;
+    ESP_LOGI(TAG, "[C] [MOCK] sd_card_opendir: %s", path);
+    s_mock_dir_idx = 0;
+    return (DIR *)&s_mock_dir_idx; /* indirizzo sentinella */
+}
+
+struct dirent *sd_card_readdir(DIR *dir)
+{
+    if (!dir || s_mock_dir_idx >= MOCK_DIR_COUNT) return NULL;
+    memset(&s_mock_dirent, 0, sizeof(s_mock_dirent));
+    s_mock_dirent.d_type = DT_REG;
+    strncpy(s_mock_dirent.d_name, s_mock_dir_names[s_mock_dir_idx],
+            sizeof(s_mock_dirent.d_name) - 1);
+    s_mock_dir_idx++;
+    return &s_mock_dirent;
+}
+
+void sd_card_closedir(DIR *dir)
+{
+    (void)dir; /* no-op */
+}
+
+int sd_card_stat(const char *path, struct stat *st)
+{
+    if (!path || !st) return -1;
+    /* cerca il nome file tra i mock */
+    const char *fname = strrchr(path, '/');
+    fname = fname ? fname + 1 : path;
+    for (int i = 0; i < MOCK_DIR_COUNT; i++) {
+        if (strcmp(fname, s_mock_dir_names[i]) == 0) {
+            memset(st, 0, sizeof(*st));
+            st->st_mode = S_IFREG | 0644;
+            st->st_size = s_mock_dir_sizes[i];
+            return 0;
+        }
+    }
+    return -1; /* non trovato */
+}
+
+#endif // DNA_SD_CARD

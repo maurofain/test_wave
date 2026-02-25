@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include <stdio.h>
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "init.h"
 #include "tasks.h"
 #include "app_version.h"
@@ -102,6 +103,7 @@ static void maybe_force_crash_at_boot(void)
 void app_main(void)
 {
     apply_boot_log_policy();
+    esp_log_level_set("INIT", ESP_LOG_INFO);
     // inizializza logging errori su SD (dopo montare la SD)
     error_log_init();
 
@@ -145,9 +147,10 @@ void app_main(void)
         uint32_t remaining_ms = BOOT_COUNTER_STABLE_WINDOW_MS;
         while (remaining_ms > 0) {
             uint32_t this_step = (remaining_ms > step_ms) ? step_ms : remaining_ms;
-            ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita': attendo ancora %lu ms (heap=%lu)",
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita': attendo ancora %lu ms (heap=%lu dram=%lu)",
                      (unsigned long)remaining_ms,
-                     (unsigned long)esp_get_free_heap_size());
+                     (unsigned long)esp_get_free_heap_size(),
+                     (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
             vTaskDelay(pdMS_TO_TICKS(this_step));
             remaining_ms -= this_step;
         }

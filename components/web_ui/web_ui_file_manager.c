@@ -205,7 +205,8 @@ esp_err_t api_files_list_get(httpd_req_t *req)
         return httpd_resp_sendstr(req, "{\"error\":\"invalid_storage\"}");
     }
 
-    DIR *dir = opendir(base_path);
+    bool is_sd = (strcmp(storage, "sd") == 0 || strcmp(storage, "sdcard") == 0);
+    DIR *dir = is_sd ? sd_card_opendir(base_path) : opendir(base_path);
     if (!dir) {
         httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_set_type(req, "application/json");
@@ -220,7 +221,7 @@ esp_err_t api_files_list_get(httpd_req_t *req)
     uint64_t sum_file_bytes = 0;
 
     struct dirent *de;
-    while ((de = readdir(dir)) != NULL) {
+    while ((de = (is_sd ? sd_card_readdir(dir) : readdir(dir))) != NULL) {
         if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
             continue;
         }
@@ -229,7 +230,7 @@ esp_err_t api_files_list_get(httpd_req_t *req)
         snprintf(full_path, sizeof(full_path), "%s/%s", base_path, de->d_name);
 
         struct stat st;
-        if (stat(full_path, &st) != 0) {
+        if ((is_sd ? sd_card_stat(full_path, &st) : stat(full_path, &st)) != 0) {
             continue;
         }
         if (!S_ISREG(st.st_mode)) {
@@ -242,7 +243,7 @@ esp_err_t api_files_list_get(httpd_req_t *req)
         cJSON_AddItemToArray(files, item);
         sum_file_bytes += (uint64_t)st.st_size;
     }
-    closedir(dir);
+    if (is_sd) sd_card_closedir(dir); else closedir(dir);
 
     uint64_t total_bytes = 0;
     uint64_t used_bytes = sum_file_bytes;
@@ -298,7 +299,8 @@ esp_err_t api_files_upload_post(httpd_req_t *req)
     char full_path[320];
     snprintf(full_path, sizeof(full_path), "%s/%s", base_path, name);
 
-    FILE *f = fopen(full_path, "wb");
+    bool is_sd = (strcmp(base_path, "/sdcard") == 0);
+    FILE *f = is_sd ? sd_card_fopen(full_path, "wb") : fopen(full_path, "wb");
     if (!f) {
         httpd_resp_set_status(req, "500 Internal Server Error");
         return httpd_resp_sendstr(req, "open_failed");
@@ -310,14 +312,14 @@ esp_err_t api_files_upload_post(httpd_req_t *req)
         int chunk = remaining > (int)sizeof(buf) ? (int)sizeof(buf) : remaining;
         int r = httpd_req_recv(req, buf, chunk);
         if (r <= 0) {
-            fclose(f);
+            if (is_sd) sd_card_fclose(f); else fclose(f);
             remove(full_path);
             httpd_resp_set_status(req, "500 Internal Server Error");
             return httpd_resp_sendstr(req, "recv_failed");
         }
-        size_t w = fwrite(buf, 1, (size_t)r, f);
+        size_t w = is_sd ? sd_card_fwrite(f, buf, (size_t)r) : fwrite(buf, 1, (size_t)r, f);
         if (w != (size_t)r) {
-            fclose(f);
+            if (is_sd) sd_card_fclose(f); else fclose(f);
             remove(full_path);
             httpd_resp_set_status(req, "500 Internal Server Error");
             return httpd_resp_sendstr(req, "write_failed");
@@ -325,7 +327,7 @@ esp_err_t api_files_upload_post(httpd_req_t *req)
         remaining -= r;
     }
 
-    fclose(f);
+    if (is_sd) sd_card_fclose(f); else fclose(f);
     return httpd_resp_sendstr(req, "ok");
 }
 
@@ -397,7 +399,8 @@ esp_err_t api_files_download_get(httpd_req_t *req)
         return httpd_resp_sendstr(req, "not_found");
     }
 
-    FILE *f = fopen(full_path, "rb");
+    bool is_sd = (strcmp(base_path, "/sdcard") == 0);
+    FILE *f = is_sd ? sd_card_fopen(full_path, "rb") : fopen(full_path, "rb");
     if (!f) {
         httpd_resp_set_status(req, "500 Internal Server Error");
         return httpd_resp_sendstr(req, "open_failed");
@@ -410,13 +413,13 @@ esp_err_t api_files_download_get(httpd_req_t *req)
 
     char buf[1024];
     size_t n = 0;
-    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    while ((n = (is_sd ? sd_card_fread(f, buf, sizeof(buf)) : fread(buf, 1, sizeof(buf), f))) > 0) {
         if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) {
-            fclose(f);
+            if (is_sd) sd_card_fclose(f); else fclose(f);
             return ESP_FAIL;
         }
     }
-    fclose(f);
+    if (is_sd) sd_card_fclose(f); else fclose(f);
 
     return httpd_resp_send_chunk(req, NULL, 0);
 }

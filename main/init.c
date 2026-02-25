@@ -6,6 +6,7 @@
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_heap_caps.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -69,7 +70,9 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 static const char *TAG = "INIT";
 
 /* Debug: inibisce i POST verso server cloud durante il bootstrap */
-#define DEBUG_DISABLE_SERVER_POST 1
+#ifndef DNA_SERVER_POST
+#define DNA_SERVER_POST 0
+#endif
 
 /*
  * Forzatura temporanea: disabilita SEMPRE la parte video (LVGL + LCD + touch + backlight).
@@ -218,7 +221,7 @@ static esp_err_t update_crash_pending_record(void)
     return ret;
 }
 
-#if !DEBUG_DISABLE_SERVER_POST
+#if !DNA_SERVER_POST
 static void build_deviceactivity_url(char *out, size_t out_len, const char *base_url)
 {
     if (!out || out_len == 0)
@@ -245,8 +248,8 @@ static void build_deviceactivity_url(char *out, size_t out_len, const char *base
 
 static esp_err_t try_send_pending_crash_record(void)
 {
-#if DEBUG_DISABLE_SERVER_POST
-    ESP_LOGW(TAG, "[M] [C] preboot crash send disabilitato da DEBUG_DISABLE_SERVER_POST");
+#if DNA_SERVER_POST
+    ESP_LOGW(TAG, "[M] [C] preboot crash send disabilitato da DNA_SERVER_POST");
     return ESP_OK;
 #else
     nvs_handle_t handle;
@@ -444,7 +447,7 @@ static esp_err_t transfer_coredump_flash_to_sd(void)
              COMPILE_MODE_LABEL,
              APP_VERSION);
 
-    FILE *out = fopen(dst_path, "wb");
+    FILE *out = sd_card_fopen(dst_path, "wb");
     if (!out)
     {
         ESP_LOGE(TAG, "[M] [C] creazione file coredump su SD fallita");
@@ -464,15 +467,15 @@ static esp_err_t transfer_coredump_flash_to_sd(void)
         err = esp_partition_read(core_part, part_offset + written, buf, chunk);
         if (err != ESP_OK)
         {
-            fclose(out);
+            sd_card_fclose(out);
             remove(dst_path);
             ESP_LOGE(TAG, "[M] [C] lettura coredump da flash fallita: %s", esp_err_to_name(err));
             return ESP_OK;
         }
 
-        if (fwrite(buf, 1, chunk, out) != chunk)
+        if (sd_card_fwrite(out, buf, chunk) != chunk)
         {
-            fclose(out);
+            sd_card_fclose(out);
             remove(dst_path);
             ESP_LOGE(TAG, "[M] [C] copia coredump flash->SD fallita");
             return ESP_OK;
@@ -480,7 +483,7 @@ static esp_err_t transfer_coredump_flash_to_sd(void)
 
         written += chunk;
     }
-    fclose(out);
+    sd_card_fclose(out);
 
     char report_path[192];
     snprintf(report_path,
@@ -495,28 +498,33 @@ static esp_err_t transfer_coredump_flash_to_sd(void)
              COMPILE_MODE_LABEL,
              APP_VERSION);
 
-    FILE *report = fopen(report_path, "w");
+    FILE *report = sd_card_fopen(report_path, "w");
     if (report)
     {
-        fprintf(report,
+        char report_buf[512];
+        int report_len;
+        report_len = snprintf(report_buf, sizeof(report_buf),
             "Coredump trasferito su SD\nmode=%s\nversion=%s\ndate=%s\nsource=flash_coredump_partition\nsize=%u\n",
                 COMPILE_MODE_LABEL,
                 APP_VERSION,
                 APP_DATE,
                 (unsigned)image_size);
+        if (report_len > 0) sd_card_fwrite(report, report_buf, (size_t)report_len);
 
-        fprintf(report,
+        report_len = snprintf(report_buf, sizeof(report_buf),
             "note=lo stack/backtrace completo e' nel file ELF coredump; error_*.log contiene solo marker applicativi\n");
+        if (report_len > 0) sd_card_fwrite(report, report_buf, (size_t)report_len);
 
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH && CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF
         char panic_reason[200] = {0};
         if (esp_core_dump_get_panic_reason(panic_reason, sizeof(panic_reason)) == ESP_OK)
         {
-            fprintf(report, "panic_reason=%s\n", panic_reason);
+            report_len = snprintf(report_buf, sizeof(report_buf), "panic_reason=%s\n", panic_reason);
+            if (report_len > 0) sd_card_fwrite(report, report_buf, (size_t)report_len);
         }
 #endif
 
-        fclose(report);
+        sd_card_fclose(report);
     }
 
     err = esp_core_dump_image_erase();
@@ -672,42 +680,6 @@ static void log_partitions(void)
     ESP_LOGI(TAG, "[M] Partizione boot      : %s (tipo %d, sottotipo %d)", boot ? boot->label : "?", boot ? boot->type : -1, boot ? boot->subtype : -1);
 }
 
-static bool check_internet_access(void)
-{
-    /* Evita dipendenza dal DNS: su reti senza DNS valido la risoluzione puo' bloccare piu' del timeout HTTP.
-     * 1.1.1.1 risponde tipicamente con redirect (301) verso HTTPS: per noi va bene, significa che il routing funziona.
-     */
-    ESP_LOGI(TAG, "[M] [NTP] Verifica accesso internet via HTTP HEAD a http://1.1.1.1/");
-
-    esp_http_client_config_t config = {
-        .url = "http://1.1.1.1/",
-        .timeout_ms = 1500,
-        .method = HTTP_METHOD_HEAD,
-    };
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        ESP_LOGW(TAG, "[M] [NTP] Impossibile inizializzare HTTP client");
-        return false;
-    }
-
-    esp_err_t err = esp_http_client_perform(client);
-    int status_code = esp_http_client_get_status_code(client);
-
-    esp_http_client_cleanup(client);
-
-    /* Consideriamo OK qualunque risposta HTTP valida (2xx/3xx).
-     * Su captive portal potremmo vedere 30x/40x: comunque indica connettivita' IP.
-     */
-    if (err == ESP_OK && status_code >= 200 && status_code < 400) {
-        ESP_LOGI(TAG, "[M] [NTP] Accesso internet OK (HTTP status: %d)", status_code);
-        return true;
-    } else {
-        ESP_LOGW(TAG, "[M] [NTP] Accesso internet NON disponibile (err: %s, status: %d)", esp_err_to_name(err), status_code);
-        return false;
-    }
-}
-
 static void ntp_sync_callback(struct timeval *tv)
 {
     device_config_t *cfg = device_config_get();
@@ -735,41 +707,6 @@ static void ntp_sync_callback(struct timeval *tv)
 
 /* forward declarations */
 static void init_sntp(void);
-
-/* helper task spawned from event handler to avoid blocking the loop */
-static void netcheck_task(void *arg)
-{
-    (void)arg;
-
-    ESP_LOGI(TAG, "[M] [NTP] netcheck_task avviata (priority=%d, free_heap=%u)",
-             (int)uxTaskPriorityGet(NULL), (unsigned)esp_get_free_heap_size());
-
-    /* perform the potentially slow network check; insert small delays so
-     * other tasks (especially IDLE) can run even if HTTP waits. */
-    bool ok = false;
-    const int max_retries = 2;           /* fewer attempts to shorten boot */
-    const TickType_t retry_delay = pdMS_TO_TICKS(100);
-
-    for (int retry = 0; retry < max_retries && !ok; ++retry) {
-        ESP_LOGI(TAG, "[M] [NTP] netcheck tentativo %d/%d", retry + 1, max_retries);
-        if (check_internet_access()) {
-            ok = true;
-            ESP_LOGI(TAG, "[M] [NTP] accesso internet confermato");
-            break;
-        }
-        ESP_LOGW(TAG, "[M] [NTP] netcheck fallito (tentativo %d), attendo %u ms",
-                 retry + 1, (unsigned)pdTICKS_TO_MS(retry_delay));
-        vTaskDelay(retry_delay);
-    }
-
-    if (ok) {
-        init_sntp();
-    } else {
-        ESP_LOGW(TAG, "[M] [NTP] netcheck: rinuncio dopo %d tentativi", max_retries);
-    }
-
-    vTaskDelete(NULL);
-}
 
 static void init_sntp(void)
 {
@@ -810,12 +747,10 @@ esp_err_t init_sync_ntp(void)
         ESP_LOGW(TAG, "[NTP] NTP is disabled in configuration");
         return ESP_FAIL;
     }
-    
-    if (!check_internet_access()) {
-        ESP_LOGW(TAG, "[NTP] No internet access, cannot sync NTP");
-        return ESP_FAIL;
-    }
-    
+
+    /* check_internet_access() rimosso: la connessione HTTP(S) esaurisce lo heap
+     * per l'init mbedTLS. SNTP è UDP e gestisce internamente le retry — inutile
+     * verificare la connettività prima. */
     ESP_LOGI(TAG, "[NTP] Forcing NTP synchronization...");
     
     // Riavvia SNTP per forzare la sincronizzazione
@@ -869,22 +804,12 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
                 ESP_LOGW(TAG, "[M] Post-ARP: s_netif_eth NULL");
             }
 
-            /* spawn a short-lived task to verify internet access and start NTP
-             * outside of the event handler context so we don't block the loop.
-             */
+            /* init_sntp() usa solo esp_sntp_* non-bloccanti: sicuro nell'event handler */
             if (device_config_get()->ntp_enabled) {
-                /* create the helper with low priority so it cannot starve the idle or
-                 * higher‑priority system tasks while performing the blocking HTTP
-                 * request (which may take several seconds). */
-                BaseType_t res = xTaskCreate(netcheck_task, "netcheck", 4096, NULL, 1, NULL);
-                if (res != pdPASS) {
-                    ESP_LOGE(TAG, "[M] [NTP] xTaskCreate(netcheck) FALLITA (free_heap=%u)",
-                             (unsigned)esp_get_free_heap_size());
-                } else {
-                    ESP_LOGI(TAG, "[M] [NTP] netcheck_task creata");
-                }
+                ESP_LOGI(TAG, "[M] [NTP] Avvio SNTP (IP disponibile)");
+                init_sntp();
             } else {
-                ESP_LOGI(TAG, "[M] [NTP] NTP disabilitato da config: skip netcheck_task");
+                ESP_LOGI(TAG, "[M] [NTP] NTP disabilitato da config");
             }
         }
     }
@@ -1300,7 +1225,13 @@ esp_err_t init_run_factory(void)
 #endif
 
     // Inizializza Remote Logging
-    ESP_ERROR_CHECK(remote_logging_init());
+    {
+        esp_err_t rl_ret = remote_logging_init();
+        if (rl_ret != ESP_OK) {
+            ESP_LOGW(TAG, "remote_logging_init failed (%s), continuing without remote logs",
+                     esp_err_to_name(rl_ret));
+        }
+    }
 
     // Inizializzazioni condizionali basate su NVS
     if (cfg->sensors.io_expander_enabled)
@@ -1484,6 +1415,52 @@ void init_i2c_and_io_expander(void) {
             break;
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+    // Log riepilogativo sezioni DNA mock attive
+    {
+        char dna[192] = "";
+#if defined(DNA_SD_CARD) && (DNA_SD_CARD == 1)
+        strcat(dna, " SD_CARD");
+#endif
+#if defined(DNA_IO_EXPANDER) && (DNA_IO_EXPANDER == 1)
+        strcat(dna, " IO_EXPANDER");
+#endif
+#if defined(DNA_LED_STRIP) && (DNA_LED_STRIP == 1)
+        strcat(dna, " LED_STRIP");
+#endif
+#if defined(DNA_SHT40) && (DNA_SHT40 == 1)
+        strcat(dna, " SHT40");
+#endif
+#if defined(DNA_RS232) && (DNA_RS232 == 1)
+        strcat(dna, " RS232");
+#endif
+#if defined(DNA_RS485) && (DNA_RS485 == 1)
+        strcat(dna, " RS485");
+#endif
+#if defined(DNA_CCTALK) && (DNA_CCTALK == 1)
+        strcat(dna, " CCTALK");
+#endif
+#if defined(DNA_PWM) && (DNA_PWM == 1)
+        strcat(dna, " PWM");
+#endif
+#if defined(DNA_TOUCHSCREEN) && (DNA_TOUCHSCREEN == 1)
+        strcat(dna, " TOUCHSCREEN");
+#endif
+#if defined(DNA_REMOTE_LOGGING) && (DNA_REMOTE_LOGGING == 1)
+        strcat(dna, " REMOTE_LOGGING");
+#endif
+#if defined(DNA_ETHERNET) && (DNA_ETHERNET == 1)
+        strcat(dna, " ETHERNET");
+#endif
+#if defined(DNA_WIFI) && (DNA_WIFI == 1)
+        strcat(dna, " WIFI");
+#endif
+#if defined(DNA_LVGL) && (DNA_LVGL == 1)
+        strcat(dna, " LVGL");
+#endif
+        if (dna[0] == '\0') strcat(dna, " (nessuna)");
+        ESP_LOGI(TAG, "[M] Sezioni DNA mock attive:%s", dna);
     }
 }
 
