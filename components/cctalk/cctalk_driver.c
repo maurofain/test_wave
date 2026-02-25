@@ -6,6 +6,13 @@
 
 static const char *TAG = "CCTALK_DRV";
 
+#ifndef DNA_CCTALK
+#define DNA_CCTALK 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_CCTALK == 0
+
 static void cctalk_task(void *arg)
 {
     uint8_t src;
@@ -39,3 +46,19 @@ esp_err_t cctalk_driver_init(void)
     ESP_LOGI(TAG, "cctalk driver initialized on UART %d (tx=%d rx=%d)", CONFIG_APP_RS232_UART_PORT, cctalk_tx_gpio, cctalk_rx_gpio);
     return ESP_OK;
 }
+
+#endif /* DNA_CCTALK == 0 */
+
+/*
+ * Mockup — nessuna UART CCtalk, nessun task.
+ * Attiva quando DNA_CCTALK == 1
+ */
+#if defined(DNA_CCTALK) && (DNA_CCTALK == 1)
+
+esp_err_t cctalk_driver_init(void)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] cctalk_driver_init: CCtalk disabilitato");
+    return ESP_OK;
+}
+
+#endif /* DNA_CCTALK == 1 */

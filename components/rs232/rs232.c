@@ -4,7 +4,14 @@
 #include "sdkconfig.h"
 #include "device_config.h"
 
-static const char *TAG = "RS232";
+static const char *TAG __attribute__((unused)) = "RS232";
+
+#ifndef DNA_RS232
+#define DNA_RS232 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_RS232 == 0
 
 /**
  * @brief Inizializza la porta RS232.
@@ -70,3 +77,32 @@ int rs232_receive(uint8_t *data, size_t max_len, uint32_t timeout_ms) {
 int rs232_send(const uint8_t *data, size_t len) {
     return uart_write_bytes(CONFIG_APP_RS232_UART_PORT, data, len);
 }
+
+#endif /* DNA_RS232 == 0 */
+
+/*
+ * Mockup — nessuna UART RS232 reale.
+ * Attiva quando DNA_RS232 == 1
+ */
+#if defined(DNA_RS232) && (DNA_RS232 == 1)
+
+esp_err_t rs232_init(void)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] rs232_init: porta RS232 simulata");
+    return ESP_OK;
+}
+
+int rs232_receive(uint8_t *data, size_t max_len, uint32_t timeout_ms)
+{
+    (void)data; (void)max_len; (void)timeout_ms;
+    return 0; /* nessun dato disponibile */
+}
+
+int rs232_send(const uint8_t *data, size_t len)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] rs232_send: %zu byte ignorati", len);
+    (void)data;
+    return (int)len; /* simulazione invio riuscito */
+}
+
+#endif /* DNA_RS232 == 1 */

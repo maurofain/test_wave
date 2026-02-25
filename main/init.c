@@ -1459,6 +1459,15 @@ void init_i2c_and_io_expander(void) {
 #if defined(DNA_LVGL) && (DNA_LVGL == 1)
         strcat(dna, " LVGL");
 #endif
+#if defined(DNA_GPIO) && (DNA_GPIO == 1)
+        strcat(dna, " GPIO");
+#endif
+#if defined(DNA_MDB) && (DNA_MDB == 1)
+        strcat(dna, " MDB");
+#endif
+#if defined(DNA_USB_SCANNER) && (DNA_USB_SCANNER == 1)
+        strcat(dna, " SCANNER");
+#endif
         if (dna[0] == '\0') strcat(dna, " (nessuna)");
         ESP_LOGI(TAG, "[M] Sezioni DNA mock attive:%s", dna);
     }

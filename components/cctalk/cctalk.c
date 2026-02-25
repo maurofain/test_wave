@@ -5,6 +5,13 @@
 #include "freertos/task.h"
 #include <string.h>
 
+#ifndef DNA_CCTALK
+#define DNA_CCTALK 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_CCTALK == 0
+
 #define CCTALK_UART_BUF_SIZE 256
 
 static int cctalk_uart_num = 1;
@@ -66,3 +73,38 @@ uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len) {
     for (int i = 0; i < len; ++i) sum += packet[i];
     return (uint8_t)(-sum);
 }
+
+#endif /* DNA_CCTALK == 0 */
+
+/*
+ * Mockup — nessuna UART CCtalk reale.
+ * Attiva quando DNA_CCTALK == 1
+ */
+#if defined(DNA_CCTALK) && (DNA_CCTALK == 1)
+
+void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate)
+{
+    (void)uart_num; (void)tx_pin; (void)rx_pin; (void)baudrate;
+    /* MOCK: nessuna inizializzazione hardware */
+}
+
+bool cctalk_send(uint8_t dest_addr, const uint8_t *data, uint8_t len)
+{
+    (void)dest_addr; (void)data; (void)len;
+    return true; /* simulazione invio riuscito */
+}
+
+bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t timeout_ms)
+{
+    (void)src_addr; (void)data; (void)len; (void)timeout_ms;
+    return false; /* nessun dato disponibile */
+}
+
+uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len)
+{
+    uint16_t sum = 0;
+    for (int i = 0; i < len; ++i) sum += packet[i];
+    return (uint8_t)(-sum);
+}
+
+#endif /* DNA_CCTALK == 1 */

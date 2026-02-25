@@ -6,6 +6,13 @@
 
 static const char *TAG = "PWM_CTRL";
 
+#ifndef DNA_PWM
+#define DNA_PWM 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_PWM == 0
+
 esp_err_t pwm_set_duty(int channel, int duty_percent) {
     if (duty_percent < 0) duty_percent = 0;
     if (duty_percent > 100) duty_percent = 100;
@@ -58,3 +65,39 @@ esp_err_t pwm_init(void) {
     ESP_LOGI(TAG, "[C] PWM inizializzato");
     return ESP_OK;
 }
+
+#endif /* DNA_PWM == 0 */
+
+/*
+ * Mockup — nessun driver LEDC reale.
+ * Attiva quando DNA_PWM == 1
+ */
+#if defined(DNA_PWM) && (DNA_PWM == 1)
+
+static int s_mock_duty[2] = {0, 0};
+
+esp_err_t pwm_set_duty(int channel, int duty_percent)
+{
+    if (channel < 0 || channel > 1) return ESP_ERR_INVALID_ARG;
+    if (duty_percent < 0) duty_percent = 0;
+    if (duty_percent > 100) duty_percent = 100;
+    s_mock_duty[channel] = duty_percent;
+    ESP_LOGI(TAG, "[C] [MOCK] pwm_set_duty: ch=%d duty=%d%%", channel, duty_percent);
+    return ESP_OK;
+}
+
+int pwm_get_duty(int channel)
+{
+    if (channel < 0 || channel > 1) return 0;
+    return s_mock_duty[channel];
+}
+
+esp_err_t pwm_init(void)
+{
+    s_mock_duty[0] = 0;
+    s_mock_duty[1] = 0;
+    ESP_LOGI(TAG, "[C] [MOCK] pwm_init: 2 canali simulati");
+    return ESP_OK;
+}
+
+#endif /* DNA_PWM == 1 */

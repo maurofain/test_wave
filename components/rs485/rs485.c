@@ -5,7 +5,14 @@
 #include "sdkconfig.h"
 #include "device_config.h"
 
-static const char *TAG = "RS485";
+static const char *TAG __attribute__((unused)) = "RS485";
+
+#ifndef DNA_RS485
+#define DNA_RS485 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_RS485 == 0
 
 /**
  * @brief Inizializza la porta RS485 in modalità Half-Duplex.
@@ -79,3 +86,32 @@ int rs485_receive(uint8_t *data, size_t max_len, uint32_t timeout_ms) {
 int rs485_send(const uint8_t *data, size_t len) {
     return uart_write_bytes(CONFIG_APP_RS485_UART_PORT, data, len);
 }
+
+#endif /* DNA_RS485 == 0 */
+
+/*
+ * Mockup — nessuna UART RS485 reale.
+ * Attiva quando DNA_RS485 == 1
+ */
+#if defined(DNA_RS485) && (DNA_RS485 == 1)
+
+esp_err_t rs485_init(void)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] rs485_init: bus RS485 simulato");
+    return ESP_OK;
+}
+
+int rs485_receive(uint8_t *data, size_t max_len, uint32_t timeout_ms)
+{
+    (void)data; (void)max_len; (void)timeout_ms;
+    return 0; /* nessun dato sul bus */
+}
+
+int rs485_send(const uint8_t *data, size_t len)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] rs485_send: %zu byte ignorati", len);
+    (void)data;
+    return (int)len; /* simulazione invio riuscito */
+}
+
+#endif /* DNA_RS485 == 1 */

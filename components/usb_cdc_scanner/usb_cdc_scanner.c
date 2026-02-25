@@ -8,6 +8,15 @@
 #include "web_ui.h" /* Sperimentali */
 #include <string.h>
 #include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#ifndef DNA_USB_SCANNER
+#define DNA_USB_SCANNER 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_USB_SCANNER == 0
 
 #if CONFIG_USB_OTG_SUPPORTED
 #include "usb/usb_host.h"
@@ -514,3 +523,52 @@ esp_err_t usb_cdc_scanner_send_off_command(void)
     return ESP_ERR_NOT_SUPPORTED;
 #endif
 }
+
+#endif /* DNA_USB_SCANNER == 0 */
+
+/*
+ * Mockup — nessun USB OTG reale, nessuna periferica scanner.
+ * Attiva quando DNA_USB_SCANNER == 1
+ */
+#if defined(DNA_USB_SCANNER) && (DNA_USB_SCANNER == 1)
+
+static const char *TAG_MOCK = "USB_SCN";
+
+void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config)
+{
+    (void)config;
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_init: scanner USB simulato");
+}
+
+void usb_cdc_scanner_task(void *param)
+{
+    (void)param;
+    /* MOCK: task fittizio, esce subito */
+    vTaskDelete(NULL);
+}
+
+esp_err_t usb_cdc_scanner_send_setup_command(void)
+{
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_setup_command");
+    return ESP_OK;
+}
+
+esp_err_t usb_cdc_scanner_send_state_command(void)
+{
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_state_command");
+    return ESP_OK;
+}
+
+esp_err_t usb_cdc_scanner_send_on_command(void)
+{
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_on_command");
+    return ESP_OK;
+}
+
+esp_err_t usb_cdc_scanner_send_off_command(void)
+{
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_off_command");
+    return ESP_OK;
+}
+
+#endif /* DNA_USB_SCANNER == 1 */

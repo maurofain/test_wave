@@ -10,6 +10,13 @@
 
 static const char *TAG = "MDB";
 
+#ifndef DNA_MDB
+#define DNA_MDB 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_MDB == 0
+
 #define MDB_UART_PORT   CONFIG_APP_MDB_UART_PORT
 #define MDB_TX_GPIO     CONFIG_APP_MDB_TX_GPIO
 #define MDB_RX_GPIO     CONFIG_APP_MDB_RX_GPIO
@@ -276,3 +283,46 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
 
     return ESP_OK;
 }
+
+#endif /* DNA_MDB == 0 */
+
+/*
+ * Mockup — nessuna UART MDB reale, nessuna periferica.
+ * Attiva quando DNA_MDB == 1
+ */
+#if defined(DNA_MDB) && (DNA_MDB == 1)
+
+static mdb_status_t s_mock_mdb_status = {0};
+
+const mdb_status_t *mdb_get_status(void)
+{
+    return &s_mock_mdb_status;
+}
+
+esp_err_t mdb_init(void)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] mdb_init: bus MDB simulato");
+    return ESP_OK;
+}
+
+esp_err_t mdb_start_engine(void)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] mdb_start_engine: polling disabilitato");
+    return ESP_OK;
+}
+
+esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] mdb_send_packet: addr=0x%02X len=%zu ignorato", address, len);
+    (void)data;
+    return ESP_OK;
+}
+
+esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len, uint32_t timeout_ms)
+{
+    (void)out_data; (void)max_len; (void)timeout_ms;
+    if (out_len) *out_len = 0;
+    return ESP_ERR_TIMEOUT;
+}
+
+#endif /* DNA_MDB == 1 */

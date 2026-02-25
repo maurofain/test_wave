@@ -7,6 +7,13 @@
 
 static const char *TAG = "AUX_GPIO";
 
+#ifndef DNA_GPIO
+#define DNA_GPIO 0
+#endif
+
+/* Codice reale — escluso se mockup attivo */
+#if DNA_GPIO == 0
+
 esp_err_t aux_gpio_init(void)
 {
     device_config_t *cfg = device_config_get();
@@ -64,3 +71,34 @@ esp_err_t aux_gpio_set_level(int pin, int level)
     }
     return ESP_ERR_INVALID_ARG;
 }
+
+#endif /* DNA_GPIO == 0 */
+
+/*
+ * Mockup — nessun GPIO reale configurato.
+ * Attiva quando DNA_GPIO == 1
+ */
+#if defined(DNA_GPIO) && (DNA_GPIO == 1)
+
+esp_err_t aux_gpio_init(void)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] aux_gpio_init: GPIO simulati");
+    return ESP_OK;
+}
+
+esp_err_t aux_gpio_get_all_json(char *json_buffer, size_t max_len)
+{
+    const char *mock_json = "{\"33\":{\"mode\":0,\"level\":0}}";
+    strncpy(json_buffer, mock_json, max_len);
+    json_buffer[max_len - 1] = '\0';
+    ESP_LOGI(TAG, "[C] [MOCK] aux_gpio_get_all_json");
+    return ESP_OK;
+}
+
+esp_err_t aux_gpio_set_level(int pin, int level)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] aux_gpio_set_level: pin=%d level=%d", pin, level);
+    return ESP_OK;
+}
+
+#endif /* DNA_GPIO == 1 */
