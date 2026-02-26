@@ -16,7 +16,7 @@
 #define TAG "REMOTE_LOG"
 #define LOG_QUEUE_SIZE 50  // default queue length; reduced dynamically if heap low
 #define LOG_MESSAGE_MAX_LEN 512
-#define LOG_TASK_STACK_SIZE 6144
+#define LOG_TASK_STACK_SIZE 12288  /* increased to avoid stack smash when handling large log messages */
 #define LOG_TASK_PRIORITY 5
 
 // Struttura per i messaggi di log
