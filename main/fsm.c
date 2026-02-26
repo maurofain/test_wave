@@ -172,19 +172,11 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_TIMEOUT) {
+                /* splash timeout: ritorna ad IDLE ma conserva il credito.  Il
+                 * credito evc rimane finché non viene speso da un programma;
+                 * il vcd viene azzerato solo dalla rimozione tessera (gestita
+                 * altrove), quindi non lo tocchiamo qui. */
                 ctx->state = FSM_STATE_IDLE;
-                ctx->credit_cents = 0;
-                ctx->ecd_coins = 0;
-                ctx->vcd_coins = 0;
-                ctx->ecd_used  = 0;
-                ctx->vcd_used  = 0;
-                ctx->program_running = false;
-                ctx->running_elapsed_ms = 0;
-                ctx->pause_elapsed_ms = 0;
-                ctx->pause_limit_reached = false;
-                ctx->running_target_ms = 0;
-                ctx->running_price_units = 0;
-                memset(ctx->running_program_name, 0, sizeof(ctx->running_program_name));
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_PAYMENT_ACCEPTED) {
                 ctx->inactivity_ms = 0;
