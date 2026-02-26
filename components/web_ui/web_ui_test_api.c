@@ -22,6 +22,9 @@
 #include "aux_gpio.h"
 #include "sht40.h"
 
+/* needed for publishing FSM actions when scanner commands are triggered */
+#include "fsm.h"
+
 #define TAG "WEB_UI_TEST_API"
 
 esp_err_t api_test_handler(httpd_req_t *req)
@@ -60,6 +63,20 @@ esp_err_t api_test_handler(httpd_req_t *req)
         web_ui_add_log("INFO", "SCANNER", "API scanner_on called");
         esp_err_t err = usb_cdc_scanner_send_on_command();
         if (err == ESP_OK) {
+            /* publish corresponding FSM action so other agents can observe it */
+            fsm_input_event_t ev = {
+                .from = AGN_ID_WEB_UI,
+                .to = {AGN_ID_FSM},
+                .action = ACTION_ID_USB_CDC_SCANNER_ON,
+                .type = FSM_INPUT_EVENT_NONE,
+                .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+                .value_i32 = 0,
+                .value_u32 = 0,
+                .aux_u32 = 0,
+                .text = {0},
+            };
+            (void)fsm_event_publish(&ev, pdMS_TO_TICKS(20));
+
             ESP_LOGI(TAG, "Scanner ON command dispatched");
             snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Scanner ON inviato\"}");
         } else {
@@ -72,6 +89,20 @@ esp_err_t api_test_handler(httpd_req_t *req)
         web_ui_add_log("INFO", "SCANNER", "API scanner_off called");
         esp_err_t err = usb_cdc_scanner_send_off_command();
         if (err == ESP_OK) {
+            /* also post an FSM action event */
+            fsm_input_event_t ev = {
+                .from = AGN_ID_WEB_UI,
+                .to = {AGN_ID_FSM},
+                .action = ACTION_ID_USB_CDC_SCANNER_OFF,
+                .type = FSM_INPUT_EVENT_NONE,
+                .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+                .value_i32 = 0,
+                .value_u32 = 0,
+                .aux_u32 = 0,
+                .text = {0},
+            };
+            (void)fsm_event_publish(&ev, pdMS_TO_TICKS(20));
+
             ESP_LOGI(TAG, "Scanner OFF command dispatched");
             snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Scanner OFF inviato\"}");
         } else {
@@ -204,7 +235,12 @@ esp_err_t api_test_handler(httpd_req_t *req)
     else if (strcmp(test_name, "rs232_start") == 0) {
         if (!s_rs232_test_handle) {
             rs232_init();
-            xTaskCreate(uart_test_task, "rs232_test", 2048, (void*)CONFIG_APP_RS232_UART_PORT, 5, &s_rs232_test_handle);
+            xTaskCreate(uart_test_task, "rs232_test",
+            /* original 2048 words (≈8 KB) proved insufficient: formatting/logging
+             * in uart_test_task can consume a few kilobytes.  Allocate double to
+             * give headroom and avoid stack‑protection panics. */
+            4096,
+            (void*)CONFIG_APP_RS232_UART_PORT, 5, &s_rs232_test_handle);
             snprintf(response, sizeof(response), "{\"message\":\"Test RS232 avviato (caratteri 55,AA,01,07)\"}");
         } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
     } else if (strcmp(test_name, "rs232_stop") == 0) {
@@ -215,7 +251,10 @@ esp_err_t api_test_handler(httpd_req_t *req)
     else if (strcmp(test_name, "rs485_start") == 0) {
         if (!s_rs485_test_handle) {
             rs485_init();
-            xTaskCreate(uart_test_task, "rs485_test", 2048, (void*)CONFIG_APP_RS485_UART_PORT, 5, &s_rs485_test_handle);
+            xTaskCreate(uart_test_task, "rs485_test",
+            /* same reasoning as rs232_test above */
+            4096,
+            (void*)CONFIG_APP_RS485_UART_PORT, 5, &s_rs485_test_handle);
             snprintf(response, sizeof(response), "{\"message\":\"Test RS485 avviato (caratteri 55,AA,01,07)\"}");
         } else snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
     } else if (strcmp(test_name, "rs485_stop") == 0) {

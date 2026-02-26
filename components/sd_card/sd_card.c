@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "sd_card.h"
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
@@ -49,7 +51,7 @@ static bool s_last_cd_state = true; // True = Estratta (Pull-up), False = Inseri
  * un inserimento o una rimozione genera un log e aggiorna lo stato interno.
  * Il task non termina mai.
  */
-static void sd_monitor_task(void *pvParameters) {
+void sd_card_monitor_run(void *pvParameters) {
     ESP_LOGI(TAG, "Avvio monitor hot-plug SD (GPIO %d)...", SD_CD_GPIO);
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << SD_CD_GPIO),
@@ -88,11 +90,9 @@ static void sd_monitor_task(void *pvParameters) {
  * rimozioni fisiche della scheda e tenerne traccia internamente.
  */
 void sd_card_init_monitor(void) {
-    static bool s_task_started = false;
-    if (s_task_started) return;
-    
-    xTaskCreate(sd_monitor_task, "sd_monitor", 4096, NULL, 5, NULL);
-    s_task_started = true;
+    /* Il task sd_monitor è ora gestito da tasks.c tramite sd_card_monitor_run().
+     * Funzione mantenuta per retrocompatibilità. */
+    ESP_LOGD(TAG, "sd_card_init_monitor: task gestito da tasks.c (sd_card_monitor_run)");
 }
 
 /**
@@ -331,7 +331,8 @@ esp_err_t sd_card_format(void) {
 
     s_is_formatting = true;
     xTaskCreate(sd_format_worker_task, "sd_fmt_work", 4096, NULL, 5, NULL);
-    xTaskCreate(sd_format_timer_task, "sd_fmt_timer", 2048, NULL, 4, NULL);
+    /* the formatting timer may call printf; enlarge stack accordingly */
+    xTaskCreate(sd_format_timer_task, "sd_fmt_timer", 4096, NULL, 4, NULL);
     
     return ESP_OK;
 }
@@ -600,6 +601,7 @@ esp_err_t sd_card_unmount(void) {
 }
 
 void sd_card_init_monitor(void) { /* no hardware, nothing to watch */ }
+void sd_card_monitor_run(void *pvParameters) { while (1) { vTaskDelay(pdMS_TO_TICKS(5000)); } }
 
 bool sd_card_is_mounted(void) { return s_mock_mounted; }
 

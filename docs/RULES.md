@@ -25,7 +25,7 @@
 - quando indico che uno step previsto in TODO.md è completato spuntiamo la relativa voce
 - nei log ESP_LOGI/ESP_LOGW/ESP_LOGE va aggiunto un prefisso tra parentesi quadre all'inizio del messaggio per
 - identificare il contesto: [M] per main app, [F] per factory app, [C] per common/components
-
+- in caso di modifiche alle dimesioni degli stack delle funzioni va aggiornata la voce corrispondente in tasks.csv
 - per simulare l'hardware senza alterare il codice "vero" utilizzare la tecnica dei
   mockup:
   1. definire un simbolo preprocessoriale (es. `DNA_SD_CARD`) in un header o

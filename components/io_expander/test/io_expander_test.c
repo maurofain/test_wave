@@ -23,7 +23,9 @@ static void io_expander_test_task(void *arg) {
 esp_err_t io_expander_test_start(void) {
     if (s_test_handle) return ESP_ERR_INVALID_STATE;
     s_run = true;
-    xTaskCreate(io_expander_test_task, "ioexp_test", 2048, NULL, 5, &s_test_handle);
+    /* give the IO expander test a bit more stack in case logging
+     * happens or the task is extended in future */
+    xTaskCreate(io_expander_test_task, "ioexp_test", 4096, NULL, 5, &s_test_handle);
     return ESP_OK;
 }
 

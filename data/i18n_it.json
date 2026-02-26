@@ -2920,5 +2920,41 @@
     "scope": "p_test",
     "key": "web_ui_test_page",
     "text": "WEB_UI_TEST_PAGE"
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "out_of_service_title",
+    "text": "Fuori servizio"
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "out_of_service_sub",
+    "text": "Reboot consecutivi: %lu\nContattare l'assistenza"
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "credit_label",
+    "text": "Credito"
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "elapsed_fmt",
+    "text": "Secondi   %s"
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "pause_fmt",
+    "text": "Pausa: %s"
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "program_btn_fmt",
+    "text": "Programma %d"
   }
 ]

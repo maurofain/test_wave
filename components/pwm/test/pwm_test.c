@@ -24,8 +24,11 @@ static void pwm_sweep_task(void *arg) {
 static TaskHandle_t s_pwm1_h = NULL, s_pwm2_h = NULL;
 
 esp_err_t pwm_test_start(int channel) {
-    if (channel == 1) xTaskCreate(pwm_sweep_task, "p1test", 2048, (void*)1, 5, &s_pwm1_h);
-    else xTaskCreate(pwm_sweep_task, "p2test", 2048, (void*)2, 5, &s_pwm2_h);
+    if (channel == 1) xTaskCreate(pwm_sweep_task, "p1test",
+            /* lots of delay loops but also logging; allocate more to be safe */
+            4096, (void*)1, 5, &s_pwm1_h);
+    else xTaskCreate(pwm_sweep_task, "p2test",
+            4096, (void*)2, 5, &s_pwm2_h);
     return ESP_OK;
 }
 

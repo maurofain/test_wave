@@ -46,3 +46,14 @@ esp_err_t init_mark_boot_completed(void);
  * @brief Registra in NVS una richiesta di crash forzato da consumare al boot successivo.
  */
 esp_err_t init_mark_forced_crash_request(void);
+
+/**
+ * @brief Inizializza display + LVGL senza touch, senza pannello emulatore.
+ *
+ * Va chiamata quando si vuole mostrare una schermata di errore (es. ERROR_LOCK)
+ * prima che il boot normale sia completato. È no-op se il display è disabilitato
+ * da config o se il DNA_LVGL mock è attivo.
+ *
+ * @return ESP_OK se il display è stato avviato, altrimenti il codice di errore.
+ */
+esp_err_t init_run_display_only(void);

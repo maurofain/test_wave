@@ -70,10 +70,17 @@ esp_err_t mdb_init(void);
 
 /**
  * @brief Avvia il Polling Engine MDB in un task FreeRTOS
- * @return ESP_OK se avviato
+ * @deprecated Usa mdb_engine_run() tramite tasks.c; questa funzione è mantenuta
+ *             per retrocompatibilitá ma non crea piú il task internamente.
+ * @return ESP_OK
  */
-esp_err_t mdb_init(void);
 esp_err_t mdb_start_engine(void);
+
+/**
+ * @brief Entry point del task di polling MDB. Da chiamare dopo mdb_init().
+ *        Funzione bloccante: non ritorna mai.
+ */
+void mdb_engine_run(void *arg);
 
 /**
  * @brief Ottiene lo stato attuale del bus MDB

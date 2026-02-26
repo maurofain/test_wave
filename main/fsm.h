@@ -138,6 +138,9 @@ typedef enum {
     ACTION_ID_USB_CDC_SCANNER_TX,
     ACTION_ID_USB_CDC_SCANNER_CONNECT,
     ACTION_ID_USB_CDC_SCANNER_DISCONNECT,
+    ACTION_ID_USB_CDC_SCANNER_READ,   /* request barcode read */
+    ACTION_ID_USB_CDC_SCANNER_ON,     /* power on scanner */
+    ACTION_ID_USB_CDC_SCANNER_OFF,    /* power off scanner */
 
     /* SD card operations */
     ACTION_ID_SD_CARD_INSERT,

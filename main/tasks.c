@@ -10,6 +10,9 @@
 #include "web_ui_programs.h"
 #include "fsm.h"
 #include "usb_cdc_scanner.h" // Scanner QR
+#include "cctalk.h"          // cctalk_driver_init + cctalk_task_run
+#include "mdb.h"             // mdb_init + mdb_engine_run
+#include "sd_card.h"         // sd_card_init_monitor + sd_card_monitor_run
 #include "freertos/idf_additions.h"
 #include <stdio.h>
 #include <string.h>
@@ -372,6 +375,27 @@ static void usb_scanner_task_wrapper(void *arg)
     usb_cdc_scanner_task(NULL);
 }
 
+/* Wrapper CCtalk: l'hardware UART è già inizializzato da init.c (cctalk_driver_init).
+ * Questo wrapper entra direttamente nel loop di ricezione. */
+static void cctalk_engine_wrapper(void *arg)
+{
+    cctalk_task_run(NULL);
+}
+
+/* Wrapper MDB engine: l'hardware UART è già inizializzato da init.c (mdb_init).
+ * Questo wrapper entra direttamente nel loop di polling. */
+static void mdb_engine_wrapper(void *arg)
+{
+    mdb_engine_run(NULL);
+}
+
+/* Wrapper SD monitor: non richiede init hardware preventivo (il task configura
+ * autonomamente il GPIO di card-detect). */
+static void sd_monitor_wrapper(void *arg)
+{
+    sd_card_monitor_run(NULL);
+}
+
 static task_param_t s_tasks[] = {
     {
         .name = "ws2812",
@@ -529,6 +553,50 @@ static task_param_t s_tasks[] = {
         .arg = NULL,
         .handle = NULL,
     },
+    {
+        /* Task di ricezione CCtalk. Richiede che cctalk_driver_init() sia già
+         * stato chiamato da init.c (avviene quando sensors.rs232_enabled=true).
+         * Default: IDLE — abilitare via tasks.csv se la periferica è presente. */
+        .name = "cctalk_task",
+        .state = TASK_STATE_IDLE,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(100),
+        .task_fn = cctalk_engine_wrapper,
+        .stack_words = 4096,                  /* RISC-V: 4KB; UART rx + snprintf + serial monitor */
+        .stack_caps = MALLOC_CAP_SPIRAM,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        /* Polling engine MDB. Richiede che mdb_init() sia già stato chiamato da
+         * init.c (avviene quando sensors.mdb_enabled=true).
+         * Default: IDLE — abilitare via tasks.csv se la periferica è presente. */
+        .name = "mdb_engine",
+        .state = TASK_STATE_IDLE,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(500),
+        .task_fn = mdb_engine_wrapper,
+        .stack_words = 4096,                  /* RISC-V: 4KB; polling state-machine MDB */
+        .stack_caps = MALLOC_CAP_SPIRAM,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        /* Monitor hot-plug SD. Configura autonomamente il GPIO di card-detect e
+         * cicla indefinitamente. Avviato sempre (default RUN). */
+        .name = "sd_monitor",
+        .state = TASK_STATE_RUN,
+        .priority = 5,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(500),
+        .task_fn = sd_monitor_wrapper,
+        .stack_words = 4096,                  /* RISC-V: 4KB; gpio_config + poll + ESP_LOG */
+        .stack_caps = MALLOC_CAP_SPIRAM,
+        .arg = NULL,
+        .handle = NULL,
+    },
 };
 
 // -----------------------------------------------------------------------------
@@ -578,6 +646,12 @@ void tasks_load_config(const char *path)
     }
 
     while (fgets(line, sizeof(line), f)) {
+        // Salta righe vuote e commenti (righe che iniziano con '#')
+        size_t leading = strspn(line, " \t");
+        if (line[leading] == '#' || line[leading] == '\r' || line[leading] == '\n' || line[leading] == '\0') {
+            continue;
+        }
+
         // name,state,priority,core,period_ms,stack_words,stack_caps
         char *save = NULL;
         char *name = strtok_r(line, ",\r\n", &save);
@@ -594,7 +668,9 @@ void tasks_load_config(const char *path)
             if (strcmp(name, "http_server") == 0) {
                 continue;
             }
-            ESP_LOGW(TAG, "[M] Task sconosciuto '%s' nella configurazione", name);
+            /* Task documentato in CSV ma non in s_tasks[] (es. task hardcoded
+             * di driver/componenti): ignora silenziosamente a livello debug. */
+            ESP_LOGD(TAG, "[M] Task '%s' in CSV non configurabile via s_tasks[] — ignorato", name);
             continue;
         }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 /**
  * @file lvgl_panel.h
  * @brief Pannello LVGL emulatore per display 7" 800×1280 verticale.
@@ -25,3 +26,15 @@
  * Acquisisce internamente il lock LVGL.
  */
 void lvgl_panel_show(void);
+
+/**
+ * @brief Mostra una schermata di blocco "Fuori servizio" a tutto schermo.
+ *
+ * Visualizza il messaggio in rosso con font 48 px (Montserrat) e il numero
+ * di reboot consecutivi che hanno causato il blocco.
+ * Va chiamata dopo che il display è già stato inizializzato.
+ * Acquisisce internamente il lock LVGL.
+ *
+ * @param reboots Numero di reboot consecutivi rilevati (mostrato a video).
+ */
+void lvgl_panel_show_out_of_service(uint32_t reboots);

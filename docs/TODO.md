@@ -33,13 +33,13 @@
   9. creare le funzioni per l'init delle periferiche descritte in HARDWARE_SETUP, un task per ogni periferica e una utility di test gestibile da interfaccia WEB
 
   10. Implementare la gestione della EEProm 24LC16BT-I/OT  , creiamo il codice per interfacciarsi in i2c e la gestione CRC
-  11. Usare la EEProm per memorizzare i dati di config. Implementiamo la seguente logica :
-       1. I dati di config devono avere un valore di CRC
-       2. all'avvio verifichiamo se c'è il config in EEPROM e se è valido
-          1. altrimenti lo leggiamo da NVS e settiamo il flag di modificato in EEProm
-          2. se non c'è in NVS o non è validi (CRC) carichiamo i valori di default, scriviamo EEProm e NVS
-          3. 3. alla modifica dei parametri (tasto save in configurazione) salviamo i dati nella EEProm e sempre nella eeprom  settiamo flag di modificato 
-          4. al successivo riavvio salviamo i dati (se validi) in NVS - se non validi li riprendiamo da NVS e settiamo il flag di modificato
+  11. ✅ Usare la EEProm per memorizzare i dati di config. Implementiamo la seguente logica :
+       1. ✅ I dati di config devono avere un valore di CRC
+       2. ✅ all'avvio verifichiamo se c'è il config in EEPROM e se è valido
+          1. ✅ altrimenti lo leggiamo da NVS e settiamo il flag di modificato in EEProm
+          2. ✅ se non c'è in NVS o non è validi (CRC) carichiamo i valori di default, scriviamo EEProm e NVS
+          3. ✅ alla modifica dei parametri (tasto save in configurazione) salviamo i dati nella EEProm e sempre nella eeprom  settiamo flag di modificato 
+          4. ✅ al successivo riavvio salviamo i dati (se validi) in NVS - se non validi li riprendiamo da NVS e settiamo il flag di modificato
 12. Driver PWM
 13. ✅ Unificazione codice APP/FACTORY con flag `COMPILE_APP` (eliminata duplicazione cartelle)
 14. ✅ Driver RS485 e ricezione dati (timeout hardware 10ms)
@@ -217,7 +217,10 @@
     - Osservabilità e test
       - Aggiungere metriche minime (`last_ok`, `last_err`, `queue_len`, `last_status_code`) esposte via API/UI.
       - Preparare test contract/flow dedicati alle route remote con mock server.
-
+ 9. lo scanner USB è gestito tramite la coda mesaggi?  
+ 10. la lettura di un codice QR deve passare a http_services che deve eseguire , se non già acquisito, il token tramite la chiamata login e quindi eseguire una chiamata a api_payment_post
+ 11. ✅ crea una funzione per visualizzare sullo schermo con il carattere a 48px la scritta 'Fuori servizio' ed eseguila nel caso di 'APP: [F] ERROR_LOCK attivo: avvio task inibito (reboot consecutivi=3)
+'
       
  ```
 

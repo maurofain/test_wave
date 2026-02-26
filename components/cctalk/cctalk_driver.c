@@ -13,7 +13,7 @@ static const char *TAG = "CCTALK_DRV";
 /* Codice reale — escluso se mockup attivo */
 #if DNA_CCTALK == 0
 
-static void cctalk_task(void *arg)
+void cctalk_task_run(void *arg)
 {
     uint8_t src;
     uint8_t buf[256];
@@ -38,12 +38,7 @@ esp_err_t cctalk_driver_init(void)
     const int cctalk_rx_gpio = 21; /* RX */
     cctalk_init(CONFIG_APP_RS232_UART_PORT, cctalk_tx_gpio, cctalk_rx_gpio, 4800);
 
-    if (xTaskCreate(cctalk_task, "cctalk_task", 2048, NULL, 5, NULL) != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to create cctalk_task");
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI(TAG, "cctalk driver initialized on UART %d (tx=%d rx=%d)", CONFIG_APP_RS232_UART_PORT, cctalk_tx_gpio, cctalk_rx_gpio);
+    ESP_LOGI(TAG, "cctalk driver initialized on UART %d (tx=%d rx=%d) — task gestito da tasks.c", CONFIG_APP_RS232_UART_PORT, cctalk_tx_gpio, cctalk_rx_gpio);
     return ESP_OK;
 }
 
@@ -59,6 +54,12 @@ esp_err_t cctalk_driver_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] cctalk_driver_init: CCtalk disabilitato");
     return ESP_OK;
+}
+
+void cctalk_task_run(void *arg)
+{
+    /* Mockup: CCtalk disabilitato — task in attesa indefinita */
+    while (1) { vTaskDelay(pdMS_TO_TICKS(5000)); }
 }
 
 #endif /* DNA_CCTALK == 1 */

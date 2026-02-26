@@ -153,7 +153,7 @@ static void mdb_coin_sm(void) {
     }
 }
 
-static void mdb_engine_task(void *arg) {
+void mdb_engine_run(void *arg) {
     ESP_LOGI(TAG, "Motore di polling MDB avviato");
     while (1) {
         mdb_coin_sm();
@@ -163,7 +163,9 @@ static void mdb_engine_task(void *arg) {
 }
 
 esp_err_t mdb_start_engine(void) {
-    xTaskCreate(mdb_engine_task, "mdb_engine", 4096, NULL, 5, NULL);
+    /* Il task mdb_engine è ora gestito da tasks.c tramite mdb_engine_run().
+     * Questa funzione è mantenuta per retrocompatibilità ma non crea il task. */
+    ESP_LOGI(TAG, "mdb_start_engine: task gestito da tasks.c (mdb_engine_run)");
     return ESP_OK;
 }
 
@@ -309,6 +311,12 @@ esp_err_t mdb_start_engine(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] mdb_start_engine: polling disabilitato");
     return ESP_OK;
+}
+
+void mdb_engine_run(void *arg)
+{
+    /* Mockup: MDB disabilitato — task in attesa indefinita */
+    while (1) { vTaskDelay(pdMS_TO_TICKS(5000)); }
 }
 
 esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)

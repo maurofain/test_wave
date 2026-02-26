@@ -5,6 +5,7 @@
 #include "esp_heap_caps.h"
 #include "init.h"
 #include "tasks.h"
+#include "lvgl_panel.h"
 #include "app_version.h"
 #include "device_config.h"
 #include "error_log.h"
@@ -58,6 +59,11 @@ static void apply_post_boot_log_policy(void)
     esp_log_level_set("USB", ESP_LOG_WARN);
     esp_log_level_set("usb_host", ESP_LOG_WARN);
     esp_log_level_set("cdc_acm", ESP_LOG_WARN);
+    /* httpd: ECONNRESET (104) e ENOBUFS (113) sono transitori (browser refresh),
+     * non indicano errori applicativi — sopprimi il flood di W/E al livello ERROR */
+    esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_uri",  ESP_LOG_ERROR);
+    esp_log_level_set("httpd",      ESP_LOG_ERROR);
 }
 
 static void maybe_force_crash_at_boot(void)
@@ -104,8 +110,10 @@ void app_main(void)
 {
     apply_boot_log_policy();
     esp_log_level_set("INIT", ESP_LOG_INFO);
+#if !defined(DNA_ERROR_DUMP) || (DNA_ERROR_DUMP == 0)
     // inizializza logging errori su SD (dopo montare la SD)
     error_log_init();
+#endif
 
     ESP_LOGI(TAG, "==========================================");
     ESP_LOGI(TAG, "  MODO COMPILE: %s", COMPILE_MODE_LABEL);
@@ -121,8 +129,13 @@ void app_main(void)
     esp_err_t init_ret = init_run_factory();
     if (init_ret == ESP_ERR_INVALID_STATE && init_is_error_lock_active())
     {
+        uint32_t reboots = init_get_consecutive_reboots();
         ESP_LOGE(TAG, LOG_CTX_PREFIX " ERROR_LOCK attivo: avvio task inibito (reboot consecutivi=%lu)",
-                 (unsigned long)init_get_consecutive_reboots());
+                 (unsigned long)reboots);
+        /* Mostra schermata "Fuori servizio" se il display è disponibile */
+        if (init_run_display_only() == ESP_OK) {
+            lvgl_panel_show_out_of_service(reboots);
+        }
         while (1)
         {
             vTaskDelay(pdMS_TO_TICKS(1000));

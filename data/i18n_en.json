@@ -2920,5 +2920,41 @@
     "scope": "p_test",
     "key": "web_ui_test_page",
     "text": "WEB_UI_TEST_PAGE"
+  },
+  {
+    "lang": "en",
+    "scope": "lvgl",
+    "key": "out_of_service_title",
+    "text": "Out of service"
+  },
+  {
+    "lang": "en",
+    "scope": "lvgl",
+    "key": "out_of_service_sub",
+    "text": "Consecutive reboots: %lu\nContact support"
+  },
+  {
+    "lang": "en",
+    "scope": "lvgl",
+    "key": "credit_label",
+    "text": "Credit"
+  },
+  {
+    "lang": "en",
+    "scope": "lvgl",
+    "key": "elapsed_fmt",
+    "text": "Seconds   %s"
+  },
+  {
+    "lang": "en",
+    "scope": "lvgl",
+    "key": "pause_fmt",
+    "text": "Pause: %s"
+  },
+  {
+    "lang": "en",
+    "scope": "lvgl",
+    "key": "program_btn_fmt",
+    "text": "Program %d"
   }
 ]

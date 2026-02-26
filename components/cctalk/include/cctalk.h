@@ -19,9 +19,12 @@ bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t tim
 // Calcola il checksum cctalk
 uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len);
 
-// Inizializza il driver CCtalk (installa UART + avvia task di ricezione)
-// Usare questa funzione per attivare la seriale e il relativo task di background.
+// Inizializza il driver CCtalk (installa UART).
+// Il task di ricezione va avviato separatamente chiamando cctalk_task_run().
 esp_err_t cctalk_driver_init(void);
+
+// Entry point del task di ricezione CCtalk. Da chiamare dopo cctalk_driver_init().
+void cctalk_task_run(void *arg);
 
 #ifdef __cplusplus
 }

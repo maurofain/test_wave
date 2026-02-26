@@ -10,6 +10,7 @@
  */
 
 #include "lvgl_panel.h"
+#include "init.h"
 
 #include "lvgl.h"
 #include "bsp/esp32_p4_nano.h"
@@ -31,6 +32,63 @@ extern const lv_font_t sevensegments_300;
 #include <time.h>
 
 static const char *TAG = "lvgl_panel";
+
+/* =========================================================================
+ * Schermata "Fuori servizio" — ERROR_LOCK attivo
+ * ========================================================================= */
+void lvgl_panel_show_out_of_service(uint32_t reboots)
+{
+    /* Se il display non è ancora inizializzato, lo avviamo ora.
+     * bsp_display_lock con timeout breve: se riesce → LVGL già attivo;
+     * se fallisce → non inizializzato, forziamo init. */
+    if (!bsp_display_lock(pdMS_TO_TICKS(200))) {
+        ESP_LOGW(TAG, "display non attivo — init forzata per schermata errore");
+        if (init_run_display_only() != ESP_OK) {
+            ESP_LOGE(TAG, "init display forzata fallita, schermata non disponibile");
+            return;
+        }
+    } else {
+        bsp_display_unlock();
+    }
+
+    if (bsp_display_lock(0)) {
+        lv_obj_t *scr = lv_scr_act();
+
+        /* Sfondo rosso scuro */
+        lv_obj_set_style_bg_color(scr, lv_color_make(0x6b, 0x00, 0x00), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_clean(scr);
+
+        /* Icona simbolo ⚠ */
+        lv_obj_t *ico = lv_label_create(scr);
+        lv_label_set_text(ico, LV_SYMBOL_WARNING);
+        lv_obj_set_style_text_font(ico, &lv_font_montserrat_48, LV_PART_MAIN);
+        lv_obj_set_style_text_color(ico, lv_color_make(0xFF, 0xCC, 0x00), LV_PART_MAIN);
+        lv_obj_align(ico, LV_ALIGN_CENTER, 0, -120);
+
+        /* Testo principale */
+        lv_obj_t *lbl = lv_label_create(scr);
+        lv_label_set_text(lbl, "Fuori servizio");
+        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_48, LV_PART_MAIN);
+        lv_obj_set_style_text_color(lbl, lv_color_make(0xFF, 0xFF, 0xFF), LV_PART_MAIN);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -40);
+
+        /* Sottotitolo con conteggio reboot */
+        char sub[64];
+        snprintf(sub, sizeof(sub), "Reboot consecutivi: %lu\nContattare l'assistenza", (unsigned long)reboots);
+        lv_obj_t *sub_lbl = lv_label_create(scr);
+        lv_label_set_text(sub_lbl, sub);
+        lv_obj_set_style_text_font(sub_lbl, &lv_font_montserrat_20, LV_PART_MAIN);
+        lv_obj_set_style_text_color(sub_lbl, lv_color_make(0xFF, 0xAA, 0xAA), LV_PART_MAIN);
+        lv_obj_set_style_text_align(sub_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        lv_label_set_long_mode(sub_lbl, LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(sub_lbl, 700);
+        lv_obj_align(sub_lbl, LV_ALIGN_CENTER, 0, 60);
+
+        bsp_display_unlock();
+    }
+}
 
 /* =========================================================================
  * Colori (tema scuro, palette analoga all'emulator web)

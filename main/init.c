@@ -1037,40 +1037,75 @@ static esp_err_t init_display_lvgl_minimal(void)
     ESP_LOGI(TAG, "  PSRAM free: %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     ESP_LOGI(TAG, "  SPIRAM caps alloc free (8bit): %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
 
-    ESP_RETURN_ON_ERROR(bsp_display_brightness_init(), TAG, "brightness init failed");
-    
-    // Log delle dimensioni dopo rotazione
+    // Luminosità: non fatale — schermo visibile è prioritario rispetto alla brightness corretta
+    if (bsp_display_brightness_init() != ESP_OK) {
+        ESP_LOGW(TAG, "[M] brightness_init fallita: backlight potrebbe restare fisso");
+    } else {
+        device_config_t *device_cfg = device_config_get();
+        uint8_t brightness = device_cfg->display.lcd_brightness;
+        if (brightness == 0) {
+            ESP_LOGW(TAG, "[M] lcd_brightness=0 in config, forzo 80%%");
+            brightness = 80;
+        }
+        if (bsp_display_brightness_set(brightness) != ESP_OK) {
+            ESP_LOGW(TAG, "[M] brightness_set(%u) fallita", (unsigned)brightness);
+        }
+        ESP_LOGI(TAG, "[M] Luminosità display: %u%%", (unsigned)brightness);
+    }
+
+    // Log delle dimensioni
     lv_coord_t hor_res = lv_display_get_horizontal_resolution(disp);
     lv_coord_t ver_res = lv_display_get_vertical_resolution(disp);
     ESP_LOGI(TAG, "[M] Dimensioni display dopo rotazione: %dx%d", hor_res, ver_res);
-    
-    // Applica la luminosità dal config invece di accendere sempre al 100%
-    device_config_t *device_cfg = device_config_get();
-    ESP_RETURN_ON_ERROR(bsp_display_brightness_set(device_cfg->display.lcd_brightness), TAG, "brightness set failed");
 
-    // Inizializza il touch
+    // Inizializza il touch (non fatale: il display funziona anche senza touch)
     bsp_touch_config_t touch_cfg = {
         .dummy = NULL,
     };
-    ESP_RETURN_ON_ERROR(bsp_touch_new(&touch_cfg, &s_touch_handle), TAG, "touch init failed");
-    
-    // Verifica che il touch sia inizializzato correttamente
-    if (s_touch_handle) {
+    esp_err_t touch_ret = bsp_touch_new(&touch_cfg, &s_touch_handle);
+    if (touch_ret != ESP_OK) {
+        ESP_LOGW(TAG, "[M] Touch init fallita (%s): display operativo senza touch", esp_err_to_name(touch_ret));
+        s_touch_handle = NULL;
+    } else if (s_touch_handle) {
         ESP_LOGI(TAG, "[M] Touch handle inizializzato: %p", s_touch_handle);
-    } else {
-        ESP_LOGE(TAG, "[M] Touch handle è NULL!");
-    }
-    
-    // Pass touch handle to touchscreen task
-    if (s_touch_handle) {
-        ESP_LOGI(TAG, "Touch handle initialized successfully: %p", s_touch_handle);
         tasks_set_touchscreen_handle(s_touch_handle);
     } else {
-        ESP_LOGE(TAG, "Touch handle is NULL after initialization");
+        ESP_LOGW(TAG, "[M] Touch handle è NULL dopo init");
     }
 
     lvgl_panel_show();
     return ESP_OK;
+}
+
+esp_err_t init_run_display_only(void)
+{
+#if defined(DNA_LVGL) && (DNA_LVGL == 1)
+    ESP_LOGI(TAG, "[M] init_run_display_only: DNA_LVGL mock attivo, display non disponibile");
+    return ESP_ERR_NOT_SUPPORTED;
+#else
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->display.enabled) {
+        ESP_LOGI(TAG, "[M] init_run_display_only: display disabilitato da config");
+        return ESP_ERR_INVALID_STATE;
+    }
+    bsp_display_cfg_t cfg_disp = {
+        .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
+        .buffer_size = BSP_LCD_DRAW_BUFF_SIZE,
+        .double_buffer = false,
+        .flags = { .buff_dma = true, .buff_spiram = false, .sw_rotate = false },
+    };
+    lv_display_t *disp = bsp_display_start_with_config(&cfg_disp);
+    if (!disp) {
+        ESP_LOGE(TAG, "[M] init_run_display_only: bsp_display_start_with_config fallito");
+        return ESP_FAIL;
+    }
+    bsp_display_rotate(disp, LV_DISPLAY_ROTATION_0);
+    if (bsp_display_brightness_init() == ESP_OK) {
+        bsp_display_brightness_set(cfg->display.lcd_brightness);
+    }
+    ESP_LOGI(TAG, "[M] init_run_display_only: display avviato per schermata errore");
+    return ESP_OK;
+#endif
 }
 
 esp_err_t init_run_factory(void)
@@ -1174,6 +1209,7 @@ esp_err_t init_run_factory(void)
 #endif
 
     // Inizializza Remote Logging
+#if !defined(DNA_ERROR_DUMP) || (DNA_ERROR_DUMP == 0)
     {
         esp_err_t rl_ret = remote_logging_init();
         if (rl_ret != ESP_OK) {
@@ -1181,6 +1217,9 @@ esp_err_t init_run_factory(void)
                      esp_err_to_name(rl_ret));
         }
     }
+#else
+    ESP_LOGI(TAG, "[M] remote_logging: disabilitato (DNA_ERROR_DUMP=1)");
+#endif
 
     // Inizializzazioni condizionali basate su NVS
     if (cfg->sensors.io_expander_enabled)
@@ -1266,11 +1305,9 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.mdb_enabled)
     {
+        /* mdb_init() inizializza solo l'hardware UART.
+         * Il task di polling (mdb_engine) è avviato da tasks_start_all() via s_tasks[]. */
         esp_err_t mdb_ret = mdb_init();
-        if (mdb_ret == ESP_OK)
-        {
-            mdb_ret = mdb_start_engine();
-        }
 
         if (mdb_ret != ESP_OK)
         {
@@ -1308,8 +1345,8 @@ esp_err_t init_run_factory(void)
         }
     }
 
-    // Inizializza sempre il monitor hot-plug SD per rilevare inserimenti
-    sd_card_init_monitor();
+    /* Il task sd_monitor è avviato da tasks_start_all() via s_tasks[] (sd_monitor_wrapper).
+     * sd_card_init_monitor() è mantenuta per retrocompatibilità ma è ora una no-op. */
 
     if (cfg->sensors.sd_card_enabled)
     {

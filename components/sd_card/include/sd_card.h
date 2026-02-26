@@ -37,14 +37,16 @@ const char* sd_card_get_last_error(void);
 /**
  * @brief Avvia il task di monitoraggio hot‑plug della SD
  *
- * Il task configura un GPIO per la rilevazione della presenza della scheda
- * e segnala inserimenti/rimozioni. Viene creato solo una volta anche se la
- * funzione è richiamata più volte.
- *
- * Nota: il monitor è separato dal montaggio; chiamare comunque
- * sd_card_mount() per accedere al filesystem.
+ * @deprecated Non crea più il task internamente; usare sd_card_monitor_run()
+ *             tramite tasks.c. Chiamata mantenuta per retrocompatibilità.
  */
 void sd_card_init_monitor(void);
+
+/**
+ * @brief Entry point del task di monitoraggio hot-plug SD.
+ *        Funzione bloccante: non ritorna mai. Da richiamare dopo sd_card_init_monitor().
+ */
+void sd_card_monitor_run(void *arg);
 
 /**
  * @brief Smonta la scheda SD e libera le risorse

@@ -72,6 +72,8 @@ esp_err_t web_ui_init(void)
     config.max_uri_handlers = 100;  /* alzato da 64: con http_services siamo ~68 handler, il vecchio limite causava 404 sulle route registrate dopo il limite */
     config.stack_size = 8192;
     config.lru_purge_enable = true;
+    config.recv_wait_timeout = 3;   /* sec: libera socket inattivi più velocemente (default ~5s) */
+    config.send_wait_timeout = 3;   /* sec: idem lato send */
     config.uri_match_fn = httpd_uri_match_wildcard;
     web_ui_load_http_task_config(&config.task_priority, &config.core_id, &config.stack_size);
 

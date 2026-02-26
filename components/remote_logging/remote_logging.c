@@ -252,6 +252,10 @@ static esp_err_t init_socket(void)
  */
 esp_err_t remote_logging_init(void)
 {
+#if defined(DNA_ERROR_DUMP) && (DNA_ERROR_DUMP == 1)
+    ESP_LOGI(TAG, "[MOCK] remote_logging_init: disabilitato (DNA_ERROR_DUMP=1)");
+    return ESP_OK;
+#endif
     if (initialized) {
         return ESP_OK;
     }

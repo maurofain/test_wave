@@ -83,6 +83,10 @@ static int vprintf_wrapper(const char *fmt, va_list args)
 
 void error_log_init(void)
 {
+#if defined(DNA_ERROR_DUMP) && (DNA_ERROR_DUMP == 1)
+    ESP_LOGI(TAG, "[MOCK] error_log_init: disabilitato (DNA_ERROR_DUMP=1)");
+    return;
+#endif
     // provare a montare la SD; la funzione sd_card_mount gestisce se è già
     // montata o se non presente
     if (sd_card_mount() != ESP_OK) {
