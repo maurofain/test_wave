@@ -54,7 +54,7 @@
  * 1 = headless forzato (ignora richieste web per abilitare display/LVGL)
  * 0 = comportamento normale da configurazione utente
  */
-#define FORCE_VIDEO_DISABLED 1
+#define FORCE_VIDEO_DISABLED 0
 
 /* Log store e handler spostati in components/web_ui/web_ui_logs.c */
 
@@ -1441,99 +1441,36 @@ esp_err_t api_config_save(httpd_req_t *req)
 esp_err_t api_tasks_get(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /api/tasks (Lettura da SPIFFS)");
-    
-    FILE *f = fopen("/spiffs/tasks.csv", "r");
+
+    FILE *f = fopen("/spiffs/tasks.json", "r");
     if (!f) {
-        ESP_LOGE(TAG, "[C] Impossibile aprire tasks.csv");
+        ESP_LOGE(TAG, "[C] Impossibile aprire tasks.json");
         httpd_resp_set_status(req, "500");
-        const char *resp_str = "{\"error\":\"File non trovato\"}";
-        httpd_resp_send(req, resp_str, strlen(resp_str));
-        return ESP_FAIL;
+        return httpd_resp_send(req, "{\"error\":\"File non trovato\"}", -1);
     }
 
-    /* NOTA: prima usavamo un buffer su stack da 4096 con strcat() non protetti.
-     * Con molte righe o valori lunghi si andava in overflow -> corruzione stack
-     * e panic "Stack protection fault" nel task HTTP durante printf/vfprintf.
-     * Costruiamo ora la risposta via cJSON (heap) in modo sicuro.
-     */
-    cJSON *arr = cJSON_CreateArray();
-    if (!arr) {
+    fseek(f, 0, SEEK_END);
+    long file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (file_size <= 0 || file_size > 32768) {
         fclose(f);
         httpd_resp_set_status(req, "500");
-        return httpd_resp_send(req, "{\"error\":\"No mem\"}", -1);
+        return httpd_resp_send(req, "{\"error\":\"Dimensione file non valida\"}", -1);
     }
 
-    char line[256];
-    bool skip_header = true;
-    bool has_http_server = false;
-
-    while (fgets(line, sizeof(line), f)) {
-        line[strcspn(line, "\r\n")] = 0;
-        if (skip_header) {
-            skip_header = false;
-            continue;
-        }
-
-        char name[64] = {0};
-        char state[16] = {0};
-        int priority = 0;
-        int core = 0;
-        int period_ms = 0;
-        int stack_words = 0;
-        char stack_caps[16] = {0};
-
-        int n = sscanf(line, "%63[^,],%15[^,],%d,%d,%d,%d,%15[^,\r\n]",
-                       name, state, &priority, &core, &period_ms, &stack_words, stack_caps);
-        if (n < 6) {
-            continue;
-        }
-        if (n < 7) { strcpy(stack_caps, "spiram"); } /* retrocompat CSV senza colonna caps */
-
-        if (strcmp(name, "http_server") == 0) {
-            has_http_server = true;
-        }
-
-        cJSON *obj = cJSON_CreateObject();
-        if (!obj) {
-            continue;
-        }
-        cJSON_AddStringToObject(obj, "name", name);
-        cJSON_AddStringToObject(obj, "state", state);
-        cJSON_AddNumberToObject(obj, "priority", priority);
-        cJSON_AddNumberToObject(obj, "core", core);
-        cJSON_AddNumberToObject(obj, "period_ms", period_ms);
-        cJSON_AddNumberToObject(obj, "stack_words", stack_words);
-        cJSON_AddStringToObject(obj, "stack_caps", stack_caps[0] ? stack_caps : "spiram");
-        cJSON_AddItemToArray(arr, obj);
-    }
-
-    fclose(f);
-
-    if (!has_http_server) {
-        /* default più sicuro: 3072 words = 12KB stack per il task httpd */
-        cJSON *obj = cJSON_CreateObject();
-        if (obj) {
-            cJSON_AddStringToObject(obj, "name", "http_server");
-            cJSON_AddStringToObject(obj, "state", "run");
-            cJSON_AddNumberToObject(obj, "priority", 5);
-            cJSON_AddNumberToObject(obj, "core", 0);
-            cJSON_AddNumberToObject(obj, "period_ms", 1000);
-            cJSON_AddNumberToObject(obj, "stack_words", 3072);
-            cJSON_AddStringToObject(obj, "stack_caps", "internal");
-            cJSON_AddItemToArray(arr, obj);
-        }
-    }
-
-    char *json_str = cJSON_PrintUnformatted(arr);
-    cJSON_Delete(arr);
-    if (!json_str) {
+    char *buf = malloc((size_t)file_size + 1);
+    if (!buf) {
+        fclose(f);
         httpd_resp_set_status(req, "500");
-        return httpd_resp_send(req, "{\"error\":\"JSON encode failed\"}", -1);
+        return httpd_resp_send(req, "{\"error\":\"Out of memory\"}", -1);
     }
+    fread(buf, 1, (size_t)file_size, f);
+    fclose(f);
+    buf[file_size] = '\0';
 
     httpd_resp_set_type(req, "application/json");
-    esp_err_t ret = httpd_resp_send(req, json_str, strlen(json_str));
-    free(json_str);
+    esp_err_t ret = httpd_resp_send(req, buf, (ssize_t)file_size);
+    free(buf);
     return ret;
 }
 
@@ -1541,72 +1478,95 @@ esp_err_t api_tasks_get(httpd_req_t *req)
 esp_err_t api_tasks_save(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST /api/tasks/save");
-    
-    char buf[4096] = {0};
-    int len = httpd_req_recv(req, buf, sizeof(buf)-1);
-    if (len <= 0) {
-        const char *resp_str = "{\"error\":\"Nessun dato ricevuto\"}";
-        httpd_resp_send(req, resp_str, strlen(resp_str));
-        return ESP_OK;
+
+    int total_len = req->content_len;
+    if (total_len <= 0 || total_len > 16384) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"Content-Length non valido\"}", -1);
     }
-    
-    cJSON *root = cJSON_Parse(buf);
-    if (!root || !cJSON_IsArray(root)) {
-        const char *resp_str = "{\"error\":\"JSON non valido\"}";
-    httpd_resp_send(req, resp_str, strlen(resp_str));
-        if (root) cJSON_Delete(root);
-        return ESP_OK;
+
+    char *buf = calloc(1, total_len + 1);
+    if (!buf) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "{\"error\":\"Out of memory\"}", -1);
     }
-    
-    // Scrivi nel file
-    FILE *f = fopen("/spiffs/tasks.csv", "w");
-    if (!f) {
-        ESP_LOGE(TAG, "[C] Impossibile aprire tasks.csv per scrittura");
-        cJSON_Delete(root);
-        httpd_resp_set_status(req, "500");
-        const char *resp_str = "{\"error\":\"Impossibile scrivere il file\"}";
-        httpd_resp_send(req, resp_str, strlen(resp_str));
-        return ESP_FAIL;
-    }
-    
-    // Scrivi header
-    fprintf(f, "name,state,priority,core,period_ms,stack_words,stack_caps\n");
-    
-    // Scrivi ogni task
-    int count = cJSON_GetArraySize(root);
-    for (int i = 0; i < count; i++) {
-        cJSON *task = cJSON_GetArrayItem(root, i);
-        if (!task) continue;
-        
-        cJSON *name = cJSON_GetObjectItem(task, "name");
-        cJSON *state = cJSON_GetObjectItem(task, "state");
-        cJSON *priority = cJSON_GetObjectItem(task, "priority");
-        cJSON *core = cJSON_GetObjectItem(task, "core");
-        cJSON *period_ms = cJSON_GetObjectItem(task, "period_ms");
-        cJSON *stack_words = cJSON_GetObjectItem(task, "stack_words");
-        cJSON *stack_caps = cJSON_GetObjectItem(task, "stack_caps");
-        
-        if (name && state && priority && core && period_ms && stack_words) {
-            const char *caps_val = (stack_caps && cJSON_IsString(stack_caps)) ? stack_caps->valuestring : "spiram";
-            fprintf(f, "%s,%s,%d,%d,%d,%d,%s\n",
-                    name->valuestring,
-                    state->valuestring,
-                    priority->valueint,
-                    core->valueint,
-                    period_ms->valueint,
-                    stack_words->valueint,
-                    caps_val);
+
+    int received = 0;
+    while (received < total_len) {
+        int r = httpd_req_recv(req, buf + received, total_len - received);
+        if (r <= 0) {
+            free(buf);
+            httpd_resp_set_status(req, "400 Bad Request");
+            return httpd_resp_send(req, "{\"error\":\"Ricezione interrotta\"}", -1);
         }
+        received += r;
+    }
+    buf[received] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root || !cJSON_IsArray(root)) {
+        ESP_LOGE(TAG, "[C] tasks/save: JSON non valido");
+        if (root) cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"JSON non valido\"}", -1);
     }
     
-    fclose(f);
+    // Serializza su file JSON con chiavi compatte (n/s/p/c/m/w/k + enum numerici)
+    int count = cJSON_GetArraySize(root);
+    cJSON *compact = cJSON_CreateArray();
+    cJSON *item;
+    cJSON_ArrayForEach(item, root) {
+        cJSON *jn = cJSON_GetObjectItem(item, "name");
+        cJSON *js = cJSON_GetObjectItem(item, "state");
+        cJSON *jp = cJSON_GetObjectItem(item, "priority");
+        cJSON *jc = cJSON_GetObjectItem(item, "core");
+        cJSON *jm = cJSON_GetObjectItem(item, "period_ms");
+        cJSON *jw = cJSON_GetObjectItem(item, "stack_words");
+        cJSON *jk = cJSON_GetObjectItem(item, "stack_caps");
+        if (!jn) continue;
+        cJSON *o = cJSON_CreateObject();
+        cJSON_AddStringToObject(o, "n", jn->valuestring ? jn->valuestring : "");
+        /* state: JS invia già int (0/1/2), ma accettiamo anche stringa per compatibilità */
+        int sv = 0;
+        if (js && cJSON_IsNumber(js)) { sv = js->valueint; }
+        else if (js && cJSON_IsString(js)) {
+            if (strcmp(js->valuestring, "run") == 0) sv = 1;
+            else if (strcmp(js->valuestring, "pause") == 0) sv = 2;
+        }
+        cJSON_AddNumberToObject(o, "s", sv);
+        cJSON_AddNumberToObject(o, "p", jp ? jp->valueint : 4);
+        cJSON_AddNumberToObject(o, "c", jc ? jc->valueint : 0);
+        cJSON_AddNumberToObject(o, "m", jm ? jm->valueint : 0);
+        cJSON_AddNumberToObject(o, "w", jw ? jw->valueint : 2048);
+        int kv = 0;
+        if (jk && cJSON_IsNumber(jk)) { kv = jk->valueint; }
+        else if (jk && cJSON_IsString(jk) && strcmp(jk->valuestring, "internal") == 0) { kv = 1; }
+        cJSON_AddNumberToObject(o, "k", kv);
+        cJSON_AddItemToArray(compact, o);
+    }
     cJSON_Delete(root);
-    
-    ESP_LOGI(TAG, "[C] Tasks salvate: %d righe", count);
+    char *json_out = cJSON_PrintUnformatted(compact);
+    cJSON_Delete(compact);
+    if (!json_out) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "{\"error\":\"JSON encode failed\"}", -1);
+    }
+
+    FILE *f = fopen("/spiffs/tasks.json", "w");
+    if (!f) {
+        ESP_LOGE(TAG, "[C] Impossibile aprire tasks.json per scrittura");
+        free(json_out);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "{\"error\":\"Impossibile scrivere il file\"}", -1);
+    }
+    fputs(json_out, f);
+    fclose(f);
+    free(json_out);
+
+    ESP_LOGI(TAG, "[C] Tasks salvate: %d voci", count);
     httpd_resp_set_type(req, "application/json");
-    const char *ok_resp = "{\"status\":\"ok\"}";
-    httpd_resp_send(req, ok_resp, strlen(ok_resp));
-    return ESP_OK;
+    return httpd_resp_send(req, "{\"status\":\"ok\"}", -1);
 }
 
 // Handler API POST /api/tasks/apply
@@ -1615,7 +1575,7 @@ esp_err_t api_tasks_apply(httpd_req_t *req)
     ESP_LOGI(TAG, "[C] POST /api/tasks/apply");
     
     // Ricarica la configurazione dal file CSV salvato su SPIFFS
-    tasks_load_config("/spiffs/tasks.csv");
+    tasks_load_config("/spiffs/tasks.json");
     
     // Applica i cambiamenti ai task FreeRTOS
     tasks_apply_n_run();

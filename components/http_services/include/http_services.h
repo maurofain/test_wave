@@ -89,3 +89,14 @@ typedef struct {
  * Provides proxy handlers for POST routes under /api/ used by cloud services.
  */
 esp_err_t http_services_register_handlers(httpd_handle_t server);
+
+/**
+ * Call remote /api/getcustomers and parse the response.
+ *
+ * @param code       Customer code to look up, or "*" for all. Must not be NULL.
+ * @param telephone  Optional telephone filter — pass empty string "" if unused.
+ * @param out        Output struct filled on success. Must not be NULL.
+ * @return ESP_OK on HTTP 200 + valid JSON, ESP_ERR_* otherwise.
+ */
+esp_err_t http_services_getcustomers(const char *code, const char *telephone,
+                                     http_services_getcustomers_response_t *out);

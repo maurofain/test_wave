@@ -151,7 +151,7 @@ void app_main(void)
      */
     apply_post_boot_log_policy();
 
-    tasks_load_config("/spiffs/tasks.csv");
+    tasks_load_config("/spiffs/tasks.json");
     tasks_start_all();
     if (BOOT_COUNTER_RESET_DELAYED)
     {

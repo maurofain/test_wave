@@ -46,6 +46,14 @@ componenti.
   - in `main/init.c`: salta il preboot crash-send (`try_send_pending_crash_record`)
   - in `http_services.c`: blocca il forwarding POST remoto (`remote_post`)
 
+### `DNA_LVGL_COUNTDOWN_BG`
+- **File:** `components/lvgl_panel/lvgl_panel.c` (definito in `CMakeLists.txt` radice)
+- **Valori:** `0` modalità barra verticale (default), `1` modalità sfondo countdown pieno
+- **Impatto:**
+  - `0`: visualizza la barra verticale a destra dell'area counter
+  - `1`: rimuove la barra e usa un riempimento dell'intera area counter che decresce con il tempo residuo
+  - in entrambi i casi, colore dinamico: verde oltre 30%, rosso a 30% o meno
+
 ### `DEBUG_FORCE_CRASH_AT_BOOT`
 - **File:** `main/main.c`
 - **Valori:** `1` forza crash intenzionale a inizio boot, `0` disattivo.

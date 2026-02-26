@@ -33,6 +33,10 @@ extern const lv_font_t sevensegments_300;
 
 static const char *TAG = "lvgl_panel";
 
+#ifndef DNA_LVGL_COUNTDOWN_BG
+#define DNA_LVGL_COUNTDOWN_BG 0
+#endif
+
 /* =========================================================================
  * Schermata "Fuori servizio" — ERROR_LOCK attivo
  * ========================================================================= */
@@ -98,6 +102,7 @@ void lvgl_panel_show_out_of_service(uint32_t reboots)
 #define COL_HDR         lv_color_make(0x0d, 0x0d, 0x20)
 #define COL_PROG        lv_color_make(0x6c, 0x34, 0x83)
 #define COL_PROG_ACT    lv_color_make(0x1e, 0x8b, 0x45)
+#define COL_PROG_LOW    lv_color_make(0xc0, 0x39, 0x2b)
 #define COL_PROG_PAUSE  lv_color_make(0xe6, 0x7e, 0x22)
 #define COL_QR          lv_color_make(0x16, 0xa0, 0x85)
 #define COL_CARD_B      lv_color_make(0x29, 0x80, 0xb9)
@@ -140,6 +145,7 @@ static lv_obj_t *s_credit_lbl  = NULL;
 static lv_obj_t *s_elapsed_lbl = NULL;
 static lv_obj_t *s_pause_lbl   = NULL;
 static lv_obj_t *s_gauge       = NULL;    /* barra verticale a destra */
+static lv_obj_t *s_counter_fill = NULL;   /* sfondo countdown pieno (mode DNA_LVGL_COUNTDOWN_BG=1) */
 static lv_obj_t *s_prog_btns[PROG_COUNT];
 static lv_obj_t *s_prog_lbls[PROG_COUNT];
 
@@ -174,20 +180,27 @@ static void fmt_mm_ss(char *buf, size_t len, uint32_t ms)
     snprintf(buf, len, "%02lu:%02lu", (unsigned long)(s / 60), (unsigned long)(s % 60));
 }
 
-/* Aggiorna l'orologio header */
+/* Aggiorna l'orologio header — aggiorna LVGL solo se il testo è cambiato */
 static void update_time(void)
 {
     if (!s_time_lbl) return;
     time_t now = time(NULL);
+    static char s_last_time[16] = "";
+    char buf[16];
     if (now == (time_t)-1) {
-        lv_label_set_text(s_time_lbl, "--:--:--");
+        if (strcmp(s_last_time, "--:--:--") != 0) {
+            lv_label_set_text(s_time_lbl, "--:--:--");
+            strncpy(s_last_time, "--:--:--", sizeof(s_last_time) - 1);
+        }
         return;
     }
     struct tm ti;
     localtime_r(&now, &ti);
-    char buf[16];
     strftime(buf, sizeof(buf), "%H:%M:%S", &ti);
-    lv_label_set_text(s_time_lbl, buf);
+    if (strcmp(s_last_time, buf) != 0) {
+        lv_label_set_text(s_time_lbl, buf);
+        strncpy(s_last_time, buf, sizeof(s_last_time) - 1);
+    }
 }
 
 /* Aggiorna box status in base a snapshot FSM (crediti, timer, stato) */
@@ -198,17 +211,24 @@ static void update_state(const fsm_ctx_t *snap)
     bool running = (snap->state == FSM_STATE_RUNNING);
     bool paused  = (snap->state == FSM_STATE_PAUSED);
 
-    /* sfondo status box */
-    if (s_status_box) {
+    /* sfondo status box — aggiorna solo se lo stato FSM è cambiato */
+    static fsm_state_t s_last_fsm_state = (fsm_state_t)-1;
+    if (s_status_box && snap->state != s_last_fsm_state) {
+#if DNA_LVGL_COUNTDOWN_BG == 0
         lv_color_t col = running ? COL_STATE_RUN :
                          paused  ? COL_STATE_PAU :
                                    COL_STATE_IDL;
         lv_obj_set_style_bg_color(s_status_box, col, LV_PART_MAIN);
+#else
+        lv_obj_set_style_bg_color(s_status_box, COL_STATE_IDL, LV_PART_MAIN);
+#endif
+        s_last_fsm_state = snap->state;
     }
 
     /* Numero grande: countdown (secondi rimanenti) se running/paused,
-     * altrimenti credito (coin) */
+     * altrimenti credito (coin) — aggiorna LVGL solo se testo cambiato */
     if (s_credit_lbl) {
+        static char s_last_credit[16] = "";
         char buf[16];
         if ((running || paused) && snap->running_target_ms > 0) {
             uint32_t rem_ms = (snap->running_target_ms > snap->running_elapsed_ms)
@@ -218,50 +238,92 @@ static void update_state(const fsm_ctx_t *snap)
         } else {
             snprintf(buf, sizeof(buf), "%ld", (long)snap->credit_cents);
         }
-        lv_label_set_text(s_credit_lbl, buf);
+        if (strcmp(s_last_credit, buf) != 0) {
+            lv_label_set_text(s_credit_lbl, buf);
+            strncpy(s_last_credit, buf, sizeof(s_last_credit) - 1);
+        }
     }
 
-    /* Etichetta sotto: contestuale */
+    /* Etichetta sotto: contestuale — aggiorna solo se testo cambiato */
     if (s_elapsed_lbl) {
+        static char s_last_elapsed[32] = "";
+        char buf[32];
         if (running || paused) {
             char mm[10];
             fmt_mm_ss(mm, sizeof(mm), snap->running_elapsed_ms);
-            char buf[32];
             snprintf(buf, sizeof(buf), "Secondi   %s", mm);
-            lv_label_set_text(s_elapsed_lbl, buf);
         } else {
-            lv_label_set_text(s_elapsed_lbl, "Credito");
+            snprintf(buf, sizeof(buf), "Credito");
+        }
+        if (strcmp(s_last_elapsed, buf) != 0) {
+            lv_label_set_text(s_elapsed_lbl, buf);
+            strncpy(s_last_elapsed, buf, sizeof(s_last_elapsed) - 1);
         }
     }
 
-    /* timer pausa */
+    /* timer pausa — aggiorna solo se testo cambiato */
     if (s_pause_lbl) {
+        static char s_last_pause[32] = "";
+        char buf[32];
         if (paused && snap->pause_elapsed_ms > 0) {
             char mm[10];
             fmt_mm_ss(mm, sizeof(mm), snap->pause_elapsed_ms);
-            char buf[32];
             snprintf(buf, sizeof(buf), "Pausa: %s", mm);
-            lv_label_set_text(s_pause_lbl, buf);
         } else {
-            lv_label_set_text(s_pause_lbl, "");
+            buf[0] = '\0';
+        }
+        if (strcmp(s_last_pause, buf) != 0) {
+            lv_label_set_text(s_pause_lbl, buf);
+            strncpy(s_last_pause, buf, sizeof(s_last_pause) - 1);
         }
     }
 
-    /* progress bar -- percentuale residua programma */
-    if (s_gauge) {
-        if (snap->running_target_ms > 0 && (running || paused)) {
-            uint32_t rem = snap->running_target_ms;
-            if (rem > snap->running_elapsed_ms) {
-                rem -= snap->running_elapsed_ms;
-            } else {
-                rem = 0;
-            }
-            uint32_t pct = (uint32_t)((rem * 100) / snap->running_target_ms);
-            lv_bar_set_value(s_gauge, pct, LV_ANIM_OFF);
+    int32_t pct = 0;
+    if (snap->running_target_ms > 0 && (running || paused)) {
+        uint32_t rem = snap->running_target_ms;
+        if (rem > snap->running_elapsed_ms) {
+            rem -= snap->running_elapsed_ms;
         } else {
-            lv_bar_set_value(s_gauge, 0, LV_ANIM_OFF);
+            rem = 0;
+        }
+        pct = (int32_t)((rem * 100) / snap->running_target_ms);
+    }
+
+#if DNA_LVGL_COUNTDOWN_BG == 1
+    /* countdown come sfondo pieno dell'area counter: il riempimento scende */
+    if (s_counter_fill) {
+        static int32_t s_last_pct = -1;
+        static int32_t s_last_band = -1;
+        if (pct != s_last_pct) {
+            int32_t h = (SECT_STATUS_H * pct) / 100;
+            lv_obj_set_size(s_counter_fill, 800, h);
+            lv_obj_align(s_counter_fill, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+            s_last_pct = pct;
+        }
+
+        int32_t band = (pct <= 30) ? 0 : 1;
+        if (band != s_last_band) {
+            lv_obj_set_style_bg_color(s_counter_fill, (band == 0) ? COL_PROG_LOW : COL_PROG_ACT, LV_PART_MAIN);
+            s_last_band = band;
         }
     }
+#else
+    /* progress bar — aggiorna solo se la percentuale è cambiata */
+    if (s_gauge) {
+        static int32_t s_last_pct = -1;
+        static int32_t s_last_band = -1;
+        if (pct != s_last_pct) {
+            lv_bar_set_value(s_gauge, pct, LV_ANIM_OFF);
+            s_last_pct = pct;
+        }
+
+        int32_t band = (pct <= 30) ? 0 : 1;
+        if (band != s_last_band) {
+            lv_obj_set_style_bg_color(s_gauge, (band == 0) ? COL_PROG_LOW : COL_PROG_ACT, LV_PART_INDICATOR);
+            s_last_band = band;
+        }
+    }
+#endif
 }
 
 
@@ -383,6 +445,7 @@ static void build_header(lv_obj_t *scr)
 
 static void build_status(lv_obj_t *scr)
 {
+    /* ---- contenitore principale ---------------------------------------- */
     s_status_box = lv_obj_create(scr);
     lv_obj_set_pos(s_status_box, 0, SECT_STATUS_Y);
     lv_obj_set_size(s_status_box, 800, SECT_STATUS_H);
@@ -393,37 +456,73 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_pad_all(s_status_box, 0, LV_PART_MAIN);
     lv_obj_remove_flag(s_status_box, LV_OBJ_FLAG_SCROLLABLE);
 
+    /* colonne: info + gauge (mode barra) */
+#if DNA_LVGL_COUNTDOWN_BG == 1
+#define GAUGE_W   0
+#else
+#define GAUGE_W   180
+#endif
+#define INFO_W    (800 - GAUGE_W)
+#define GAUGE_PAD 12
 
-    /* Barra di avanzamento verticale a DESTRA (0..100%) — occupa quasi tutta
-     * l'altezza del box, larga 60 px con bordo dal bordo dx */
+#if DNA_LVGL_COUNTDOWN_BG == 1
+    /* Sfondo countdown pieno (il livello scende dall'alto verso il basso) */
+    s_counter_fill = lv_obj_create(s_status_box);
+    lv_obj_set_size(s_counter_fill, 800, 0);
+    lv_obj_align(s_counter_fill, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    lv_obj_set_style_bg_color(s_counter_fill, COL_PROG_ACT, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_counter_fill, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_counter_fill, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_counter_fill, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_counter_fill, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(s_counter_fill, LV_OBJ_FLAG_SCROLLABLE);
+#else
+    s_counter_fill = NULL;
+#endif
+
+#if DNA_LVGL_COUNTDOWN_BG == 0
+    /* ---- barra di progressione — posizionata con coordinate assolute ---- */
+    /* Evitare sub-container intermedi: in LVGL v9 possono creare problemi
+     * di clipping/offset. La barra va direttamente su s_status_box. */
     s_gauge = lv_bar_create(s_status_box);
-    lv_obj_set_size(s_gauge, 60, SECT_STATUS_H - 24);
-    lv_obj_align(s_gauge, LV_ALIGN_RIGHT_MID, -12, 0);
+    lv_obj_set_pos(s_gauge, INFO_W + GAUGE_PAD, GAUGE_PAD);
+    lv_obj_set_size(s_gauge, GAUGE_W - GAUGE_PAD * 2, SECT_STATUS_H - GAUGE_PAD * 2);
     lv_bar_set_range(s_gauge, 0, 100);
-    lv_bar_set_value(s_gauge, 0, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(s_gauge, COL_CARD, LV_PART_MAIN);
+    lv_bar_set_value(s_gauge, 30, LV_ANIM_OFF);   /* valore visibile iniziale */
+    lv_bar_set_orientation(s_gauge, LV_BAR_ORIENTATION_VERTICAL);
+    lv_obj_set_style_bg_color(s_gauge, lv_color_make(0x40, 0x40, 0x70), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_gauge, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_gauge, 12, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_gauge, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_gauge, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_gauge, 8, LV_PART_MAIN);
     lv_obj_set_style_bg_color(s_gauge, COL_PROG_ACT, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(s_gauge, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(s_gauge, 12, LV_PART_INDICATOR);
+    lv_obj_set_style_pad_all(s_gauge, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_border_width(s_gauge, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(s_gauge, 8, LV_PART_INDICATOR);
+    lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_MAIN);
+#else
+    s_gauge = NULL;
+#endif
 
-    /* Numero grande centrato nell'area sinistra (lasciando 80 px per il gauge) */
+    /* ---- testi centrati nell'area sinistra (0..INFO_W) ---- */
+    /* lv_obj_align su s_status_box centra in 800px; offset -GAUGE_W/2 sposta
+     * il centro di visualizzazione nella zona sinistra 700px */
     s_credit_lbl = lv_label_create(s_status_box);
     lv_label_set_text(s_credit_lbl, "0");
     lv_obj_set_style_text_color(s_credit_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_credit_lbl, FONT_BIGNUM, LV_PART_MAIN);
-    /* centro verticale del box, spostato a sx per lasciare spazio al gauge */
-    lv_obj_align(s_credit_lbl, LV_ALIGN_CENTER, -40, -60);
+    lv_obj_align(s_credit_lbl, LV_ALIGN_CENTER, -(GAUGE_W / 2), -60);
 
-    /* Etichetta contestuale sotto il numero */
+    /* etichetta contestuale */
     s_elapsed_lbl = lv_label_create(s_status_box);
     lv_label_set_text(s_elapsed_lbl, "Credito");
     lv_obj_set_style_text_color(s_elapsed_lbl, COL_GREY, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_elapsed_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_obj_align(s_elapsed_lbl, LV_ALIGN_CENTER, -40, 80);
+    lv_obj_align(s_elapsed_lbl, LV_ALIGN_CENTER, -(GAUGE_W / 2), 80);
 
-    /* Timer pausa — in basso a sx */
+    /* timer pausa */
     s_pause_lbl = lv_label_create(s_status_box);
     lv_label_set_text(s_pause_lbl, "");
     lv_obj_set_style_text_color(s_pause_lbl, COL_PROG_PAUSE, LV_PART_MAIN);

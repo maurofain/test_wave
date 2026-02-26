@@ -796,6 +796,121 @@ static esp_err_t api_paymentoffline_post(httpd_req_t *req)
     return forward_post(req, "/api/paymentoffline", NULL, false);
 }
 
+/* =========================================================================
+ * Direct C call: getcustomers
+ * Builds request body, calls remote_post(), parses response.
+ * ========================================================================= */
+esp_err_t http_services_getcustomers(const char *code, const char *telephone,
+                                     http_services_getcustomers_response_t *out)
+{
+    if (!code || !out) return ESP_ERR_INVALID_ARG;
+    memset(out, 0, sizeof(*out));
+
+    /* --- build request body -------------------------------------------- */
+    cJSON *req_json = cJSON_CreateObject();
+    if (!req_json) return ESP_ERR_NO_MEM;
+    cJSON_AddStringToObject(req_json, "Code", code);
+    cJSON_AddStringToObject(req_json, "Telephone", telephone ? telephone : "");
+    char *body = cJSON_PrintUnformatted(req_json);
+    cJSON_Delete(req_json);
+    if (!body) return ESP_ERR_NO_MEM;
+
+    ESP_LOGI(TAG, "getcustomers: body=%s", body);
+
+    /* --- call remote server -------------------------------------------- */
+    char *resp = NULL;
+    int status = 0;
+    size_t resp_len = 0;
+    esp_err_t err = remote_post("/api/getcustomers", body, NULL, &resp, &status, &resp_len);
+    free(body);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "getcustomers: remote_post failed: %s", esp_err_to_name(err));
+        out->common.iserror = true;
+        out->common.codeerror = -1;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "%s", esp_err_to_name(err));
+        if (resp) free(resp);
+        return err;
+    }
+    if (!resp) {
+        out->common.iserror = true;
+        out->common.codeerror = -2;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "no_response");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "getcustomers: HTTP %d, resp_len=%u", status, (unsigned)resp_len);
+
+    /* --- parse response ------------------------------------------------- */
+    cJSON *root = cJSON_Parse(resp);
+    free(resp);
+    if (!root) {
+        out->common.iserror = true;
+        out->common.codeerror = -3;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "json_parse_error");
+        return ESP_FAIL;
+    }
+
+    /* common error fields */
+    cJSON *je = cJSON_GetObjectItemCaseSensitive(root, "iserror");
+    out->common.iserror = cJSON_IsTrue(je);
+    cJSON *jce = cJSON_GetObjectItemCaseSensitive(root, "codeerror");
+    if (cJSON_IsNumber(jce)) out->common.codeerror = (int32_t)jce->valueint;
+    cJSON *jde = cJSON_GetObjectItemCaseSensitive(root, "deserror");
+    if (cJSON_IsString(jde) && jde->valuestring)
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "%s", jde->valuestring);
+
+    if (out->common.iserror) {
+        ESP_LOGW(TAG, "getcustomers: server error %d: %s", out->common.codeerror, out->common.deserror);
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+
+    /* customers array */
+    cJSON *arr = cJSON_GetObjectItemCaseSensitive(root, "customers");
+    if (cJSON_IsArray(arr)) {
+        cJSON *item;
+        cJSON_ArrayForEach(item, arr) {
+            if (out->customer_count >= HTTP_SERVICES_MAX_FILES) break;
+            http_services_customer_t *c = &out->customers[out->customer_count];
+
+            cJSON *jv = cJSON_GetObjectItemCaseSensitive(item, "valid");
+            c->valid = cJSON_IsTrue(jv);
+
+            cJSON *jcode = cJSON_GetObjectItemCaseSensitive(item, "code");
+            if (cJSON_IsString(jcode) && jcode->valuestring)
+                snprintf(c->code, sizeof(c->code), "%s", jcode->valuestring);
+
+            cJSON *jtel = cJSON_GetObjectItemCaseSensitive(item, "telephone");
+            if (cJSON_IsString(jtel) && jtel->valuestring)
+                snprintf(c->telephone, sizeof(c->telephone), "%s", jtel->valuestring);
+
+            cJSON *jemail = cJSON_GetObjectItemCaseSensitive(item, "email");
+            if (cJSON_IsString(jemail) && jemail->valuestring)
+                snprintf(c->email, sizeof(c->email), "%s", jemail->valuestring);
+
+            cJSON *jname = cJSON_GetObjectItemCaseSensitive(item, "name");
+            if (cJSON_IsString(jname) && jname->valuestring)
+                snprintf(c->name, sizeof(c->name), "%s", jname->valuestring);
+
+            cJSON *jsur = cJSON_GetObjectItemCaseSensitive(item, "surname");
+            if (cJSON_IsString(jsur) && jsur->valuestring)
+                snprintf(c->surname, sizeof(c->surname), "%s", jsur->valuestring);
+
+            cJSON *jamt = cJSON_GetObjectItemCaseSensitive(item, "amount");
+            if (cJSON_IsNumber(jamt)) c->amount = (int32_t)jamt->valueint;
+
+            cJSON *jnew = cJSON_GetObjectItemCaseSensitive(item, "new");
+            c->is_new = cJSON_IsTrue(jnew);
+
+            out->customer_count++;
+        }
+    }
+
+    cJSON_Delete(root);
+    ESP_LOGI(TAG, "getcustomers: parsed %u customer(s)", (unsigned)out->customer_count);
+    return ESP_OK;
+}
+
 static esp_err_t api_getcustomers_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/getcustomers -> proxy to remote server");

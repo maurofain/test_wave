@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdlib.h>
+#include "cJSON.h"
 
 #ifndef DNA_LED_STRIP
 #define DNA_LED_STRIP 0
@@ -404,7 +406,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(500),
         .task_fn = ws2812_task,
-        .stack_words = 2048,                  /* RISC-V: StackType_t=1B; ~2KB reali */
+        .stack_words = 4096,                  /* RISC-V: 4KB; ESP_LOGW in retry loop */
         .stack_caps = MALLOC_CAP_INTERNAL,
         .arg = NULL,
         .handle = NULL,
@@ -638,58 +640,74 @@ void tasks_load_config(const char *path)
         return;
     }
 
-    char line[160];
-    // Salta intestazione
-    if (!fgets(line, sizeof(line), f)) {
+    fseek(f, 0, SEEK_END);
+    long file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (file_size <= 0 || file_size > 32768) {
+        ESP_LOGE(TAG, "[M] tasks.json: dimensione non valida (%ld)", file_size);
         fclose(f);
         return;
     }
 
-    while (fgets(line, sizeof(line), f)) {
-        // Salta righe vuote e commenti (righe che iniziano con '#')
-        size_t leading = strspn(line, " \t");
-        if (line[leading] == '#' || line[leading] == '\r' || line[leading] == '\n' || line[leading] == '\0') {
-            continue;
-        }
+    char *buf = malloc((size_t)file_size + 1);
+    if (!buf) {
+        ESP_LOGE(TAG, "[M] tasks.json: out of memory");
+        fclose(f);
+        return;
+    }
+    fread(buf, 1, (size_t)file_size, f);
+    fclose(f);
+    buf[file_size] = '\0';
 
-        // name,state,priority,core,period_ms,stack_words,stack_caps
-        char *save = NULL;
-        char *name = strtok_r(line, ",\r\n", &save);
-        char *state = strtok_r(NULL, ",\r\n", &save);
-        char *prio = strtok_r(NULL, ",\r\n", &save);
-        char *core = strtok_r(NULL, ",\r\n", &save);
-        char *period = strtok_r(NULL, ",\r\n", &save);
-        char *stack = strtok_r(NULL, ",\r\n", &save);
-        char *caps_str = strtok_r(NULL, ",\r\n", &save);
-        if (!name) continue;
+    cJSON *arr = cJSON_Parse(buf);
+    free(buf);
+    if (!arr || !cJSON_IsArray(arr)) {
+        ESP_LOGE(TAG, "[M] tasks.json: JSON non valido");
+        if (arr) cJSON_Delete(arr);
+        return;
+    }
+
+    cJSON *obj;
+    cJSON_ArrayForEach(obj, arr) {
+        cJSON *jname = cJSON_GetObjectItem(obj, "n");
+        if (!jname || !cJSON_IsString(jname)) continue;
+        const char *name = jname->valuestring;
 
         task_param_t *t = find_task_by_name(name);
         if (!t) {
-            if (strcmp(name, "http_server") == 0) {
-                continue;
-            }
-            /* Task documentato in CSV ma non in s_tasks[] (es. task hardcoded
-             * di driver/componenti): ignora silenziosamente a livello debug. */
-            ESP_LOGD(TAG, "[M] Task '%s' in CSV non configurabile via s_tasks[] — ignorato", name);
+            if (strcmp(name, "http_server") == 0) continue;
+            ESP_LOGD(TAG, "[M] Task '%s' in JSON non in s_tasks[] — ignorato", name);
             continue;
         }
 
-        if (state) t->state = parse_state(state, t->state);
-        if (prio) t->priority = (UBaseType_t)atoi(prio);
-        if (core) t->core_id = (BaseType_t)atoi(core);
-        if (period) t->period_ticks = pdMS_TO_TICKS(atoi(period));
-        if (stack) {
-            uint32_t val = (uint32_t)atoi(stack);
-            if (val < 512) val = 512;   /* minimo FreeRTOS: non forzare 8192 */
-            t->stack_words = val;
-        }        if (caps_str) {
-            if (strcasecmp(caps_str, "spiram") == 0) {
-                t->stack_caps = MALLOC_CAP_SPIRAM;
-            } else if (strcasecmp(caps_str, "internal") == 0) {
-                t->stack_caps = MALLOC_CAP_INTERNAL;
+        cJSON *jstate  = cJSON_GetObjectItem(obj, "s");
+        cJSON *jprio   = cJSON_GetObjectItem(obj, "p");
+        cJSON *jcore   = cJSON_GetObjectItem(obj, "c");
+        cJSON *jperiod = cJSON_GetObjectItem(obj, "m");
+        cJSON *jstack  = cJSON_GetObjectItem(obj, "w");
+        cJSON *jcaps   = cJSON_GetObjectItem(obj, "k");
+
+        if (jstate && cJSON_IsNumber(jstate)) {
+            switch (jstate->valueint) {
+                case 1:  t->state = TASK_STATE_RUN;   break;
+                case 2:  t->state = TASK_STATE_PAUSE; break;
+                default: t->state = TASK_STATE_IDLE;  break;
             }
-        }    }
-    fclose(f);
+        }
+        if (jprio   && cJSON_IsNumber(jprio))   t->priority     = (UBaseType_t)jprio->valueint;
+        if (jcore   && cJSON_IsNumber(jcore))   t->core_id      = (BaseType_t)jcore->valueint;
+        if (jperiod && cJSON_IsNumber(jperiod)) t->period_ticks = pdMS_TO_TICKS(jperiod->valueint);
+        if (jstack  && cJSON_IsNumber(jstack)) {
+            uint32_t val = (uint32_t)jstack->valueint;
+            if (val < 512) val = 512;
+            t->stack_words = val;
+        }
+        if (jcaps && cJSON_IsNumber(jcaps)) {
+            t->stack_caps = (jcaps->valueint == 1) ? MALLOC_CAP_INTERNAL : MALLOC_CAP_SPIRAM;
+        }
+    }
+    cJSON_Delete(arr);
+    ESP_LOGI(TAG, "[M] tasks.json caricato da %s", path);
 }
 
 /* ============================================================
@@ -746,18 +764,18 @@ void tasks_start_all(void)
 
 void tasks_apply_n_run(void)
 {
-    ESP_LOGI(TAG, "Applicazione nuovi stati task...");
+    ESP_LOGI(TAG, "Applicazione nuovi stati task... (display.enabled=%d)", (int)device_config_get()->display.enabled);
     device_config_t *cfg = device_config_get();
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
 
-        // Forza comportamento dei task legati al display in base alla config
+        // Forza IDLE sui task display solo se headless; altrimenti rispetta il CSV
         if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0)) {
             if (!cfg->display.enabled) {
                 t->state = TASK_STATE_IDLE; // headless: garantiamo che siano disabilitati
-            } else {
-                t->state = TASK_STATE_RUN; // display abilitato => assicuriamo che partano
+                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (display.enabled=false)", t->name);
             }
+            // display abilitato: stato gestito dal CSV, nessun override
         }
         // Forza stato idle su io_expander se il sensore è disabilitato
         if (strcmp(t->name, "io_expander") == 0 && !cfg->sensors.io_expander_enabled) {

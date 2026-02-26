@@ -648,26 +648,18 @@ static esp_err_t init_spiffs(void)
         ESP_LOGI(TAG, "[M] === Totale file: %d ===", file_count);
     }
 
-    // Leggi e mostra tasks.csv
-    FILE *f = fopen("/spiffs/tasks.csv", "r");
+    // Logga la dimensione di tasks.json
+    FILE *f = fopen("/spiffs/tasks.json", "r");
     if (f)
     {
-        ESP_LOGI(TAG, "[M] === Contenuto tasks.csv ===");
-        char line[256];
-        int line_num = 0;
-        while (fgets(line, sizeof(line), f))
-        {
-            line_num++;
-            // Rimuovi newline
-            line[strcspn(line, "\r\n")] = 0;
-            ESP_LOGI(TAG, "[M]   [%d] %s", line_num, line);
-        }
+        fseek(f, 0, SEEK_END);
+        long fsz = ftell(f);
         fclose(f);
-        ESP_LOGI(TAG, "[M] ================================");
+        ESP_LOGI(TAG, "[M] tasks.json presente: %ld byte", fsz);
     }
     else
     {
-        ESP_LOGW(TAG, "[M] File tasks.csv non trovato");
+        ESP_LOGW(TAG, "[M] File tasks.json non trovato");
     }
 
     return ESP_OK;

@@ -301,7 +301,7 @@ static void usb_cdc_scanner_open_task(void *arg)
         cdc_acm_dev_hdl_t cdc_dev = NULL;
         ESP_LOGI(TAG, "Trying to open CDC device %04X:%04X", vid, pid);
         esp_err_t err = cdc_acm_host_open(vid, pid, 0, &dev_config, &cdc_dev);
-        if (err != ESP_OK) {
+        if (err != ESP_OK && dual_pid != 0 && dual_pid != pid) {
             ESP_LOGI(TAG, "Try dual PID %04X:%04X", vid, dual_pid);
             err = cdc_acm_host_open(vid, dual_pid, 0, &dev_config, &cdc_dev);
         }

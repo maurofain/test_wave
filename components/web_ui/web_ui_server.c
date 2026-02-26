@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "esp_err.h"
+#include "cJSON.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -12,49 +13,52 @@ static httpd_handle_t s_server = NULL;
 
 static void web_ui_load_http_task_config(UBaseType_t *priority, BaseType_t *core_id, size_t *stack_size)
 {
-    FILE *f = fopen("/spiffs/tasks.csv", "r");
+    FILE *f = fopen("/spiffs/tasks.json", "r");
     if (!f) {
         return;
     }
 
-    char line[192];
-    bool skip_header = true;
-    while (fgets(line, sizeof(line), f)) {
-        line[strcspn(line, "\r\n")] = 0;
-        if (skip_header) {
-            skip_header = false;
-            continue;
-        }
+    fseek(f, 0, SEEK_END);
+    long file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (file_size <= 0 || file_size > 32768) {
+        fclose(f);
+        return;
+    }
 
-        char name[64] = {0};
-        char state[16] = {0};
-        int prio = -1;
-        int core = -1;
-        int period_ms = 0;
-        int stack_words = 0;
+    char *buf = malloc((size_t)file_size + 1);
+    if (!buf) {
+        fclose(f);
+        return;
+    }
+    fread(buf, 1, (size_t)file_size, f);
+    fclose(f);
+    buf[file_size] = '\0';
 
-        if (sscanf(line, "%63[^,],%15[^,],%d,%d,%d,%d",
-                   name, state, &prio, &core, &period_ms, &stack_words) != 6) {
-            continue;
-        }
+    cJSON *arr = cJSON_Parse(buf);
+    free(buf);
+    if (!arr || !cJSON_IsArray(arr)) {
+        if (arr) cJSON_Delete(arr);
+        return;
+    }
 
-        if (strcmp(name, "http_server") != 0) {
-            continue;
-        }
+    cJSON *obj;
+    cJSON_ArrayForEach(obj, arr) {
+        cJSON *jname = cJSON_GetObjectItem(obj, "n");
+        if (!jname || !cJSON_IsString(jname)) continue;
+        if (strcmp(jname->valuestring, "http_server") != 0) continue;
 
-        if (prio >= 1) {
-            *priority = (UBaseType_t)prio;
-        }
-        if (core >= 0) {
-            *core_id = (BaseType_t)core;
-        }
-        if (stack_words >= 2048) {
-            *stack_size = (size_t)stack_words * sizeof(StackType_t);
-        }
+        cJSON *jprio  = cJSON_GetObjectItem(obj, "p");
+        cJSON *jcore  = cJSON_GetObjectItem(obj, "c");
+        cJSON *jstack = cJSON_GetObjectItem(obj, "w");
+
+        if (jprio  && cJSON_IsNumber(jprio)  && jprio->valueint  >= 1)    *priority  = (UBaseType_t)jprio->valueint;
+        if (jcore  && cJSON_IsNumber(jcore)  && jcore->valueint  >= 0)    *core_id   = (BaseType_t)jcore->valueint;
+        if (jstack && cJSON_IsNumber(jstack) && jstack->valueint >= 2048) *stack_size = (size_t)jstack->valueint * sizeof(StackType_t);
         break;
     }
 
-    fclose(f);
+    cJSON_Delete(arr);
 }
 
 // Forward declaration: implemented in web_ui.c (same component)
