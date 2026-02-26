@@ -50,6 +50,7 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #include "bsp/touch.h"
 #include "bsp/display.h"
 #include "lvgl.h"
+#include "lvgl_panel.h"
 #include "io_expander.h"
 #include "eeprom_24lc16.h"
 #include "pwm.h"
@@ -1001,58 +1002,6 @@ static esp_err_t start_ethernet(void)
 // Public API
 // -----------------------------------------------------------------------------
 
-// Global variables for time display
-static lv_obj_t *time_label = NULL;
-
-static void update_time_display(lv_timer_t *timer)
-{
-    if (time_label == NULL) return;
-    
-    time_t now = time(NULL);
-    if (now == (time_t)-1) {
-        char lvgl_time_not_available[48] = {0};
-        device_config_get_ui_text_scoped("lvgl", "time_not_available", "Ora non disponibile", lvgl_time_not_available, sizeof(lvgl_time_not_available));
-        lv_label_set_text(time_label, lvgl_time_not_available);
-        return;
-    }
-    
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    
-    char time_str[64];
-    strftime(time_str, sizeof(time_str), "%d/%m/%Y %H:%M:%S", &timeinfo);
-    lv_label_set_text(time_label, time_str);
-
-    // Layout verticale: nessuna rotazione artificiale del widget
-    lv_obj_set_style_transform_angle(time_label, 0, LV_PART_MAIN);
-    lv_obj_center(time_label);
-}
-
-static void lvgl_show_minimal_screen(void)
-{
-    if (!bsp_display_lock(0))
-    {
-        ESP_LOGW(TAG, "[M] LVGL lock failed");
-        return;
-    }
-
-    lv_obj_t *scr = lv_scr_act();
-    lv_obj_set_style_bg_color(scr, lv_color_make(0x10, 0x10, 0x10), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
-
-    time_label = lv_label_create(scr);
-    lv_obj_set_style_text_color(time_label, lv_color_make(0xEE, 0xEE, 0xEE), LV_PART_MAIN);
-    lv_obj_center(time_label);
-    
-    // Aggiorna l'orario iniziale
-    update_time_display(NULL);
-    
-    // Crea un timer per aggiornare l'orario ogni secondo
-    lv_timer_create(update_time_display, 1000, NULL);
-
-    bsp_display_unlock();
-}
-
 static esp_err_t init_display_lvgl_minimal(void)
 {
     ESP_LOGI(TAG, "Heap before display init:");
@@ -1120,7 +1069,7 @@ static esp_err_t init_display_lvgl_minimal(void)
         ESP_LOGE(TAG, "Touch handle is NULL after initialization");
     }
 
-    lvgl_show_minimal_screen();
+    lvgl_panel_show();
     return ESP_OK;
 }
 

@@ -14,7 +14,7 @@ add_compile_definitions(
     DNA_LVGL=0
     DNA_ETHERNET=0
     DNA_WIFI=0
-    DNA_SD_CARD=1
+    DNA_SD_CARD=0
     DNA_TOUCHSCREEN=0
     DNA_REMOTE_LOGGING=0
     DNA_IO_EXPANDER=1
