@@ -117,3 +117,8 @@ bool web_ui_is_running(void)
 {
     return (s_server != NULL);
 }
+
+httpd_handle_t web_ui_get_server_handle(void)
+{
+    return s_server;
+}

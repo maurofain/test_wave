@@ -1215,7 +1215,7 @@
     "lang": "it",
     "scope": "p_runtime",
     "key": "editor_csv",
-    "text": "Editor Tasks CSV"
+    "text": "Editor Task"
   },
   {
     "lang": "it",
@@ -1689,7 +1689,7 @@
     "lang": "it",
     "scope": "p_runtime",
     "key": "tasks_csv",
-    "text": "Tasks CSV"
+    "text": "Task"
   },
   {
     "lang": "it",

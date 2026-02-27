@@ -219,6 +219,44 @@ esp_err_t reboot_ota1_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t register_uri_if_missing(httpd_handle_t server, httpd_uri_t *uri)
+{
+    esp_err_t err = httpd_register_uri_handler(server, uri);
+    if (err == ESP_OK || err == ESP_ERR_HTTPD_HANDLER_EXISTS) {
+        return ESP_OK;
+    }
+    ESP_LOGE(TAG, "Errore registrazione endpoint runtime %s: %s", uri->uri, esp_err_to_name(err));
+    return err;
+}
+
+static esp_err_t web_ui_register_factory_runtime_endpoints(void)
+{
+    httpd_handle_t server = web_ui_get_server_handle();
+    if (!server) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    httpd_uri_t uri_tasks = {.uri = "/tasks", .method = HTTP_GET, .handler = tasks_page_handler};
+    ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_tasks), TAG, "register /tasks");
+
+    httpd_uri_t uri_api_tasks = {.uri = "/api/tasks", .method = HTTP_GET, .handler = api_tasks_get};
+    ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_api_tasks), TAG, "register /api/tasks");
+
+    httpd_uri_t uri_api_tasks_save = {.uri = "/api/tasks/save", .method = HTTP_POST, .handler = api_tasks_save};
+    ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_api_tasks_save), TAG, "register /api/tasks/save");
+
+    httpd_uri_t uri_api_tasks_apply = {.uri = "/api/tasks/apply", .method = HTTP_POST, .handler = api_tasks_apply};
+    ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_api_tasks_apply), TAG, "register /api/tasks/apply");
+
+    httpd_uri_t uri_test = {.uri = "/test", .method = HTTP_GET, .handler = test_page_handler};
+    ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_test), TAG, "register /test");
+
+    httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
+    ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_api_test), TAG, "register /api/test/*");
+
+    return ESP_OK;
+}
+
 esp_err_t maintainer_enable_handler(httpd_req_t *req)
 {
     if (!web_ui_has_valid_password(req)) {
@@ -226,6 +264,12 @@ esp_err_t maintainer_enable_handler(httpd_req_t *req)
     }
 
     web_ui_factory_features_override_set(true);
+    esp_err_t reg_err = web_ui_register_factory_runtime_endpoints();
+    if (reg_err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "text/plain; charset=utf-8");
+        return httpd_resp_send(req, "Mantainer attivato, ma registrazione endpoint runtime fallita", -1);
+    }
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     return httpd_resp_sendstr(req,
         "<html><body><h1>Mantainer attivato</h1>"
@@ -538,11 +582,6 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "pwd.className='section';"
         "pwd.innerHTML=\"<h2>🔐 Password boot/emulatore</h2><p style='margin:8px 0 12px 0;color:#566573;'>Modifica password richiesta per /emulator e reboot FACTORY.</p><div class='form-group'><label>Password attuale</label><input type='password' id='boot_pwd_current' placeholder='password attuale'></div><div class='form-group'><label>Nuova password</label><input type='password' id='boot_pwd_new' placeholder='min 4 caratteri'></div><div class='form-group'><label>Conferma nuova password</label><input type='password' id='boot_pwd_confirm' placeholder='ripeti password'></div><button type='button' onclick='saveBootPassword()' style='background:#8e44ad;'>💾 Salva password boot</button>\";"
         "nameSection.insertAdjacentElement('afterend',pwd);"
-        "const prg=document.createElement('div');"
-        "prg.className='section';"
-        "prg.style.cssText='background:#eef6ff;border-left:5px solid #1f6feb;';"
-        "prg.innerHTML=\"<h2 style='margin-top:0;'>📊 Tabella Programmi</h2><p style='margin:10px 0 14px 0;'>Gestione prezzi, durata e relay per programma.</p><a href='/config/programs' style='display:inline-block;padding:10px 14px;background:#1f6feb;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri editor programmi</a>\";"
-        "pwd.insertAdjacentElement('afterend',prg);"
         "}"
         "ensureFactorySections();"
         "window.__configOriginalLang='it';"
@@ -1529,18 +1568,41 @@ esp_err_t api_tasks_save(httpd_req_t *req)
     }
     
     // Serializza su file JSON con chiavi compatte (n/s/p/c/m/w/k + enum numerici)
+    // Accetta in input sia formato esteso (name/state/...) sia compatto (n/s/...).
     int count = cJSON_GetArraySize(root);
+    int converted = 0;
     cJSON *compact = cJSON_CreateArray();
     cJSON *item;
     cJSON_ArrayForEach(item, root) {
         cJSON *jn = cJSON_GetObjectItem(item, "name");
+        if (!cJSON_IsString(jn)) {
+            jn = cJSON_GetObjectItem(item, "n");
+        }
         cJSON *js = cJSON_GetObjectItem(item, "state");
+        if (!js) {
+            js = cJSON_GetObjectItem(item, "s");
+        }
         cJSON *jp = cJSON_GetObjectItem(item, "priority");
+        if (!jp) {
+            jp = cJSON_GetObjectItem(item, "p");
+        }
         cJSON *jc = cJSON_GetObjectItem(item, "core");
+        if (!jc) {
+            jc = cJSON_GetObjectItem(item, "c");
+        }
         cJSON *jm = cJSON_GetObjectItem(item, "period_ms");
+        if (!jm) {
+            jm = cJSON_GetObjectItem(item, "m");
+        }
         cJSON *jw = cJSON_GetObjectItem(item, "stack_words");
+        if (!jw) {
+            jw = cJSON_GetObjectItem(item, "w");
+        }
         cJSON *jk = cJSON_GetObjectItem(item, "stack_caps");
-        if (!jn) continue;
+        if (!jk) {
+            jk = cJSON_GetObjectItem(item, "k");
+        }
+        if (!cJSON_IsString(jn) || !jn->valuestring || jn->valuestring[0] == '\0') continue;
         cJSON *o = cJSON_CreateObject();
         cJSON_AddStringToObject(o, "n", jn->valuestring ? jn->valuestring : "");
         /* state: JS invia già int (0/1/2), ma accettiamo anche stringa per compatibilità */
@@ -1560,8 +1622,14 @@ esp_err_t api_tasks_save(httpd_req_t *req)
         else if (jk && cJSON_IsString(jk) && strcmp(jk->valuestring, "internal") == 0) { kv = 1; }
         cJSON_AddNumberToObject(o, "k", kv);
         cJSON_AddItemToArray(compact, o);
+        converted++;
     }
     cJSON_Delete(root);
+    if (count > 0 && converted == 0) {
+        cJSON_Delete(compact);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"Formato task non riconosciuto\"}", -1);
+    }
     char *json_out = cJSON_PrintUnformatted(compact);
     cJSON_Delete(compact);
     if (!json_out) {

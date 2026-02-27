@@ -164,7 +164,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
             break;
 
         case FSM_STATE_CREDIT:
-            if (event == FSM_EVENT_PROGRAM_SELECTED && ctx->credit_cents >= 0) {  /* BUG2 fix: >= 0 perché il credito è già stato scalato prima di chiamare handle_event */
+            if (event == FSM_EVENT_PROGRAM_SELECTED && ctx->credit_cents > 0) {
                 ctx->state = FSM_STATE_RUNNING;
                 ctx->program_running = true;
                 ctx->running_elapsed_ms = 0;
@@ -289,6 +289,11 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_PROGRAM_SELECTED:
             if (ctx->state != FSM_STATE_CREDIT) {
+                return false;
+            }
+
+            if (ctx->credit_cents <= 0) {
+                fsm_append_message("Credito a zero: selezione programma non consentita");
                 return false;
             }
 

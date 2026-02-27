@@ -67,7 +67,7 @@ Esempi rapidi:
 
 ### Codice unificato APP/FACTORY
 - Il progetto usa una singola base sorgente in `main/`.
-- La modalità di compilazione è selezionata con `COMPILE_APP` in `app_version.h` (file sorgente unico per la scelta modalità):
+- La modalità di compilazione è selezionata con `COMPILE_APP` in `main/app_version.h` (file sorgente unico per la scelta modalità):
    - `COMPILE_APP=1` → APP
    - `COMPILE_APP=0` → FACTORY
 - Le differenze operative sono condizionate da macro, evitando drift tra cartelle duplicate.

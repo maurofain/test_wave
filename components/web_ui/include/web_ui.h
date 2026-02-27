@@ -20,6 +20,11 @@ void web_ui_stop(void);
 bool web_ui_is_running(void);
 
 /**
+ * @brief Restituisce l'handle del server HTTP Web UI
+ */
+httpd_handle_t web_ui_get_server_handle(void);
+
+/**
  * @brief Aggiunge un log internamente (per uso da altri componenti)
  * @param level Livello del log (INFO, ERROR, etc.)
  * @param tag Tag del componente che genera il log

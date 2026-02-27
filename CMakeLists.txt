@@ -8,7 +8,7 @@ set(EXTRA_COMPONENT_DIRS components/waveshare__esp32_p4_nano)
 # ---------------------------------------------------------------------------
 # Flag DNA_* (DoNotActivate) — visibili a TUTTI i componenti e a main/
 # Impostare a 1 per attivare il mockup del modulo corrispondente.
-# Modificare qui invece che in app_version.h o nei CMakeLists dei componenti.
+# Modificare qui invece che in main/app_version.h o nei CMakeLists dei componenti.
 # ---------------------------------------------------------------------------
 
 # --- Valori base (modificare qui) ------------------------------------------

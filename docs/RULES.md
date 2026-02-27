@@ -1,4 +1,4 @@
-- il progetto gestisce 2 modalità di esecuzione: APP e FACTORY, compilate da base codice unica (`main/`) tramite flag `COMPILE_APP` in `app_version.h`. Le partizioni restano separate per OTA sicuro.
+- il progetto gestisce 2 modalità di esecuzione: APP e FACTORY, compilate da base codice unica (`main/`) tramite flag `COMPILE_APP` in `main/app_version.h`. Le partizioni restano separate per OTA sicuro.
 - La app è multilingua e carica la tabella stringhe dai file in SPIFFS i18n_XX.json dove XX è il cofice lingua. Ogni tsto che appare nell'interfaccia web o nel pannello touch va tabellata
 - per il sourcing di ESP-IDF si può usare get_idf 
 - per la compilazione usare `idfc -b`, flash `idfc -f`, per flash solo factory `idfc -f -o f`, per monitor `idfc -m`

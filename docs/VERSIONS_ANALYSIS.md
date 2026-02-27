@@ -202,7 +202,7 @@ Per poter decodificare un crash in modo affidabile (anche mesi dopo), conservare
 - `build/flash_args` (o `build/flash_project_args`)
 - `build/flash_app_args`
 - `sdkconfig.defaults`
-- `app_version.h` e `main/app_version.h`
+- `main/app_version.h`
 - `docs/COMPILE_FLAGS.md`
 
 ## 13) Bundle automatico in `./versions`

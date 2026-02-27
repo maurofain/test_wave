@@ -50,7 +50,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         ? "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
         : "";
     const char *tasks_link = show_tasks
-        ? "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor CSV</span></a>"
+        ? "<a href='/tasks' class='btn-link'><span class='icon'>📋</span><span>Editor Task</span></a>"
         : "";
     const char *httpservices_link = show_httpservices
         ? "<a href='/httpservices' class='btn-link'><span class='icon'>🔐</span><span>HTTP Services</span></a>"
@@ -374,7 +374,7 @@ esp_err_t tasks_page_handler(httpd_req_t *req)
         "<div id='status'></div>"
         "<table id='tasksTable'><thead><tr>"
         "<th>Nome</th><th>Stato</th><th>Priorità</th><th>Core</th><th>Periodo (ms)</th><th>Stack Words</th><th>Stack Mem</th>"
-        "</tr></thead><tbody id='tasksBody'>Caricamento...</tbody></table>"
+        "</tr></thead><tbody id='tasksBody'></tbody></table>"
         "<div style='display:flex; gap:10px;'>"
         "<button type='button' class='btn-add' onclick='addRow()'>➕ Aggiungi Task</button>"
         "<button type='button' onclick='saveTasks()'>💾 Salva</button>"
@@ -385,11 +385,15 @@ esp_err_t tasks_page_handler(httpd_req_t *req)
         "<script>"
         "let tasks=[];"
         "const S=['idle','run','pause'],K=['spiram','internal'];"
-        "function decode(raw){return raw.map(t=>({name:t.n,state:S[t.s]||'idle',priority:t.p,core:t.c,period_ms:t.m,stack_words:t.w,stack_caps:K[t.k]||'spiram'}));}"
-        "function encode(t){const Se={idle:0,run:1,pause:2},Ke={spiram:0,internal:1};return({n:t.name,s:Se[t.state]??0,p:t.priority,c:t.core,m:t.period_ms,w:t.stack_words,k:Ke[t.stack_caps]??0});}"
+        "function decode(raw){const arr=Array.isArray(raw)?raw:(raw&&Array.isArray(raw.tasks)?raw.tasks:[]);return arr.map(t=>({name:t.n,state:S[t.s]||'idle',priority:t.p,core:t.c,period_ms:t.m,stack_words:t.w,stack_caps:K[t.k]||'spiram'}));}"
+        "function encode(t){const Se={idle:0,run:1,pause:2},Ke={spiram:0,internal:1};const s=(Se[t.state]!==undefined)?Se[t.state]:0;const k=(Ke[t.stack_caps]!==undefined)?Ke[t.stack_caps]:0;return({n:t.name,s:s,p:t.priority,c:t.core,m:t.period_ms,w:t.stack_words,k:k});}"
+        "function setTableMessage(msg){const tbody=document.getElementById('tasksBody');if(!tbody)return;tbody.innerHTML=`<tr><td colspan='7' style='text-align:center;color:#7f8c8d;padding:14px;'>${msg}</td></tr>`;}"
         "async function loadTasks(){"
+        "setTableMessage('Caricamento...');"
         "try{const r=await fetch('/api/tasks');if(!r.ok)throw new Error('HTTP '+r.status);"
-        "tasks=decode(await r.json());renderTable();}catch(e){showStatus('Errore caricamento tasks: '+e.message,'error');}}"
+        "tasks=decode(await r.json());"
+        "if(tasks.length===0){setTableMessage('Nessun task disponibile');const s=document.getElementById('status');if(s){s.textContent='';s.className='';}return;}"
+        "renderTable();}catch(e){showStatus('Errore caricamento tasks: '+e.message,'error');setTableMessage('Errore caricamento task');}}"
         "function renderTable(){"
         "const tbody=document.getElementById('tasksBody');tbody.innerHTML='';"
         "tasks.forEach((task,idx)=>{"
@@ -600,7 +604,7 @@ esp_err_t api_index_page_handler(httpd_req_t *req)
         "<tr><td>POST</td><td class='mono'>/api/emulator/program/pause_toggle</td><td>Program pause toggle</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/emulator/program/pause_toggle',false,false,'')\">Invia</button></td></tr>"
         "<tr><td>GET</td><td class='mono'>/api/emulator/fsm/messages</td><td>FSM queue/snapshot</td><td><a class='api-btn' href='/api/emulator/fsm/messages'>Apri</a></td></tr>"
 
-        "<tr><td>GET</td><td class='mono'>/api/tasks</td><td>Tasks CSV</td><td><a class='api-btn' href='/api/tasks'>Apri</a></td></tr>"
+        "<tr><td>GET</td><td class='mono'>/api/tasks</td><td>Tasks</td><td><a class='api-btn' href='/api/tasks'>Apri</a></td></tr>"
         "<tr><td>POST</td><td class='mono'>/api/tasks/save</td><td>Save tasks (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/tasks/save',false,true,'[]')\">Invia</button></td></tr>"
         "<tr><td>POST</td><td class='mono'>/api/tasks/apply</td><td>Apply tasks</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/tasks/apply',false,false,'')\">Invia</button></td></tr>"
         "<tr><td>POST</td><td class='mono'>/api/test/*</td><td>Run internal tests</td><td><button class='api-btn' onclick=\"alert('Endpoint wildcard: usare la pagina /test')\">Info</button></td></tr>"

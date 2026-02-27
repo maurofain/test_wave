@@ -1116,7 +1116,8 @@ esp_err_t init_run_factory(void)
 
     // Inizializza I2C e EEPROM prima della configurazione (essenziale per il boot)
 #if defined(CONFIG_BSP_I2C_NUM)
-    ESP_LOGW(TAG, "[M] Legacy I2C init skipped (BSP uses i2c_master)");
+    ESP_LOGI(TAG, "[M] BSP I2C attivo: inizializzo EEPROM 24LC16 su i2c_master");
+    ESP_ERROR_CHECK(eeprom_24lc16_init());
 #else
     ESP_ERROR_CHECK(init_i2c_bus());
     ESP_ERROR_CHECK(eeprom_24lc16_init());

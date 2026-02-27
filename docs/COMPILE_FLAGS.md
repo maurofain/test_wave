@@ -15,13 +15,13 @@ tramite `add_compile_definitions(...)` e sono propagati dal build system a
 Per attivare il mockup di un modulo: modificare il valore del flag corrispondente
 da `0` a `1` nel blocco `add_compile_definitions()` di `CMakeLists.txt`.
 
-Non occorre modificare `app_version.h`, né i `CMakeLists.txt` dei singoli
+Non occorre modificare `main/app_version.h`, né i `CMakeLists.txt` dei singoli
 componenti.
 
 ## Flag custom progetto
 
 ### `COMPILE_APP`
-- **File:** `app_version.h`, `main/app_version.h`
+- **File:** `main/app_version.h`
 - **Valori:** `1` = build APP, `0` = build FACTORY
 - **Impatto:** abilita/disabilita porzioni di codice con `#if COMPILE_APP` (es. `main/main.c`, `main/init.c`) e determina `COMPILE_MODE_LABEL` / `COMPILE_LOG_PREFIX`.
 
