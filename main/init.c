@@ -63,6 +63,7 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #include "device_activity.h"
 #include "error_log.h"
 #include "fsm.h"  // needed for fsm_event_queue_init()
+#include "periph_i2c.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -1113,6 +1114,7 @@ esp_err_t init_run_factory(void)
 #if defined(CONFIG_BSP_I2C_NUM)
     bsp_i2c_init();
 #endif
+    periph_i2c_init();
 
     // Inizializza I2C e EEPROM prima della configurazione (essenziale per il boot)
 #if defined(CONFIG_BSP_I2C_NUM)
@@ -1125,6 +1127,21 @@ esp_err_t init_run_factory(void)
 
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
+
+    // Inizializza Remote Logging il prima possibile per catturare i log pre-rete
+#if !defined(DNA_REMOTE_LOGGING) || (DNA_REMOTE_LOGGING == 0)
+    {
+        esp_err_t rl_ret = remote_logging_init();
+        if (rl_ret != ESP_OK) {
+            ESP_LOGW(TAG, "[M] remote_logging_init early failed (%s), continuo senza remote logs",
+                     esp_err_to_name(rl_ret));
+        } else {
+            ESP_LOGI(TAG, "[M] remote_logging early init attivo (log pre-rete catturati)");
+        }
+    }
+#else
+    ESP_LOGI(TAG, "[M] remote_logging: disabilitato (DNA_REMOTE_LOGGING=1)");
+#endif
 
     /* prepare the FSM mailbox early so that any code executing during
      * initialization (event handlers, helper tasks, etc.) can publish
@@ -1151,6 +1168,18 @@ esp_err_t init_run_factory(void)
 
     // Display + LVGL (minimal screen) - skip se headless
     device_config_t *cfg = device_config_get();
+
+#if !COMPILE_APP
+    /* In FACTORY il display deve rimanere disponibile anche con config salvata headless */
+    if (!cfg->display.enabled) {
+        ESP_LOGW(TAG, "[F] Display disabilitato in config: forzo abilitazione runtime in FACTORY");
+    }
+    cfg->display.enabled = true;
+    if (cfg->display.lcd_brightness == 0) {
+        cfg->display.lcd_brightness = 80;
+        ESP_LOGI(TAG, "[F] Luminosità display a 0: imposto fallback runtime a 80%% in FACTORY");
+    }
+#endif
 
 #if FORCE_VIDEO_DISABLED
     /* Override runtime: blocca ogni inizializzazione video in questa build */
@@ -1201,34 +1230,14 @@ esp_err_t init_run_factory(void)
     ESP_ERROR_CHECK(device_activity_init());
 #endif
 
-    // Inizializza Remote Logging
-#if !defined(DNA_REMOTE_LOGGING) || (DNA_REMOTE_LOGGING == 0)
-    {
-        esp_err_t rl_ret = remote_logging_init();
-        if (rl_ret != ESP_OK) {
-            ESP_LOGW(TAG, "remote_logging_init failed (%s), continuing without remote logs",
-                     esp_err_to_name(rl_ret));
-        }
-    }
-#else
-    ESP_LOGI(TAG, "[M] remote_logging: disabilitato (DNA_REMOTE_LOGGING=1)");
-#endif
-
     // Inizializzazioni condizionali basate su NVS
     if (cfg->sensors.io_expander_enabled)
     {
-#if defined(CONFIG_BSP_I2C_NUM)
-        ESP_LOGW(TAG, "[M] I/O Expander skipped (legacy I2C disabled with BSP)");
-#else
-        // La porta I2C è già inizializzata sopra, io_expander_init la riutilizzerà
+        // La porta I2C è già inizializzata sopra (BSP o legacy), io_expander_init la riutilizzerà
         esp_err_t exp_ret = io_expander_init();
         if (exp_ret != ESP_OK) {
-            ESP_LOGW(TAG, "I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
-#if COMPILE_APP
+            ESP_LOGW(TAG, "[M] I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
             cfg->sensors.io_expander_enabled = false;
-#else
-            return exp_ret;
-#endif
         }
         if (exp_ret == ESP_OK) {
             // Controllo GPIO3 solo se expander disponibile
@@ -1241,7 +1250,6 @@ esp_err_t init_run_factory(void)
                 vTaskDelay(pdMS_TO_TICKS(1000));
             }
         }
-#endif
     }
     else
     {
@@ -1379,17 +1387,28 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
 
 void init_i2c_and_io_expander(void) {
 #if defined(CONFIG_BSP_I2C_NUM)
-    bsp_i2c_init();
+    ESP_LOGI(TAG, "[M] [I2C] Avvio init bus I2C BSP (port=%d)", CONFIG_BSP_I2C_NUM);
+    esp_err_t i2c_ret = bsp_i2c_init();
+    if (i2c_ret != ESP_OK) {
+        ESP_LOGW(TAG, "[M] [I2C] Init bus I2C BSP fallita: %s", esp_err_to_name(i2c_ret));
+    } else {
+        ESP_LOGI(TAG, "[M] [I2C] Bus I2C BSP inizializzato correttamente");
+    }
+#else
+    ESP_LOGW(TAG, "[M] [I2C] CONFIG_BSP_I2C_NUM non definito: init bus I2C BSP non disponibile");
 #endif
+    ESP_LOGI(TAG, "[M] [IOX] Avvio init I/O Expander su bus I2C");
+    periph_i2c_init();
     esp_err_t exp_ret = io_expander_init();
     if (exp_ret != ESP_OK) {
-        ESP_LOGW(TAG, "I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
+        ESP_LOGW(TAG, "[M] [IOX] I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
         return;
     }
+    ESP_LOGI(TAG, "[M] [IOX] I/O Expander inizializzato correttamente");
     // Controllo GPIO3 solo se expander disponibile
     while (true) {
         int gpio3_value = io_get_pin(3) ? 1 : 0;
-        ESP_LOGI(TAG, "Valore GPIO3: %d", gpio3_value);
+        ESP_LOGI(TAG, "[M] [IOX] Valore GPIO3: %d", gpio3_value);
         if (gpio3_value == 1) {
             break;
         }

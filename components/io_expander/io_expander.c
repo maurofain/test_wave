@@ -1,7 +1,9 @@
 #include "io_expander.h"
-#include "bsp/esp-bsp.h"
+#include "periph_i2c.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 /* DNA_IO_EXPANDER: imposta a 1 nel CMakeLists del componente per attivare il
  * mockup senza hardware reale (nessun I2C/FXL6408). Default: 0. */
@@ -29,6 +31,53 @@ uint8_t io_input_state = 0x00;
 #if DNA_IO_EXPANDER == 0  /* implementazioni reali — escluse se mockup attivo */
 
 static i2c_master_dev_handle_t io_out_dev, io_in_dev;
+static bool s_io_exp_ready = false;
+
+static void io_expander_reset_handles(void)
+{
+    io_out_dev = NULL;
+    io_in_dev = NULL;
+    s_io_exp_ready = false;
+}
+
+static esp_err_t io_expander_prepare_bus(i2c_master_bus_handle_t *out_bus)
+{
+    i2c_master_bus_handle_t bus = periph_i2c_get_handle();
+    if (bus == NULL) {
+        ESP_LOGE(TAG, "[C] Periph I2C bus non inizializzato: chiama periph_i2c_init() prima");
+        return ESP_ERR_INVALID_STATE;
+    }
+    *out_bus = bus;
+    return ESP_OK;
+}
+
+static esp_err_t io_expander_attach_devices(i2c_master_bus_handle_t bus)
+{
+    esp_err_t ret;
+    i2c_device_config_t out_cfg = {
+        .device_address = FXL6408_ADDR_OUT,
+        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+    };
+    ret = i2c_master_bus_add_device(bus, &out_cfg, &io_out_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Errore aggiunta device OUTPUT (0x%02X): %s", FXL6408_ADDR_OUT, esp_err_to_name(ret));
+        io_expander_reset_handles();
+        return ret;
+    }
+
+    i2c_device_config_t in_cfg = {
+        .device_address = FXL6408_ADDR_IN,
+        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+    };
+    ret = i2c_master_bus_add_device(bus, &in_cfg, &io_in_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Errore aggiunta device INPUT (0x%02X): %s", FXL6408_ADDR_IN, esp_err_to_name(ret));
+        io_expander_reset_handles();
+        return ret;
+    }
+
+    return ESP_OK;
+}
 
 static esp_err_t write_reg(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t val) {
     uint8_t data[] = {reg, val};
@@ -40,69 +89,97 @@ static esp_err_t read_reg(i2c_master_dev_handle_t dev, uint8_t reg, uint8_t *val
 }
 
 esp_err_t io_expander_init(void) {
-    i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
-    esp_err_t ret;
-    // Inizializzazione chip OUTPUT
-    i2c_device_config_t out_cfg = {
-        .device_address = FXL6408_ADDR_OUT,
-        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
-    };
-    ret = i2c_master_bus_add_device(bus, &out_cfg, &io_out_dev);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[C] Errore aggiunta device OUTPUT (0x%02X): %s", FXL6408_ADDR_OUT, esp_err_to_name(ret));
-        return ESP_ERR_NOT_FOUND;
+    if (s_io_exp_ready) {
+        return ESP_OK;
     }
-    ret = write_reg(io_out_dev, REG_DIRECTION, 0xFF);       // Tutti i pin come output
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[C] Errore comunicazione chip OUTPUT (0x%02X): %s",
-                 FXL6408_ADDR_OUT, esp_err_to_name(ret));
-        /* se il bus è momentaneamente saturo ci proviamo una volta in più */
-        vTaskDelay(pdMS_TO_TICKS(10));
-        ret = write_reg(io_out_dev, REG_DIRECTION, 0xFF);
+
+    esp_err_t ret;
+    i2c_master_bus_handle_t bus = NULL;
+    for (int attempt = 0; attempt < 2; attempt++) {
+        ret = io_expander_prepare_bus(&bus);
         if (ret != ESP_OK) {
+            return ret;
+        }
+        ret = io_expander_attach_devices(bus);
+        if (ret != ESP_OK) {
+            if (ret == ESP_ERR_INVALID_STATE && attempt == 0) {
+                continue;
+            }
             return ESP_ERR_NOT_FOUND;
         }
+
+        ret = write_reg(io_out_dev, REG_DIRECTION, 0xFF); // Tutti i pin come output
+        if (ret == ESP_OK) {
+            break;
+        }
+
+        ESP_LOGE(TAG, "[C] Errore comunicazione chip OUTPUT (0x%02X): %s",
+                 FXL6408_ADDR_OUT, esp_err_to_name(ret));
+        io_expander_reset_handles();
+        if (ret == ESP_ERR_INVALID_STATE && attempt == 0) {
+            continue;
+        }
+        return ESP_ERR_NOT_FOUND;
     }
+
+    if (io_out_dev == NULL || io_in_dev == NULL) {
+        return ESP_ERR_NOT_FOUND;
+    }
+
     write_reg(io_out_dev, REG_OUTPUT_TRISTATE, 0x00); // Disabilita High-Z (attiva driver)
     write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
 
-    // Inizializzazione chip INPUT
-    i2c_device_config_t in_cfg = {
-        .device_address = FXL6408_ADDR_IN,
-        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
-    };
-    ret = i2c_master_bus_add_device(bus, &in_cfg, &io_in_dev);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[C] Errore aggiunta device INPUT (0x%02X): %s", FXL6408_ADDR_IN, esp_err_to_name(ret));
-        return ESP_ERR_NOT_FOUND;
-    }
     ret = write_reg(io_in_dev, REG_DIRECTION, 0x00);        // Tutti i pin come input
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[C] Errore comunicazione chip INPUT (0x%02X): %s",
                  FXL6408_ADDR_IN, esp_err_to_name(ret));
+        io_expander_reset_handles();
         return ESP_ERR_NOT_FOUND;
     }
     // Abilita Pull-up su tutti i pin di input per stabilizzare bit flottanti (come il bit 4)
     write_reg(io_in_dev, REG_PULL_SELECT, 0xFF); // 1 = Pull-up
     write_reg(io_in_dev, REG_PULL_ENABLE, 0xFF); // 1 = Abilitato
 
+    s_io_exp_ready = true;
     ESP_LOGI(TAG, "[C] Inizializzati FXL6408 ad indirizzi 0x%02X (OUT) e 0x%02X (IN)", FXL6408_ADDR_OUT, FXL6408_ADDR_IN);
     return ESP_OK;
 }
 
 void io_set_pin(int pin, int value) {
+    if (!s_io_exp_ready) {
+        if (io_expander_init() != ESP_OK) {
+            return;
+        }
+    }
     if (pin < 0 || pin > 7) return;
     if (value) {
         io_output_state |= (1 << pin);
     } else {
         io_output_state &= ~(1 << pin);
     }
-    write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
+    esp_err_t ret = write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        io_expander_reset_handles();
+        if (io_expander_init() == ESP_OK) {
+            write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
+        }
+    }
 }
 
 void io_set_port(uint8_t val) {
+    if (!s_io_exp_ready) {
+        if (io_expander_init() != ESP_OK) {
+            return;
+        }
+    }
     io_output_state = val;
-    write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
+    esp_err_t ret = write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
+    if (ret == ESP_ERR_INVALID_STATE) {
+        io_expander_reset_handles();
+        if (io_expander_init() == ESP_OK) {
+            write_reg(io_out_dev, REG_OUTPUT_DATA, io_output_state);
+        }
+    }
 }
 
 bool io_get_pin(int pin) {
@@ -112,9 +189,20 @@ bool io_get_pin(int pin) {
 }
 
 uint8_t io_get(void) {
+    if (!s_io_exp_ready) {
+        if (io_expander_init() != ESP_OK) {
+            return io_input_state;
+        }
+    }
     uint8_t val = 0;
-    if (read_reg(io_in_dev, REG_INPUT_DATA, &val) == ESP_OK) {
+    esp_err_t ret = read_reg(io_in_dev, REG_INPUT_DATA, &val);
+    if (ret == ESP_OK) {
         io_input_state = val;
+    } else if (ret == ESP_ERR_INVALID_STATE) {
+        io_expander_reset_handles();
+        if (io_expander_init() == ESP_OK && read_reg(io_in_dev, REG_INPUT_DATA, &val) == ESP_OK) {
+            io_input_state = val;
+        }
     }
     return io_input_state;
 }

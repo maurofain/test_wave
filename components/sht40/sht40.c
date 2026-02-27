@@ -16,7 +16,7 @@ static bool s_sht40_ready = false;
  * ============================================================ */
 #if DNA_SHT40 == 0
 
-#include "bsp/esp-bsp.h"
+#include "periph_i2c.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -25,6 +25,42 @@ static bool s_sht40_ready = false;
 #define SHT40_CMD_MEAS      0xFD  // High precision measurement
 
 static i2c_master_dev_handle_t sht_dev;
+
+static esp_err_t sht40_prepare_device(void)
+{
+    i2c_master_bus_handle_t bus = periph_i2c_get_handle();
+    if (bus == NULL) {
+        ESP_LOGE(TAG, "[C] Periph I2C bus non inizializzato: chiama periph_i2c_init() prima");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (sht_dev != NULL) {
+        return ESP_OK;
+    }
+
+    i2c_device_config_t cfg = {
+        .device_address = SHT40_ADDR,
+        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+    };
+    esp_err_t ret = i2c_master_bus_add_device(bus, &cfg, &sht_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Sensore SHT40 non risponde a 0x%02X: %s", SHT40_ADDR, esp_err_to_name(ret));
+        sht_dev = NULL;
+        return ret;
+    }
+
+    return ESP_OK;
+}
+
+static void sht40_drop_device(void)
+{
+    if (sht_dev == NULL) {
+        return;
+    }
+    (void)i2c_master_bus_rm_device(sht_dev);
+    sht_dev = NULL;
+    s_sht40_ready = false;
+}
 
 static uint8_t crc8(const uint8_t *data, size_t len) {
     uint8_t crc = 0xFF;
@@ -44,23 +80,20 @@ static uint8_t crc8(const uint8_t *data, size_t len) {
 esp_err_t sht40_init(void) {
     s_sht40_ready = false;
 
-    i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
-    i2c_device_config_t cfg = {
-        .device_address = SHT40_ADDR,
-        .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
-    };
-    esp_err_t ret = i2c_master_bus_add_device(bus, &cfg, &sht_dev);
+    esp_err_t ret = sht40_prepare_device();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "[C] Sensore SHT40 non risponde a 0x%02X: %s", SHT40_ADDR, esp_err_to_name(ret));
         return ret;
     }
     
     // Soft Reset
     uint8_t cmd_reset = 0x94;
-    ESP_LOGI(TAG, "Inizializzazione SHT40: invio Soft Reset (0x94)...");
+    ESP_LOGI(TAG, "[C] Inizializzazione SHT40: invio Soft Reset (0x94)...");
     ret = i2c_master_transmit(sht_dev, &cmd_reset, 1, pdMS_TO_TICKS(100));
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[C] Errore invio Soft Reset: %s", esp_err_to_name(ret));
+        if (ret == ESP_ERR_INVALID_STATE) {
+            sht40_drop_device();
+        }
         return ret;
     }
     
@@ -74,17 +107,30 @@ esp_err_t sht40_init(void) {
 
 esp_err_t sht40_read(float *temp, float *hum) {
     if (!s_sht40_ready || sht_dev == NULL) {
-        return ESP_ERR_INVALID_STATE;
+        esp_err_t init_ret = sht40_init();
+        if (init_ret != ESP_OK) {
+            return init_ret;
+        }
     }
 
     uint8_t cmd = SHT40_CMD_MEAS;
     uint8_t data[6] = {0};
 
     // Invia comando di misura
-    ESP_LOGI(TAG, "Lettura SHT40: invio comando 0x%02X", cmd);
+    ESP_LOGI(TAG, "[C] Lettura SHT40: invio comando 0x%02X", cmd);
     esp_err_t ret = i2c_master_transmit(sht_dev, &cmd, 1, pdMS_TO_TICKS(100));
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "[C] SHT40 handle non valido, provo re-init");
+        sht40_drop_device();
+        esp_err_t init_ret = sht40_init();
+        if (init_ret == ESP_OK) {
+            ret = i2c_master_transmit(sht_dev, &cmd, 1, pdMS_TO_TICKS(100));
+        } else {
+            ret = init_ret;
+        }
+    }
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Errore invio comando: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "[C] Errore invio comando: %s", esp_err_to_name(ret));
         return ret;
     }
 
@@ -93,25 +139,45 @@ esp_err_t sht40_read(float *temp, float *hum) {
 
     // Legge i 6 byte (Temp MSB, Temp LSB, Temp CRC, Hum MSB, Hum LSB, Hum CRC)
     ret = i2c_master_receive(sht_dev, data, 6, pdMS_TO_TICKS(100));
+    if (ret == ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "[C] SHT40 receive in invalid state, provo re-init");
+        sht40_drop_device();
+        esp_err_t init_ret = sht40_init();
+        if (init_ret == ESP_OK) {
+            ret = i2c_master_transmit(sht_dev, &cmd, 1, pdMS_TO_TICKS(100));
+            if (ret == ESP_OK) {
+                vTaskDelay(pdMS_TO_TICKS(20));
+                ret = i2c_master_receive(sht_dev, data, 6, pdMS_TO_TICKS(100));
+            }
+        } else {
+            ret = init_ret;
+        }
+    }
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Errore ricezione dati: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "[C] Errore ricezione dati: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    ESP_LOGI(TAG, "Raw data: %02X %02X [%02X] %02X %02X [%02X]", 
+    ESP_LOGI(TAG, "[C] Raw data: %02X %02X [%02X] %02X %02X [%02X]",
              data[0], data[1], data[2], data[3], data[4], data[5]);
+
+    if (data[0] == 0xFF && data[1] == 0xFF && data[2] == 0xFF &&
+        data[3] == 0xFF && data[4] == 0xFF && data[5] == 0xFF) {
+        ESP_LOGW(TAG, "[C] Lettura SHT40 tutta 0xFF: bus/device non pronto");
+        return ESP_ERR_INVALID_RESPONSE;
+    }
 
     // Verifica CRC Temperatura
     uint8_t calc_crc_t = crc8(data, 2);
     if (calc_crc_t != data[2]) {
-        ESP_LOGE(TAG, "Errore CRC Temperatura: calc=0x%02X, recv=0x%02X", calc_crc_t, data[2]);
+        ESP_LOGE(TAG, "[C] Errore CRC Temperatura: calc=0x%02X, recv=0x%02X", calc_crc_t, data[2]);
         return ESP_ERR_INVALID_CRC;
     }
 
     // Verifica CRC Umidità
     uint8_t calc_crc_h = crc8(data + 3, 2);
     if (calc_crc_h != data[5]) {
-        ESP_LOGE(TAG, "Errore CRC Umidità: calc=0x%02X, recv=0x%02X", calc_crc_h, data[5]);
+        ESP_LOGE(TAG, "[C] Errore CRC Umidità: calc=0x%02X, recv=0x%02X", calc_crc_h, data[5]);
         return ESP_ERR_INVALID_CRC;
     }
 
@@ -124,7 +190,7 @@ esp_err_t sht40_read(float *temp, float *hum) {
     *temp = -45.0f + 175.0f * (float)raw_temp / 65535.0f;
     *hum = -6.0f + 125.0f * (float)raw_hum / 65535.0f;
 
-    ESP_LOGI(TAG, "Valori convertiti: T=%.2f, H=%.2f (raw_t=%u, raw_h=%u)", *temp, *hum, raw_temp, raw_hum);
+    ESP_LOGI(TAG, "[C] Valori convertiti: T=%.2f, H=%.2f (raw_t=%u, raw_h=%u)", *temp, *hum, raw_temp, raw_hum);
 
     // Clipping umidità (0-100%)
     if (*hum < 0) *hum = 0;

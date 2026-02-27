@@ -1,5 +1,5 @@
 #include "eeprom_24lc16.h"
-#include "bsp/esp-bsp.h"
+#include "periph_i2c.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "freertos/FreeRTOS.h"
@@ -24,8 +24,8 @@ static uint8_t get_mem_addr(uint16_t address) {
 }
 
 esp_err_t eeprom_24lc16_init(void) {
-    i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
-    ESP_RETURN_ON_FALSE(bus, ESP_ERR_INVALID_STATE, TAG, "BSP I2C bus not initialized");
+    i2c_master_bus_handle_t bus = periph_i2c_get_handle();
+    ESP_RETURN_ON_FALSE(bus, ESP_ERR_INVALID_STATE, TAG, "Periph I2C bus not initialized");
 
     for (int i = 0; i < 8; i++) {
         i2c_device_config_t dev_cfg = {
@@ -44,8 +44,26 @@ esp_err_t eeprom_24lc16_init(void) {
     uint8_t dummy;
     esp_err_t ret = i2c_master_receive(eeprom_dev_handles[0], &dummy, 1, pdMS_TO_TICKS(100));
     if (ret == ESP_OK) {
+        uint8_t probe[16] = {0};
+        char hex_line[(16 * 3) + 1] = {0};
+
         s_eeprom_available = true;
         ESP_LOGI(TAG, "[C] EEPROM 24LC16BT found and ready");
+
+        esp_err_t probe_ret = eeprom_24lc16_read(0, probe, sizeof(probe));
+        if (probe_ret == ESP_OK) {
+            size_t off = 0;
+            for (size_t i = 0; i < sizeof(probe); i++) {
+                off += (size_t)snprintf(&hex_line[off], sizeof(hex_line) - off, "%02X", probe[i]);
+                if (i + 1 < sizeof(probe) && off + 2 < sizeof(hex_line)) {
+                    hex_line[off++] = ' ';
+                    hex_line[off] = '\0';
+                }
+            }
+            ESP_LOGI(TAG, "[C] EEPROM probe [0x0000..0x000F]: %s", hex_line);
+        } else {
+            ESP_LOGW(TAG, "[C] EEPROM probe read fallita: %s", esp_err_to_name(probe_ret));
+        }
     } else {
         s_eeprom_available = false;
         ESP_LOGW(TAG, "[C] EEPROM 24LC16BT not responding: %s", esp_err_to_name(ret));

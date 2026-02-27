@@ -45,7 +45,7 @@ static i2c_master_bus_handle_t i2c_handle = NULL;  // I2C Handle
 static i2s_chan_handle_t i2s_tx_chan = NULL;
 static i2s_chan_handle_t i2s_rx_chan = NULL;
 static const audio_codec_data_if_t *i2s_data_if = NULL;  /* Codec data interface */
-
+static bool s_display_i2c_diag_logged = false;
 /* Può essere usato per l'inizializzazione di `i2s_std_gpio_config_t` e/o `i2s_std_config_t` */
 #define BSP_I2S_GPIO_CFG       \
     {                          \
@@ -68,6 +68,38 @@ static const audio_codec_data_if_t *i2s_data_if = NULL;  /* Codec data interface
         .slot_cfg = I2S_STD_PHILIP_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO), \
         .gpio_cfg = BSP_I2S_GPIO_CFG,                                                                 \
     }
+
+static void bsp_display_i2c_diagnostic_log_once(void)
+{
+    if (s_display_i2c_diag_logged) {
+        return;
+    }
+    s_display_i2c_diag_logged = true;
+
+    esp_err_t init_ret = bsp_i2c_init();
+    if (init_ret != ESP_OK || i2c_handle == NULL) {
+        ESP_LOGE(TAG, "[C][I2C-DIAG] bus non disponibile (init=%s, handle=%p)",
+                 esp_err_to_name(init_ret),
+                 i2c_handle);
+        return;
+    }
+
+    ESP_LOGE(TAG, "[C][I2C-DIAG] scan I2C su SDA=%d SCL=%d", BSP_I2C_SDA, BSP_I2C_SCL);
+    int found = 0;
+    for (uint8_t addr = 0x03; addr < 0x78; addr++) {
+        esp_err_t probe_ret = i2c_master_probe(i2c_handle, addr, 20);
+        if (probe_ret == ESP_OK) {
+            ESP_LOGE(TAG, "[C][I2C-DIAG] trovato device @0x%02X", addr);
+            found++;
+        }
+    }
+
+    if (found == 0) {
+        ESP_LOGE(TAG, "[C][I2C-DIAG] nessun device trovato sul bus");
+    } else {
+        ESP_LOGE(TAG, "[C][I2C-DIAG] totale device trovati: %d", found);
+    }
+}
 
 esp_err_t bsp_i2c_init(void)
 {
@@ -320,8 +352,11 @@ esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 
 esp_err_t bsp_display_brightness_init(void)
 {
-    bsp_i2c_init();
-    return ESP_OK;
+    esp_err_t ret = bsp_i2c_init();
+    if (ret == ESP_OK) {
+        bsp_display_i2c_diagnostic_log_once();
+    }
+    return ret;
 }
 
 esp_err_t bsp_display_brightness_set(int brightness_percent)
@@ -352,20 +387,50 @@ esp_err_t bsp_display_brightness_set(int brightness_percent)
     };
 
     i2c_master_dev_handle_t dev_handle = NULL;
-    if (i2c_master_bus_add_device(i2c_handle, &i2c_dev_conf, &dev_handle) != ESP_OK)
+    esp_err_t add_ret = i2c_master_bus_add_device(i2c_handle, &i2c_dev_conf, &dev_handle);
+    if (add_ret != ESP_OK)
     {
-        return ESP_FAIL;
+        ESP_LOGE(TAG,
+                 "[C] brightness add_device addr=0x%02X failed: %s",
+                 chip_addr,
+                 esp_err_to_name(add_ret));
+        bsp_display_i2c_diagnostic_log_once();
+        return add_ret;
     }
 
 
     esp_err_t ret = i2c_master_transmit(dev_handle, data_to_send, sizeof(data_to_send), 50);
+    if (ret == ESP_ERR_INVALID_STATE && i2c_handle != NULL) {
+        /* Bus potrebbe essere in stato invalido (es. dopo fallimento touch GT911):
+         * recupera il bus e riprova una volta. */
+        ESP_LOGW(TAG, "[C] brightness tx INVALID_STATE: reset bus e retry");
+        i2c_master_bus_rm_device(dev_handle);
+        dev_handle = NULL;
+        esp_err_t reset_ret = i2c_master_bus_reset(i2c_handle);
+        if (reset_ret == ESP_OK) {
+            /* Riaggiungi dispositivo e riprova */
+            if (i2c_master_bus_add_device(i2c_handle, &i2c_dev_conf, &dev_handle) == ESP_OK) {
+                ret = i2c_master_transmit(dev_handle, data_to_send, sizeof(data_to_send), 50);
+                if (ret == ESP_OK) {
+                    ESP_LOGI(TAG, "[C] brightness tx OK dopo bus reset");
+                }
+            }
+        }
+    }
     if (ret != ESP_OK)
     {
-        i2c_master_bus_rm_device(dev_handle);
+        ESP_LOGE(TAG,
+                 "[C] brightness tx addr=0x%02X reg=0x%02X value=0x%02X failed: %s",
+                 chip_addr,
+                 data_to_send[0],
+                 data_to_send[1],
+                 esp_err_to_name(ret));
+        if (dev_handle) i2c_master_bus_rm_device(dev_handle);
+        bsp_display_i2c_diagnostic_log_once();
         return ret;
     }
 
-    i2c_master_bus_rm_device(dev_handle);
+    if (dev_handle) i2c_master_bus_rm_device(dev_handle);
 
     return ESP_OK;
 }
@@ -649,6 +714,7 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
 {
     /* Initilize I2C */
     BSP_ERROR_CHECK_RETURN_ERR(bsp_i2c_init());
+    bsp_display_i2c_diagnostic_log_once();
 
     /* Initialize touch */
     const esp_lcd_touch_config_t tp_cfg = {
@@ -705,7 +771,27 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
 };
     tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle), TAG, "");
-    return esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch);
+    esp_err_t touch_ret = esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch);
+    if (touch_ret != ESP_OK) {
+        ESP_LOGE(TAG,
+                 "[C] touch init GT911 failed addr=0x%02X int=%d rst=%d: %s",
+                 tp_io_config.dev_addr,
+                 BSP_LCD_TOUCH_INT,
+                 BSP_LCD_TOUCH_RST,
+                 esp_err_to_name(touch_ret));
+        bsp_display_i2c_diagnostic_log_once();
+        /* Il fallimento GT911 può lasciare il bus I2C in stato invalido:
+         * recupera il bus con un reset hardware prima di restituire l'errore. */
+        if (i2c_handle != NULL) {
+            esp_err_t reset_ret = i2c_master_bus_reset(i2c_handle);
+            if (reset_ret != ESP_OK) {
+                ESP_LOGE(TAG, "[C] i2c_master_bus_reset dopo touch failure: %s", esp_err_to_name(reset_ret));
+            } else {
+                ESP_LOGI(TAG, "[C] bus I2C recuperato dopo fallimento touch");
+            }
+        }
+    }
+    return touch_ret;
 }
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
@@ -774,8 +860,11 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
 static lv_indev_t *bsp_display_indev_init(lv_display_t *disp)
 {
     esp_lcd_touch_handle_t tp;
-    BSP_ERROR_CHECK_RETURN_NULL(bsp_touch_new(NULL, &tp));
-    assert(tp);
+    esp_err_t ret = bsp_touch_new(NULL, &tp);
+    if (ret != ESP_OK || tp == NULL) {
+        ESP_LOGW(TAG, "[C] Touch init non disponibile (%s), proseguo senza input touch", esp_err_to_name(ret));
+        return NULL;
+    }
 
     /* Add touch input (for selected screen) */
     const lvgl_port_touch_cfg_t touch_cfg = {
@@ -816,7 +905,10 @@ lv_display_t *bsp_display_start_with_config(const bsp_display_cfg_t *cfg)
 
     BSP_NULL_CHECK(disp = bsp_display_lcd_init(cfg), NULL);
 
-    BSP_NULL_CHECK(disp_indev = bsp_display_indev_init(disp), NULL);
+    disp_indev = bsp_display_indev_init(disp);
+    if (!disp_indev) {
+        ESP_LOGW(TAG, "[C] Display avviato senza touch input");
+    }
 
     return disp;
 }
