@@ -2,7 +2,7 @@
 
 - creiamo in questa cartella un progetto in esp-idf che usa la scheda ESP32-P4 Waveshare https://www.waveshare.com/product/arduino/boards-kits/esp32-p4/esp32-p4-module-dev-kit.htm e che ha una scheda di espansione con l'hardware descritto in HARDWARE_SETUP al punto 1 e 8
 
-- la scheda deve usare la tabella di partizioni già presente nel progetto, implementare l'interfaccia ethernet e il wifi per la comunicazione, il protocollo http, la funzione OTA con la partizione factory che contiene un firmaware per il recovery della partizione ota_0 e funzioni di test e configurazione , la partizione ota_0 ha la app principale del dispositivo. Per ora implementiamo la app factory
+- la scheda deve usare la tabella di partizioni già presente nel progetto, implementare l'interfaccia ethernet e il wifi per la comunicazione, il protocollo http, la funzione OTA con partizioni applicative allineate (factory, ota_0, ota_1 della stessa dimensione). La partizione factory contiene un firmware di recovery e manutenzione, mentre l'applicazione principale viene aggiornata sui due slot OTA (A/B) con switch della partizione di boot a update concluso. Per ora implementiamo la app factory
 
 - Va utilizzato freeRTOs. implementiamo un sorgente init.c con tutte le funzioni di inizializzazione, un sorgente tasks.c con tutte le funzioni che prevedeno la creazione di tasks. Va creata una struttura task_param  per la definizione dei task in cui indichiamo stato (run, idle, pause) , priorità, core da utilizzare, frequenza di attivazione della funzione. Per ogni task utilizzato va compilata un istanza di task_param memorizzata in un array.
 

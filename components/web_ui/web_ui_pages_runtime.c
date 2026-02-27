@@ -21,6 +21,11 @@ esp_err_t root_get_handler(httpd_req_t *req)
     bool show_httpservices = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_HTTP_SERVICES);
     bool show_emulator = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_EMULATOR);
     bool show_programs = web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS);
+    const bool maintainer_active = web_ui_factory_features_override_get();
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    const bool is_running_ota = running &&
+        (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 ||
+         running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1);
     const char *profile_label = web_ui_profile_view_label();
     const bool is_factory_view = (strcmp(profile_label, "Factory View") == 0);
     const char *home_title = is_factory_view ? "Factory Console" : "MH1001 control";
@@ -28,12 +33,13 @@ esp_err_t root_get_handler(httpd_req_t *req)
     const char *extra_style =
         ".card{background:white;padding:25px;margin:20px 0;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:.3s}"
         ".card:hover{transform:translateY(-5px)}h2{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;margin-top:0}"
-        ".grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}@media(max-width:600px){.grid{grid-template-columns:1fr}}"
+        ".grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.grid{grid-template-columns:1fr}}"
         ".btn-link{display:flex;align-items:center;padding:20px;background:#3498db;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:18px;transition:.3s;gap:15px}"
         ".btn-link:hover{background:#2980b9;box-shadow:0 4px 8px rgba(0,0,0,0.2)}"
         ".btn-config{background:#27ae60}.btn-config:hover{background:#219150}"
         ".btn-test{background:#e67e22}.btn-test:hover{background:#d35400}"
         ".btn-emu{background:#8e44ad}.btn-emu:hover{background:#7d3c98}"
+        ".btn-maint{background:#6c5ce7}.btn-maint:hover{background:#5a4acb}"
         ".btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}"
         ".btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}";
 
@@ -52,14 +58,21 @@ esp_err_t root_get_handler(httpd_req_t *req)
     const char *emulator_link = show_emulator
         ? "<a href='/emulator' class='btn-link btn-emu'><span class='icon'>🕹️</span><span>Emulatore</span></a>"
         : "";
+    const char *mantainer_link = (show_emulator && !maintainer_active)
+        ? "<a href='#' onclick=\"return window.goProtectedPath('/maintainer/enable');\" class='btn-link btn-maint'><span class='icon'>🛠️</span><span>Mantainer</span></a>"
+        : "";
     const char *programs_link = show_programs
         ? "<a href='/config/programs' class='btn-link'><span class='icon'>📊</span><span>Tabella Programmi</span></a>"
         : "";
+    const char *logs_link = "<a href='/logs' class='btn-link'><span class='icon'>📋</span><span>Log</span></a>";
     const char *reboot_factory_crash_link = is_factory_view
         ? "<a href='#' onclick=\"if(confirm('Confermi crash intenzionale?')){fetch('/api/debug/crash',{method:'POST'});setTimeout(()=>location.reload(),600);} return false;\" class='btn-reboot' style='background:#e74c3c;'>Crash</a>"
         : "";
     const char *reboot_app_restore_link = !is_factory_view
         ? "<a href='#' onclick=\"if(confirm('Confermi il ripristino di OTA_x con la versione Factory?')){fetch('/api/debug/restore',{method:'POST'}).then(r=>r.text()).then(t=>alert(t)).catch(()=>alert('Errore restore'));} return false;\" class='btn-reboot' style='background:#f39c12;'>Restore</a>"
+        : "";
+    const char *promote_factory_link = (is_factory_view && is_running_ota)
+        ? "<a href='#' onclick=\"if(confirm('Confermi copia OTA corrente su Factory?')){fetch('/api/debug/promote_factory',{method:'POST'}).then(r=>r.text()).then(t=>alert(t)).catch(()=>alert('Errore copia'));} return false;\" class='btn-reboot' style='background:#6c5ce7;'>Promote Factory</a>"
         : "";
 
     int body_len = snprintf(NULL, 0,
@@ -67,7 +80,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
         "<a href='/files' class='btn-link'><span class='icon'>📁</span><span>File Manager</span></a>"
-        "%s%s%s%s%s"
+        "%s%s%s%s%s%s%s"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
@@ -82,17 +95,20 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
         "<div style='margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;'>"
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
-        "%s%s"
+        "%s%s%s"
         "</div>"
         "</div></div></div></div>",
         test_link,
         tasks_link,
         httpservices_link,
         emulator_link,
+        mantainer_link,
         programs_link,
+        logs_link,
         profile_label,
         reboot_factory_crash_link,
-        reboot_app_restore_link);
+        reboot_app_restore_link,
+        promote_factory_link);
 
     if (body_len < 0) {
         httpd_resp_send_500(req);
@@ -110,7 +126,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/config' class='btn-link btn-config'><span class='icon'>⚙️</span><span>Configurazione</span></a>"
         "<a href='/stats' class='btn-link'><span class='icon'>📈</span><span>Statistiche</span></a>"
         "<a href='/files' class='btn-link'><span class='icon'>📁</span><span>File Manager</span></a>"
-        "%s%s%s%s%s"
+        "%s%s%s%s%s%s%s"
         "<a href='/ota' class='btn-link btn-ota'><span class='icon'>🔄</span><span>Update OTA</span></a>"
         "</div>"
         "<div class='card'><h2>ℹ️ Informazioni</h2>"
@@ -125,17 +141,20 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<a href='/reboot/ota1' class='btn-reboot' style='background:#8e44ad;'>OTA1</a>"
         "<div style='margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;'>"
         "<a href='/api' class='btn-reboot' style='background:#3498db;'>API</a>"
-        "%s%s"
+        "%s%s%s"
         "</div>"
         "</div></div></div></div>",
         test_link,
         tasks_link,
         httpservices_link,
         emulator_link,
+        mantainer_link,
         programs_link,
+        logs_link,
         profile_label,
         reboot_factory_crash_link,
-        reboot_app_restore_link);
+        reboot_app_restore_link,
+        promote_factory_link);
 
     httpd_resp_sendstr_chunk(req, body);
     free(body);
@@ -596,6 +615,7 @@ esp_err_t api_index_page_handler(httpd_req_t *req)
         "<tr><td>POST</td><td class='mono'>/api/debug/usb/restart</td><td>Restart USB host</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/debug/usb/restart',false,false,'')\">Invia</button></td></tr>"
         "<tr><td>POST</td><td class='mono'>/api/debug/crash</td><td>Crash intenzionale (Factory)</td><td><button class='api-btn' onclick=\"if(confirm('Confermi crash intenzionale?')) apiCall('POST','/api/debug/crash',false,false,'')\">Invia</button></td></tr>"
         "<tr><td>POST</td><td class='mono'>/api/debug/restore</td><td>Restore factory su OTA inattiva (APP)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/debug/restore',false,false,'')\">Invia</button></td></tr>"
+        "<tr><td>POST</td><td class='mono'>/api/debug/promote_factory</td><td>Copia OTA running su Factory (Mantainer)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/debug/promote_factory',false,false,'')\">Invia</button></td></tr>"
 
         "<tr><td>POST</td><td class='mono'>/api/login</td><td>Authenticate remote (JSON)</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/login',false,true,'{\\\"serial\\\":\\\"AD-34-DFG-333\\\",\\\"password\\\":\\\"md5...\\\"}')\">Invia</button></td></tr>"
         "<tr><td>POST</td><td class='mono'>/api/getconfig</td><td>Get remote config</td><td><button class='api-btn' onclick=\"apiCall('POST','/api/getconfig',false,false,'')\">Invia</button></td></tr>"

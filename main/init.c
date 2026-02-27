@@ -1201,7 +1201,7 @@ esp_err_t init_run_factory(void)
 #endif
 
     // Inizializza Remote Logging
-#if !defined(DNA_ERROR_DUMP) || (DNA_ERROR_DUMP == 0)
+#if !defined(DNA_REMOTE_LOGGING) || (DNA_REMOTE_LOGGING == 0)
     {
         esp_err_t rl_ret = remote_logging_init();
         if (rl_ret != ESP_OK) {
@@ -1210,7 +1210,7 @@ esp_err_t init_run_factory(void)
         }
     }
 #else
-    ESP_LOGI(TAG, "[M] remote_logging: disabilitato (DNA_ERROR_DUMP=1)");
+    ESP_LOGI(TAG, "[M] remote_logging: disabilitato (DNA_REMOTE_LOGGING=1)");
 #endif
 
     // Inizializzazioni condizionali basate su NVS

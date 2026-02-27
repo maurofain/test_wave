@@ -81,6 +81,7 @@ esp_err_t api_debug_usb_enumerate(httpd_req_t *req);
 esp_err_t api_debug_usb_restart(httpd_req_t *req);
 esp_err_t api_debug_crash(httpd_req_t *req);
 esp_err_t api_debug_restore(httpd_req_t *req);
+esp_err_t api_debug_promote_factory(httpd_req_t *req);
 
 // Reboot handlers
 esp_err_t reboot_factory_handler(httpd_req_t *req);
@@ -88,6 +89,7 @@ esp_err_t reboot_app_handler(httpd_req_t *req);
 esp_err_t reboot_app_last_handler(httpd_req_t *req);
 esp_err_t reboot_ota0_handler(httpd_req_t *req);
 esp_err_t reboot_ota1_handler(httpd_req_t *req);
+esp_err_t maintainer_enable_handler(httpd_req_t *req);
 
 // Task handles and helpers used across web_ui files
 extern TaskHandle_t s_rs232_test_handle;
@@ -101,6 +103,8 @@ esp_err_t perform_ota(const char *url);
 // Profilo/UI feature flags (factory/app) per visibilità e accessibilità endpoint
 bool web_ui_feature_enabled(web_ui_feature_t feature);
 const char *web_ui_profile_view_label(void);
+void web_ui_factory_features_override_set(bool enabled);
+bool web_ui_factory_features_override_get(void);
 void web_ui_i18n_cache_invalidate(void);
 
 // Error handler esposto per la registrazione (moved to pages)

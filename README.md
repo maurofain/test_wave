@@ -16,8 +16,9 @@ This project targets the Waveshare ESP32-P4 Module Dev Kit and an expansion boar
 
 ## Partitions
 The provided custom table in [partitions.csv](partitions.csv) is used by default:
-- `factory` (3 MB): recovery/test image when compiled with `COMPILE_APP=0`.
-- `ota_0` (10 MB): main application slot when compiled with `COMPILE_APP=1`.
+- `factory` (4.75 MB): recovery/test image when compiled with `COMPILE_APP=0`.
+- `ota_0` (4.75 MB): application slot A.
+- `ota_1` (4.75 MB): application slot B.
 - `nvs`, `phy_init`, `otadata`, `storage` (SPIFFS) as support partitions.
 
 ## Networking (Factory mode)
@@ -28,7 +29,7 @@ The provided custom table in [partitions.csv](partitions.csv) is used by default
 
 HTTP endpoints:
 - `GET /status` → JSON with running/boot partition and IPs (AP/STA/Ethernet).
-- `POST /ota?url=<http(s)://...>` → triggers OTA to `ota_0` and reboots on success. If no query is provided, uses `APP_OTA_DEFAULT_URL` when set.
+- `POST /ota?url=<http(s)://...>` → triggers OTA to the inactive app slot (`ota_0` / `ota_1`) and reboots on success. If no query is provided, uses `APP_OTA_DEFAULT_URL` when set.
 
 ### Test API (legacy + REST)
 

@@ -962,7 +962,10 @@ void device_config_reboot_factory(void)
     const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
     if (factory) {
         ESP_LOGI(TAG, "Impostazione partizione di boot: FACTORY");
-        esp_ota_set_boot_partition(factory);
+        esp_err_t err = esp_ota_set_boot_partition(factory);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Errore set boot partition FACTORY: %s", esp_err_to_name(err));
+        }
         esp_restart();
     } else {
         ESP_LOGE(TAG, "Partizione Factory non trovata!");
@@ -979,7 +982,10 @@ void device_config_reboot_ota0(void)
     const esp_partition_t *ota0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
     if (ota0) {
         ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_0");
-        esp_ota_set_boot_partition(ota0);
+        esp_err_t err = esp_ota_set_boot_partition(ota0);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Errore set boot partition OTA_0: %s", esp_err_to_name(err));
+        }
         esp_restart();
     } else {
         ESP_LOGE(TAG, "Partizione OTA_0 non trovata!");
@@ -991,7 +997,10 @@ void device_config_reboot_ota1(void)
     const esp_partition_t *ota1 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, NULL);
     if (ota1) {
         ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_1");
-        esp_ota_set_boot_partition(ota1);
+        esp_err_t err = esp_ota_set_boot_partition(ota1);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Errore set boot partition OTA_1: %s", esp_err_to_name(err));
+        }
         esp_restart();
     } else {
         ESP_LOGE(TAG, "Partizione OTA_1 non trovata!");
@@ -1018,7 +1027,10 @@ void device_config_reboot_app_last(void)
 
     if (target) {
         ESP_LOGI(TAG, "Impostazione partizione di boot: APP LAST (%s)", target->label);
-        esp_ota_set_boot_partition(target);
+        esp_err_t err = esp_ota_set_boot_partition(target);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Errore set boot partition APP LAST (%s): %s", target->label, esp_err_to_name(err));
+        }
         esp_restart();
     } else {
         ESP_LOGE(TAG, "Partizione APP LAST non trovata (OTA_0/OTA_1 assenti)!");

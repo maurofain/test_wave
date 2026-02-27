@@ -683,8 +683,23 @@ esp_err_t perform_ota(const char *url)
 
 static bool is_factory_runtime(void)
 {
+    if (web_ui_factory_features_override_get()) {
+        return true;
+    }
     const esp_partition_t *running = esp_ota_get_running_partition();
     return (running && running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY);
+}
+
+static bool s_factory_features_override = false;
+
+void web_ui_factory_features_override_set(bool enabled)
+{
+    s_factory_features_override = enabled;
+}
+
+bool web_ui_factory_features_override_get(void)
+{
+    return s_factory_features_override;
 }
 
 const char *web_ui_profile_view_label(void)

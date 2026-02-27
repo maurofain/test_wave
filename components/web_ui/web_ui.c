@@ -219,6 +219,22 @@ esp_err_t reboot_ota1_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t maintainer_enable_handler(httpd_req_t *req)
+{
+    if (!web_ui_has_valid_password(req)) {
+        return web_ui_send_password_required(req, "Mantainer", "/maintainer/enable");
+    }
+
+    web_ui_factory_features_override_set(true);
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    return httpd_resp_sendstr(req,
+        "<html><body><h1>Mantainer attivato</h1>"
+        "<p>Funzionalita Factory abilitate in runtime su app OTA.</p>"
+        "<p><a href='/'>Torna alla Home</a></p>"
+        "<script>setTimeout(function(){window.location.href='/'},800);</script>"
+        "</body></html>");
+}
+
 
 // Handler per la pagina OTA
 esp_err_t ota_get_handler(httpd_req_t *req)
@@ -1732,6 +1748,103 @@ esp_err_t api_debug_restore(httpd_req_t *req)
     return httpd_resp_send(req, resp, -1);
 }
 
+esp_err_t api_debug_promote_factory(httpd_req_t *req)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    if (!running) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Partizione running non disponibile", -1);
+    }
+
+    if (!web_ui_factory_features_override_get()) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Operazione disponibile solo in modalità Mantainer", -1);
+    }
+
+    if (!(running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 ||
+          running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Operazione consentita solo da runtime OTA", -1);
+    }
+
+    const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP,
+                                                              ESP_PARTITION_SUBTYPE_APP_FACTORY,
+                                                              NULL);
+    if (!factory) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Partizione Factory non trovata", -1);
+    }
+
+    if (factory->size < running->size) {
+        ESP_LOGW(TAG,
+                 "[C] promote_factory blocked: running=%s size=0x%08x, factory=%s size=0x%08x",
+                 running->label,
+                 (unsigned)running->size,
+                 factory->label,
+                 (unsigned)factory->size);
+        char err_msg[220];
+        snprintf(err_msg,
+                 sizeof(err_msg),
+                 "Dimensione Factory insufficiente: running %s=0x%X, factory %s=0x%X. Aggiornare partition table sul device.",
+                 running->label,
+                 (unsigned)running->size,
+                 factory->label,
+                 (unsigned)factory->size);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "text/plain; charset=utf-8");
+        return httpd_resp_send(req, err_msg, -1);
+    }
+
+    ESP_LOGW(TAG, "[C] POST /api/debug/promote_factory running=%s target=%s", running->label, factory->label);
+
+    esp_err_t err = esp_partition_erase_range(factory, 0, factory->size);
+    if (err != ESP_OK) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Erase Factory fallita", -1);
+    }
+
+    uint8_t *buf = malloc(4096);
+    if (!buf) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "Memoria insufficiente per copia", -1);
+    }
+
+    size_t copied = 0;
+    while (copied < running->size) {
+        size_t chunk = running->size - copied;
+        if (chunk > 4096) {
+            chunk = 4096;
+        }
+
+        err = esp_partition_read(running, copied, buf, chunk);
+        if (err != ESP_OK) {
+            free(buf);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            return httpd_resp_send(req, "Lettura OTA running fallita", -1);
+        }
+
+        err = esp_partition_write(factory, copied, buf, chunk);
+        if (err != ESP_OK) {
+            free(buf);
+            httpd_resp_set_status(req, "500 Internal Server Error");
+            return httpd_resp_send(req, "Scrittura Factory fallita", -1);
+        }
+
+        copied += chunk;
+    }
+
+    free(buf);
+
+    char resp[160];
+    snprintf(resp,
+             sizeof(resp),
+             "Copia completata: %s -> Factory (%u bytes)",
+             running->label,
+             (unsigned)running->size);
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    return httpd_resp_send(req, resp, -1);
+}
+
 #if DNA_SYS_MONITOR == 0
 /* GET /api/sysinfo — heap DRAM/SPIRAM + CPU usage per core */
 static esp_err_t sysinfo_get_handler(httpd_req_t *req)
@@ -1990,6 +2103,10 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_register_uri_handler(server, &uri_api_debug_restore);
     ESP_LOGI(TAG, "Registered POST /api/debug/restore handler");
 
+    httpd_uri_t uri_api_debug_promote_factory = {.uri = "/api/debug/promote_factory", .method = HTTP_POST, .handler = api_debug_promote_factory};
+    httpd_register_uri_handler(server, &uri_api_debug_promote_factory);
+    ESP_LOGI(TAG, "Registered POST /api/debug/promote_factory handler");
+
     // Register API handlers from http_services component
     http_services_register_handlers(server);
 
@@ -1997,6 +2114,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
         httpd_uri_t uri_emulator = {.uri = "/emulator", .method = HTTP_GET, .handler = emulator_page_handler_local};
         httpd_register_uri_handler(server, &uri_emulator);
     }
+
+    httpd_uri_t uri_maintainer_enable = {.uri = "/maintainer/enable", .method = HTTP_GET, .handler = maintainer_enable_handler};
+    httpd_register_uri_handler(server, &uri_maintainer_enable);
 
     // Reboot Handlers
     httpd_uri_t uri_reboot_factory = {.uri = "/reboot/factory", .method = HTTP_GET, .handler = reboot_factory_handler};

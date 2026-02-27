@@ -46,7 +46,14 @@ esp_err_t api_logs_receive(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
 
     char buf[512] = {0};
-    httpd_req_recv(req, buf, sizeof(buf)-1);
+    int received = httpd_req_recv(req, buf, sizeof(buf)-1);
+    if (received <= 0) {
+        const char *resp_str = "{\"error\":\"Empty body\"}";
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_send(req, resp_str, strlen(resp_str));
+        return ESP_OK;
+    }
+    buf[received] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
@@ -58,20 +65,46 @@ esp_err_t api_logs_receive(httpd_req_t *req)
     cJSON *level = cJSON_GetObjectItem(root, "level");
     cJSON *tag = cJSON_GetObjectItem(root, "tag");
     cJSON *message = cJSON_GetObjectItem(root, "message");
+    cJSON *msg = cJSON_GetObjectItem(root, "msg");
     cJSON *timestamp = cJSON_GetObjectItem(root, "timestamp");
 
-    if (level && tag && message && timestamp) {
+    const cJSON *effective_message = (message && cJSON_IsString(message)) ? message : msg;
+
+    if (level && cJSON_IsString(level) && tag && cJSON_IsString(tag) && effective_message && cJSON_IsString(effective_message)) {
         // Memorizza il log
         stored_log_t *log = &stored_logs[log_index];
         strncpy(log->level, level->valuestring, sizeof(log->level) - 1);
         strncpy(log->tag, tag->valuestring, sizeof(log->tag) - 1);
-        strncpy(log->message, message->valuestring, sizeof(log->message) - 1);
-        strncpy(log->timestamp, timestamp->valuestring, sizeof(log->timestamp) - 1);
+        strncpy(log->message, effective_message->valuestring, sizeof(log->message) - 1);
+        log->level[sizeof(log->level) - 1] = '\0';
+        log->tag[sizeof(log->tag) - 1] = '\0';
+        log->message[sizeof(log->message) - 1] = '\0';
+
+        if (timestamp && cJSON_IsString(timestamp) && timestamp->valuestring[0] != '\0') {
+            strncpy(log->timestamp, timestamp->valuestring, sizeof(log->timestamp) - 1);
+            log->timestamp[sizeof(log->timestamp) - 1] = '\0';
+        } else {
+            time_t now = time(NULL);
+            struct tm timeinfo;
+            if (now != (time_t)-1) {
+                localtime_r(&now, &timeinfo);
+                strftime(log->timestamp, sizeof(log->timestamp), "%H:%M:%S", &timeinfo);
+            } else {
+                strncpy(log->timestamp, "??:??:??", sizeof(log->timestamp) - 1);
+                log->timestamp[sizeof(log->timestamp) - 1] = '\0';
+            }
+        }
 
         log_index = (log_index + 1) % MAX_STORED_LOGS;
         if (log_count < MAX_STORED_LOGS) {
             log_count++;
         }
+    } else {
+        cJSON_Delete(root);
+        const char *resp_str = "{\"error\":\"Missing required fields: level, tag, message/msg\"}";
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_send(req, resp_str, strlen(resp_str));
+        return ESP_OK;
     }
 
     cJSON_Delete(root);
