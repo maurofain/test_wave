@@ -1,7 +1,7 @@
 #ifndef APP_VERSION_H
 #define APP_VERSION_H
 
-#define APP_VERSION "1.3.18"
+#define APP_VERSION "1.3.27"
 #define APP_DATE    "2026-02-27"
 
 /* 1 = build APP, 0 = build FACTORY */
@@ -14,6 +14,13 @@
 #define COMPILE_MODE_LABEL "FACTORY"
 #define COMPILE_LOG_PREFIX "F"
 #endif
+
+/*
+ * Boot minimale diagnostico:
+ * 1 = esegue solo init I2C + init EEPROM (con probe 16 byte) e termina la sequenza di boot
+ * 0 = boot normale
+ */
+#define MINIMAL_I2C_EEPROM_BOOT 0
 
 #endif // APP_VERSION_H
 

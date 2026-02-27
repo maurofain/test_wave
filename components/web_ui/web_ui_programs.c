@@ -8,6 +8,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * @file web_ui_programs.c
+ * @brief Gestione della tabella programmi e dei relè virtuali
+ *
+ * Questo modulo mantiene in RAM la configurazione dei "programmi"
+ * (usati in emulatori e nella macchina reale) e fornisce API per serializzare
+ * su JSON, caricare/salvare da file e modificare stati dei relè virtuali.
+ */
+
 #define TAG "WEB_UI_PROGRAMS"
 #define PROGRAMS_STORAGE_PATH "/spiffs/programs.json"
 
@@ -15,6 +24,14 @@ static web_ui_program_table_t s_program_table;
 static web_ui_virtual_relay_state_t s_virtual_relays[WEB_UI_VIRTUAL_RELAY_MAX + 1];
 static bool s_initialized = false;
 
+/**
+ * @brief Salva la tabella dei programmi su SPIFFS
+ *
+ * Converte la tabella corrente in JSON ed esegue fwrite sul percorso
+ * definito da PROGRAMS_STORAGE_PATH. Usa malloc/free internamente.
+ *
+ * @return ESP_OK se la scrittura ha scritto tutti i byte, ESP_FAIL altrimenti
+ */
 static esp_err_t programs_save_to_storage(void)
 {
     char *json = web_ui_program_table_to_json();
@@ -36,6 +53,12 @@ static esp_err_t programs_save_to_storage(void)
     return (written == len) ? ESP_OK : ESP_FAIL;
 }
 
+/**
+ * @brief Tenta di caricare la tabella programmi da file
+ *
+ * Se il file è assente o malformato viene mantenuta la configurazione
+ * di default (generata da programs_init_defaults()).
+ */
 static void programs_try_load_from_storage(void)
 {
     FILE *file = fopen(PROGRAMS_STORAGE_PATH, "r");
@@ -84,6 +107,12 @@ static void programs_try_load_from_storage(void)
     }
 }
 
+/**
+ * @brief Inizializza la tabella programmi con valori predefiniti
+ *
+ * La funzione è eseguita in modo pigro la prima volta che serve, e
+ * successivamente carica eventuali dati salvati su memoria permanente.
+ */
 static void programs_init_defaults(void)
 {
     if (s_initialized) {
@@ -109,12 +138,26 @@ static void programs_init_defaults(void)
     programs_try_load_from_storage();
 }
 
+/**
+ * @brief Restituisce puntatore alla tabella programmi attuale
+ *
+ * Garantisce l'inizializzazione lazy se necessario.
+ *
+ * @return puntatore const a una struttura static
+ */
 const web_ui_program_table_t *web_ui_program_table_get(void)
 {
     programs_init_defaults();
     return &s_program_table;
 }
 
+/**
+ * @brief Converte la tabella programmi in stringa JSON minificata
+ *
+ * L'utente deve liberare la memoria restituita con free().
+ *
+ * @return stringa JSON allocata oppure NULL in caso di errore
+ */
 char *web_ui_program_table_to_json(void)
 {
     programs_init_defaults();
@@ -151,6 +194,19 @@ char *web_ui_program_table_to_json(void)
     return json;
 }
 
+/**
+ * @brief Aggiorna la tabella programmi a partire da un payload JSON
+ *
+ * Il JSON viene validato, le eventuali inconsistenze ritornano
+ * ESP_ERR_INVALID_ARG e un messaggio esplicativo viene copiato in
+ * `err_msg` se non NULL.
+ *
+ * @param json_payload buffer contenente JSON
+ * @param len lunghezza del buffer
+ * @param err_msg output per messaggio d'errore (opzionale)
+ * @param err_msg_len dimensione di err_msg
+ * @return ESP_OK se aggiornato con successo, altrimenti codice errore
+ */
 esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t len, char *err_msg, size_t err_msg_len)
 {
     programs_init_defaults();
@@ -268,6 +324,17 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
     return ESP_OK;
 }
 
+/**
+ * @brief Controlla uno dei relè virtuali (stub per test)
+ *
+ * L'implementazione registra lo stato richiesto e aggiunge un messaggio al
+ * log FSM. Non ha effetto sull'hardware reale.
+ *
+ * @param relay_number indice relè (1..WEB_UI_VIRTUAL_RELAY_MAX)
+ * @param status true per attivare, false per disattivare
+ * @param duration_ms durata della segnalazione in millisecondi
+ * @return ESP_OK se accettato, ESP_ERR_INVALID_ARG se l'indice è fuori range
+ */
 esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32_t duration_ms)
 {
     programs_init_defaults();
@@ -294,6 +361,12 @@ esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32
     return ESP_OK;
 }
 
+/**
+ * @brief Legge lo stato di un relè virtuale
+ *
+ * Copia i dati nel buffer fornito. Restituisce false se l'indice non è valido
+ * o il puntatore di output è NULL.
+ */
 bool web_ui_virtual_relay_get(uint8_t relay_number, web_ui_virtual_relay_state_t *state_out)
 {
     programs_init_defaults();
@@ -306,6 +379,14 @@ bool web_ui_virtual_relay_get(uint8_t relay_number, web_ui_virtual_relay_state_t
     return true;
 }
 
+/**
+ * @brief Serializza lo stato di tutti i relè virtuali in JSON
+ *
+ * L'array risultante contiene oggetti con campi relay_number, status e
+ * duration. L'allocazione deve essere liberata con free().
+ *
+ * @return stringa JSON oppure NULL
+ */
 char *web_ui_virtual_relays_to_json(void)
 {
     programs_init_defaults();

@@ -5,10 +5,18 @@
 #include <stdint.h>
 #include "esp_err.h"
 
+/**
+ * @file web_ui_programs.h
+ * @brief Tipi e interfaccia per gestione programmi emulatori
+ */
+
 #define WEB_UI_PROGRAM_MAX 10
 #define WEB_UI_PROGRAM_NAME_MAX 32
 #define WEB_UI_VIRTUAL_RELAY_MAX 10
 
+/**
+ * @brief Rappresenta un singolo programma configurabile
+ */
 typedef struct {
     uint8_t program_id;
     char name[WEB_UI_PROGRAM_NAME_MAX];
@@ -29,8 +37,17 @@ typedef struct {
     uint32_t duration_ms;
 } web_ui_virtual_relay_state_t;
 
+/**
+ * @brief Ottiene la tabella programmi corrente
+ */
 const web_ui_program_table_t *web_ui_program_table_get(void);
+#/**
+ * @brief Serializza la tabella programmi in JSON (allocato)
+ */
 char *web_ui_program_table_to_json(void);
+/**
+ * @brief Aggiorna la tabella a partire da JSON
+ */
 esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t len, char *err_msg, size_t err_msg_len);
 
 esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32_t duration_ms);

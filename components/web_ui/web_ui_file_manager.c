@@ -11,6 +11,13 @@
 
 #define TAG "WEB_UI_FILES"
 
+/**
+ * @brief Traduce l'identificatore storage nel path base del filesystem.
+ *
+ * @param storage Nome storage richiesto (`spiffs`, `sd`, `sdcard`).
+ * @param base_path Puntatore di output al path base risolto.
+ * @return true se lo storage è riconosciuto, false in caso contrario.
+ */
 static bool storage_to_base_path(const char *storage, const char **base_path)
 {
     if (!storage || !base_path) {
@@ -27,6 +34,12 @@ static bool storage_to_base_path(const char *storage, const char **base_path)
     return false;
 }
 
+/**
+ * @brief Verifica che il nome file non contenga path traversal o separatori.
+ *
+ * @param name Nome file da validare.
+ * @return true se il nome è considerato sicuro, false altrimenti.
+ */
 static bool is_safe_filename(const char *name)
 {
     if (!name || name[0] == '\0') {
@@ -43,6 +56,15 @@ static bool is_safe_filename(const char *name)
     return true;
 }
 
+/**
+ * @brief Estrae un parametro dalla query string della richiesta HTTP.
+ *
+ * @param req Richiesta HTTP in ingresso.
+ * @param key Nome della chiave da leggere.
+ * @param out Buffer di output per il valore.
+ * @param out_len Dimensione del buffer di output.
+ * @return ESP_OK se trovato, errore ESP-IDF in caso di assenza/fallimento.
+ */
 static esp_err_t get_query_value(httpd_req_t *req, const char *key, char *out, size_t out_len)
 {
     if (!req || !key || !out || out_len == 0) {
@@ -69,6 +91,15 @@ static esp_err_t get_query_value(httpd_req_t *req, const char *key, char *out, s
     return ret;
 }
 
+/**
+ * @brief Renderizza la pagina web del mini file manager.
+ *
+ * La pagina include elenco file, upload, download, eliminazione multipla
+ * e visualizzazione inline con formattazione JSON lato client.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la risposta viene inviata correttamente.
+ */
 esp_err_t files_page_handler(httpd_req_t *req)
 {
     const char *extra_style =
@@ -228,6 +259,15 @@ esp_err_t files_page_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Restituisce la lista file della root dello storage selezionato.
+ *
+ * Query supportata: `storage=spiffs|sd|sdcard`.
+ * La risposta include dimensione dei file e spazio usato/totale quando disponibile.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK in caso di risposta inviata; errore HTTP in caso di parametri/storage non validi.
+ */
 esp_err_t api_files_list_get(httpd_req_t *req)
 {
     char storage[16] = {0};
@@ -317,6 +357,15 @@ esp_err_t api_files_list_get(httpd_req_t *req)
     return ret;
 }
 
+/**
+ * @brief Carica un file binario nello storage selezionato.
+ *
+ * Query richieste: `storage` e `name`.
+ * Il body viene scritto in streaming per chunk fino al completamento.
+ *
+ * @param req Richiesta HTTP POST con payload binario.
+ * @return ESP_OK se l'upload termina correttamente; errore HTTP in caso di fallimento.
+ */
 esp_err_t api_files_upload_post(httpd_req_t *req)
 {
     char storage[16] = {0};
@@ -368,6 +417,14 @@ esp_err_t api_files_upload_post(httpd_req_t *req)
     return httpd_resp_sendstr(req, "ok");
 }
 
+/**
+ * @brief Elimina un file dallo storage selezionato.
+ *
+ * Body JSON richiesto: `{ "storage": "...", "name": "..." }`.
+ *
+ * @param req Richiesta HTTP POST con body JSON.
+ * @return ESP_OK se la risposta viene inviata; errore HTTP in caso di parametri o file non valido.
+ */
 esp_err_t api_files_delete_post(httpd_req_t *req)
 {
     char body[256];
@@ -411,6 +468,15 @@ esp_err_t api_files_delete_post(httpd_req_t *req)
     return httpd_resp_sendstr(req, "ok");
 }
 
+/**
+ * @brief Eroga il contenuto di un file come download.
+ *
+ * Query richieste: `storage` e `name`.
+ * La risposta imposta `Content-Disposition: attachment` e invia il file a chunk.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se il file viene inviato completamente; ESP_FAIL su interruzioni di stream.
+ */
 esp_err_t api_files_download_get(httpd_req_t *req)
 {
     char storage[16] = {0};

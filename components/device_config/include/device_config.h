@@ -40,6 +40,7 @@ typedef struct {
     bool rs485_enabled;         ///< UART RS485
     bool mdb_enabled;           ///< UART MDB
     bool cctalk_enabled;        ///< CCtalk (uses same UART as RS232)
+    bool eeprom_enabled;        ///< EEPROM 24LC16 (visibilità UI/test)
     bool pwm1_enabled;          ///< PWM1
     bool pwm2_enabled;          ///< PWM2
     bool sd_card_enabled;       ///< SD Card
@@ -128,6 +129,7 @@ typedef struct {
 typedef struct {
     uint16_t server_port;   ///< Porta UDP per broadcast
     bool use_broadcast;     ///< Invia in broadcast UDP
+    bool write_to_sd;       ///< Salva anche i log su SD
 } device_remote_log_config_t;
 
 /**
@@ -187,6 +189,12 @@ esp_err_t device_config_save(const device_config_t *config);
  * @return Stringa JSON allocata (da liberare con free())
  */
 char* device_config_to_json(const device_config_t *config);
+
+/**
+ * @brief Legge il JSON configurazione direttamente da EEPROM (senza fallback NVS)
+ * @return Stringa JSON allocata (da liberare con free()) oppure NULL se EEPROM non valida/non disponibile
+ */
+char* device_config_read_json_from_eeprom(void);
 
 /**
  * @brief Ottiene la configurazione corrente

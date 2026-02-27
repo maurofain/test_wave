@@ -30,6 +30,15 @@ componenti.
 - **Valori:** `1` disabilita forzatamente la parte video, `0` comportamento da configurazione runtime.
 - **Impatto:** inibisce codice e/o comportamenti relativi a display/LVGL/touch e gestione web della parte video.
 
+### `MINIMAL_I2C_EEPROM_BOOT`
+- **File:** `main/app_version.h`, `main/main.c`
+- **Valori:** `1` attiva boot minimale diagnostico, `0` boot normale.
+- **Impatto:** subito dopo `init_i2c_and_io_expander()` in `app_main`, esegue solo:
+  - `eeprom_24lc16_init()`
+  - lettura EEPROM dei primi 16 byte (`0x0000..0x000F`)
+  - log del dump HEX
+  - stop intenzionale in loop (non prosegue verso `init_run_factory()` e non avvia i task)
+
 ### `BOOT_COUNTER_RESET_DELAYED`
 - **File:** `main/main.c`
 - **Valori:** `1` reset contatore reboot posticipato, `0` immediato.

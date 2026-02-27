@@ -11,6 +11,12 @@
 
 static httpd_handle_t s_server = NULL;
 
+/**
+ * @brief Legge eventuali sovrascritture di configurazione della task HTTP
+ *
+ * Se esiste /spiffs/tasks.json e contiene un oggetto per "http_server" viene
+ * usata per impostare priorità/core/stack della task creata da httpd_start.
+ */
 static void web_ui_load_http_task_config(UBaseType_t *priority, BaseType_t *core_id, size_t *stack_size)
 {
     FILE *f = fopen("/spiffs/tasks.json", "r");
@@ -64,6 +70,14 @@ static void web_ui_load_http_task_config(UBaseType_t *priority, BaseType_t *core
 // Forward declaration: implemented in web_ui.c (same component)
 esp_err_t web_ui_register_handlers(httpd_handle_t server);
 
+/**
+ * @brief Inizializza e avvia il server Web UI
+ *
+ * Configura i parametri HTTP (porta, handler max, timeouts, ecc.) e chiama
+ * web_ui_register_handlers per installare gli URI.
+ *
+ * @return ESP_OK se il server parte correttamente, altrimenti errore ESP
+ */
 esp_err_t web_ui_init(void)
 {
     if (s_server != NULL) {
@@ -105,6 +119,9 @@ esp_err_t web_ui_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Arresta il server HTTP se è in esecuzione
+ */
 void web_ui_stop(void)
 {
     if (s_server) {
@@ -113,11 +130,21 @@ void web_ui_stop(void)
     }
 }
 
+/**
+ * @brief Indica se il server HTTP Web UI è attivo
+ *
+ * @return true se web_ui_init ha avuto successo e non è stato fermato
+ */
 bool web_ui_is_running(void)
 {
     return (s_server != NULL);
 }
 
+/**
+ * @brief Restituisce l'handle usato dal server HTTP
+ *
+ * Utile per componenti esterni che desiderano registrare handler propri.
+ */
 httpd_handle_t web_ui_get_server_handle(void)
 {
     return s_server;

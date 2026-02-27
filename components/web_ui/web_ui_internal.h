@@ -6,7 +6,21 @@
 #include "web_ui_profile.h"
 #include <stdbool.h>
 
+/**
+ * @file web_ui_internal.h
+ * @brief Dichiarazioni interne condivise tra i file del componente Web UI
+ *
+ * Contiene prototipi non destinati all'uso esterno; la maggior parte delle
+ * funzioni sono implementate in altri .c e servono a mantenere il codice
+ * organizzato.
+ */
+
 // Helper interni esportati tra i file di web_ui (NON API pubblica)
+/**
+ * @brief Invia l'intestazione HTML standard per le pagine Web UI
+ *
+ * Gestisce head/meta, stile CSS e navigazione superiore opzionale.
+ */
 esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style, bool show_nav);
 
 // Asset/handler spostato nel modulo comune

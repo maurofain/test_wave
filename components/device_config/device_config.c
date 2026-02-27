@@ -304,6 +304,7 @@ static void _set_defaults(device_config_t *config)
     // Default Remote Logging (broadcast disabled by default)
     config->remote_log.server_port = 9514;  // Default port for broadcast
     config->remote_log.use_broadcast = false; // No broadcast by default
+    config->remote_log.write_to_sd = false; // Salvataggio su SD disabilitato di default
 
     // Default Sensori (tutti abilitati per impostazione predefinita)
     config->sensors.io_expander_enabled = true;
@@ -314,6 +315,7 @@ static void _set_defaults(device_config_t *config)
     config->sensors.rs485_enabled = true;
     config->sensors.mdb_enabled = true;
     config->sensors.cctalk_enabled = true; /* CCtalk enabled by default */
+    config->sensors.eeprom_enabled = true;
     config->sensors.pwm1_enabled = true;
     config->sensors.pwm2_enabled = true;
     config->sensors.sd_card_enabled = true;
@@ -649,6 +651,7 @@ esp_err_t device_config_load(device_config_t *config)
                     cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
                     if (server_port) config->remote_log.server_port = (uint16_t)server_port->valueint;
                     config->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
+                    config->remote_log.write_to_sd = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "write_to_sd"));
                 }
 
                 // Analisi config Sensori
@@ -663,6 +666,10 @@ esp_err_t device_config_load(device_config_t *config)
                     config->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled"));
                     config->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
                     config->sensors.cctalk_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "cctalk_enabled"));
+                    cJSON *eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom_enabled");
+                    if (eeprom_enabled) {
+                        config->sensors.eeprom_enabled = cJSON_IsTrue(eeprom_enabled);
+                    }
                     config->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled"));
                     config->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
                     config->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled"));
@@ -813,6 +820,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON *remote_log_obj = cJSON_CreateObject();
     cJSON_AddNumberToObject(remote_log_obj, "server_port", config->remote_log.server_port);
     cJSON_AddBoolToObject(remote_log_obj, "use_broadcast", config->remote_log.use_broadcast);
+    cJSON_AddBoolToObject(remote_log_obj, "write_to_sd", config->remote_log.write_to_sd);
     cJSON_AddItemToObject(root, "remote_log", remote_log_obj);
 
     // Sensors
@@ -825,6 +833,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddBoolToObject(sensors_obj, "rs485_enabled", config->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors_obj, "mdb_enabled", config->sensors.mdb_enabled);
     cJSON_AddBoolToObject(sensors_obj, "cctalk_enabled", config->sensors.cctalk_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "eeprom_enabled", config->sensors.eeprom_enabled);
     cJSON_AddBoolToObject(sensors_obj, "pwm1_enabled", config->sensors.pwm1_enabled);
     cJSON_AddBoolToObject(sensors_obj, "pwm2_enabled", config->sensors.pwm2_enabled);
     cJSON_AddBoolToObject(sensors_obj, "sd_card_enabled", config->sensors.sd_card_enabled);
@@ -898,6 +907,12 @@ char* device_config_to_json(const device_config_t *config)
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     return json_str;
+}
+
+char* device_config_read_json_from_eeprom(void)
+{
+    bool eeprom_modified = false;
+    return _read_from_eeprom(&eeprom_modified);
 }
 
 esp_err_t device_config_save(const device_config_t *config)

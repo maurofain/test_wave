@@ -39,6 +39,15 @@
 #include "http_services.h"
 #include "web_ui_programs.h"
 
+/*
+ * @file web_ui.c
+ * @brief Implementazione centrale dei gestori HTTP e utilità della Web UI
+ *
+ * Questo file contiene la maggior parte dei percorsi HTML e API non
+ * specificamente classificati in altri moduli. Include anche helpers per la
+ * gestione della lingua, dei reboot, del caricamento file e altro.
+ */
+
 #if DNA_SYS_MONITOR == 0
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -68,6 +77,16 @@
 TaskHandle_t s_rs232_test_handle = NULL;
 TaskHandle_t s_rs485_test_handle = NULL;
 
+/**
+ * @brief Estrae il codice lingua da un nome file i18n_<lang>.json
+ *
+ * Controlla formato e ritorna il codice in `out_lang` normalizzato.
+ *
+ * @param name nome file (es. "i18n_it.json")
+ * @param out_lang buffer output
+ * @param out_len dimensione del buffer
+ * @return true se estrazione riuscita
+ */
 static bool web_ui_extract_lang_from_filename(const char *name, char *out_lang, size_t out_len)
 {
     if (!name || !out_lang || out_len < 3) {
@@ -112,6 +131,12 @@ static bool web_ui_extract_lang_from_filename(const char *name, char *out_lang, 
     return true;
 }
 
+/**
+ * @brief Converte un codice lingua in etichetta leggibile
+ *
+ * Ad esempio "it" => "Italiano (IT)"; usa l'upper-case per codici
+ * non riconosciuti.
+ */
 static void web_ui_lang_label_from_code(const char *lang, char *label, size_t label_len)
 {
     if (!label || label_len == 0) {
@@ -145,6 +170,14 @@ static void web_ui_lang_label_from_code(const char *lang, char *label, size_t la
 }
 
 // TEST UART: 0x55, 0xAA, 0x01, 0x07 (periodico)
+/**
+ * @brief Task di prova per invio sequenza periodica su UART
+ *
+ * Usato dai comandi di test RS232/RS485 per generare traffico e monitorarlo
+ * via serial_test.
+ *
+ * @param arg porta UART (CONFIG_APP_RS232_UART_PORT o RS485)
+ */
 void uart_test_task(void *arg) {
     uart_port_t port = (uart_port_t)(intptr_t)arg;
     const char* seq_hex[] = {"\\0x55", "\\0xAA", "\\0x01", "\\0x07"};
@@ -175,6 +208,11 @@ void uart_test_task(void *arg) {
 
 /* Helpers `ip_to_str` and `perform_ota` are implemented in `web_ui_common.c` (shared helpers). */
 
+/**
+ * @brief Handler HTTP per riavviare in modalità factory
+ *
+ * Protegge con password e mostra una pagina di attesa prima del reboot.
+ */
 esp_err_t reboot_factory_handler(httpd_req_t *req)
 {
     if (!web_ui_has_valid_password(req)) {
@@ -187,6 +225,9 @@ esp_err_t reboot_factory_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Handler per riavvio in modalità applicazione
+ */
 esp_err_t reboot_app_handler(httpd_req_t *req)
 {
     httpd_resp_sendstr(req, "<html><body><h1>Reboot in Production Mode...</h1><p>Attendere il riavvio.</p></body></html>");
@@ -195,6 +236,9 @@ esp_err_t reboot_app_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Handler per riavvio sulla partizione "app last"
+ */
 esp_err_t reboot_app_last_handler(httpd_req_t *req)
 {
     httpd_resp_sendstr(req, "<html><body><h1>Reboot in App Last...</h1><p>Attendere il riavvio.</p></body></html>");
@@ -203,6 +247,9 @@ esp_err_t reboot_app_last_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Handler per riavvio sulla partizione OTA0
+ */
 esp_err_t reboot_ota0_handler(httpd_req_t *req)
 {
     httpd_resp_sendstr(req, "<html><body><h1>Reboot in OTA0...</h1><p>Attendere il riavvio.</p></body></html>");
@@ -211,6 +258,9 @@ esp_err_t reboot_ota0_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Handler per riavvio sulla partizione OTA1
+ */
 esp_err_t reboot_ota1_handler(httpd_req_t *req)
 {
     httpd_resp_sendstr(req, "<html><body><h1>Reboot in OTA1...</h1><p>Attendere il riavvio.</p></body></html>");
@@ -219,6 +269,13 @@ esp_err_t reboot_ota1_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Registro un URI solo se non è già presente
+ *
+ * Evita errori quando si re-invoca la registrazione più volte (es. dopo
+ * abilitazione dinamica di feature). Logga in caso di fallimento diverso da
+ * già esistente.
+ */
 static esp_err_t register_uri_if_missing(httpd_handle_t server, httpd_uri_t *uri)
 {
     esp_err_t err = httpd_register_uri_handler(server, uri);
@@ -229,6 +286,13 @@ static esp_err_t register_uri_if_missing(httpd_handle_t server, httpd_uri_t *uri
     return err;
 }
 
+/**
+ * @brief Registra gli endpoint "factory-runtime" quando richiesto
+ *
+ * Questi URI vengono abilitati solo se un manutentore abilitato chiama
+ * `/maintainer/enable` o tramite override intenzionale. Comprende task,
+ * test, ecc.
+ */
 static esp_err_t web_ui_register_factory_runtime_endpoints(void)
 {
     httpd_handle_t server = web_ui_get_server_handle();
@@ -257,6 +321,12 @@ static esp_err_t web_ui_register_factory_runtime_endpoints(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Handler che attiva le feature di manutenzione (factory) in runtime
+ *
+ * Richiede password. Dopo l'attivazione registra gli endpoint aggiuntivi
+ * e mostra un messaggio di conferma.
+ */
 esp_err_t maintainer_enable_handler(httpd_req_t *req)
 {
     if (!web_ui_has_valid_password(req)) {
@@ -281,6 +351,12 @@ esp_err_t maintainer_enable_handler(httpd_req_t *req)
 
 
 // Handler per la pagina OTA
+/**
+ * @brief Risponde alla GET /ota mostrando il form HTML per l'aggiornamento
+ *
+ * Il form utilizza Javascript per inviare un POST binario a `/ota/upload` e
+ * mostrare la progress bar.
+ */
 esp_err_t ota_get_handler(httpd_req_t *req)
 {
     const char *extra_style = 
@@ -315,6 +391,13 @@ esp_err_t ota_get_handler(httpd_req_t *req)
 }
 
 // Handler per l'upload OTA (POST)
+/**
+ * @brief Riceve un firmware binario via POST e lo scrive sulla partizione OTA
+ *
+ * Il body deve essere raw (`application/octet-stream`). Gestisce stream
+ * e verifica CRC tramite API esp_ota_*; al termine imposta la partizione
+ * di boot ed esegue `esp_restart()`.
+ */
 esp_err_t ota_upload_handler(httpd_req_t *req)
 {
     char content_type[64] = {0};
@@ -386,6 +469,11 @@ esp_err_t ota_upload_handler(httpd_req_t *req)
 }
 
 // Handler per l'URL OTA (POST)
+/**
+ * @brief Avvia l'OTA scaricando un file remoto
+ *
+ * Attende un query parameter `url` e richiama `perform_ota`.
+ */
 esp_err_t ota_post_handler(httpd_req_t *req)
 {
     char q[256], u[200] = {0};
@@ -396,6 +484,11 @@ esp_err_t ota_post_handler(httpd_req_t *req)
 }
 
 // Handler per errore 404
+/**
+ * @brief Risponde alle richieste non gestite con 404
+ *
+ * Questo handler viene registrato come default in httpd_config_t.
+ */
 esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
 {
     httpd_resp_set_status(req, "404 Non Trovato");
@@ -403,6 +496,12 @@ esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
 }
 
 // Handler per pagina configurazione
+/**
+ * @brief Genera l'interfaccia HTML `/config` per tutte le impostazioni del dispositivo
+ *
+ * La pagina mostra campi input, toggle e sezioni collassabili. I valori vengono
+ * caricati/salvati via API `/api/config`.
+ */
 esp_err_t config_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /config");
@@ -485,6 +584,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
 
         "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>📊 Logging Remoto<span class='section-toggle-icon'>▸</span></h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_broadcast' name='remote_log_broadcast'><span class='slider'></span></label><span>Usa broadcast UDP</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_sd' name='remote_log_sd'><span class='slider'></span></label><span>Salva log su SD</span></div>"
         "<div class='form-group indent'><label>Porta UDP</label><input type='number' id='remote_log_port' name='remote_log_port' min='1024' max='65535' placeholder='9514' style='width:120px; padding:6px; border:1px solid #ddd; border-radius:4px;'></div>"
         "</div>"
 
@@ -496,6 +596,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs232' name='rs232'><span class='slider'></span></label><span>UART RS232</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs485' name='rs485'><span class='slider'></span></label><span>UART RS485</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='mdb' name='mdb'><span class='slider'></span></label><span>MDB Engine</span></div>"
+        "<div class='sw-row'><label class='switch'><input type='checkbox' id='eeprom' name='eeprom'><span class='slider'></span></label><span>EEPROM 24LC16</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='sd_card' name='sd_card'><span class='slider'></span></label><span>Scheda SD</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm1' name='pwm1'><span class='slider'></span></label><span>PWM Canale 1</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm2' name='pwm2'><span class='slider'></span></label><span>PWM Canale 2</span></div>"
@@ -665,6 +766,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('server_password').value = (c.server && c.server.password) ? c.server.password : 'c1ef6429c5e0f753ff24a114de6ee7d4';"
         "document.getElementById('remote_log_port').value=c.remote_log.server_port;"
         "document.getElementById('remote_log_broadcast').checked=c.remote_log.use_broadcast;"
+        "document.getElementById('remote_log_sd').checked=!!(c.remote_log && c.remote_log.write_to_sd);"
         "document.getElementById('io_exp').checked=c.sensors.io_expander_enabled;"
         "document.getElementById('temp').checked=c.sensors.temperature_enabled;"
         "document.getElementById('led').checked=c.sensors.led_enabled;"
@@ -672,6 +774,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('rs232').checked=c.sensors.rs232_enabled;"
         "document.getElementById('rs485').checked=c.sensors.rs485_enabled;"
         "document.getElementById('mdb').checked=c.sensors.mdb_enabled;"
+        "document.getElementById('eeprom').checked=(typeof c.sensors.eeprom_enabled==='undefined')?true:!!c.sensors.eeprom_enabled;"
         "document.getElementById('sd_card').checked=c.sensors.sd_card_enabled;"
         "document.getElementById('pwm1').checked=c.sensors.pwm1_enabled;"
         "document.getElementById('pwm2').checked=c.sensors.pwm2_enabled;"
@@ -730,8 +833,8 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "ntp_enabled:document.getElementById('ntp_en').checked,"
         "ntp:{server1:document.getElementById('ntp_server1').value,server2:document.getElementById('ntp_server2').value,timezone_offset:parseInt(document.getElementById('ntp_timezone_offset').value)},"
         "server:{enabled:document.getElementById('server_en').checked,url:document.getElementById('server_url').value,serial:document.getElementById('server_serial').value,password:document.getElementById('server_password').value},"
-        "remote_log:{server_port:parseInt(document.getElementById('remote_log_port').value),use_broadcast:document.getElementById('remote_log_broadcast').checked},"
-        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
+        "remote_log:{server_port:parseInt(document.getElementById('remote_log_port').value),use_broadcast:document.getElementById('remote_log_broadcast').checked,write_to_sd:document.getElementById('remote_log_sd').checked},"
+        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,eeprom_enabled:document.getElementById('eeprom').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
 "scanner:{enabled:document.getElementById('scanner_en').checked,vid:document.getElementById('scanner_vid').value,pid:document.getElementById('scanner_pid').value,dual_pid:document.getElementById('scanner_dual_pid').value},"
         "display:{enabled:document.getElementById('display_en').checked,lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
         "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
@@ -940,6 +1043,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "eeprom_enabled", cfg->sensors.eeprom_enabled);
     cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
     cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
     cJSON_AddBoolToObject(sensors, "pwm2_enabled", cfg->sensors.pwm2_enabled);
@@ -991,6 +1095,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON *remote_log = cJSON_CreateObject();
     cJSON_AddNumberToObject(remote_log, "server_port", cfg->remote_log.server_port);
     cJSON_AddBoolToObject(remote_log, "use_broadcast", cfg->remote_log.use_broadcast);
+    cJSON_AddBoolToObject(remote_log, "write_to_sd", cfg->remote_log.write_to_sd);
     cJSON_AddItemToObject(root, "remote_log", remote_log);
 
     // Scanner configuration
@@ -1185,6 +1290,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "eeprom_enabled", cfg->sensors.eeprom_enabled);
     cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
     cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
     cJSON_AddBoolToObject(sensors, "pwm2_enabled", cfg->sensors.pwm2_enabled);
@@ -1337,6 +1443,10 @@ esp_err_t api_config_save(httpd_req_t *req)
         cfg->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled"));
         cfg->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled"));
         cfg->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
+        cJSON *eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom_enabled");
+        if (eeprom_enabled) {
+            cfg->sensors.eeprom_enabled = cJSON_IsTrue(eeprom_enabled);
+        }
         cfg->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled"));
         cfg->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
         cfg->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled"));
@@ -1425,8 +1535,9 @@ esp_err_t api_config_save(httpd_req_t *req)
             cfg->remote_log.server_port = (uint16_t)server_port->valueint;
         }
         cfg->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
-        ESP_LOGI(TAG, "[C] Remote logging config: port=%d, broadcast=%d",
-                cfg->remote_log.server_port, cfg->remote_log.use_broadcast);
+        cfg->remote_log.write_to_sd = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "write_to_sd"));
+        ESP_LOGI(TAG, "[C] Remote logging config: port=%d, broadcast=%d, sd=%d",
+                cfg->remote_log.server_port, cfg->remote_log.use_broadcast, cfg->remote_log.write_to_sd);
     }
 
     // Scanner configuration (API save)
@@ -1914,7 +2025,21 @@ esp_err_t api_debug_promote_factory(httpd_req_t *req)
 }
 
 #if DNA_SYS_MONITOR == 0
-/* GET /api/sysinfo — heap DRAM/SPIRAM + CPU usage per core */
+/**
+ * @brief API di diagnostica di sistema
+ *
+ * Endpoint `GET /api/sysinfo` usato dal frontend per visualizzare dati di
+ * memoria e, quando disponibili, l'uso della CPU per core. La funzione viene
+ * compilata solo se `DNA_SYS_MONITOR` è zero (feature monitor disabilitata nel
+ * codice principale).
+ *
+ * La risposta è un oggetto JSON contenente:
+ *   - heap.dram_free / heap.dram_total
+ *   - heap.spiram_free / heap.spiram_total
+ *   - cpu.available ("true"/"false")
+ *   - cpu.core0_pct, cpu.core1_pct (se supportato)
+ *   - uptime_s
+ */
 static esp_err_t sysinfo_get_handler(httpd_req_t *req)
 {
     size_t dram_free  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -1973,6 +2098,18 @@ static esp_err_t sysinfo_get_handler(httpd_req_t *req)
 #endif /* DNA_SYS_MONITOR == 0 */
 
 
+/**
+ * @brief Registra tutti gli endpoint HTTP del Web UI
+ *
+ * Questa funzione costruisce e registra le URI usate dal server, sia
+ * quelle di sistema (radice, logo, ecc.) sia quelle dinamiche per task e
+ * configurazioni. Viene invocata durante l'inizializzazione del server e
+ * può essere chiamata nuovamente se gli handler devono essere reinseriti.
+ *
+ * @param server Handle del server HTTP.
+ * @return ESP_OK se tutte le registrazioni vanno a buon fine, altrimenti il
+ *         primo errore riscontrato.
+ */
 esp_err_t web_ui_register_handlers(httpd_handle_t server)
 {
     // Registrazione URI di sistema (ex-init.c)

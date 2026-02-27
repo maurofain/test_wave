@@ -9,6 +9,7 @@
 #include "app_version.h"
 #include "device_config.h"
 #include "error_log.h"
+#include "eeprom_24lc16.h"
 
 static const char *TAG = "APP";
 #define LOG_CTX_PREFIX "[" COMPILE_LOG_PREFIX "]"
@@ -125,6 +126,36 @@ void app_main(void)
     // Inizializzazione I2C e I/O Expander
     ESP_LOGI(TAG, "Inizializzazione I2C e I/O Expander");
     init_i2c_and_io_expander();
+
+#if MINIMAL_I2C_EEPROM_BOOT
+    ESP_LOGW(TAG, LOG_CTX_PREFIX " [MINBOOT] Modalita' minimale attiva: eseguo solo init EEPROM + read primi 16 byte");
+    esp_err_t eep_init_ret = eeprom_24lc16_init();
+    if (eep_init_ret != ESP_OK) {
+        ESP_LOGE(TAG, LOG_CTX_PREFIX " [MINBOOT] EEPROM init fallita: %s", esp_err_to_name(eep_init_ret));
+    } else {
+        uint8_t probe[16] = {0};
+        esp_err_t eep_read_ret = eeprom_24lc16_read(0x0000, probe, sizeof(probe));
+        if (eep_read_ret != ESP_OK) {
+            ESP_LOGE(TAG, LOG_CTX_PREFIX " [MINBOOT] EEPROM read 0x0000..0x000F fallita: %s", esp_err_to_name(eep_read_ret));
+        } else {
+            char hex_line[3 * 16 + 1] = {0};
+            char *p = hex_line;
+            for (size_t i = 0; i < sizeof(probe); i++) {
+                int n = snprintf(p, (size_t)(hex_line + sizeof(hex_line) - p), "%02X%s", probe[i], (i + 1 < sizeof(probe)) ? " " : "");
+                if (n <= 0) {
+                    break;
+                }
+                p += n;
+            }
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " [MINBOOT] EEPROM probe [0x0000..0x000F]: %s", hex_line);
+        }
+    }
+
+    ESP_LOGW(TAG, LOG_CTX_PREFIX " [MINBOOT] Sequenza volutamente fermata dopo init I2C/IO-Expander/EEPROM");
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+#endif
 
     esp_err_t init_ret = init_run_factory();
     if (init_ret == ESP_ERR_INVALID_STATE && init_is_error_lock_active())

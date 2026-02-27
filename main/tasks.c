@@ -749,9 +749,14 @@ void tasks_start_all(void)
             ESP_LOGI(TAG, "[M] Task saltato %s (stato=%d)", t->name, (int)t->state);
             continue;
         }
+        if (strcmp(t->name, "touchscreen") == 0 && t->arg == NULL) {
+            ESP_LOGW(TAG, "[M] Task saltato %s (touch handle non disponibile)", t->name);
+            continue;
+        }
         ESP_LOGI(TAG, "[M] Avvio task %s (stack=%lu words)...", t->name, (unsigned long)t->stack_words);
         // Non sovrascrivere arg se già impostato (es. touchscreen handle)
-        if (t->arg == NULL) {
+        // e non impostare fallback per task che richiedono handle specifici.
+        if (t->arg == NULL && strcmp(t->name, "touchscreen") != 0) {
             t->arg = t;
         }
         BaseType_t res = task_create(t);
@@ -784,9 +789,13 @@ void tasks_apply_n_run(void)
 
         if (t->state == TASK_STATE_RUN) {
             if (t->handle == NULL) {
+                if (strcmp(t->name, "touchscreen") == 0 && t->arg == NULL) {
+                    ESP_LOGW(TAG, "[M] Task saltato %s (touch handle non disponibile)", t->name);
+                    continue;
+                }
                 ESP_LOGI(TAG, "Avvio task %s (stack=%lu words)...", t->name, (unsigned long)t->stack_words);
                 // Non sovrascrivere arg se già impostato (es. touchscreen handle)
-                if (t->arg == NULL) {
+                if (t->arg == NULL && strcmp(t->name, "touchscreen") != 0) {
                     t->arg = t;
                 }
                 xTaskCreatePinnedToCoreWithCaps(t->task_fn, t->name, t->stack_words, t->arg, t->priority, &t->handle, t->core_id, t->stack_caps);

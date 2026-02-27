@@ -2,6 +2,10 @@
 
 #include <stdbool.h>
 
+/**
+ * @file web_ui_profile.h
+ * @brief Definizioni dei profili e delle feature Web UI
+ */
 typedef enum {
     WEB_UI_SCOPE_APP = 0,
     WEB_UI_SCOPE_FACTORY,
@@ -20,6 +24,9 @@ typedef enum {
     WEB_UI_FEATURE_ENDPOINT_PROGRAMS,
 } web_ui_feature_t;
 
+/**
+ * @brief Calcola lo scope (app/factory) per una feature
+ */
 static inline web_ui_scope_t web_ui_feature_scope(web_ui_feature_t feature)
 {
     switch (feature) {
@@ -46,6 +53,9 @@ static inline web_ui_scope_t web_ui_feature_scope(web_ui_feature_t feature)
     }
 }
 
+/**
+ * @brief Verifica se uno scope è consentito nello stato corrente
+ */
 static inline bool web_ui_scope_allows(web_ui_scope_t scope, bool is_factory_runtime)
 {
     if (scope == WEB_UI_SCOPE_ALL) {

@@ -1,6 +1,7 @@
 #include "remote_logging.h"
 #include "device_config.h"
 #include "web_ui.h"
+#include "sd_card.h"
 #include <esp_log.h>
 #include <esp_netif.h>
 #include "lwip/sockets.h"
@@ -12,6 +13,8 @@
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>
+#include <stdio.h>
+#include <sys/stat.h>
 
 #define TAG "REMOTE_LOG"
 #define LOG_QUEUE_SIZE 50  // default queue length; reduced dynamically if heap low
@@ -47,6 +50,114 @@ static volatile bool s_in_custom_vprintf = false;
 // Per limitare i log di errore UDP
 static int udp_error_count = 0;
 static TickType_t last_udp_error_time = 0;
+static FILE *s_sd_log_file = NULL;
+static char s_sd_log_path[64] = {0};
+
+static bool is_ntp_time_valid(time_t now)
+{
+    if (now <= 0) {
+        return false;
+    }
+    struct tm tm_info;
+    localtime_r(&now, &tm_info);
+    return (tm_info.tm_year >= (2024 - 1900));
+}
+
+static bool build_sd_path_with_datetime(char *out, size_t out_len, time_t now)
+{
+    if (!out || out_len == 0 || !is_ntp_time_valid(now)) {
+        return false;
+    }
+    struct tm tm_info;
+    localtime_r(&now, &tm_info);
+    char suffix[32] = {0};
+    if (strftime(suffix, sizeof(suffix), "%y%m%d-%H%M", &tm_info) == 0) {
+        return false;
+    }
+    snprintf(out, out_len, "/sdcard/MH1001-%s.log", suffix);
+    return true;
+}
+
+static bool build_sd_path_fallback(char *out, size_t out_len)
+{
+    if (!out || out_len == 0) {
+        return false;
+    }
+    struct stat st;
+    char candidate[64];
+    for (int i = 0; i <= 999; i++) {
+        snprintf(candidate, sizeof(candidate), "/sdcard/MH1001-%03d.log", i);
+        if (sd_card_stat(candidate, &st) != 0) {
+            snprintf(out, out_len, "%s", candidate);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool ensure_sd_log_file(time_t now)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->remote_log.write_to_sd) {
+        if (s_sd_log_file) {
+            sd_card_fflush(s_sd_log_file);
+            sd_card_fclose(s_sd_log_file);
+            s_sd_log_file = NULL;
+            s_sd_log_path[0] = '\0';
+        }
+        return false;
+    }
+    if (!sd_card_is_mounted()) {
+        return false;
+    }
+
+    char desired[64] = {0};
+    if (!build_sd_path_with_datetime(desired, sizeof(desired), now)) {
+        if (!build_sd_path_fallback(desired, sizeof(desired))) {
+            return false;
+        }
+    }
+
+    if (s_sd_log_file == NULL) {
+        s_sd_log_file = sd_card_fopen(desired, "a");
+        if (!s_sd_log_file) {
+            return false;
+        }
+        strncpy(s_sd_log_path, desired, sizeof(s_sd_log_path) - 1);
+        s_sd_log_path[sizeof(s_sd_log_path) - 1] = '\0';
+        return true;
+    }
+
+    if (strcmp(s_sd_log_path, desired) != 0 && strstr(s_sd_log_path, "MH1001-") && strstr(s_sd_log_path, "/sdcard/MH1001-") && strstr(s_sd_log_path, ".log")) {
+        bool current_is_fallback = (strlen(s_sd_log_path) >= strlen("/sdcard/MH1001-000.log")) &&
+                                   (s_sd_log_path[15] >= '0' && s_sd_log_path[15] <= '9') &&
+                                   (s_sd_log_path[16] >= '0' && s_sd_log_path[16] <= '9') &&
+                                   (s_sd_log_path[17] >= '0' && s_sd_log_path[17] <= '9');
+        if (current_is_fallback && is_ntp_time_valid(now)) {
+            sd_card_fflush(s_sd_log_file);
+            sd_card_fclose(s_sd_log_file);
+            s_sd_log_file = NULL;
+
+            if (rename(s_sd_log_path, desired) == 0) {
+                strncpy(s_sd_log_path, desired, sizeof(s_sd_log_path) - 1);
+                s_sd_log_path[sizeof(s_sd_log_path) - 1] = '\0';
+            }
+
+            s_sd_log_file = sd_card_fopen(s_sd_log_path[0] ? s_sd_log_path : desired, "a");
+            if (!s_sd_log_file) {
+                s_sd_log_file = sd_card_fopen(desired, "a");
+                if (!s_sd_log_file) {
+                    s_sd_log_path[0] = '\0';
+                    return false;
+                }
+                strncpy(s_sd_log_path, desired, sizeof(s_sd_log_path) - 1);
+                s_sd_log_path[sizeof(s_sd_log_path) - 1] = '\0';
+            }
+        }
+    }
+
+    return true;
+}
 
 /**
  * @brief Converte il livello ESP_LOG in stringa
@@ -146,6 +257,24 @@ static void log_sender_task(void *pvParameters)
 
         // Salva sempre localmente nel web UI per visualizzazione diretta
         web_ui_add_log(log_msg.level, log_msg.tag, log_msg.message);
+
+        // Salva su SD se abilitato in configurazione
+        {
+            char sd_line[LOG_MESSAGE_MAX_LEN + 128];
+            struct tm timeinfo;
+            localtime_r(&log_msg.timestamp, &timeinfo);
+            strftime(sd_line, sizeof(sd_line), "[%Y-%m-%d %H:%M:%S] ", &timeinfo);
+            size_t line_len = strlen(sd_line);
+            snprintf(sd_line + line_len, sizeof(sd_line) - line_len,
+                     "%s %s: %s\n", log_msg.level, log_msg.tag, log_msg.message);
+
+            if (ensure_sd_log_file(log_msg.timestamp) && s_sd_log_file) {
+                size_t wr = sd_card_fwrite(s_sd_log_file, sd_line, strlen(sd_line));
+                if (wr > 0) {
+                    sd_card_fflush(s_sd_log_file);
+                }
+            }
+        }
 
         // Invia in broadcast UDP se abilitato
         if (cfg->remote_log.use_broadcast) {
@@ -366,6 +495,13 @@ void remote_logging_stop(void)
         close(sock_fd);
         sock_fd = -1;
     }
+
+    if (s_sd_log_file) {
+        sd_card_fflush(s_sd_log_file);
+        sd_card_fclose(s_sd_log_file);
+        s_sd_log_file = NULL;
+    }
+    s_sd_log_path[0] = '\0';
 
     initialized = false;
     ESP_LOGI(TAG, "Logging remoto fermato");

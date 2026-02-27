@@ -158,6 +158,65 @@ static uint8_t s_active_prog = 0;
 typedef struct { uint8_t prog_id; } prog_btn_ud_t;
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
+static void btn_style(lv_obj_t *btn, lv_color_t bg);
+
+/* Cerca metadati programma per id */
+static const web_ui_program_entry_t *find_program_entry(uint8_t pid)
+{
+    const web_ui_program_table_t *tbl = web_ui_program_table_get();
+    if (!tbl) {
+        return NULL;
+    }
+    for (uint8_t i = 0; i < tbl->count; i++) {
+        if (tbl->programs[i].program_id == pid) {
+            return &tbl->programs[i];
+        }
+    }
+    return NULL;
+}
+
+/* Aggiorna stato pulsanti programma in base a credito/FSM */
+static void refresh_prog_buttons(const fsm_ctx_t *snap)
+{
+    bool has_snap = (snap != NULL);
+    bool running_or_paused = has_snap &&
+                             (snap->state == FSM_STATE_RUNNING || snap->state == FSM_STATE_PAUSED);
+
+    if (has_snap && snap->credit_cents <= 0) {
+        s_active_prog = 0;
+    }
+
+    for (int i = 0; i < PROG_COUNT; i++) {
+        lv_obj_t *btn = s_prog_btns[i];
+        if (!btn) {
+            continue;
+        }
+
+        uint8_t pid = (uint8_t)(i + 1);
+        const web_ui_program_entry_t *entry = find_program_entry(pid);
+        bool program_enabled = (entry && entry->enabled);
+        bool credit_ok = has_snap && entry &&
+                         (snap->credit_cents > 0) &&
+                         (snap->credit_cents >= (int32_t)entry->price_units);
+        bool is_active = running_or_paused && (s_active_prog == pid) && has_snap && (snap->credit_cents > 0);
+
+        if (is_active) {
+            btn_style(btn, COL_PROG_ACT);
+        } else {
+            btn_style(btn, COL_PROG);
+        }
+
+        bool can_click = program_enabled && credit_ok;
+        if (can_click) {
+            lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+        } else {
+            lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_opa(btn, LV_OPA_50, LV_PART_MAIN);
+        }
+    }
+}
+
 /* =========================================================================
  * Helpers
  * ========================================================================= */
@@ -293,34 +352,20 @@ static void update_state(const fsm_ctx_t *snap)
     /* countdown come sfondo pieno dell'area counter: il riempimento scende */
     if (s_counter_fill) {
         static int32_t s_last_pct = -1;
-        static int32_t s_last_band = -1;
         if (pct != s_last_pct) {
             int32_t h = (SECT_STATUS_H * pct) / 100;
             lv_obj_set_size(s_counter_fill, 800, h);
             lv_obj_align(s_counter_fill, LV_ALIGN_BOTTOM_LEFT, 0, 0);
             s_last_pct = pct;
         }
-
-        int32_t band = (pct <= 30) ? 0 : 1;
-        if (band != s_last_band) {
-            lv_obj_set_style_bg_color(s_counter_fill, (band == 0) ? COL_PROG_LOW : COL_PROG_ACT, LV_PART_MAIN);
-            s_last_band = band;
-        }
     }
 #else
     /* progress bar — aggiorna solo se la percentuale è cambiata */
     if (s_gauge) {
         static int32_t s_last_pct = -1;
-        static int32_t s_last_band = -1;
         if (pct != s_last_pct) {
             lv_bar_set_value(s_gauge, pct, LV_ANIM_OFF);
             s_last_pct = pct;
-        }
-
-        int32_t band = (pct <= 30) ? 0 : 1;
-        if (band != s_last_band) {
-            lv_obj_set_style_bg_color(s_gauge, (band == 0) ? COL_PROG_LOW : COL_PROG_ACT, LV_PART_INDICATOR);
-            s_last_band = band;
         }
     }
 #endif
@@ -390,21 +435,36 @@ static void on_prog_btn(lv_event_t *e)
 
     uint8_t pid = ud->prog_id;
 
-    /* cerca metadati programma */
-    const web_ui_program_table_t *tbl = web_ui_program_table_get();
-    const web_ui_program_entry_t *entry = NULL;
-    if (tbl) {
-        for (uint8_t i = 0; i < tbl->count; i++) {
-            if (tbl->programs[i].program_id == pid) {
-                entry = &tbl->programs[i];
-                break;
-            }
-        }
+    const web_ui_program_entry_t *entry = find_program_entry(pid);
+    if (!entry || !entry->enabled) {
+        ESP_LOGW(TAG, "[C] Programma non disponibile: id=%u", pid);
+        return;
+    }
+
+    fsm_ctx_t snap = {0};
+    if (!fsm_runtime_snapshot(&snap)) {
+        ESP_LOGW(TAG, "[C] Snapshot FSM non disponibile, click programma ignorato");
+        return;
+    }
+
+    if (snap.credit_cents <= 0 || snap.credit_cents < (int32_t)entry->price_units) {
+        s_active_prog = 0;
+        refresh_prog_buttons(&snap);
+        ESP_LOGI(TAG, "[C] Credito insufficiente, programma non selezionabile: id=%u credit=%ld price=%u",
+                 pid,
+                 (long)snap.credit_cents,
+                 (unsigned)entry->price_units);
+        return;
     }
 
     /* se è il programma già attivo → pause/toggle, altrimenti start */
     bool pause_toggle = (s_active_prog == pid);
     if (!pause_toggle) {
+        for (int i = 0; i < PROG_COUNT; i++) {
+            if (s_prog_btns[i]) {
+                btn_style(s_prog_btns[i], COL_PROG);
+            }
+        }
         s_active_prog = pid;
         /* feedback visivo immediato */
         btn_style(btn, COL_PROG_ACT);
@@ -471,6 +531,8 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_size(s_counter_fill, 800, 0);
     lv_obj_align(s_counter_fill, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_obj_set_style_bg_color(s_counter_fill, COL_PROG_ACT, LV_PART_MAIN);
+    lv_obj_set_style_bg_grad_color(s_counter_fill, COL_PROG_LOW, LV_PART_MAIN);
+    lv_obj_set_style_bg_grad_dir(s_counter_fill, LV_GRAD_DIR_VER, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_counter_fill, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_counter_fill, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(s_counter_fill, 0, LV_PART_MAIN);
@@ -496,6 +558,8 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_border_width(s_gauge, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(s_gauge, 8, LV_PART_MAIN);
     lv_obj_set_style_bg_color(s_gauge, COL_PROG_ACT, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_color(s_gauge, COL_PROG_LOW, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_dir(s_gauge, LV_GRAD_DIR_VER, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(s_gauge, LV_OPA_COVER, LV_PART_INDICATOR);
     lv_obj_set_style_pad_all(s_gauge, 0, LV_PART_INDICATOR);
     lv_obj_set_style_border_width(s_gauge, 0, LV_PART_INDICATOR);
@@ -595,6 +659,7 @@ static void panel_timer_cb(lv_timer_t *t)
     fsm_ctx_t snap = {0};
     if (fsm_runtime_snapshot(&snap)) {
         update_state(&snap);
+        refresh_prog_buttons(&snap);
     }
 }
 
@@ -624,7 +689,10 @@ void lvgl_panel_show(void)
     /* Prima esecuzione immediata per popolare i dati */
     update_time();
     fsm_ctx_t snap = {0};
-    if (fsm_runtime_snapshot(&snap)) update_state(&snap);
+    if (fsm_runtime_snapshot(&snap)) {
+        update_state(&snap);
+        refresh_prog_buttons(&snap);
+    }
 
     /* Timer periodico 700 ms */
     lv_timer_create(panel_timer_cb, 700, NULL);

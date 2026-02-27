@@ -1,6 +1,15 @@
 #include "web_ui.h"
 #include "web_ui_internal.h"
 #include "esp_log.h"
+
+/**
+ * @file web_ui_test_api.c
+ * @brief Implementazione delle API per eseguire test hardware via HTTP
+ *
+ * Contiene il dispatcher principale per gli endpoint sotto il prefisso
+ * `/api/test/` e le chiamate ai vari
+ * sottosistemi di test (LED, seriali, scanner, EEPROM, MDB, ecc.).
+ */
 #include "cJSON.h"
 #include "device_config.h"
 #include "bsp/display.h"
@@ -22,11 +31,45 @@
 #include "aux_gpio.h"
 #include "sht40.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 /* needed for publishing FSM actions when scanner commands are triggered */
 #include "fsm.h"
 
 #define TAG "WEB_UI_TEST_API"
 
+static volatile bool s_sd_init_in_progress = false;
+
+static void sd_init_worker_task(void *pv)
+{
+    (void)pv;
+    ESP_LOGI(TAG, "[C] SD init worker avviato");
+
+    if (sd_card_is_mounted()) {
+        (void)sd_card_unmount();
+    }
+
+    esp_err_t err = sd_card_mount();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "[C] SD init worker completato con successo");
+    } else {
+        ESP_LOGW(TAG, "[C] SD init worker fallito: %s", esp_err_to_name(err));
+    }
+
+    s_sd_init_in_progress = false;
+    vTaskDelete(NULL);
+}
+
+/**
+ * @brief Dispatcher API per i comandi di test hardware sotto il prefisso `/api/test/`.
+ *
+ * Analizza il suffisso URI, invoca il modulo test corrispondente (LED, seriali,
+ * EEPROM, MDB, SD, scanner, GPIO, sensori) e restituisce una risposta JSON.
+ *
+ * @param req Richiesta HTTP POST.
+ * @return ESP_OK dopo l'invio della risposta HTTP.
+ */
 esp_err_t api_test_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST %s", req->uri);
@@ -286,14 +329,17 @@ esp_err_t api_test_handler(httpd_req_t *req)
     }
 
     else if (strcmp(test_name, "sd_init") == 0) {
-        if (sd_card_is_mounted()) {
-            sd_card_unmount();
-        }
-        esp_err_t err = sd_card_mount();
-        if (err == ESP_OK) {
-            snprintf(response, sizeof(response), "{\"message\":\"SD Inizializzata con successo\"}");
+        if (s_sd_init_in_progress) {
+            snprintf(response, sizeof(response), "{\"message\":\"Inizializzazione SD già in corso\"}");
         } else {
-            snprintf(response, sizeof(response), "{\"error\":\"Inizializzazione fallita: %s\"}", esp_err_to_name(err));
+            s_sd_init_in_progress = true;
+            BaseType_t ok = xTaskCreate(sd_init_worker_task, "sd_init_worker", 4096, NULL, 5, NULL);
+            if (ok == pdPASS) {
+                snprintf(response, sizeof(response), "{\"message\":\"Inizializzazione SD avviata\"}");
+            } else {
+                s_sd_init_in_progress = false;
+                snprintf(response, sizeof(response), "{\"error\":\"Impossibile avviare init SD\"}");
+            }
         }
     }
     else if (strcmp(test_name, "sd_format") == 0) {

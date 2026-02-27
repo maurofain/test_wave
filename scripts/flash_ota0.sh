@@ -24,22 +24,30 @@ get_compile_app() {
   awk '/^#define[[:space:]]+COMPILE_APP[[:space:]]+[01]/{print $3; exit}' "$file"
 }
 
-if [ ! -f "$ROOT_VER" ] || [ ! -f "$MAIN_VER" ]; then
-  echo "❌ File versione non trovati (app_version.h / main/app_version.h)."
+if [ ! -f "$MAIN_VER" ]; then
+  echo "❌ File versione non trovato: main/app_version.h"
   exit 1
 fi
 
-ROOT_MODE="$(get_compile_app "$ROOT_VER")"
 MAIN_MODE="$(get_compile_app "$MAIN_VER")"
+ROOT_MODE=""
+if [ -f "$ROOT_VER" ]; then
+  ROOT_MODE="$(get_compile_app "$ROOT_VER")"
+fi
 
-if [ -z "$ROOT_MODE" ] || [ -z "$MAIN_MODE" ] || [ "$ROOT_MODE" != "$MAIN_MODE" ]; then
+if [ -z "$MAIN_MODE" ]; then
+  echo "❌ COMPILE_APP non trovato in main/app_version.h."
+  exit 1
+fi
+
+if [ -n "$ROOT_MODE" ] && [ "$ROOT_MODE" != "$MAIN_MODE" ]; then
   echo "❌ COMPILE_APP incoerente tra root e main (root=$ROOT_MODE, main=$MAIN_MODE)."
   echo "   Esegui: ./scripts/switch_to_production.sh"
   exit 1
 fi
 
-if [ "$ROOT_MODE" != "1" ]; then
-  echo "❌ Modalità corrente FACTORY (COMPILE_APP=$ROOT_MODE). Per flash OTA_0 imposta COMPILE_APP=1."
+if [ "$MAIN_MODE" != "1" ]; then
+  echo "❌ Modalità corrente FACTORY (COMPILE_APP=$MAIN_MODE). Per flash OTA_0 imposta COMPILE_APP=1."
   echo "   Esegui: ./scripts/switch_to_production.sh"
   exit 1
 fi

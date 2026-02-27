@@ -1,16 +1,29 @@
 #include "web_ui_internal.h"
 #include "web_ui.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
+
+/**
+ * @file web_ui_logs.c
+ * @brief Gestione endpoint e buffer interno per i log ricevuti via HTTP
+ */
 #include "cJSON.h"
 #include "esp_http_server.h"
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #define TAG "WEB_UI"
-#define MAX_STORED_LOGS 100
+#define LOG_INITIAL_CAPACITY 300
+#define LOG_CIRCULAR_CAPACITY 300
 #define MAX_ALLOWED_LOG_LEVEL ESP_LOG_INFO  // non mostrare/applicare livelli > INFO
 
-// Helper: converte stringa livello ("ERROR","WARN",...) in valore numerico esp_log_level_t
+/**
+ * @brief Converte una stringa livello log nel corrispondente valore numerico ESP-IDF.
+ *
+ * @param s Livello testuale (es. `ERROR`, `WARN`, `INFO`).
+ * @return Valore `esp_log_level_t` compatibile.
+ */
 static int level_str_to_num(const char *s)
 {
     if (!s) return ESP_LOG_NONE;
@@ -31,11 +44,90 @@ typedef struct {
     char message[256];
 } stored_log_t;
 
-static stored_log_t stored_logs[MAX_STORED_LOGS];
-static int log_count = 0;
-static int log_index = 0;
+static stored_log_t *initial_logs = NULL;
+static stored_log_t *circular_logs = NULL;
+static int initial_log_count = 0;
+static int circular_log_count = 0;
+static int circular_log_index = 0;
 
-// Handler API POST /api/logs (riceve log dal server remoto)
+/**
+ * @brief Garantisce l'allocazione dei buffer log in PSRAM.
+ *
+ * @return true se i buffer sono disponibili, false altrimenti.
+ */
+static bool ensure_logs_storage(void)
+{
+    if (initial_logs && circular_logs) {
+        return true;
+    }
+
+    if (!initial_logs) {
+        initial_logs = (stored_log_t *)heap_caps_calloc(LOG_INITIAL_CAPACITY, sizeof(stored_log_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    }
+    if (!circular_logs) {
+        circular_logs = (stored_log_t *)heap_caps_calloc(LOG_CIRCULAR_CAPACITY, sizeof(stored_log_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    }
+
+    if (!(initial_logs && circular_logs)) {
+        ESP_LOGE(TAG, "[C] Buffer log in PSRAM non disponibile");
+        if (initial_logs) {
+            free(initial_logs);
+            initial_logs = NULL;
+        }
+        if (circular_logs) {
+            free(circular_logs);
+            circular_logs = NULL;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Copia un log nel doppio buffer: prima area storica, poi area circolare.
+ *
+ * @param level Livello log.
+ * @param tag Tag log.
+ * @param message Messaggio log.
+ * @param timestamp Timestamp testuale.
+ */
+static void append_stored_log(const char *level, const char *tag, const char *message, const char *timestamp)
+{
+    if (!ensure_logs_storage()) {
+        return;
+    }
+
+    stored_log_t *log = NULL;
+    if (initial_log_count < LOG_INITIAL_CAPACITY) {
+        log = &initial_logs[initial_log_count++];
+    } else {
+        log = &circular_logs[circular_log_index];
+        circular_log_index = (circular_log_index + 1) % LOG_CIRCULAR_CAPACITY;
+        if (circular_log_count < LOG_CIRCULAR_CAPACITY) {
+            circular_log_count++;
+        }
+    }
+
+    strncpy(log->level, level, sizeof(log->level) - 1);
+    strncpy(log->tag, tag, sizeof(log->tag) - 1);
+    strncpy(log->message, message, sizeof(log->message) - 1);
+    strncpy(log->timestamp, timestamp, sizeof(log->timestamp) - 1);
+
+    log->level[sizeof(log->level) - 1] = '\0';
+    log->tag[sizeof(log->tag) - 1] = '\0';
+    log->message[sizeof(log->message) - 1] = '\0';
+    log->timestamp[sizeof(log->timestamp) - 1] = '\0';
+}
+
+/**
+ * @brief Riceve un log remoto e lo memorizza nel buffer circolare locale.
+ *
+ * Endpoint: `POST /api/logs`.
+ *
+ * @param req Richiesta HTTP POST con body JSON.
+ * @return ESP_OK dopo invio risposta HTTP.
+ */
 esp_err_t api_logs_receive(httpd_req_t *req)
 {
     ESP_LOGD(TAG, "[C] POST /api/logs");
@@ -71,34 +163,30 @@ esp_err_t api_logs_receive(httpd_req_t *req)
     const cJSON *effective_message = (message && cJSON_IsString(message)) ? message : msg;
 
     if (level && cJSON_IsString(level) && tag && cJSON_IsString(tag) && effective_message && cJSON_IsString(effective_message)) {
-        // Memorizza il log
-        stored_log_t *log = &stored_logs[log_index];
-        strncpy(log->level, level->valuestring, sizeof(log->level) - 1);
-        strncpy(log->tag, tag->valuestring, sizeof(log->tag) - 1);
-        strncpy(log->message, effective_message->valuestring, sizeof(log->message) - 1);
-        log->level[sizeof(log->level) - 1] = '\0';
-        log->tag[sizeof(log->tag) - 1] = '\0';
-        log->message[sizeof(log->message) - 1] = '\0';
+        if (!ensure_logs_storage()) {
+            cJSON_Delete(root);
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_send(req, "{\"error\":\"PSRAM logs unavailable\"}", HTTPD_RESP_USE_STRLEN);
+            return ESP_OK;
+        }
 
+        char ts[20] = {0};
         if (timestamp && cJSON_IsString(timestamp) && timestamp->valuestring[0] != '\0') {
-            strncpy(log->timestamp, timestamp->valuestring, sizeof(log->timestamp) - 1);
-            log->timestamp[sizeof(log->timestamp) - 1] = '\0';
+            strncpy(ts, timestamp->valuestring, sizeof(ts) - 1);
+            ts[sizeof(ts) - 1] = '\0';
         } else {
             time_t now = time(NULL);
             struct tm timeinfo;
             if (now != (time_t)-1) {
                 localtime_r(&now, &timeinfo);
-                strftime(log->timestamp, sizeof(log->timestamp), "%H:%M:%S", &timeinfo);
+                strftime(ts, sizeof(ts), "%H:%M:%S", &timeinfo);
             } else {
-                strncpy(log->timestamp, "??:??:??", sizeof(log->timestamp) - 1);
-                log->timestamp[sizeof(log->timestamp) - 1] = '\0';
+                strncpy(ts, "??:??:??", sizeof(ts) - 1);
+                ts[sizeof(ts) - 1] = '\0';
             }
         }
 
-        log_index = (log_index + 1) % MAX_STORED_LOGS;
-        if (log_count < MAX_STORED_LOGS) {
-            log_count++;
-        }
+        append_stored_log(level->valuestring, tag->valuestring, effective_message->valuestring, ts);
     } else {
         cJSON_Delete(root);
         const char *resp_str = "{\"error\":\"Missing required fields: level, tag, message/msg\"}";
@@ -116,8 +204,19 @@ esp_err_t api_logs_receive(httpd_req_t *req)
 /**
  * @brief Aggiunge un log internamente (per uso da altri componenti)
  */
+/**
+ * @brief Inserisce un log nel buffer circolare usato dalla Web UI.
+ *
+ * @param level Livello testuale del log.
+ * @param tag Tag sorgente.
+ * @param message Messaggio da memorizzare.
+ */
 void web_ui_add_log(const char *level, const char *tag, const char *message)
 {
+    if (!ensure_logs_storage()) {
+        return;
+    }
+
     // Ottieni timestamp corrente
     time_t now = time(NULL);
     struct tm timeinfo;
@@ -130,20 +229,17 @@ void web_ui_add_log(const char *level, const char *tag, const char *message)
         strncpy(timestamp, "??:??:??", sizeof(timestamp));
     }
 
-    // Memorizza il log
-    stored_log_t *log = &stored_logs[log_index];
-    strncpy(log->level, level, sizeof(log->level) - 1);
-    strncpy(log->tag, tag, sizeof(log->tag) - 1);
-    strncpy(log->message, message, sizeof(log->message) - 1);
-    strncpy(log->timestamp, timestamp, sizeof(log->timestamp) - 1);
-
-    log_index = (log_index + 1) % MAX_STORED_LOGS;
-    if (log_count < MAX_STORED_LOGS) {
-        log_count++;
-    }
+    append_stored_log(level ? level : "INFO", tag ? tag : "WEB_UI", message ? message : "", timestamp);
 }
 
-// Handler API GET /api/logs (restituisce i log memorizzati)
+/**
+ * @brief Restituisce i log memorizzati nel buffer circolare.
+ *
+ * Endpoint: `GET /api/logs`.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK dopo invio risposta JSON.
+ */
 esp_err_t api_logs_get(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /api/logs - Processing request");
@@ -155,25 +251,40 @@ esp_err_t api_logs_get(httpd_req_t *req)
 
     cJSON *root = cJSON_CreateArray();
 
-    int start_idx = (log_count < MAX_STORED_LOGS) ? 0 : log_index;
-    int count = log_count;
+    if (ensure_logs_storage()) {
+        for (int i = 0; i < initial_log_count; i++) {
+            stored_log_t *log = &initial_logs[i];
 
-    for (int i = 0; i < count; i++) {
-        int idx = (start_idx + i) % MAX_STORED_LOGS;
-        stored_log_t *log = &stored_logs[idx];
+            int msg_lvl = level_str_to_num(log->level);
+            if (msg_lvl > MAX_ALLOWED_LOG_LEVEL) {
+                continue;
+            }
 
-        /* Filtra i log che superano il livello massimo consentito (MAX_ALLOWED_LOG_LEVEL) */
-        int msg_lvl = level_str_to_num(log->level);
-        if (msg_lvl > MAX_ALLOWED_LOG_LEVEL) {
-            continue; // skip troppo dettagliati
+            cJSON *log_obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(log_obj, "timestamp", log->timestamp);
+            cJSON_AddStringToObject(log_obj, "level", log->level);
+            cJSON_AddStringToObject(log_obj, "tag", log->tag);
+            cJSON_AddStringToObject(log_obj, "message", log->message);
+            cJSON_AddItemToArray(root, log_obj);
         }
 
-        cJSON *log_obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(log_obj, "timestamp", log->timestamp);
-        cJSON_AddStringToObject(log_obj, "level", log->level);
-        cJSON_AddStringToObject(log_obj, "tag", log->tag);
-        cJSON_AddStringToObject(log_obj, "message", log->message);
-        cJSON_AddItemToArray(root, log_obj);
+        int start_idx = (circular_log_count < LOG_CIRCULAR_CAPACITY) ? 0 : circular_log_index;
+        for (int i = 0; i < circular_log_count; i++) {
+            int idx = (start_idx + i) % LOG_CIRCULAR_CAPACITY;
+            stored_log_t *log = &circular_logs[idx];
+
+            int msg_lvl = level_str_to_num(log->level);
+            if (msg_lvl > MAX_ALLOWED_LOG_LEVEL) {
+                continue;
+            }
+
+            cJSON *log_obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(log_obj, "timestamp", log->timestamp);
+            cJSON_AddStringToObject(log_obj, "level", log->level);
+            cJSON_AddStringToObject(log_obj, "tag", log->tag);
+            cJSON_AddStringToObject(log_obj, "message", log->message);
+            cJSON_AddItemToArray(root, log_obj);
+        }
     }
 
     char *json_str = cJSON_Print(root);
@@ -185,7 +296,14 @@ esp_err_t api_logs_get(httpd_req_t *req)
     return ESP_OK;
 }
 
-// API: restituisce i livelli correnti per i tag presenti nei log memorizzati
+/**
+ * @brief Restituisce i livelli log correnti per i tag presenti nel buffer.
+ *
+ * Endpoint: `GET /api/logs/levels`.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK dopo invio risposta JSON.
+ */
 esp_err_t api_logs_levels_get(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /api/logs/levels");
@@ -194,25 +312,54 @@ esp_err_t api_logs_levels_get(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
 
     cJSON *root = cJSON_CreateArray();
-    // raccolta tag unici
-    for (int i = 0; i < log_count; i++) {
-        int idx = ( (log_index - log_count) + i + MAX_STORED_LOGS ) % MAX_STORED_LOGS;
-        stored_log_t *log = &stored_logs[idx];
-        // verifica unicità
-        bool found = false;
-        for (int j = 0; j < cJSON_GetArraySize(root); j++) {
-            cJSON *item = cJSON_GetArrayItem(root, j);
-            cJSON *t = cJSON_GetObjectItem(item, "tag");
-            if (t && strcmp(t->valuestring, log->tag) == 0) { found = true; break; }
+    if (ensure_logs_storage()) {
+        // raccolta tag unici dalla parte iniziale
+        for (int i = 0; i < initial_log_count; i++) {
+            stored_log_t *log = &initial_logs[i];
+            bool found = false;
+            for (int j = 0; j < cJSON_GetArraySize(root); j++) {
+                cJSON *item = cJSON_GetArrayItem(root, j);
+                cJSON *t = cJSON_GetObjectItem(item, "tag");
+                if (t && strcmp(t->valuestring, log->tag) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                continue;
+            }
+            int lvl = esp_log_level_get(log->tag);
+            int applied = (lvl > MAX_ALLOWED_LOG_LEVEL) ? MAX_ALLOWED_LOG_LEVEL : lvl;
+            cJSON *obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(obj, "tag", log->tag);
+            cJSON_AddNumberToObject(obj, "level", applied);
+            cJSON_AddItemToArray(root, obj);
         }
-        if (found) continue;
-        int lvl = esp_log_level_get(log->tag);
-        /* Report del livello effettivo applicato (clamp a MAX_ALLOWED_LOG_LEVEL) */
-        int applied = (lvl > MAX_ALLOWED_LOG_LEVEL) ? MAX_ALLOWED_LOG_LEVEL : lvl;
-        cJSON *obj = cJSON_CreateObject();
-        cJSON_AddStringToObject(obj, "tag", log->tag);
-        cJSON_AddNumberToObject(obj, "level", applied);
-        cJSON_AddItemToArray(root, obj);
+
+        // raccolta tag unici dalla parte circolare (ordine cronologico)
+        int start_idx = (circular_log_count < LOG_CIRCULAR_CAPACITY) ? 0 : circular_log_index;
+        for (int i = 0; i < circular_log_count; i++) {
+            int idx = (start_idx + i) % LOG_CIRCULAR_CAPACITY;
+            stored_log_t *log = &circular_logs[idx];
+            bool found = false;
+            for (int j = 0; j < cJSON_GetArraySize(root); j++) {
+                cJSON *item = cJSON_GetArrayItem(root, j);
+                cJSON *t = cJSON_GetObjectItem(item, "tag");
+                if (t && strcmp(t->valuestring, log->tag) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                continue;
+            }
+            int lvl = esp_log_level_get(log->tag);
+            int applied = (lvl > MAX_ALLOWED_LOG_LEVEL) ? MAX_ALLOWED_LOG_LEVEL : lvl;
+            cJSON *obj = cJSON_CreateObject();
+            cJSON_AddStringToObject(obj, "tag", log->tag);
+            cJSON_AddNumberToObject(obj, "level", applied);
+            cJSON_AddItemToArray(root, obj);
+        }
     }
 
     char *json = cJSON_Print(root);
@@ -223,7 +370,14 @@ esp_err_t api_logs_levels_get(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler API POST /api/logs/level (imposta livello log per un tag)
+/**
+ * @brief Imposta il livello log di un tag specifico con clamp di sicurezza.
+ *
+ * Endpoint: `POST /api/logs/level` con body JSON `{tag, level}`.
+ *
+ * @param req Richiesta HTTP POST.
+ * @return ESP_OK dopo invio risposta JSON; ESP_FAIL in caso di body/JSON non valido.
+ */
 esp_err_t api_logs_set_level(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST /api/logs/level");
@@ -265,7 +419,14 @@ esp_err_t api_logs_set_level(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler API OPTIONS /api/logs (per CORS preflight)
+/**
+ * @brief Gestisce il preflight CORS per endpoint logs.
+ *
+ * Endpoint: `OPTIONS /api/logs`.
+ *
+ * @param req Richiesta HTTP OPTIONS.
+ * @return ESP_OK dopo invio header CORS.
+ */
 esp_err_t api_logs_options(httpd_req_t *req)
 {
     ESP_LOGD(TAG, "[C] OPTIONS /api/logs");
@@ -279,7 +440,14 @@ esp_err_t api_logs_options(httpd_req_t *req)
     return ESP_OK;
 }
 
-// Handler pagina logs
+/**
+ * @brief Renderizza la pagina web di monitoraggio log.
+ *
+ * Include visualizzazione log remoti, filtri e controlli livelli runtime.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la pagina viene inviata correttamente.
+ */
 esp_err_t logs_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /logs");
@@ -303,6 +471,7 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "  <input id='logFilterInput' placeholder='Filtro? (usa * e ?)' style='width:260px;padding:6px;margin-right:6px;border-radius:4px;border:1px solid #ccc'/>"
         "  <button id='applyLogFilterBtn' style='padding:6px 10px;background:#2ecc71;color:white;border-radius:4px;border:none;margin-right:6px;'>Applica filtro</button>"
         "  <button id='clearLogFilterBtn' style='padding:6px 8px;background:#95a5a6;color:white;border-radius:4px;border:none;'>Pulisci filtro</button>"
+        "  <label style='margin-left:12px;display:inline-flex;align-items:center;gap:6px;color:#2c3e50;font-weight:bold;'><input type='checkbox' id='autoScrollToggle'>Autoscroll</label>"
         "</div>"
         "<div class='log-container' id='logContainer'>"
         "In attesa di log...<br>"
@@ -311,6 +480,7 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "</div>"
         "<script>"
         "const LEVELS = [{v:0,t:'NONE'},{v:1,t:'ERROR'},{v:2,t:'WARN'},{v:3,t:'INFO'},{v:4,t:'DEBUG'},{v:5,t:'VERBOSE'}];"
+        "let AUTO_SCROLL = false;"
         "function levelToText(v){const l=LEVELS.find(x=>x.v===v);return l?l.t:v;}"
         "async function setLogLevel(tag, level){try{return fetch('/api/logs/level',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag:tag,level:level})}).then(r=>{if(!r.ok)throw r;return r.json();}).then(js=>{loadLevels();if(js.clamped)console.warn('Livello richiesto clamped to',js.applied);return true;}).catch(e=>{console.error(e);return false;});}catch(e){console.error(e);return false;}}"
         "async function loadLevels(){"
@@ -352,7 +522,7 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "entry.innerHTML=`<span class='log-timestamp'>${log.timestamp}</span><span class='log-level'>[${log.level}]</span><span class='log-tag'>${log.tag}:</span><span class='log-message'>${log.message}</span>`;"
         "container.appendChild(entry);"
         "});"
-        "container.scrollTop=container.scrollHeight;"
+        "if(AUTO_SCROLL) container.scrollTop=container.scrollHeight;"
         "}catch(e){console.error(e);document.getElementById('logContainer').innerHTML='Errore caricamento log: '+e;}"
         "}"
         "// Client-side log filter + bulk-apply levels (supports wildcards * and ?)\n"
@@ -362,10 +532,11 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "  var applyBtn = document.getElementById('applyLevelsBtn');\n"
         "  if(applyBtn){ applyBtn.addEventListener('click', async function(){ var container = document.getElementById('levelsContainer'); if(!container) return; var selects = container.querySelectorAll('select[data-tag]'); applyBtn.disabled=true; applyBtn.innerText='Applicazione...'; for(const s of selects){ var tag = s.getAttribute('data-tag'); var lvl = parseInt(s.value); try{ await setLogLevel(tag,lvl); }catch(e){console.error(e);} } applyBtn.disabled=false; applyBtn.innerText='Applica livelli'; }); }\n"
         "  var fbtn = document.getElementById('applyLogFilterBtn'); var cbtn = document.getElementById('clearLogFilterBtn'); var finp = document.getElementById('logFilterInput');\n"
+        "  var as=document.getElementById('autoScrollToggle'); if(as){ as.checked=false; as.addEventListener('change', function(){ AUTO_SCROLL = !!as.checked; }); }\n"
         "  if(fbtn && finp){ fbtn.addEventListener('click', function(){ var v=(finp.value||'').trim(); LOG_FILTER_RE = v ? wildcardToRegExp(v) : null; loadLogs(); }); }\n"
         "  if(cbtn && finp){ cbtn.addEventListener('click', function(){ finp.value=''; LOG_FILTER_RE = null; loadLogs(); }); }\n"
         "});\n"
-        "(function(){ const _orig = loadLogs; loadLogs = async function(){ try{ const r = await fetch('/api/logs'); if(!r.ok) throw new Error('Logs Error'); const logs = await r.json(); const container = document.getElementById('logContainer'); if(!container) return; const filtered = LOG_FILTER_RE ? logs.filter(l => LOG_FILTER_RE.test(l.message) || LOG_FILTER_RE.test(l.tag) || LOG_FILTER_RE.test(l.level)) : logs; if(filtered.length===0){ container.innerHTML = LOG_FILTER_RE ? 'Nessun log ricevuto che soddisfi il filtro.' : 'Nessun log ricevuto ancora.'; return; } container.innerHTML = ''; filtered.forEach(log=>{ const entry=document.createElement('div'); entry.className='log-entry log-'+log.level.toLowerCase(); entry.innerHTML = `<span class=\'log-timestamp\'>${log.timestamp}</span><span class=\'log-level\'>[${log.level}]</span><span class=\'log-tag\'>${log.tag}:</span><span class=\'log-message\'>${log.message}</span>`; container.appendChild(entry); }); container.scrollTop = container.scrollHeight; }catch(e){ console.error(e); document.getElementById('logContainer').innerHTML = 'Errore caricamento log: '+e; } }; })();\n"
+        "(function(){ const _orig = loadLogs; loadLogs = async function(){ try{ const r = await fetch('/api/logs'); if(!r.ok) throw new Error('Logs Error'); const logs = await r.json(); const container = document.getElementById('logContainer'); if(!container) return; const filtered = LOG_FILTER_RE ? logs.filter(l => LOG_FILTER_RE.test(l.message) || LOG_FILTER_RE.test(l.tag) || LOG_FILTER_RE.test(l.level)) : logs; if(filtered.length===0){ container.innerHTML = LOG_FILTER_RE ? 'Nessun log ricevuto che soddisfi il filtro.' : 'Nessun log ricevuto ancora.'; return; } container.innerHTML = ''; filtered.forEach(log=>{ const entry=document.createElement('div'); entry.className='log-entry log-'+log.level.toLowerCase(); entry.innerHTML = `<span class=\'log-timestamp\'>${log.timestamp}</span><span class=\'log-level\'>[${log.level}]</span><span class=\'log-tag\'>${log.tag}:</span><span class=\'log-message\'>${log.message}</span>`; container.appendChild(entry); }); if(AUTO_SCROLL) container.scrollTop = container.scrollHeight; }catch(e){ console.error(e); document.getElementById('logContainer').innerHTML = 'Errore caricamento log: '+e; } }; })();\n"
         "window.addEventListener('load',()=>{loadLevels(); loadLogs();});\n"
         "setInterval(()=>{loadLogs(); loadLevels();},5000);"
         "</script></body></html>";

@@ -4,12 +4,20 @@
 
 set -euo pipefail
 
-for f in app_version.h main/app_version.h; do
-    if [ ! -f "$f" ]; then
-        echo "❌ Errore: file '$f' non trovato."
-        exit 1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+updated=0
+for f in "$REPO_ROOT/main/app_version.h" "$REPO_ROOT/app_version.h"; do
+    if [ -f "$f" ]; then
+        sed -i 's/^#define COMPILE_APP .*/#define COMPILE_APP 0/' "$f"
+        updated=1
     fi
-    sed -i 's/^#define COMPILE_APP .*/#define COMPILE_APP 0/' "$f"
 done
+
+if [ "$updated" -eq 0 ]; then
+    echo "❌ Errore: nessun file app_version.h trovato in '$REPO_ROOT'."
+    exit 1
+fi
 
 echo "✅ Modalità FACTORY impostata (COMPILE_APP=0)."

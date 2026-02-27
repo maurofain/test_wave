@@ -344,3 +344,168 @@ Please enable CONFIG_ESP_SYSTEM_USE_FRAME_POINTER option to have a full backtrac
 4. RS485 (tx)
 5. MDB (tx)
 6. Scanner
+
+----------------------------------------------
+
+
+i/mauro/code/Progetti/0.Clienti/MicroHard/test_wave/.venv/bin/activate
+--- esp-idf-monitor 1.9.0 on /dev/ttyACM0 115200
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x1 (POWERON),boot:0x30f (SPI_FAST_FLASH_BOOT)
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x10b4
+load:0x4ff29ed0,len:0xb5c
+load:0x4ff2cbd0,len:0x32b8
+entry 0x4ff29ed0
+I (1079) esp_core_dump_flash: Init core dump to flash
+I (1079) esp_core_dump_flash: Found partition 'coredump' @ e50000 188416 bytes
+I (1094) esp_core_dump_flash: Core dump data checksum is correct
+I (1094) esp_core_dump_flash: Found core dump 13988 bytes in flash @ 0xe50000
+I (1096) INIT: Valore GPIO3: 1
+I (1126) INIT: [M] Sezioni DNA mock attive: LED_STRIP RS232 RS485 PWM GPIO MDB
+W (1136) INIT: Avviso lettura NVS: ESP_ERR_INVALID_ARG (verranno usate le defaults)
+W (1136) INIT: [M] boot_guard: reset_reason=1 force_crash=0 consecutive_reboots=0 limit=3
+I (1216) INIT: [M] SPIFFS montato: totale=1438481, usato=147588
+I (1216) INIT: [M] === Elenco file SPIFFS ===
+I (1226) INIT: [M]   [1] i18n_en.json (60915 bytes)
+I (1226) INIT: [M]   [2] tasks.csv (1608 bytes)
+I (1226) INIT: [M]   [3] i18n_it.json (65434 bytes)
+I (1236) INIT: [M]   [4] logo.jpg (12183 bytes)
+I (1236) INIT: [M]   [5] tasks.json (1757 bytes)
+I (1246) INIT: [M]   [6] .gitkeep (77 bytes)
+I (1246) INIT: [M]   [7] activity.json (170 bytes)
+I (1246) INIT: [M]   [8] .comments/image01.jpg.xml (152 bytes)
+I (1256) INIT: [M]   [9] programs.json (1068 bytes)
+I (1296) INIT: [M] === Totale file: 9 ===
+I (1346) INIT: [M] tasks.json presente: 1757 byte
+I (1346) INIT: [M] Partizione in esecuzione: ota_1 (tipo 0, sottotipo 17)
+I (1346) INIT: [M] Partizione boot      : ota_1 (tipo 0, sottotipo 17)
+I (1356) INIT: [M] BSP I2C attivo: inizializzo EEPROM 24LC16 su i2c_master
+I (2056) INIT: [M] remote_logging early init attivo (log pre-rete catturati)
+W (2056) INIT: [M] [C] preboot crash send saltato: server non configurato
+I (2056) INIT: Heap before display init:
+I (2066) INIT:   INTERNAL free: 294843
+I (2066) INIT:   DMA free: 255295
+I (2066) INIT:   PSRAM free: 33242016
+I (2076) INIT:   SPIRAM caps alloc free (8bit): 33242016
+E (3506) lcd_panel.io.i2c: panel_io_i2c_rx_buffer(145): i2c transaction failed
+E (3506) GT911: touch_gt911_read_cfg(410): GT911 read error!
+E (3506) GT911: esp_lcd_touch_new_i2c_gt911(161): GT911 init failed
+E (3516) GT911: Error (0x103)! Touch controller GT911 initialization failed!
+ESP_ERROR_CHECK failed: esp_err_t 0x103 (ESP_ERR_INVALID_STATE) at 0x400378e2
+file: "./components/waveshare__esp32_p4_nano/esp32_p4_nano.c" line 777
+func: bsp_display_indev_init
+expression: bsp_touch_new(((void *)0), &tp)
+
+abort() was called at PC 0x4ff141a7 on core 0
+Backtrace: 0x4ff141fe:0x4ff2ed20 0x4ff141ae:0x4ff2ed20 0x4ff1e38c:0x4ff2ed30 0x4ff141a8:0x4ff2eda0 0x400378e4:0x4ff2edb0 0x4003792c:0x4ff2ede0 0x40014a80:0x4ff2edf0 0x400160ec:0x4ff2ee40 0x40013c2c:0x4ff2ee60 0x40108e20:0x4ff2ee80 0x4ff15624:0x4ff2eea0
+--- 0x40014a80: io_mux_enable_lp_io_clock at /home/mauro/esp/v5.5.2/esp-idf/components/esp_hw_support/port/esp32p4/io_mux.c:69
+--- 0x400160ec: i2c_common_deinit_pins at /home/mauro/esp/v5.5.2/esp-idf/components/esp_driver_i2c/i2c_common.c:462
+--- 0x40013c2c: spi_flash_hal_init at /home/mauro/esp/v5.5.2/esp-idf/components/hal/spi_flash_hal.c:118
+Unsupported DWARF opcode 0: 0x00000007
+
+
+
+
+ELF file SHA256: b81c04875
+--- Warning: Checksum mismatch between flashed and built applications. Checksum of built application is 88357c1fa76465f0373a0e589c7d6b49848732493ca29c9a023ca489e09d909c
+
+I (3610) esp_core_dump_flash: Save core dump to flash...
+I (3616) esp_core_dump_common: Backing up stack @ 0x4ff2ebd0 and use core dump stack @ 0x4ff261a0
+I (3625) esp_core_dump_flash: Erase flash 16384 bytes @ 0xe50000
+I (3787) esp_core_dump_flash: Write end offset 0x36c4, check sum length 4
+I (3787) esp_core_dump_common: Core dump used 980 bytes on stack. 904 bytes left free.
+I (3790) esp_core_dump_common: Restoring stack @ 0x4ff2ebd0
+I (3795) esp_core_dump_flash: Core dump has been saved to flash.
+Rebooting...
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0xc (SW_CPU_RESET),boot:0x30f (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff0da2c
+--- 0x4ff0da2c: spi_flash_hal_common_command at /home/mauro/esp/v5.5.2/esp-idf/components/hal/spi_flash_hal_common.inc:188
+Core1 Saved PC:0x4ff0db74
+--- 0x4ff0db74: spimem_flash_ll_get_buffer_data at /home/mauro/esp/v5.5.2/esp-idf/components/hal/esp32p4/include/hal/spimem_flash_ll.h:357
+--- (inlined by) spi_flash_hal_common_command at /home/mauro/esp/v5.5.2/esp-idf/components/hal/spi_flash_hal_common.inc:212
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x10b4
+load:0x4ff29ed0,len:0xb5c
+load:0x4ff2cbd0,len:0x32b8
+entry 0x4ff29ed0
+I (1021) esp_core_dump_flash: Init core dump to flash
+I (1021) esp_core_dump_flash: Found partition 'coredump' @ e50000 188416 bytes
+I (1036) esp_core_dump_flash: Core dump data checksum is correct
+I (1036) esp_core_dump_flash: Found core dump 14020 bytes in flash @ 0xe50000
+I (1038) INIT: Valore GPIO3: 1
+I (1068) INIT: [M] Sezioni DNA mock attive: LED_STRIP RS232 RS485 PWM GPIO MDB
+W (1078) INIT: Avviso lettura NVS: ESP_ERR_INVALID_ARG (verranno usate le defaults)
+W (1088) INIT: [M] boot_guard: reset_reason=4 force_crash=0 consecutive_reboots=1 limit=3
+W (1088) INIT: [M] [C] crash pending registrato: reason=4
+I (1168) INIT: [M] SPIFFS montato: totale=1438481, usato=147588
+I (1168) INIT: [M] === Elenco file SPIFFS ===
+I (1168) INIT: [M]   [1] i18n_en.json (60915 bytes)
+I (1178) INIT: [M]   [2] tasks.csv (1608 bytes)
+I (1178) INIT: [M]   [3] i18n_it.json (65434 bytes)
+I (1188) INIT: [M]   [4] logo.jpg (12183 bytes)
+I (1188) INIT: [M]   [5] tasks.json (1757 bytes)
+I (1188) INIT: [M]   [6] .gitkeep (77 bytes)
+I (1188) INIT: [M]   [7] activity.json (170 bytes)
+I (1198) INIT: [M]   [8] .comments/image01.jpg.xml (152 bytes)
+I (1208) INIT: [M]   [9] programs.json (1068 bytes)
+I (1248) INIT: [M] === Totale file: 9 ===
+I (1298) INIT: [M] tasks.json presente: 1757 byte
+I (1298) INIT: [M] Partizione in esecuzione: ota_1 (tipo 0, sottotipo 17)
+I (1298) INIT: [M] Partizione boot      : ota_1 (tipo 0, sottotipo 17)
+I (1298) INIT: [M] BSP I2C attivo: inizializzo EEPROM 24LC16 su i2c_master
+I (2008) INIT: [M] remote_logging early init attivo (log pre-rete catturati)
+W (2008) INIT: [M] [C] preboot crash send saltato: server non configurato
+I (2008) INIT: Heap before display init:
+I (2008) INIT:   INTERNAL free: 294843
+I (2018) INIT:   DMA free: 255295
+I (2018) INIT:   PSRAM free: 33242016
+I (2018) INIT:   SPIRAM caps alloc free (8bit): 33242016
+E (3448) lcd_panel.io.i2c: panel_io_i2c_rx_buffer(145): i2c transaction failed
+E (3458) GT911: touch_gt911_read_cfg(410): GT911 read error!
+E (3458) GT911: esp_lcd_touch_new_i2c_gt911(161): GT911 init failed
+E (3458) GT911: Error (0x103)! Touch controller GT911 initialization failed!
+ESP_ERROR_CHECK failed: esp_err_t 0x103 (ESP_ERR_INVALID_STATE) at 0x400378e2
+file: "./components/waveshare__esp32_p4_nano/esp32_p4_nano.c" line 777
+func: bsp_display_indev_init
+expression: bsp_touch_new(((void *)0), &tp)
+
+abort() was called at PC 0x4ff141a7 on core 0
+Backtrace: 0x4ff141fe:0x4ff2ed20 0x4ff141ae:0x4ff2ed20 0x4ff1e38c:0x4ff2ed30 0x4ff141a8:0x4ff2eda0 0x400378e4:0x4ff2edb0 0x4003792c:0x4ff2ede0 0x40014a80:0x4ff2edf0 0x400160ec:0x4ff2ee40 0x40013c2c:0x4ff2ee60 0x40108e20:0x4ff2ee80 0x4ff15624:0x4ff2eea0
+--- 0x40014a80: io_mux_enable_lp_io_clock at /home/mauro/esp/v5.5.2/esp-idf/components/esp_hw_support/port/esp32p4/io_mux.c:69
+--- 0x400160ec: i2c_common_deinit_pins at /home/mauro/esp/v5.5.2/esp-idf/components/esp_driver_i2c/i2c_common.c:462
+--- 0x40013c2c: spi_flash_hal_init at /home/mauro/esp/v5.5.2/esp-idf/components/hal/spi_flash_hal.c:118
+Unsupported DWARF opcode 0: 0x00000007
+
+
+
+
+ELF file SHA256: b81c04875
+--- Warning: Checksum mismatch between flashed and built applications. Checksum of built application is 88357c1fa76465f0373a0e589c7d6b49848732493ca29c9a023ca489e09d909c
+
+I (3556) esp_core_dump_flash: Save core dump to flash...
+I (3561) esp_core_dump_common: Backing up stack @ 0x4ff2ebd0 and use core dump stack @ 0x4ff261a0
+I (3570) esp_core_dump_flash: Erase flash 16384 bytes @ 0xe50000
+I (3731) esp_core_dump_flash: Write end offset 0x36c4, check sum length 4
+I (3732) esp_core_dump_common: Core dump used 980 bytes on stack. 904 bytes left free.
+I (3734) esp_core_dump_common: Restoring stack @ 0x4ff2ebd0
+I (3739) esp_core_dump_flash: Core dump has been saved to flash.
+Rebooting...
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0xc (SW_CPU_RESET),boot:0x30f (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff0da2c
+--- 0x4ff0da2c: spi_flash_hal_common_command at /home/mauro/esp/v5.5.2/esp-idf/components/hal/spi_flash_hal_common.inc:188
+Core1 Saved PC:0x4ff0db74
+--- 0x4ff0db74: spimem_flash_ll_get_buffer_data at /home/mauro/esp/v5.5.2/esp-idf/components/hal/esp32p4/include/hal/spimem_flash_ll.h:357
+--- (inlined by) spi_flash_hal_common_command at /home/mauro/esp/v5.5.2/esp-idf/components/hal/spi_flash_hal_common.inc:212
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x10b4
+load:0x4ff29ed0,len:0xb5c
+load:0x4ff2cbd0,len:0x32b8
+entry 0x4ff29ed0
+--- Error: device reports readiness to read but returned no data (device disconnected or multiple access on port?)

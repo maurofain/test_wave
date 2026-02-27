@@ -14,6 +14,15 @@
 
 #define TAG "WEB_UI_PAGES_RUNTIME"
 
+/**
+ * @brief Renderizza la home principale della Web UI.
+ *
+ * La pagina compone dinamicamente i collegamenti disponibili in base al profilo
+ * attivo (Factory/App), alle feature abilitate e alla partizione in esecuzione.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la pagina viene inviata correttamente.
+ */
 esp_err_t root_get_handler(httpd_req_t *req)
 {
     bool show_test = web_ui_feature_enabled(WEB_UI_FEATURE_HOME_TEST);
@@ -44,7 +53,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
         ".btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}";
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, home_title, extra_style, false);
+    send_head(req, home_title, extra_style, true);
 
     const char *test_link = show_test
         ? "<a href='/test' class='btn-link btn-test'><span class='icon'>🔧</span><span>Test Hardware</span></a>"
@@ -232,6 +241,15 @@ esp_err_t root_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Espone lo stato runtime dispositivo in formato JSON.
+ *
+ * Include partizioni OTA, IP di rete, stato Web UI, stato MDB, stato SD,
+ * telemetria ambiente e configurazione corrente serializzata.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la risposta JSON è inviata; ESP_FAIL su errore memoria.
+ */
 esp_err_t status_get_handler(httpd_req_t *req)
 {
     esp_netif_t *ap, *sta, *eth;
@@ -243,6 +261,14 @@ esp_err_t status_get_handler(httpd_req_t *req)
     const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *boot = esp_ota_get_boot_partition();
     const mdb_status_t *mdb = mdb_get_status();
+
+    bool sd_mounted = sd_card_is_mounted();
+    bool sd_present = sd_card_is_present();
+    uint64_t sd_total_kb = 0;
+    uint64_t sd_used_kb = 0;
+    if (sd_mounted) {
+        sd_total_kb = sd_card_get_total_size();
+    }
 
     char *config_json = device_config_to_json(device_config_get());
 
@@ -263,8 +289,8 @@ esp_err_t status_get_handler(httpd_req_t *req)
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,
              web_ui_is_running() ? "true" : "false",
              mdb->coin.is_online ? "true" : "false", mdb->coin.state, mdb->coin.credit_cents,
-             sd_card_is_mounted() ? "true" : "false", sd_card_is_present() ? "true" : "false",
-             sd_card_get_total_size(), sd_card_get_used_size(),
+             sd_mounted ? "true" : "false", sd_present ? "true" : "false",
+             (unsigned long long)sd_total_kb, (unsigned long long)sd_used_kb,
              sd_card_get_last_error(),
              tasks_get_temperature(), tasks_get_humidity(),
              config_json ? config_json : "{}");
@@ -277,6 +303,15 @@ esp_err_t status_get_handler(httpd_req_t *req)
     return ret;
 }
 
+/**
+ * @brief Renderizza la pagina statistiche con aggiornamento periodico lato client.
+ *
+ * La pagina legge `/status` via JavaScript e mostra rete, firmware, SD, driver,
+ * ambiente e stato MDB in sezioni dedicate.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la pagina viene inviata correttamente.
+ */
 esp_err_t stats_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /stats");
@@ -350,6 +385,15 @@ esp_err_t stats_page_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Renderizza la pagina editor dei task applicativi.
+ *
+ * L'interfaccia consente caricamento, modifica, salvataggio e applicazione della
+ * tabella task su `tasks.json` tramite endpoint `/api/tasks*`.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la pagina viene inviata correttamente.
+ */
 esp_err_t tasks_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /tasks");
@@ -430,6 +474,15 @@ esp_err_t tasks_page_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Renderizza la pagina di test delle chiamate HTTP services.
+ *
+ * La pagina include login, gestione token/JWT e pulsanti per invocare endpoint
+ * remoti/locali con tracciamento richiesta/risposta.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la pagina viene inviata correttamente.
+ */
 esp_err_t httpservices_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /httpservices");
@@ -561,6 +614,15 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Renderizza l'indice interattivo degli endpoint API disponibili.
+ *
+ * Espone una tabella con metodi/URI e azioni rapide (apertura o invocazione)
+ * per semplificare test manuali e diagnostica.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la pagina viene inviata correttamente.
+ */
 esp_err_t api_index_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /api (index)");

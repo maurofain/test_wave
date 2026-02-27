@@ -13,6 +13,15 @@
 #include <time.h>
 #include <ctype.h>
 
+/*
+ * @file web_ui_common.c
+ * @brief Funzioni condivise dal sottosistema Web UI (i18n, utility, OTA)
+ *
+ * Questo modulo contiene helper interni utilizzati da più file del
+ * componente web_ui. Molte di queste funzioni gestiscono la cache delle
+ * traduzioni, conversioni di indirizzi IP, e assistenza per l'OTA.
+ */
+
 static const char *HTML_STYLE_NAV = 
     "nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
     "nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}"
@@ -31,6 +40,16 @@ typedef struct {
 static i18n_cache_entry_t s_i18n_cache[I18N_CACHE_MAX_ENTRIES];
 static size_t s_i18n_cache_next_slot = 0;
 
+/**
+ * @brief Duplica una stringa C in memoria heap
+ *
+ * Restituisce una nuova stringa allocata che contiene la copia
+ * del contenuto di `src`. Se `src` è NULL o l'allocazione fallisce viene
+ * restituito NULL.
+ *
+ * @param src stringa da duplicare
+ * @return puntatore a stringa allocata (deallocare con free) o NULL
+ */
 static char *dup_cstr(const char *src)
 {
     if (!src) {
@@ -45,6 +64,16 @@ static char *dup_cstr(const char *src)
     return dst;
 }
 
+/**
+ * @brief Determina lo scope i18n per un particolare URI
+ *
+ * L'URI viene confrontato con alcuni prefissi noti ("/config", "/logs", "/test"
+ * ecc.) per stabilire quale gruppo di traduzioni utilizzare. Questo aiuta a
+ * generare il file javascript delle stringhe solo per la pagina richiesta.
+ *
+ * @param uri URI della richiesta HTTP
+ * @return nome dello scope i18n (es. "p_runtime", "p_logs")
+ */
 static const char *i18n_scope_for_uri(const char *uri)
 {
     if (!uri || uri[0] == '\0') {
@@ -70,6 +99,16 @@ static const char *i18n_scope_for_uri(const char *uri)
     return "p_runtime";
 }
 
+/**
+ * @brief Verifica se una chiave di traduzione appartiene allo scope corrente
+ *
+ * Alcune chiavi sono globali (nav, header, lvgl) e devono essere sempre
+ * incluse; altre vengono mostrate solo se coincidono con lo scope della pagina.
+ *
+ * @param scope chiave richiesta
+ * @param page_scope scope corrente della pagina
+ * @return true se la chiave deve essere inclusa
+ */
 static bool i18n_scope_allowed(const char *scope, const char *page_scope)
 {
     if (!scope || !page_scope) {
@@ -85,6 +124,16 @@ static bool i18n_scope_allowed(const char *scope, const char *page_scope)
     return strcmp(scope, page_scope) == 0;
 }
 
+/**
+ * @brief Recupera dalla cache l'oggetto JSON delle stringhe i18n
+ *
+ * Se la coppia <lingua, scope> è stata precedentemente memorizzata viene
+ * restituita una duplica della stringa json; altrimenti NULL.
+ *
+ * @param lang codice lingua ("en","it", ...)
+ * @param page_scope scope della pagina
+ * @return copia JSON oppure NULL se non presente
+ */
 static char *i18n_cache_get(const char *lang, const char *page_scope)
 {
     if (!lang || !page_scope) {
@@ -104,6 +153,16 @@ static char *i18n_cache_get(const char *lang, const char *page_scope)
     return NULL;
 }
 
+/**
+ * @brief Inserisce o aggiorna un elemento nella cache i18n
+ *
+ * La cache è circolare con dimensione fissa, sovrascrivendo le voci più
+ * vecchie quando necessario.
+ *
+ * @param lang codice lingua
+ * @param page_scope scope pagina
+ * @param table_json stringa JSON delle traduzioni
+ */
 static void i18n_cache_put(const char *lang, const char *page_scope, const char *table_json)
 {
     if (!lang || !page_scope || !table_json) {
@@ -134,6 +193,13 @@ static void i18n_cache_put(const char *lang, const char *page_scope, const char 
     s_i18n_cache_next_slot = (s_i18n_cache_next_slot + 1) % I18N_CACHE_MAX_ENTRIES;
 }
 
+/**
+ * @brief Svuota tutta la cache dei file di traduzione
+ *
+ * Deve essere chiamata quando le risorse i18n vengono aggiornate dall'esterno
+ * (es. cambio dei file su SPIFFS) in modo che le richieste successive
+ * rileggeranno i nuovi contenuti.
+ */
 void web_ui_i18n_cache_invalidate(void)
 {
     for (size_t i = 0; i < I18N_CACHE_MAX_ENTRIES; i++) {
@@ -145,6 +211,12 @@ void web_ui_i18n_cache_invalidate(void)
     s_i18n_cache_next_slot = 0;
 }
 
+/**
+ * @brief Aggiunge una coppia chiave/valore ad un oggetto cJSON se mancante
+ *
+ * Utility usata internamente durante la costruzione della tabella i18n per
+ * evitare duplicati.
+ */
 static void add_table_mapping(cJSON *table, const char *key, const char *value)
 {
     if (!table || !key || !value || key[0] == '\0') {
@@ -504,37 +576,45 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
 
     const bool show_tasks = web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TASKS);
     const bool show_test = web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TEST);
+    const bool show_programs = web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS);
     char txt_nav_home[24] = {0};
     char txt_nav_config[24] = {0};
-    char txt_nav_stats[24] = {0};
+    char txt_nav_files[24] = {0};
     char txt_nav_tasks[24] = {0};
     char txt_nav_logs[24] = {0};
     char txt_nav_test[24] = {0};
+    char txt_nav_programs[24] = {0};
     char txt_nav_ota[24] = {0};
     device_config_get_ui_text_scoped("nav", "home", "Home", txt_nav_home, sizeof(txt_nav_home));
     device_config_get_ui_text_scoped("nav", "config", "Config", txt_nav_config, sizeof(txt_nav_config));
-    device_config_get_ui_text_scoped("nav", "stats", "Statistiche", txt_nav_stats, sizeof(txt_nav_stats));
+    device_config_get_ui_text_scoped("nav", "files", "File", txt_nav_files, sizeof(txt_nav_files));
     device_config_get_ui_text_scoped("nav", "tasks", "Task", txt_nav_tasks, sizeof(txt_nav_tasks));
     device_config_get_ui_text_scoped("nav", "logs", "Log", txt_nav_logs, sizeof(txt_nav_logs));
     device_config_get_ui_text_scoped("nav", "test", "Test", txt_nav_test, sizeof(txt_nav_test));
+    device_config_get_ui_text_scoped("nav", "programs", "Programmi", txt_nav_programs, sizeof(txt_nav_programs));
     device_config_get_ui_text_scoped("nav", "ota", "OTA", txt_nav_ota, sizeof(txt_nav_ota));
 
     char nav_tasks[96] = {0};
     char nav_test[96] = {0};
+    char nav_programs[96] = {0};
     if (show_tasks) {
         snprintf(nav_tasks, sizeof(nav_tasks), "<a href='/tasks'>📋 %s</a>", txt_nav_tasks);
     }
     if (show_test) {
         snprintf(nav_test, sizeof(nav_test), "<a href='/test'>🔧 %s</a>", txt_nav_test);
     }
+    if (show_programs) {
+        snprintf(nav_programs, sizeof(nav_programs), "<a href='/config/programs'>📊 %s</a>", txt_nav_programs);
+    }
     int nav_needed = snprintf(NULL, 0,
-             "<nav><a href='/'>🏠 %s</a><a href='/config'>⚙️ %s</a><a href='/stats'>📈 %s</a>%s<a href='/logs'>📋 %s</a>%s<a href='/ota'>🔄 %s</a></nav>",
+             "<nav><a href='/'>🏠 %s</a><a href='/config'>⚙️ %s</a>%s<a href='/files'>📁 %s</a>%s<a href='/logs'>📋 %s</a>%s<a href='/ota'>🔄 %s</a></nav>",
              txt_nav_home,
              txt_nav_config,
-             txt_nav_stats,
+             nav_test,
+             txt_nav_files,
              nav_tasks,
              txt_nav_logs,
-             nav_test,
+             nav_programs,
              txt_nav_ota);
     if (nav_needed < 0) {
         free(emu_button);
@@ -546,13 +626,14 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         return ESP_ERR_NO_MEM;
     }
     snprintf(nav_html, (size_t)nav_needed + 1,
-             "<nav><a href='/'>🏠 %s</a><a href='/config'>⚙️ %s</a><a href='/stats'>📈 %s</a>%s<a href='/logs'>📋 %s</a>%s<a href='/ota'>🔄 %s</a></nav>",
+             "<nav><a href='/'>🏠 %s</a><a href='/config'>⚙️ %s</a>%s<a href='/files'>📁 %s</a>%s<a href='/logs'>📋 %s</a>%s<a href='/ota'>🔄 %s</a></nav>",
              txt_nav_home,
              txt_nav_config,
-             txt_nav_stats,
+             nav_test,
+             txt_nav_files,
              nav_tasks,
              txt_nav_logs,
-             nav_test,
+             nav_programs,
              txt_nav_ota);
 
     int needed = snprintf(

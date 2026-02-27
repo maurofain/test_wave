@@ -8,6 +8,12 @@
 
 #define TAG "WEB_UI_PROGRAMS_PAGE"
 
+/**
+ * @brief Genera la pagina HTML di editing della tabella programmi
+ *
+ * Viene servita solo se l'opzione WEB_UI_FEATURE_ENDPOINT_PROGRAMS è
+ * abilitata. L'HTML contiene la logica JS per caricare/salvare via API.
+ */
 esp_err_t programs_page_handler(httpd_req_t *req)
 {
     if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
@@ -76,6 +82,11 @@ esp_err_t programs_page_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief API GET /api/programs
+ *
+ * Restituisce lo stato corrente della tabella programmi come JSON.
+ */
 esp_err_t api_programs_get(httpd_req_t *req)
 {
     char *json = web_ui_program_table_to_json();
@@ -90,6 +101,12 @@ esp_err_t api_programs_get(httpd_req_t *req)
     return ret;
 }
 
+/**
+ * @brief API POST /api/programs/save
+ *
+ * Riceve un payload JSON contenente l'elenco dei programmi, lo valida usando
+ * web_ui_program_table_update_from_json e risponde con status ok o errore.
+ */
 esp_err_t api_programs_save(httpd_req_t *req)
 {
     if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
@@ -132,6 +149,12 @@ esp_err_t api_programs_save(httpd_req_t *req)
     return httpd_resp_send(req, "{\"status\":\"ok\"}", -1);
 }
 
+/**
+ * @brief API usata dall'emulatore per comandare relè virtuali
+ *
+ * Accetta JSON con relay_number, status e duration. Ritorna lo stato
+ * aggiornato dei relè.
+ */
 esp_err_t api_emulator_relay_control(httpd_req_t *req)
 {
     if (req->content_len <= 0 || req->content_len > 1024) {
@@ -192,6 +215,11 @@ esp_err_t api_emulator_relay_control(httpd_req_t *req)
     return ret;
 }
 
+/**
+ * @brief API per cambiare la password protetta del boot
+ *
+ * Questa chiamata è protetta da feature e verifica payload minimo.
+ */
 esp_err_t api_security_password(httpd_req_t *req)
 {
     if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {

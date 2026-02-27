@@ -5,6 +5,8 @@
 #include "cJSON.h"
 #include <string.h>
 
+#define EEPROM_TOTAL_SIZE 2048
+
 static const char *TAG = "EEPROM_TEST";
 
 esp_err_t eeprom_test_handler(httpd_req_t *req) {
@@ -34,10 +36,36 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
         cJSON *len_obj = cJSON_GetObjectItem(root, "len");
         int addr = addr_obj ? addr_obj->valueint : 0;
         int len = len_obj ? len_obj->valueint : 16;
+        esp_err_t read_ret = ESP_OK;
+
+        if (addr < 0) addr = 0;
+        if (len <= 0) len = 1;
         if (len > 256) len = 256;
 
+        if ((addr + len) > EEPROM_TOTAL_SIZE) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "range_out_of_bounds");
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
+            cJSON_AddNumberToObject(resp, "max_size", EEPROM_TOTAL_SIZE);
+            goto send_response;
+        }
+
+        if (!eeprom_24lc16_is_available()) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "eeprom_not_available");
+            goto send_response;
+        }
+
         uint8_t *data = malloc(len);
-        if (eeprom_24lc16_read(addr, data, len) == ESP_OK) {
+        if (!data) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "no_memory");
+            goto send_response;
+        }
+
+        read_ret = eeprom_24lc16_read(addr, data, len);
+        if (read_ret == ESP_OK) {
             cJSON *arr = cJSON_CreateArray();
             for (int i = 0; i < len; i++) {
                 cJSON_AddItemToArray(arr, cJSON_CreateNumber(data[i]));
@@ -46,17 +74,22 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
             cJSON_AddStringToObject(resp, "status", "ok");
         } else {
             cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", esp_err_to_name(read_ret));
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
         }
         free(data);
     } 
     else if (strcmp(op->valuestring, "read_json") == 0) {
-        char *json = device_config_to_json(device_config_get());
+        char *json = device_config_read_json_from_eeprom();
         if (json) {
             cJSON_AddStringToObject(resp, "json", json);
+            cJSON_AddStringToObject(resp, "source", "eeprom");
             cJSON_AddStringToObject(resp, "status", "ok");
             free(json);
         } else {
             cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "eeprom_not_valid_or_unavailable");
         }
     }
     else if (strcmp(op->valuestring, "status") == 0) {
@@ -65,22 +98,60 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
         cJSON_AddStringToObject(resp, "status", "ok");
     }
     else if (strcmp(op->valuestring, "write") == 0) {
-        int addr = cJSON_GetObjectItem(root, "addr")->valueint;
+        cJSON *addr_item = cJSON_GetObjectItem(root, "addr");
         cJSON *data_arr = cJSON_GetObjectItem(root, "data");
+        if (!addr_item || !cJSON_IsNumber(addr_item) || !data_arr || !cJSON_IsArray(data_arr)) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "invalid_payload");
+            goto send_response;
+        }
+
+        int addr = addr_item->valueint;
+        if (addr < 0) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "invalid_addr");
+            goto send_response;
+        }
+
         int len = cJSON_GetArraySize(data_arr);
-        
+        if (len <= 0 || (addr + len) > EEPROM_TOTAL_SIZE) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "range_out_of_bounds");
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
+            cJSON_AddNumberToObject(resp, "max_size", EEPROM_TOTAL_SIZE);
+            goto send_response;
+        }
+
+        if (!eeprom_24lc16_is_available()) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "eeprom_not_available");
+            goto send_response;
+        }
+
         uint8_t *data = malloc(len);
+        if (!data) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "no_memory");
+            goto send_response;
+        }
         for (int i = 0; i < len; i++) {
             data[i] = (uint8_t)cJSON_GetArrayItem(data_arr, i)->valueint;
         }
 
-        if (eeprom_24lc16_write(addr, data, len) == ESP_OK) {
+        esp_err_t write_ret = eeprom_24lc16_write(addr, data, len);
+        if (write_ret == ESP_OK) {
             cJSON_AddStringToObject(resp, "status", "ok");
         } else {
             cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", esp_err_to_name(write_ret));
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
         }
         free(data);
     }
+
+send_response:
 
     char *json_resp = cJSON_PrintUnformatted(resp);
     httpd_resp_set_type(req, "application/json");

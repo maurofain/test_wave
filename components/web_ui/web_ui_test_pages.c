@@ -3,6 +3,15 @@
 
 #define TAG "WEB_UI_TEST_PAGE"
 
+/**
+ * @brief Renderizza la pagina `/test` per diagnostica e comandi hardware.
+ *
+ * La pagina include sezioni collassabili per periferiche e comandi manuali,
+ * con JavaScript per invocare gli endpoint sotto il prefisso `/api/test/` e mostrare i risultati.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la pagina viene inviata correttamente.
+ */
 esp_err_t test_page_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /test");
@@ -276,6 +285,8 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "  } finally { btn.disabled = false; if(orig) btn.innerHTML = orig; }"
         "}"
 
+        "async function fetchJsonWithTimeout(url,opts,timeoutMs){const ctrl=new AbortController();const t=setTimeout(function(){ctrl.abort();},timeoutMs||8000);try{const r=await fetch(url,Object.assign({},opts||{},{signal:ctrl.signal}));const json=await r.json().catch(function(){return {error:'Risposta JSON non valida'};});return {ok:r.ok,status:r.status,json:json};}catch(e){if(e&&e.name==='AbortError'){return {ok:false,status:0,json:{error:'Timeout richiesta'}};}throw e;}finally{clearTimeout(t);}}"
+
         "async function runTest(test,params={}){"
         "try{"
         "const isSd = test.startsWith('sd_');"
@@ -295,8 +306,9 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "  statusBox.scrollTop=statusBox.scrollHeight;"
         "}"
 
-        "const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)});"
-        "const result=await r.json().catch(()=>({error:'Risposta JSON non valida'}));"
+        "const fr=await fetchJsonWithTimeout(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)},12000);"
+        "const r={ok:fr.ok,status:fr.status};"
+        "const result=fr.json||{error:'Risposta JSON non valida'};"
         "const time = new Date().toLocaleTimeString();"
 
         "if(r.ok){"
@@ -348,8 +360,9 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "  }, 5000);"
         "};"
         "try{"
-        "const r=await fetch('/api/test/serial_monitor',{method:'POST'});"
-        "const res=await r.json();"
+        "const mon=await fetchJsonWithTimeout('/api/test/serial_monitor',{method:'POST'},6000);"
+        "if(!mon.ok)return;"
+        "const res=mon.json||{};"
         "const processLog = (log, modeId) => {"
         "  if(!log || !document.getElementById(modeId)) return '';"
         "  const mode = document.getElementById(modeId).value;"
@@ -368,8 +381,8 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "if(res.rs485) { const el=document.getElementById('rs485_status'); el.innerHTML=processLog(res.rs485, 'rs485_mode'); el.scrollTop=el.scrollHeight; }"
         "if(res.mdb) { const el=document.getElementById('mdb_status'); el.innerHTML=processLog(res.mdb, 'mdb_mode'); el.scrollTop=el.scrollHeight; }"
         "if(res.cctalk) { const el=document.getElementById('cctalk_status'); if(el) { el.innerHTML = processLog(res.cctalk, 'cctalk_mode'); el.scrollTop = el.scrollHeight; } }"
-        "const rio=await fetch('/api/test/io_get',{method:'POST'});"
-        "const io=await rio.json();"
+        "const rio=await fetchJsonWithTimeout('/api/test/io_get',{method:'POST'},6000);"
+        "const io=rio.json||{};"
         "if(io){"
         "  const out_grid = document.getElementById('outputs_grid');"
         "  const in_grid = document.getElementById('inputs_grid');"
@@ -490,6 +503,7 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "    if(!c.sensors.rs232_enabled){ const s=document.getElementById('section_rs232'); if(s) s.style.display='none'; }"
         "    if(!c.sensors.rs485_enabled){ const s=document.getElementById('section_rs485'); if(s) s.style.display='none'; }"
         "    if(!c.sensors.mdb_enabled){ const s=document.getElementById('section_mdb'); if(s) s.style.display='none'; }"
+        "    if(typeof c.sensors.eeprom_enabled !== 'undefined' && !c.sensors.eeprom_enabled){ const s=document.getElementById('section_eeprom'); if(s) s.style.display='none'; }"
         "    if(!c.sensors.sd_card_enabled){ const s=document.getElementById('section_sd'); if(s) s.style.display='none'; }"
         "  }"
         "  /* scanner */ if(c.scanner){ if(!c.scanner.enabled){ const s=document.getElementById('section_scanner'); if(s) s.style.display='none'; }}"
@@ -499,8 +513,9 @@ esp_err_t test_page_handler(httpd_req_t *req)
 
         "async function refreshSDStatus(){"
         "try{"
-        "  const r=await fetch('/status');"
-        "  const res=await r.json();"
+        "  const sr=await fetchJsonWithTimeout('/status',{},6000);"
+        "  if(!sr.ok||!sr.json||!sr.json.sd){return;}"
+        "  const res=sr.json;"
         "  const el=document.getElementById('sd_mounted_status');"
         "  if(el) {"
         "    if(res.sd.mounted) el.innerText = '✅ MONTATA';"
@@ -526,10 +541,12 @@ esp_err_t test_page_handler(httpd_req_t *req)
 
         "async function updateGPIOs(){"
         "try{"
-        "  const r=await fetch('/status');"
-        "  const s=await r.json();"
-        "  const res=await fetch('/api/test/gpio_get',{method:'POST'});"
-        "  const gpios=await res.json();"
+        "  const sr=await fetchJsonWithTimeout('/status',{},6000);"
+        "  if(!sr.ok||!sr.json){return;}"
+        "  const s=sr.json;"
+        "  const gr=await fetchJsonWithTimeout('/api/test/gpio_get',{method:'POST'},6000);"
+        "  if(!gr.ok||!gr.json){return;}"
+        "  const gpios=gr.json;"
         "  let h='';"
         "  [33].forEach(pin=>{"
         "    const cfg = gpios[pin];"
