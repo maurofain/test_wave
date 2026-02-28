@@ -257,11 +257,15 @@ static esp_err_t usb_cdc_scanner_send_framed_command(const char *payload)
 
 static void usb_cdc_scanner_open_task(void *arg)
 {
+    /* Attendi che l'USB host completi l'enumerazione dei dispositivi già collegati */
+    vTaskDelay(pdMS_TO_TICKS(3000));
+
     // Read runtime configuration (NVS/device_config)
     device_config_t *d_cfg = device_config_get();
     uint16_t vid = (uint16_t)(CONFIG_USB_CDC_SCANNER_VID ? CONFIG_USB_CDC_SCANNER_VID : SCANNER_DEFAULT_VID);
     uint16_t pid = (uint16_t)(CONFIG_USB_CDC_SCANNER_PID ? CONFIG_USB_CDC_SCANNER_PID : SCANNER_DEFAULT_PID);
-    uint16_t dual_pid = (uint16_t)CONFIG_USB_CDC_SCANNER_DUAL_PID;
+    /* dual_pid not used: scanner ha un solo PID */
+    uint16_t dual_pid = 0; // (uint16_t)CONFIG_USB_CDC_SCANNER_DUAL_PID;
     bool runtime_enabled = true;
     if (d_cfg) {
         /* If NVS contains zero/invalid values, fall back to our SCANNER_DEFAULT_* constants */
@@ -301,10 +305,13 @@ static void usb_cdc_scanner_open_task(void *arg)
         cdc_acm_dev_hdl_t cdc_dev = NULL;
         ESP_LOGI(TAG, "Trying to open CDC device %04X:%04X", vid, pid);
         esp_err_t err = cdc_acm_host_open(vid, pid, 0, &dev_config, &cdc_dev);
+        /* dual PID logic removed – scanner usa un solo PID */
+        /*
         if (err != ESP_OK && dual_pid != 0 && dual_pid != pid) {
             ESP_LOGI(TAG, "Try dual PID %04X:%04X", vid, dual_pid);
             err = cdc_acm_host_open(vid, dual_pid, 0, &dev_config, &cdc_dev);
         }
+        */
         if (err == ESP_OK) {
             ESP_LOGI(TAG, "CDC device opened");
             s_cdc_dev = cdc_dev;
@@ -342,11 +349,42 @@ static void usb_cdc_scanner_open_task(void *arg)
                         if (usb_host_get_device_descriptor(dev_hdl, &device_desc) == ESP_OK && device_desc) {
                             uint16_t enum_vid = device_desc->idVendor;
                             uint16_t enum_pid = device_desc->idProduct;
+                            uint8_t dev_class = device_desc->bDeviceClass;
                             ESP_LOGI(TAG, "Enumerated device %d VID:%04X PID:%04X class:%02X",
-                                     addr_list[i], enum_vid, enum_pid, device_desc->bDeviceClass);
+                                     addr_list[i], enum_vid, enum_pid, dev_class);
 
-                            if (!is_same_vid_pid(enum_vid, enum_pid, vid, pid) &&
-                                !is_same_vid_pid(enum_vid, enum_pid, vid, dual_pid)) {
+                            /* Decide whether to attempt a CDC-ACM open.
+                             * - If the device class is CDC (0x02) or zero, try.
+                             * - If the device class is something else, inspect interfaces for CDC class.
+                             */
+                            bool has_cdc_iface = false;
+                            if (dev_class != SCANNER_DEFAULT_CLASS && dev_class != 0) {
+                                const usb_config_desc_t *cfg_desc = NULL;
+                                if (usb_host_get_active_config_descriptor(dev_hdl, &cfg_desc) == ESP_OK && cfg_desc) {
+                                    const uint8_t *p = (const uint8_t *)cfg_desc + cfg_desc->bLength;
+                                    int len = cfg_desc->wTotalLength - cfg_desc->bLength;
+                                    while (len >= 2) {
+                                        uint8_t desc_len = p[0];
+                                        uint8_t desc_type = p[1];
+                                        if (desc_len == 0) break;
+                                        if (desc_type == 0x04 && desc_len >= 9) { /* interface descriptor */
+                                            uint8_t iface_class = p[5];
+                                            if (iface_class == SCANNER_DEFAULT_CLASS) {
+                                                has_cdc_iface = true;
+                                                break;
+                                            }
+                                        }
+                                        p += desc_len;
+                                        len -= desc_len;
+                                    }
+                                }
+                            }
+
+                            if (!has_cdc_iface && dev_class != SCANNER_DEFAULT_CLASS && dev_class != 0) {
+                                ESP_LOGI(TAG, "Skipping device %04X:%04X with class %02X (no CDC interface)",
+                                         enum_vid, enum_pid, dev_class);
+                            } else if (!is_same_vid_pid(enum_vid, enum_pid, vid, pid) &&
+                                       !is_same_vid_pid(enum_vid, enum_pid, vid, dual_pid)) {
                                 ESP_LOGI(TAG, "Trying fallback open on enumerated device %04X:%04X", enum_vid, enum_pid);
                                 err = cdc_acm_host_open(enum_vid, enum_pid, 0, &dev_config, &cdc_dev);
                                 if (err == ESP_OK) {
@@ -385,10 +423,10 @@ static void usb_cdc_scanner_open_task(void *arg)
                 }
                 cdc_dev = NULL;
             } else {
-                ESP_LOGI(TAG, "Retrying in 120s");
+                ESP_LOGI(TAG, "Retrying in 5s");
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(120000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
