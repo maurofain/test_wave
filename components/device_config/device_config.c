@@ -1,4 +1,11 @@
 #include "device_config.h"
+#include <stdint.h>
+
+/* Minimal forward declaration to avoid including web_ui_internal.h here.
+ * The real implementation lives in web_ui_common.c; we only call the
+ * concat helper which returns a heap-allocated string or NULL.
+ */
+char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id);
 #include "esp_log.h"
 #include "esp_check.h"
 #include "nvs_flash.h"
@@ -11,6 +18,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 
 static const char *TAG = "DEVICE_CFG";
@@ -48,6 +56,70 @@ static const char *_effective_lang(const char *language);
 
 static cJSON *s_i18n_lookup_cache = NULL;
 static char s_i18n_lookup_lang[8] = {0};
+
+/* Optional map cache (loaded from /spiffs/i18n_<lang>.map.json) */
+static cJSON *s_i18n_map_cache = NULL;
+static char s_i18n_map_lang[8] = {0};
+
+static void _i18n_map_cache_clear(void)
+{
+    if (s_i18n_map_cache) {
+        cJSON_Delete(s_i18n_map_cache);
+        s_i18n_map_cache = NULL;
+    }
+    s_i18n_map_lang[0] = '\0';
+}
+
+static void _build_i18n_map_path(const char *language, char *out, size_t out_len)
+{
+    snprintf(out, out_len, "/spiffs/i18n_%s.map.json", _effective_lang(language));
+}
+
+static esp_err_t _i18n_map_cache_build_for_lang(const char *language)
+{
+    const char *lang = _effective_lang(language);
+    if (s_i18n_map_cache && strcmp(s_i18n_map_lang, lang) == 0) {
+        return ESP_OK;
+    }
+
+    _i18n_map_cache_clear();
+
+    char path[64] = {0};
+    _build_i18n_map_path(lang, path, sizeof(path));
+
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (size <= 0) {
+        fclose(f);
+        return ESP_ERR_INVALID_SIZE;
+    }
+    char *buf = malloc((size_t)size + 1);
+    if (!buf) {
+        fclose(f);
+        return ESP_ERR_NO_MEM;
+    }
+    size_t r = fread(buf, 1, (size_t)size, f);
+    fclose(f);
+    if (r != (size_t)size) {
+        free(buf);
+        return ESP_ERR_INVALID_SIZE;
+    }
+    buf[size] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root) return ESP_ERR_INVALID_STATE;
+
+    s_i18n_map_cache = root;
+    strncpy(s_i18n_map_lang, lang, sizeof(s_i18n_map_lang) - 1);
+    s_i18n_map_lang[sizeof(s_i18n_map_lang) - 1] = '\0';
+    return ESP_OK;
+}
 
 static void _i18n_lookup_cache_clear(void)
 {
@@ -1108,6 +1180,43 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
 {
     if (!scope || !key || !out || out_len == 0) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Prefer numeric lookup via PSRAM when we have a map and PSRAM dictionary loaded.
+       If that fails or map isn't present, fall back to the textual lookup cache. */
+    if (_i18n_map_cache_build_for_lang(NULL) == ESP_OK && s_i18n_map_cache) {
+        cJSON *scopes = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "scopes");
+        cJSON *keys = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "keys");
+        uint8_t scope_id = 0;
+        uint16_t key_id = 0;
+        if (cJSON_IsObject(scopes) && cJSON_IsObject(keys)) {
+            cJSON *it = NULL;
+            cJSON_ArrayForEach(it, scopes) {
+                if (!cJSON_IsString(it) || !it->valuestring) continue;
+                if (strcmp(it->valuestring, scope) == 0) {
+                    scope_id = (uint8_t)atoi(it->string);
+                    break;
+                }
+            }
+            cJSON *jt = NULL;
+            cJSON_ArrayForEach(jt, keys) {
+                if (!cJSON_IsString(jt) || !jt->valuestring) continue;
+                if (strcmp(jt->valuestring, key) == 0) {
+                    key_id = (uint16_t)atoi(jt->string);
+                    break;
+                }
+            }
+        }
+
+        if (scope_id != 0 && key_id != 0) {
+            char *concat = i18n_concat_from_psram(scope_id, key_id);
+            if (concat) {
+                strncpy(out, concat, out_len - 1);
+                out[out_len - 1] = '\0';
+                free(concat);
+                return ESP_OK;
+            }
+        }
     }
 
     if (_i18n_lookup_cache_build_for_lang(NULL) != ESP_OK || !s_i18n_lookup_cache) {

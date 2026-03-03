@@ -72,6 +72,7 @@
      2. ERROR.log che  deve comprendere i dati di crash con lo stack chiamate. Ogni errore avrà il suo file con nome = timestamp
      3. ✅ In caso di indisponibilità del SD (assente, guasta o piena) per ambedue i tipi di log si eseguirà solo l'invio al server remoto.
      4. ✅ nella chiamata api/deviceactivity: tabella JSON `activity.json` salvata in SPIFFS e caricata in PSRAM al boot; fornita API `device_activity_find()` con ID/descrizioni (id es. 1=Start,2=Stop,3=Pause,4=Resume).
+  41. ✅ Creare una FSM per la gestione del ciclo operativo della macchina (vedi FSM.md)
 
 # ⏸️ RITARDATI
 
@@ -84,7 +85,17 @@
 - Factory 
 
  0. Fare valutazione per le funzioni di caricamento da remoto su chiamata degli artefatti immagini, tabelle testi e del firmware stesso. Considerare che questi contenuti possono essere salvarti sia in SPIFFS che in SD
- 1. Creare una FSM per la gestione del ciclo operativo della macchina (vedi FSM.md)
+ 1. riorganizzazione tabelle localizzazione
+    1. modificare la struttura dei json rimuovendo il campo lang (ridondante) e aggiornare i 2 file json 
+    2. impostare il campo scope come un id uint_8 ed aggiornare i file
+    3. impostare il campo key  come un id uint_16 univoco per lingua ed aggiornare i file.
+    4. creare il campo section uint_8  necessario alla concatenazione automatica di stringhe di lunghezza > 32 byte che vanno spezzate in blocchi da 32 byte tutti con key uguale e la posizione di concatenazione in questo campo e che vengono ricostruite concatenando tutti i record con una data key e ordinate in base a section
+    5. in pratica abbiamo una unica chiave a 32 bit ssssssss kkkkkkkk kkkkkkkk ssssssss
+    6. impostare il campo text con lunghezza massima 32 byte incluso terminatore \0
+    7. mantenere i vecchi json ed aggiornarle i record con un campo id da popolare con il nuovo id generato dalla conversione
+    8. creare nuove funzioni per la ricerca e la concatenazione e restituzione delle stringhe
+    9. rivedere in tutto il codice tutti gli utilizzi delle stringhe vecchio formato e cambiare il metodo di ricerca da scope+key alfanumerici a numerici usando i vecchi file che hanno tutti i riferimenti (nuovo id / scope+key)
+    10. Crea uno script pythom confronta i testi della vecchia struttura con i testi della nuova per tutte le lingue
  2. modifica della Coda di eventi da utilizzare nell FSM e nei moduli di controllo: 
     1. partendo dalla definizione attuale di fsm_input_event_t definiamo che ogni agente (task o funzione di origine o destinazione di un messaggio) deve possedere un suo id unico chiamato agn_id di tipo uint8_t, quindi aggiungiamo dei campi alla struttura:
        1. From : agente che ha generato il messaggio
@@ -217,7 +228,7 @@
     - Osservabilità e test
       - Aggiungere metriche minime (`last_ok`, `last_err`, `queue_len`, `last_status_code`) esposte via API/UI.
       - Preparare test contract/flow dedicati alle route remote con mock server.
- 9. lo scanner USB è gestito tramite la coda mesaggi?  
+ 9.  lo scanner USB è gestito tramite la coda mesaggi?  
  10. la lettura di un codice QR deve passare a http_services che deve eseguire , se non già acquisito, il token tramite la chiamata login e quindi eseguire una chiamata a api_payment_post
  11. ✅ crea una funzione per visualizzare sullo schermo con il carattere a 48px la scritta 'Fuori servizio' ed eseguila nel caso di 'APP: [F] ERROR_LOCK attivo: avvio task inibito (reboot consecutivi=3)
 '

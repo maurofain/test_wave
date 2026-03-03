@@ -12,6 +12,8 @@
 #include "lvgl_panel.h"
 #include "init.h"
 
+#include "device_config.h"
+
 #include "lvgl.h"
 #include "bsp/esp32_p4_nano.h"
 
@@ -700,4 +702,44 @@ void lvgl_panel_show(void)
     bsp_display_unlock();
 
     ESP_LOGI(TAG, "[C] Pannello emulatore LVGL visualizzato (800x1280)");
+}
+
+void lvgl_panel_refresh_texts(void)
+{
+    if (!bsp_display_lock(100)) return;
+
+    /* Aggiorna etichette dinamiche con i testi localizzati */
+    char buf[128];
+
+    if (s_elapsed_lbl) {
+        if (device_config_get_ui_text_scoped("lvgl", "elapsed_label", "Credito", buf, sizeof(buf)) == ESP_OK) {
+            lv_label_set_text(s_elapsed_lbl, buf);
+        } else {
+            lv_label_set_text(s_elapsed_lbl, "Credito");
+        }
+    }
+
+    if (s_pause_lbl) {
+        if (device_config_get_ui_text_scoped("lvgl", "pause_label", "", buf, sizeof(buf)) == ESP_OK) {
+            lv_label_set_text(s_pause_lbl, buf);
+        } else {
+            lv_label_set_text(s_pause_lbl, "");
+        }
+    }
+
+    /* Aggiorna etichette pulsanti programmi (usa formato con %d) */
+    for (int i = 0; i < PROG_COUNT; ++i) {
+        if (!s_prog_lbls[i]) continue;
+        if (device_config_get_ui_text_scoped("lvgl", "program", "Programma %d", buf, sizeof(buf)) == ESP_OK) {
+            char tmp[64];
+            snprintf(tmp, sizeof(tmp), buf, i + 1);
+            lv_label_set_text(s_prog_lbls[i], tmp);
+        } else {
+            char tmp[32];
+            snprintf(tmp, sizeof(tmp), "Programma %d", i + 1);
+            lv_label_set_text(s_prog_lbls[i], tmp);
+        }
+    }
+
+    bsp_display_unlock();
 }

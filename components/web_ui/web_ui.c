@@ -1,4 +1,6 @@
 #include "web_ui.h"
+#include "web_ui_internal.h"
+#include "lvgl_panel.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "device_config.h"
@@ -996,6 +998,9 @@ esp_err_t api_config_get(httpd_req_t *req)
 {
     ESP_LOGD(TAG, "[C] GET /api/config");
     device_config_t *cfg = device_config_get();
+    char prev_lang[8] = {0};
+    const char *cfg_lang_before = device_config_get_ui_language();
+    if (cfg_lang_before) strncpy(prev_lang, cfg_lang_before, sizeof(prev_lang)-1);
     
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "device_name", cfg->device_name);
@@ -1592,6 +1597,22 @@ esp_err_t api_config_save(httpd_req_t *req)
     device_config_save(cfg);
     // Applica stati task che dipendono dalla configurazione (es. display on/off)
     tasks_apply_n_run();
+    /* Se la lingua è cambiata: carica la nuova tabella in PSRAM, invalida cache e
+     * aggiorna i testi LVGL in runtime. Il client web si ricaricherà da sola. */
+    {
+        char prev_lang_local[8] = {0};
+        const char *cfg_lang_before_local = device_config_get_ui_language();
+        if (cfg_lang_before_local) strncpy(prev_lang_local, cfg_lang_before_local, sizeof(prev_lang_local)-1);
+        if (strncmp(prev_lang_local, cfg->ui.language, sizeof(prev_lang_local)) != 0) {
+            ESP_LOGI(TAG, "[C] Lingua cambiata: '%s' -> '%s'", prev_lang_local, cfg->ui.language);
+            web_ui_i18n_cache_invalidate();
+            if (web_ui_i18n_load_language_psram(cfg->ui.language) != ESP_OK) {
+                ESP_LOGW(TAG, "[C] Impossibile caricare tabella lingua '%s' in PSRAM", cfg->ui.language);
+            }
+            /* Aggiorna testi sul display LVGL (se attivo) */
+            lvgl_panel_refresh_texts();
+        }
+    }
     cJSON_Delete(root);
     
     httpd_resp_set_type(req, "application/json");
@@ -2139,6 +2160,13 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     // Registrazione URI Web UI (Pagine e API)
     httpd_uri_t uri_config = {.uri = "/config", .method = HTTP_GET, .handler = config_page_handler};
     httpd_register_uri_handler(server, &uri_config);
+
+    /* Load i18n dictionary into PSRAM for current UI language */
+    const char *lang = device_config_get_ui_language();
+    if (!lang) lang = "en";
+    if (web_ui_i18n_load_language_psram(lang) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to load i18n into PSRAM for language %s", lang);
+    }
     
     httpd_uri_t uri_stats = {.uri = "/stats", .method = HTTP_GET, .handler = stats_page_handler};
     httpd_register_uri_handler(server, &uri_stats);

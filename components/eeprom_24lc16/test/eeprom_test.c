@@ -97,6 +97,97 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
         cJSON_AddBoolToObject(resp, "updated", device_config_is_updated());
         cJSON_AddStringToObject(resp, "status", "ok");
     }
+    else if (strcmp(op->valuestring, "dump_ascii") == 0) {
+        /* return an ASCII‑clean dump of requested EEPROM range */
+        cJSON *addr_obj = cJSON_GetObjectItem(root, "addr");
+        cJSON *len_obj = cJSON_GetObjectItem(root, "len");
+        int addr = addr_obj ? addr_obj->valueint : 0;
+        int len = len_obj ? len_obj->valueint : EEPROM_TOTAL_SIZE;
+        if (addr < 0) addr = 0;
+        if (len <= 0) len = EEPROM_TOTAL_SIZE;
+        if ((addr + len) > EEPROM_TOTAL_SIZE) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "range_out_of_bounds");
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
+            cJSON_AddNumberToObject(resp, "max_size", EEPROM_TOTAL_SIZE);
+            goto send_response;
+        }
+        if (!eeprom_24lc16_is_available()) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "eeprom_not_available");
+            goto send_response;
+        }
+        uint8_t *data = malloc(len);
+        if (!data) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "no_memory");
+            goto send_response;
+        }
+        esp_err_t read_ret = eeprom_24lc16_read(addr, data, len);
+        if (read_ret == ESP_OK) {
+            char *ascii = malloc(len + 1);
+            if (ascii) {
+                for (int i = 0; i < len; i++) {
+                    uint8_t b = data[i];
+                    ascii[i] = (b >= 32 && b <= 126) ? (char)b : '.';
+                }
+                ascii[len] = '\0';
+                cJSON_AddStringToObject(resp, "ascii", ascii);
+                free(ascii);
+            }
+            cJSON_AddStringToObject(resp, "status", "ok");
+        } else {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", esp_err_to_name(read_ret));
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
+        }
+        free(data);
+    }
+    else if (strcmp(op->valuestring, "dump_hex") == 0) {
+        /* return raw bytes for hex rendering */
+        cJSON *addr_obj = cJSON_GetObjectItem(root, "addr");
+        cJSON *len_obj = cJSON_GetObjectItem(root, "len");
+        int addr = addr_obj ? addr_obj->valueint : 0;
+        int len = len_obj ? len_obj->valueint : EEPROM_TOTAL_SIZE;
+        if (addr < 0) addr = 0;
+        if (len <= 0) len = EEPROM_TOTAL_SIZE;
+        if ((addr + len) > EEPROM_TOTAL_SIZE) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "range_out_of_bounds");
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
+            cJSON_AddNumberToObject(resp, "max_size", EEPROM_TOTAL_SIZE);
+            goto send_response;
+        }
+        if (!eeprom_24lc16_is_available()) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "eeprom_not_available");
+            goto send_response;
+        }
+        uint8_t *data = malloc(len);
+        if (!data) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "no_memory");
+            goto send_response;
+        }
+        esp_err_t read_ret = eeprom_24lc16_read(addr, data, len);
+        if (read_ret == ESP_OK) {
+            cJSON *arr = cJSON_CreateArray();
+            for (int i = 0; i < len; i++) {
+                cJSON_AddItemToArray(arr, cJSON_CreateNumber(data[i]));
+            }
+            cJSON_AddItemToObject(resp, "data", arr);
+            cJSON_AddStringToObject(resp, "status", "ok");
+        } else {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", esp_err_to_name(read_ret));
+            cJSON_AddNumberToObject(resp, "addr", addr);
+            cJSON_AddNumberToObject(resp, "len", len);
+        }
+        free(data);
+    }
     else if (strcmp(op->valuestring, "write") == 0) {
         cJSON *addr_item = cJSON_GetObjectItem(root, "addr");
         cJSON *data_arr = cJSON_GetObjectItem(root, "data");

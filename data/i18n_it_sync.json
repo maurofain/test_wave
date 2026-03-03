@@ -1,0 +1,3946 @@
+[
+  {
+    "lang": "it",
+    "scope": "header",
+    "key": "time_not_set",
+    "text": "Ora non impostata",
+    "scope_id": 1,
+    "key_id": 1
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "time_not_available",
+    "text": "Ora non disponibile",
+    "scope_id": 2,
+    "key_id": 2
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "config",
+    "text": "Config",
+    "scope_id": 3,
+    "key_id": 3
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "emulator",
+    "text": "Emulatore",
+    "scope_id": 3,
+    "key_id": 4
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "home",
+    "text": "Home",
+    "scope_id": 3,
+    "key_id": 5
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "logs",
+    "text": "Log",
+    "scope_id": 3,
+    "key_id": 6
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "ota",
+    "text": "OTA",
+    "scope_id": 3,
+    "key_id": 7
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "stats",
+    "text": "Statistiche",
+    "scope_id": 3,
+    "key_id": 8
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "tasks",
+    "text": "Task",
+    "scope_id": 3,
+    "key_id": 9
+  },
+  {
+    "lang": "it",
+    "scope": "nav",
+    "key": "test",
+    "text": "Test",
+    "scope_id": 3,
+    "key_id": 10
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "abilitato",
+    "text": "Abilitato",
+    "scope_id": 4,
+    "key_id": 11
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "aggiorna",
+    "text": "Aggiorna",
+    "scope_id": 4,
+    "key_id": 12
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "aggiorna_dati",
+    "text": "🔄 Aggiorna Dati",
+    "scope_id": 4,
+    "key_id": 13
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "apri_editor_programmi",
+    "text": "Apri editor programmi",
+    "scope_id": 4,
+    "key_id": 14
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "attendere_il_riavvio",
+    "text": "Attendere il riavvio.",
+    "scope_id": 4,
+    "key_id": 15
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "backup_config",
+    "text": "📥 Backup Config",
+    "scope_id": 4,
+    "key_id": 16
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "base_server_url",
+    "text": "Base server URL",
+    "scope_id": 4,
+    "key_id": 17
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "baudrate",
+    "text": "Baudrate",
+    "scope_id": 4,
+    "key_id": 18
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "buffer_rx",
+    "text": "Buffer RX",
+    "scope_id": 4,
+    "key_id": 19
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "buffer_tx",
+    "text": "Buffer TX",
+    "scope_id": 4,
+    "key_id": 20
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "carica_firmware",
+    "text": "⬆️ Carica Firmware",
+    "scope_id": 4,
+    "key_id": 21
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "conferma_nuova_password",
+    "text": "Conferma nuova password",
+    "scope_id": 4,
+    "key_id": 22
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "data_bits",
+    "text": "Data Bits",
+    "scope_id": 4,
+    "key_id": 23
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "dhcp",
+    "text": "DHCP",
+    "scope_id": 4,
+    "key_id": 24
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "display",
+    "text": "📺 Display",
+    "scope_id": 4,
+    "key_id": 25
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "display_abilitato",
+    "text": "Display abilitato",
+    "scope_id": 4,
+    "key_id": 26
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "dual_pid_opzionale",
+    "text": "Dual PID (opzionale)",
+    "scope_id": 4,
+    "key_id": 27
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "ethernet",
+    "text": "🌐 Ethernet",
+    "scope_id": 4,
+    "key_id": 28
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "gateway",
+    "text": "Gateway",
+    "scope_id": 4,
+    "key_id": 29
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "gestione_prezzi_durata_e_relay_per_programma",
+    "text": "Gestione prezzi, durata e relay per programma.",
+    "scope_id": 4,
+    "key_id": 30
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "gpio_33",
+    "text": "GPIO 33",
+    "scope_id": 4,
+    "key_id": 31
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "gpio_ausiliario_gpio33",
+    "text": "🔘 GPIO Ausiliario (GPIO33)",
+    "scope_id": 4,
+    "key_id": 32
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "i_o_expander",
+    "text": "I/O Expander",
+    "scope_id": 4,
+    "key_id": 33
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "identita_dispositivo",
+    "text": "🆔 Identità Dispositivo",
+    "scope_id": 4,
+    "key_id": 34
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "indirizzo_ip",
+    "text": "Indirizzo IP",
+    "scope_id": 4,
+    "key_id": 35
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "input_float",
+    "text": "Input (Float)",
+    "scope_id": 4,
+    "key_id": 36
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "input_pull_down",
+    "text": "Input (Pull-down)",
+    "scope_id": 4,
+    "key_id": 37
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "input_pull_up",
+    "text": "Input (Pull-up)",
+    "scope_id": 4,
+    "key_id": 38
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "italiano_it",
+    "text": "Italiano (IT)",
+    "scope_id": 4,
+    "key_id": 39
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "led_strip_ws2812",
+    "text": "LED Strip (WS2812)",
+    "scope_id": 4,
+    "key_id": 40
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "lingua_ui",
+    "text": "Lingua UI",
+    "scope_id": 4,
+    "key_id": 41
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "logging_remoto",
+    "text": "📊 Logging Remoto",
+    "scope_id": 4,
+    "key_id": 42
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "luminosita_lcd",
+    "text": "Luminosità LCD (",
+    "scope_id": 4,
+    "key_id": 43
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "mdb_configuration",
+    "text": "MDB Configuration",
+    "scope_id": 4,
+    "key_id": 44
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "mdb_engine",
+    "text": "MDB Engine",
+    "scope_id": 4,
+    "key_id": 45
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "modalita",
+    "text": "Modalità",
+    "scope_id": 4,
+    "key_id": 46
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "modifica_password_richiesta_per_emulator_e_reboot_factory",
+    "text": "Modifica password richiesta per /emulator e reboot FACTORY.",
+    "scope_id": 4,
+    "key_id": 47
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "nome_dispositivo",
+    "text": "Nome Dispositivo",
+    "scope_id": 4,
+    "key_id": 48
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "ntp",
+    "text": "NTP",
+    "scope_id": 4,
+    "key_id": 49
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "ntp_abilitato",
+    "text": "NTP Abilitato",
+    "scope_id": 4,
+    "key_id": 50
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "numero_di_led",
+    "text": "Numero di LED",
+    "scope_id": 4,
+    "key_id": 51
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "nuova_password",
+    "text": "Nuova password",
+    "scope_id": 4,
+    "key_id": 52
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "offset_fuso_orario_ore",
+    "text": "Offset Fuso Orario (ore)",
+    "scope_id": 4,
+    "key_id": 53
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "output",
+    "text": "Output",
+    "scope_id": 4,
+    "key_id": 54
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "parita_0_none_1_odd_2_even",
+    "text": "Parità (0:None, 1:Odd, 2:Even)",
+    "scope_id": 4,
+    "key_id": 55
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "password",
+    "text": "Password",
+    "scope_id": 4,
+    "key_id": 56
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "password_attuale",
+    "text": "Password attuale",
+    "scope_id": 4,
+    "key_id": 57
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "password_boot_emulatore",
+    "text": "🔐 Password boot/emulatore",
+    "scope_id": 4,
+    "key_id": 58
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "periferiche_hardware",
+    "text": "🔌 Periferiche Hardware",
+    "scope_id": 4,
+    "key_id": 59
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "pid",
+    "text": "PID",
+    "scope_id": 4,
+    "key_id": 60
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "porta_udp",
+    "text": "Porta UDP",
+    "scope_id": 4,
+    "key_id": 61
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "pwm_canale_1",
+    "text": "PWM Canale 1",
+    "scope_id": 4,
+    "key_id": 62
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "pwm_canale_2",
+    "text": "PWM Canale 2",
+    "scope_id": 4,
+    "key_id": 63
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "reboot_in_app_last",
+    "text": "Reboot in App Last...",
+    "scope_id": 4,
+    "key_id": 64
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "reboot_in_factory_mode",
+    "text": "Reboot in Factory Mode...",
+    "scope_id": 4,
+    "key_id": 65
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "reboot_in_ota0",
+    "text": "Reboot in OTA0...",
+    "scope_id": 4,
+    "key_id": 66
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "reboot_in_ota1",
+    "text": "Reboot in OTA1...",
+    "scope_id": 4,
+    "key_id": 67
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "reboot_in_production_mode",
+    "text": "Reboot in Production Mode...",
+    "scope_id": 4,
+    "key_id": 68
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "reset_fabbrica",
+    "text": "⚠️ Reset Fabbrica",
+    "scope_id": 4,
+    "key_id": 69
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "rs232_configuration",
+    "text": "RS232 Configuration",
+    "scope_id": 4,
+    "key_id": 70
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "rs485_configuration",
+    "text": "RS485 Configuration",
+    "scope_id": 4,
+    "key_id": 71
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "salva_configurazione",
+    "text": "💾 Salva Configurazione",
+    "scope_id": 4,
+    "key_id": 72
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "salva_password_boot",
+    "text": "💾 Salva password boot",
+    "scope_id": 4,
+    "key_id": 73
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "scanner_usb_cdc",
+    "text": "Scanner USB (CDC)",
+    "scope_id": 4,
+    "key_id": 74
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "scheda_sd",
+    "text": "Scheda SD",
+    "scope_id": 4,
+    "key_id": 75
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "sensore_temperatura",
+    "text": "Sensore Temperatura",
+    "scope_id": 4,
+    "key_id": 76
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "server_abilitato",
+    "text": "Server abilitato",
+    "scope_id": 4,
+    "key_id": 77
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "server_ntp_1",
+    "text": "Server NTP 1",
+    "scope_id": 4,
+    "key_id": 78
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "server_ntp_2",
+    "text": "Server NTP 2",
+    "scope_id": 4,
+    "key_id": 79
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "server_password_md5",
+    "text": "Server password (MD5)",
+    "scope_id": 4,
+    "key_id": 80
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "server_remoto",
+    "text": "🔁 Server Remoto",
+    "scope_id": 4,
+    "key_id": 81
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "server_serial",
+    "text": "Server serial",
+    "scope_id": 4,
+    "key_id": 82
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "ssid",
+    "text": "SSID",
+    "scope_id": 4,
+    "key_id": 83
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "stato_iniziale_solo_out",
+    "text": "Stato Iniziale (Solo Out)",
+    "scope_id": 4,
+    "key_id": 84
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "stop_bits_1_2",
+    "text": "Stop Bits (1, 2)",
+    "scope_id": 4,
+    "key_id": 85
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "subnet_mask",
+    "text": "Subnet Mask",
+    "scope_id": 4,
+    "key_id": 86
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "tabella_programmi",
+    "text": "📊 Tabella Programmi",
+    "scope_id": 4,
+    "key_id": 87
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "tag_porte_seriali",
+    "text": "(TAG) Porte Seriali",
+    "scope_id": 4,
+    "key_id": 88
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "uart_rs232",
+    "text": "UART RS232",
+    "scope_id": 4,
+    "key_id": 89
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "uart_rs485",
+    "text": "UART RS485",
+    "scope_id": 4,
+    "key_id": 90
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "usa_broadcast_udp",
+    "text": "Usa broadcast UDP",
+    "scope_id": 4,
+    "key_id": 91
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "vid",
+    "text": "VID",
+    "scope_id": 4,
+    "key_id": 92
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "wifi_abilitato",
+    "text": "WiFi Abilitato",
+    "scope_id": 4,
+    "key_id": 93
+  },
+  {
+    "lang": "it",
+    "scope": "p_config",
+    "key": "wifi_sta",
+    "text": "📡 WiFi STA",
+    "scope_id": 4,
+    "key_id": 94
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "annulla",
+    "text": "Annulla",
+    "scope_id": 5,
+    "key_id": 95
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "continua",
+    "text": "Continua",
+    "scope_id": 5,
+    "key_id": 96
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "credito",
+    "text": "Credito",
+    "scope_id": 5,
+    "key_id": 97
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "in_pausa_00_00",
+    "text": "In pausa: 00:00",
+    "scope_id": 5,
+    "key_id": 98
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "inserire_la_password_per_continuare",
+    "text": "Inserire la password per continuare.",
+    "scope_id": 5,
+    "key_id": 99
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "layout_operativo_pannello_utente_800x1280_a_sinistra_quadro_elet",
+    "text": "Layout operativo: pannello utente 800x1280 a sinistra, quadro elettrico a destra",
+    "scope_id": 5,
+    "key_id": 100
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "nessun_evento_in_coda",
+    "text": "Nessun evento in coda",
+    "scope_id": 5,
+    "key_id": 101
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "password_richiesta",
+    "text": "🔒 Password richiesta",
+    "scope_id": 5,
+    "key_id": 102
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_1",
+    "text": "Programma 1",
+    "scope_id": 5,
+    "key_id": 103
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_2",
+    "text": "Programma 2",
+    "scope_id": 5,
+    "key_id": 104
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_3",
+    "text": "Programma 3",
+    "scope_id": 5,
+    "key_id": 105
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_4",
+    "text": "Programma 4",
+    "scope_id": 5,
+    "key_id": 106
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_5",
+    "text": "Programma 5",
+    "scope_id": 5,
+    "key_id": 107
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_6",
+    "text": "Programma 6",
+    "scope_id": 5,
+    "key_id": 108
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_7",
+    "text": "Programma 7",
+    "scope_id": 5,
+    "key_id": 109
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "programma_8",
+    "text": "Programma 8",
+    "scope_id": 5,
+    "key_id": 110
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "quadro_elettrico",
+    "text": "Quadro elettrico",
+    "scope_id": 5,
+    "key_id": 111
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r1",
+    "text": "R1",
+    "scope_id": 5,
+    "key_id": 112
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r10",
+    "text": "R10",
+    "scope_id": 5,
+    "key_id": 113
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r2",
+    "text": "R2",
+    "scope_id": 5,
+    "key_id": 114
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r3",
+    "text": "R3",
+    "scope_id": 5,
+    "key_id": 115
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r4",
+    "text": "R4",
+    "scope_id": 5,
+    "key_id": 116
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r5",
+    "text": "R5",
+    "scope_id": 5,
+    "key_id": 117
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r6",
+    "text": "R6",
+    "scope_id": 5,
+    "key_id": 118
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r7",
+    "text": "R7",
+    "scope_id": 5,
+    "key_id": 119
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r8",
+    "text": "R8",
+    "scope_id": 5,
+    "key_id": 120
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "r9",
+    "text": "R9",
+    "scope_id": 5,
+    "key_id": 121
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "relay",
+    "text": "Relay",
+    "scope_id": 5,
+    "key_id": 122
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "ricarica_coin",
+    "text": "Ricarica Coin",
+    "scope_id": 5,
+    "key_id": 123
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "stato_credito",
+    "text": "Stato credito",
+    "scope_id": 5,
+    "key_id": 124
+  },
+  {
+    "lang": "it",
+    "scope": "p_emulator",
+    "key": "tempo_00_00",
+    "text": "Tempo: 00:00",
+    "scope_id": 5,
+    "key_id": 125
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "applica_filtro",
+    "text": "Applica filtro",
+    "scope_id": 6,
+    "key_id": 126
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "configura_il_logging_remoto_nella_pagina",
+    "text": "Configura il logging remoto nella pagina",
+    "scope_id": 6,
+    "key_id": 127
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "configurazione",
+    "text": "Configurazione",
+    "scope_id": 6,
+    "key_id": 128
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "dere_i_nuovi_log_applica_livelli",
+    "text": "dere i nuovi log.                                                               Applica livelli",
+    "scope_id": 6,
+    "key_id": 129
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "html",
+    "text": "html += '",
+    "scope_id": 6,
+    "key_id": 130
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "i_log_vengono_ricevuti_via_udp_dal_server_configurato_aggiorna_l",
+    "text": "I log vengono ricevuti via UDP dal server configurato. Aggiorna la pagina per ve",
+    "scope_id": 6,
+    "key_id": 131
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "in_attesa_di_log",
+    "text": "In attesa di log...",
+    "scope_id": 6,
+    "key_id": 132
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "item_tag",
+    "text": "' + item.tag + '",
+    "scope_id": 6,
+    "key_id": 133
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "l_t",
+    "text": "' + l.t + '",
+    "scope_id": 6,
+    "key_id": 134
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "log_remoto_ricevuti",
+    "text": "📋 Log Remoto Ricevuti",
+    "scope_id": 6,
+    "key_id": 135
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "nessun_tag_disponibile",
+    "text": "Nessun tag disponibile",
+    "scope_id": 6,
+    "key_id": 136
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "per_iniziare_a_ricevere_log",
+    "text": "per iniziare a ricevere log.",
+    "scope_id": 6,
+    "key_id": 137
+  },
+  {
+    "lang": "it",
+    "scope": "p_logs",
+    "key": "pulisci_filtro",
+    "text": "Pulisci filtro",
+    "scope_id": 6,
+    "key_id": 138
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "400_bad_request",
+    "text": "400 Bad Request",
+    "scope_id": 7,
+    "key_id": 139
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "403_forbidden",
+    "text": "403 Forbidden",
+    "scope_id": 7,
+    "key_id": 140
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "404_non_trovato",
+    "text": "404 Non Trovato",
+    "scope_id": 7,
+    "key_id": 141
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "405_method_not_allowed",
+    "text": "405 Method Not Allowed",
+    "scope_id": 7,
+    "key_id": 142
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "abilitato",
+    "text": "Abilitato",
+    "scope_id": 7,
+    "key_id": 11
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "button_class_btn_secondary_onclick_loadprograms_ricarica_button",
+    "text": "<button class='btn-secondary' onclick='loadPrograms()'>🔄 Ricarica</button>",
+    "scope_id": 7,
+    "key_id": 143
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "button_onclick_saveprograms_salva_tabella_button",
+    "text": "<button onclick='savePrograms()'>💾 Salva tabella</button>",
+    "scope_id": 7,
+    "key_id": 144
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "c_get_config_programs",
+    "text": "[C] GET /config/programs",
+    "scope_id": 7,
+    "key_id": 145
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "campi_current_password_new_password_obbligatori",
+    "text": "Campi current_password/new_password obbligatori",
+    "scope_id": 7,
+    "key_id": 146
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "campi_relay_number_status_duration_obbligatori",
+    "text": "Campi relay_number/status/duration obbligatori",
+    "scope_id": 7,
+    "key_id": 147
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "div",
+    "text": "</div>",
+    "scope_id": 7,
+    "key_id": 148
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "div_class_container_div_class_section",
+    "text": "<div class='container'><div class='section'>",
+    "scope_id": 7,
+    "key_id": 149
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "div_div",
+    "text": "</div></div>",
+    "scope_id": 7,
+    "key_id": 150
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "div_id_status_class_status_div",
+    "text": "<div id='status' class='status'></div>",
+    "scope_id": 7,
+    "key_id": 151
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "durata_s",
+    "text": "Durata (s)",
+    "scope_id": 7,
+    "key_id": 152
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "editor_tabella_programmi_factory",
+    "text": "📊 Editor Tabella Programmi (FACTORY)",
+    "scope_id": 7,
+    "key_id": 153
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "errore_lettura_payload",
+    "text": "Errore lettura payload",
+    "scope_id": 7,
+    "key_id": 154
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "errore_validazione",
+    "text": "Errore validazione",
+    "scope_id": 7,
+    "key_id": 155
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "h2_editor_tabella_programmi_factory_h2",
+    "text": "<h2>📊 Editor Tabella Programmi (FACTORY)</h2>",
+    "scope_id": 7,
+    "key_id": 156
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "id",
+    "text": "ID",
+    "scope_id": 7,
+    "key_id": 157
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "imposta_nome_abilitazione_prezzo_durata_e_relay_mask_per_ogni_pr",
+    "text": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.",
+    "scope_id": 7,
+    "key_id": 158
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "json_non_valido",
+    "text": "JSON non valido",
+    "scope_id": 7,
+    "key_id": 159
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "method_not_allowed",
+    "text": "Method not allowed",
+    "scope_id": 7,
+    "key_id": 160
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "nome",
+    "text": "Nome",
+    "scope_id": 7,
+    "key_id": 161
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "nuova_password_non_valida_o_errore_salvataggio",
+    "text": "Nuova password non valida o errore salvataggio",
+    "scope_id": 7,
+    "key_id": 162
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "p_imposta_nome_abilitazione_prezzo_durata_e_relay_mask_per_ogni_",
+    "text": "<p>Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.</p>",
+    "scope_id": 7,
+    "key_id": 163
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "password_attuale_non_valida",
+    "text": "Password attuale non valida",
+    "scope_id": 7,
+    "key_id": 164
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "pausa_max_s",
+    "text": "Pausa Max (s)",
+    "scope_id": 7,
+    "key_id": 165
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "secondi_pausa_tutti",
+    "text": "Secondi pausa (tutti)",
+    "scope_id": 7,
+    "key_id": 166
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "imposta_pausa_tutti",
+    "text": "Imposta",
+    "scope_id": 7,
+    "key_id": 167
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "payload_non_valido",
+    "text": "Payload non valido",
+    "scope_id": 7,
+    "key_id": 168
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "prezzo",
+    "text": "Prezzo",
+    "scope_id": 7,
+    "key_id": 169
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "relay_mask",
+    "text": "Relay mask",
+    "scope_id": 7,
+    "key_id": 170
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "relay_number_fuori_range",
+    "text": "relay_number fuori range",
+    "scope_id": 7,
+    "key_id": 171
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "return",
+    "text": "return `",
+    "scope_id": 7,
+    "key_id": 172
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "return_tr",
+    "text": "return `<tr>`+",
+    "scope_id": 7,
+    "key_id": 173
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "ricarica",
+    "text": "🔄 Ricarica",
+    "scope_id": 7,
+    "key_id": 174
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "salva_tabella",
+    "text": "💾 Salva tabella",
+    "scope_id": 7,
+    "key_id": 175
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "script_body_html",
+    "text": "</script></body></html>",
+    "scope_id": 7,
+    "key_id": 176
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "tabella_programmi",
+    "text": "Tabella Programmi",
+    "scope_id": 7,
+    "key_id": 87
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "table_thead_tr_th_id_th_th_nome_th_th_abilitato_th_th_prezzo_th_",
+    "text": "<table><thead><tr><th>ID</th><th>Nome</th><th>Abilitato</th><th>Prezzo</th><th>Durata (s)</th><th>Pausa Max (s)</th><th>Relay mask</th></tr></thead><tbody id='programRows'></tbody></table>",
+    "scope_id": 7,
+    "key_id": 177
+  },
+  {
+    "lang": "it",
+    "scope": "p_programs",
+    "key": "web_ui_programs_page",
+    "text": "WEB_UI_PROGRAMS_PAGE",
+    "scope_id": 7,
+    "key_id": 178
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "activity",
+    "text": "Activity",
+    "scope_id": 8,
+    "key_id": 179
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "aggiorna_dati",
+    "text": "🔄 Aggiorna Dati",
+    "scope_id": 8,
+    "key_id": 13
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "aggiorna_pagina",
+    "text": "🔄 Aggiorna Pagina",
+    "scope_id": 8,
+    "key_id": 180
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "aggiungi_task",
+    "text": "➕ Aggiungi Task",
+    "scope_id": 8,
+    "key_id": 181
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "ambiente",
+    "text": "️ Ambiente",
+    "scope_id": 8,
+    "key_id": 182
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "api",
+    "text": "API",
+    "scope_id": 8,
+    "key_id": 183
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "api_endpoints",
+    "text": "📡 API Endpoints",
+    "scope_id": 8,
+    "key_id": 184
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "app_last",
+    "text": "APP LAST",
+    "scope_id": 8,
+    "key_id": 185
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "applica",
+    "text": "🚀 Applica",
+    "scope_id": 8,
+    "key_id": 186
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "apply_tasks",
+    "text": "Apply tasks",
+    "scope_id": 8,
+    "key_id": 187
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "authenticate_remote",
+    "text": "Authenticate (remote)",
+    "scope_id": 8,
+    "key_id": 188
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "backup_configuration",
+    "text": "Backup configuration",
+    "scope_id": 8,
+    "key_id": 189
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "benvenuti_nell_interfaccia_di_configurazione_e_test",
+    "text": "Benvenuti nell'interfaccia di configurazione e test.",
+    "scope_id": 8,
+    "key_id": 190
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "caricamento",
+    "text": "Caricamento...",
+    "scope_id": 8,
+    "key_id": 191
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "configurazione",
+    "text": "Configurazione",
+    "scope_id": 8,
+    "key_id": 128
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "configurazione_task",
+    "text": "📋 Configurazione Task",
+    "scope_id": 8,
+    "key_id": 192
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "copia",
+    "text": "Copia",
+    "scope_id": 8,
+    "key_id": 193
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "core",
+    "text": "Core",
+    "scope_id": 8,
+    "key_id": 194
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "credito_accumulato",
+    "text": "Credito Accumulato",
+    "scope_id": 8,
+    "key_id": 195
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "current_configuration",
+    "text": "Current configuration",
+    "scope_id": 8,
+    "key_id": 196
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "description",
+    "text": "Description",
+    "scope_id": 8,
+    "key_id": 197
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "device_status_json",
+    "text": "Device status JSON",
+    "scope_id": 8,
+    "key_id": 198
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "editor_csv",
+    "text": "Editor Task",
+    "scope_id": 8,
+    "key_id": 199
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "emulatore",
+    "text": "Emulatore",
+    "scope_id": 8,
+    "key_id": 200
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "factory",
+    "text": "FACTORY",
+    "scope_id": 8,
+    "key_id": 201
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "factory_reset",
+    "text": "Factory reset",
+    "scope_id": 8,
+    "key_id": 202
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "fetch_firmware",
+    "text": "Fetch firmware",
+    "scope_id": 8,
+    "key_id": 203
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "fetch_images",
+    "text": "Fetch images",
+    "scope_id": 8,
+    "key_id": 204
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "fetch_translations",
+    "text": "Fetch translations",
+    "scope_id": 8,
+    "key_id": 205
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "firmware",
+    "text": "💾 Firmware",
+    "scope_id": 8,
+    "key_id": 206
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "force_ntp_sync",
+    "text": "Force NTP sync",
+    "scope_id": 8,
+    "key_id": 207
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "get",
+    "text": "GET",
+    "scope_id": 8,
+    "key_id": 208
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "get_customers",
+    "text": "Get customers",
+    "scope_id": 8,
+    "key_id": 209
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "get_operators",
+    "text": "Get operators",
+    "scope_id": 8,
+    "key_id": 210
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "get_remote_config",
+    "text": "Get remote config",
+    "scope_id": 8,
+    "key_id": 211
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "gettoniera",
+    "text": "Gettoniera",
+    "scope_id": 8,
+    "key_id": 212
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "header",
+    "text": "Header",
+    "scope_id": 8,
+    "key_id": 213
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "http_services",
+    "text": "HTTP Services",
+    "scope_id": 8,
+    "key_id": 214
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "i_o_expander",
+    "text": "I/O Expander",
+    "scope_id": 8,
+    "key_id": 33
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "indirizzo_ip_ethernet",
+    "text": "Indirizzo IP Ethernet",
+    "scope_id": 8,
+    "key_id": 215
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "indirizzo_ip_wifi_ap",
+    "text": "Indirizzo IP WiFi AP",
+    "scope_id": 8,
+    "key_id": 216
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "indirizzo_ip_wifi_sta",
+    "text": "Indirizzo IP WiFi STA",
+    "scope_id": 8,
+    "key_id": 217
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "informazioni",
+    "text": "ℹ️ Informazioni",
+    "scope_id": 8,
+    "key_id": 218
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "invia",
+    "text": "Invia",
+    "scope_id": 8,
+    "key_id": 219
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "is_jwt",
+    "text": "Is JWT",
+    "scope_id": 8,
+    "key_id": 220
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "keepalive",
+    "text": "Keepalive",
+    "scope_id": 8,
+    "key_id": 221
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "led_ws2812",
+    "text": "LED WS2812",
+    "scope_id": 8,
+    "key_id": 222
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "log_levels",
+    "text": "Log levels",
+    "scope_id": 8,
+    "key_id": 223
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "login_chiamate_http",
+    "text": "🔐 Login + Chiamate HTTP",
+    "scope_id": 8,
+    "key_id": 224
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "mdb_engine",
+    "text": "MDB Engine",
+    "scope_id": 8,
+    "key_id": 45
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "mdb_status",
+    "text": "🎰 MDB Status",
+    "scope_id": 8,
+    "key_id": 225
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "method",
+    "text": "Method",
+    "scope_id": 8,
+    "key_id": 226
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "nome",
+    "text": "Nome",
+    "scope_id": 8,
+    "key_id": 161
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "offline_payment",
+    "text": "Offline payment",
+    "scope_id": 8,
+    "key_id": 227
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "ota0",
+    "text": "OTA0",
+    "scope_id": 8,
+    "key_id": 228
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "ota1",
+    "text": "OTA1",
+    "scope_id": 8,
+    "key_id": 229
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "partizione_al_boot",
+    "text": "Partizione al Boot",
+    "scope_id": 8,
+    "key_id": 230
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "partizione_corrente",
+    "text": "Partizione Corrente",
+    "scope_id": 8,
+    "key_id": 231
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "password_md5",
+    "text": "Password (MD5):",
+    "scope_id": 8,
+    "key_id": 232
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "payload",
+    "text": "Payload",
+    "scope_id": 8,
+    "key_id": 233
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "payment_request",
+    "text": "Payment request",
+    "scope_id": 8,
+    "key_id": 234
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "periodo_ms",
+    "text": "Periodo (ms)",
+    "scope_id": 8,
+    "key_id": 235
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post",
+    "text": "POST",
+    "scope_id": 8,
+    "key_id": 236
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_activity",
+    "text": "POST /api/activity",
+    "scope_id": 8,
+    "key_id": 237
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_getconfig",
+    "text": "POST /api/getconfig",
+    "scope_id": 8,
+    "key_id": 238
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_getcustomers",
+    "text": "POST /api/getcustomers",
+    "scope_id": 8,
+    "key_id": 239
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_getfirmware",
+    "text": "POST /api/getfirmware",
+    "scope_id": 8,
+    "key_id": 240
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_getimages",
+    "text": "POST /api/getimages",
+    "scope_id": 8,
+    "key_id": 241
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_getoperators",
+    "text": "POST /api/getoperators",
+    "scope_id": 8,
+    "key_id": 242
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_gettranslations",
+    "text": "POST /api/gettranslations",
+    "scope_id": 8,
+    "key_id": 243
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_keepalive",
+    "text": "POST /api/keepalive",
+    "scope_id": 8,
+    "key_id": 244
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_payment",
+    "text": "POST /api/payment",
+    "scope_id": 8,
+    "key_id": 245
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_paymentoffline",
+    "text": "POST /api/paymentoffline",
+    "scope_id": 8,
+    "key_id": 246
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "post_api_serviceused",
+    "text": "POST /api/serviceused",
+    "scope_id": 8,
+    "key_id": 247
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "priorita",
+    "text": "Priorità",
+    "scope_id": 8,
+    "key_id": 248
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "profilo",
+    "text": "Profilo:",
+    "scope_id": 8,
+    "key_id": 249
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "pwm_channel_1_2",
+    "text": "PWM Channel 1/2",
+    "scope_id": 8,
+    "key_id": 250
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "reboot",
+    "text": "Reboot",
+    "scope_id": 8,
+    "key_id": 251
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "restart_usb_host",
+    "text": "Restart USB host",
+    "scope_id": 8,
+    "key_id": 252
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "rete",
+    "text": "🌐 Rete",
+    "scope_id": 8,
+    "key_id": 253
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "richiesta",
+    "text": "Richiesta",
+    "scope_id": 8,
+    "key_id": 254
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "rimuovi",
+    "text": "Rimuovi",
+    "scope_id": 8,
+    "key_id": 255
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "risposta",
+    "text": "Risposta",
+    "scope_id": 8,
+    "key_id": 256
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "run_internal_tests",
+    "text": "Run internal tests",
+    "scope_id": 8,
+    "key_id": 257
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "salva",
+    "text": "💾 Salva",
+    "scope_id": 8,
+    "key_id": 258
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "save_configuration",
+    "text": "Save configuration",
+    "scope_id": 8,
+    "key_id": 259
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "save_tasks",
+    "text": "Save tasks",
+    "scope_id": 8,
+    "key_id": 260
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "sd_card",
+    "text": "SD Card",
+    "scope_id": 8,
+    "key_id": 261
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "sensore_temperatura",
+    "text": "Sensore Temperatura",
+    "scope_id": 8,
+    "key_id": 76
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "serial",
+    "text": "Serial:",
+    "scope_id": 8,
+    "key_id": 262
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "service_used",
+    "text": "Service used",
+    "scope_id": 8,
+    "key_id": 263
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "set_log_level",
+    "text": "Set log level",
+    "scope_id": 8,
+    "key_id": 264
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "spazio_totale",
+    "text": "Spazio Totale",
+    "scope_id": 8,
+    "key_id": 265
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "spazio_usato",
+    "text": "Spazio Usato",
+    "scope_id": 8,
+    "key_id": 266
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "stack_words",
+    "text": "Stack bytess",
+    "scope_id": 8,
+    "key_id": 267
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "statistiche",
+    "text": "Statistiche",
+    "scope_id": 8,
+    "key_id": 268
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "stato",
+    "text": "Stato",
+    "scope_id": 8,
+    "key_id": 269
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "stato_driver",
+    "text": "🔌 Stato Driver",
+    "scope_id": 8,
+    "key_id": 270
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "stato_logico_sm",
+    "text": "Stato Logico (SM)",
+    "scope_id": 8,
+    "key_id": 271
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "stored_logs",
+    "text": "Stored logs",
+    "scope_id": 8,
+    "key_id": 272
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "tabella_programmi",
+    "text": "Tabella Programmi",
+    "scope_id": 8,
+    "key_id": 87
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "tasks_csv",
+    "text": "Task",
+    "scope_id": 8,
+    "key_id": 273
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "temperatura",
+    "text": "Temperatura",
+    "scope_id": 8,
+    "key_id": 274
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "test_hardware",
+    "text": "Test Hardware",
+    "scope_id": 8,
+    "key_id": 275
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "token",
+    "text": "Token:",
+    "scope_id": 8,
+    "key_id": 276
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "uart_rs232",
+    "text": "UART RS232",
+    "scope_id": 8,
+    "key_id": 89
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "uart_rs485",
+    "text": "UART RS485",
+    "scope_id": 8,
+    "key_id": 90
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "umidita",
+    "text": "Umidità",
+    "scope_id": 8,
+    "key_id": 277
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "update_ota",
+    "text": "Update OTA",
+    "scope_id": 8,
+    "key_id": 278
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "uri",
+    "text": "URI",
+    "scope_id": 8,
+    "key_id": 279
+  },
+  {
+    "lang": "it",
+    "scope": "p_runtime",
+    "key": "usb_enumerate",
+    "text": "USB enumerate",
+    "scope_id": 8,
+    "key_id": 280
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "4800_baud_pin_21_rx_20_tx",
+    "text": "(4800 baud — PIN 21 RX, 20 TX)",
+    "scope_id": 9,
+    "key_id": 281
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "aggiorna",
+    "text": "🔄 Aggiorna",
+    "scope_id": 9,
+    "key_id": 12
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "aggiorna_pagina",
+    "text": "🔄 Aggiorna Pagina",
+    "scope_id": 9,
+    "key_id": 180
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "applica",
+    "text": "🚀 Applica",
+    "scope_id": 9,
+    "key_id": 186
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "avvia_aggiornamenti_periodici_per_la_sezione_scanner",
+    "text": "// avvia aggiornamenti periodici per la sezione Scanner",
+    "scope_id": 9,
+    "key_id": 282
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "backup",
+    "text": "📥 Backup",
+    "scope_id": 9,
+    "key_id": 283
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "backup_json_config",
+    "text": "Backup JSON Config",
+    "scope_id": 9,
+    "key_id": 284
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "blink_tutte_le_uscite_1hz",
+    "text": "Blink Tutte le Uscite (1Hz)",
+    "scope_id": 9,
+    "key_id": 285
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_id_btn_led_manual_onclick_toggleledmanual_style_backgroun",
+    "text": "<button id='btn_led_manual' onclick=\"toggleLedManual()\" style='background:#2ecc71'>🚀 Inizia Manuale</button>",
+    "scope_id": 9,
+    "key_id": 286
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_onclick_refreshsdstatus_style_background_3498db_aggiorna_",
+    "text": "<button onclick='refreshSDStatus()' style='background:#3498db'>🔄 Aggiorna</button>",
+    "scope_id": 9,
+    "key_id": 287
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_onclick_runtest_sd_init_style_background_27ae60_init_butt",
+    "text": "<button onclick=\"runTest('sd_init')\" style='background:#27ae60'>⚡ Init</button>",
+    "scope_id": 9,
+    "key_id": 288
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_onclick_runtest_sht_read_style_background_f39c12_forza_te",
+    "text": "<button onclick=\"runTest('sht_read')\" style='background:#f39c12'>🔄 FORZA TEST LETTURA</button>",
+    "scope_id": 9,
+    "key_id": 289
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_onclick_setpwm_style_background_2980b9_applica_button",
+    "text": "<button onclick=\"setPWM()\" style='background:#2980b9'>🚀 Applica</button>",
+    "scope_id": 9,
+    "key_id": 290
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_onclick_testeeprom_read_json_style_background_9b59b6_legg",
+    "text": "<button onclick=\"testEEPROM('read_json')\" style='background:#9b59b6'>📄 Leggi JSON</button>",
+    "scope_id": 9,
+    "key_id": 291
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_onclick_testeeprom_read_style_background_3498db_leggi_but",
+    "text": "<button onclick=\"testEEPROM('read')\" style='background:#3498db'>📖 Leggi</button>",
+    "scope_id": 9,
+    "key_id": 292
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_onclick_testeeprom_write_scrivi_button",
+    "text": "<button onclick=\"testEEPROM('write')\">✍️ Scrivi</button>",
+    "scope_id": 9,
+    "key_id": 293
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_type_button_onclick_runscannercommand_scanner_off_class_b",
+    "text": "<button type='button' onclick=\"runScannerCommand('scanner_off')\" class='btn-stop'>Scanner OFF</button>",
+    "scope_id": 9,
+    "key_id": 294
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_type_button_onclick_runscannercommand_scanner_on_style_ba",
+    "text": "<button type='button' onclick=\"runScannerCommand('scanner_on')\" style='background:#2ecc71'>Scanner ON</button>",
+    "scope_id": 9,
+    "key_id": 295
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_type_button_onclick_runscannercommand_scanner_setup_style",
+    "text": "<button type='button' onclick=\"runScannerCommand('scanner_setup')\" style='background:#8e44ad'>Scanner SETUP</button>",
+    "scope_id": 9,
+    "key_id": 296
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "button_type_button_onclick_runscannercommand_scanner_state_style",
+    "text": "<button type='button' onclick=\"runScannerCommand('scanner_state')\" style='background:#3498db'>Scanner STATE</button>",
+    "scope_id": 9,
+    "key_id": 297
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "c",
+    "text": "-- °C / -- %",
+    "scope_id": 9,
+    "key_id": 298
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "c_get_test",
+    "text": "[C] GET /test",
+    "scope_id": 9,
+    "key_id": 299
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "canale",
+    "text": "Canale:",
+    "scope_id": 9,
+    "key_id": 300
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "caricamento",
+    "text": "Caricamento...",
+    "scope_id": 9,
+    "key_id": 191
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "cctalk",
+    "text": "📡 CCtalk",
+    "scope_id": 9,
+    "key_id": 301
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "clear",
+    "text": "🗑️ Clear",
+    "scope_id": 9,
+    "key_id": 302
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "collapsible_sections_support",
+    "text": "/* Collapsible sections support */",
+    "scope_id": 9,
+    "key_id": 303
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "config_json",
+    "text": "📄 Config JSON:",
+    "scope_id": 9,
+    "key_id": 304
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "controllo_manuale",
+    "text": "Controllo Manuale",
+    "scope_id": 9,
+    "key_id": 305
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "controllo_manuale_pwm",
+    "text": "Controllo Manuale PWM",
+    "scope_id": 9,
+    "key_id": 306
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "copiato",
+    "text": "📋 Copiato",
+    "scope_id": 9,
+    "key_id": 307
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "dato_byte_0_255",
+    "text": "Dato Byte (0-255)",
+    "scope_id": 9,
+    "key_id": 308
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "display_brightness_slider_handler_debounced_persist_after_idle",
+    "text": "// display brightness slider handler (debounced + persist after idle)",
+    "scope_id": 9,
+    "key_id": 309
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div",
+    "text": "</div>",
+    "scope_id": 9,
+    "key_id": 148
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_container",
+    "text": "<div class='container'>",
+    "scope_id": 9,
+    "key_id": 310
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls",
+    "text": "<div class='test-controls'>",
+    "scope_id": 9,
+    "key_id": 311
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_cctalk_onclick_togglesimpl",
+    "text": "<div class='test-controls'><button id='btn_cctalk' onclick=\"toggleSimpleTest('cctalk', 'btn_cctalk', 'Test CCtalk')\">▶️ Inizia Test</button></div></div>",
+    "scope_id": 9,
+    "key_id": 312
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_ioexp_onclick_togglesimple",
+    "text": "<div class='test-controls'><button id='btn_ioexp' onclick=\"toggleSimpleTest('ioexp', 'btn_ioexp', 'Blink')\">▶️ Inizia Blink</button></div></div>",
+    "scope_id": 9,
+    "key_id": 313
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_led_rainbow_onclick_toggle",
+    "text": "<div class='test-controls'><button id='btn_led_rainbow' onclick=\"toggleLedRainbow()\">▶️ Inizia Rainbow</button></div></div>",
+    "scope_id": 9,
+    "key_id": 314
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_mdb_onclick_togglesimplete",
+    "text": "<div class='test-controls'><button id='btn_mdb' onclick=\"toggleSimpleTest('mdb', 'btn_mdb', 'Test MDB')\">▶️ Inizia Test</button></div></div>",
+    "scope_id": 9,
+    "key_id": 315
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_pwm1_onclick_togglesimplet",
+    "text": "<div class='test-controls'><button id='btn_pwm1' onclick=\"toggleSimpleTest('pwm1', 'btn_pwm1', 'Sweep PWM1')\">▶️ Inizia Sweep</button></div></div>",
+    "scope_id": 9,
+    "key_id": 316
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_pwm2_onclick_togglesimplet",
+    "text": "<div class='test-controls'><button id='btn_pwm2' onclick=\"toggleSimpleTest('pwm2', 'btn_pwm2', 'Sweep PWM2')\">▶️ Inizia Sweep</button></div></div>",
+    "scope_id": 9,
+    "key_id": 317
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_rs232_onclick_togglesimple",
+    "text": "<div class='test-controls'><button id='btn_rs232' onclick=\"toggleSimpleTest('rs232', 'btn_rs232', 'Test RS232')\">▶️ Inizia Test</button></div></div>",
+    "scope_id": 9,
+    "key_id": 318
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_id_btn_rs485_onclick_togglesimple",
+    "text": "<div class='test-controls'><button id='btn_rs485' onclick=\"toggleSimpleTest('rs485', 'btn_rs485', 'Test RS485')\">▶️ Inizia Test</button></div></div>",
+    "scope_id": 9,
+    "key_id": 319
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_onclick_if_confirm_cancellare_tut",
+    "text": "<div class='test-controls'><button onclick=\"if(confirm('Cancellare TUTTI i dati per pulire la scheda?'))runTest('sd_format')\" style='background:#c0392b'>🧨 Pulisci/Formatta</button></div>",
+    "scope_id": 9,
+    "key_id": 320
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_onclick_runconfigbackup_style_bac",
+    "text": "<div class='test-controls'><button onclick=\"runConfigBackup()\" style='background:#9b59b6'>📥 Backup</button></div></div>",
+    "scope_id": 9,
+    "key_id": 321
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_button_onclick_runtest_sd_list_elenca_bu",
+    "text": "<div class='test-controls'><button onclick=\"runTest('sd_list')\">📂 Elenca</button></div></div>",
+    "scope_id": 9,
+    "key_id": 322
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_input_type_number_id_eeprom_addr_value_0",
+    "text": "<div class='test-controls'><input type='number' id='eeprom_addr' value='0' min='0' max='2047' style='width:80px'></div></div>",
+    "scope_id": 9,
+    "key_id": 323
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_input_type_number_id_eeprom_val_value_12",
+    "text": "<div class='test-controls'><input type='number' id='eeprom_val' value='123' min='0' max='255' style='width:80px'>",
+    "scope_id": 9,
+    "key_id": 324
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_input_type_text_id_cctalk_input_placehol",
+    "text": "<div class='test-controls'><input type='text' id='cctalk_input' placeholder='0x01 0x02...'><button onclick=\"sendSerial('cctalk')\">🚀 Invia</button></div></div>",
+    "scope_id": 9,
+    "key_id": 325
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_input_type_text_id_mdb_input_placeholder",
+    "text": "<div class='test-controls'><input type='text' id='mdb_input' placeholder='08 00...'><button onclick=\"sendSerial('mdb')\">🚀 Invia</button></div></div>",
+    "scope_id": 9,
+    "key_id": 326
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_input_type_text_id_rs232_input_placehold",
+    "text": "<div class='test-controls'><input type='text' id='rs232_input' placeholder='\\\\0x55 Test...'><button onclick=\"sendSerial('rs232')\">🚀 Invia</button></div></div>",
+    "scope_id": 9,
+    "key_id": 327
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_controls_input_type_text_id_rs485_input_placehold",
+    "text": "<div class='test-controls'><input type='text' id='rs485_input' placeholder='Richiesta...'><button onclick=\"sendSerial('rs485')\">🚀 Invia</button></div></div>",
+    "scope_id": 9,
+    "key_id": 328
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item",
+    "text": "<div class='test-item'>",
+    "scope_id": 9,
+    "key_id": 329
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_backup_json_config_span",
+    "text": "<div class='test-item'><span>Backup JSON Config</span>",
+    "scope_id": 9,
+    "key_id": 330
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_blink_tutte_le_uscite_",
+    "text": "<div class='test-item'><span class='test-label'>Blink Tutte le Uscite (1Hz)</span>",
+    "scope_id": 9,
+    "key_id": 331
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_pattern_rainbow_span",
+    "text": "<div class='test-item'><span class='test-label'>Pattern Rainbow</span>",
+    "scope_id": 9,
+    "key_id": 332
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_pwm1_duty_cycle_sweep_",
+    "text": "<div class='test-item'><span class='test-label'>PWM1 Duty Cycle Sweep</span>",
+    "scope_id": 9,
+    "key_id": 333
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_pwm2_duty_cycle_sweep_",
+    "text": "<div class='test-item'><span class='test-label'>PWM2 Duty Cycle Sweep</span>",
+    "scope_id": 9,
+    "key_id": 334
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_stato_montaggio_span",
+    "text": "<div class='test-item'><span class='test-label'>Stato Montaggio:</span>",
+    "scope_id": 9,
+    "key_id": 335
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_test_loopback_0x55_0xa",
+    "text": "<div class='test-item'><span class='test-label'>Test Loopback: 0x55, 0xAA, 0x01, 0x07</span>",
+    "scope_id": 9,
+    "key_id": 336
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_test_loopback_echo_spa",
+    "text": "<div class='test-item'><span class='test-label'>Test Loopback/Echo</span>",
+    "scope_id": 9,
+    "key_id": 337
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_test_loopback_invia_pa",
+    "text": "<div class='test-item'><span class='test-label'>Test Loopback: invia pacchetto di prova</span>",
+    "scope_id": 9,
+    "key_id": 338
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_ultime_letture_span",
+    "text": "<div class='test-item'><span class='test-label'>Ultime Letture</span>",
+    "scope_id": 9,
+    "key_id": 339
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_class_test_label_ultimo_errore_span",
+    "text": "<div class='test-item'><span class='test-label'>Ultimo Errore:</span>",
+    "scope_id": 9,
+    "key_id": 340
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_dato_byte_0_255_span",
+    "text": "<div class='test-item'><span>Dato Byte (0-255)</span>",
+    "scope_id": 9,
+    "key_id": 341
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_elenco_file_root_span",
+    "text": "<div class='test-item'><span>Elenco File (Root)</span>",
+    "scope_id": 9,
+    "key_id": 342
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_indirizzo_0_2047_span",
+    "text": "<div class='test-item'><span>Indirizzo (0-2047)</span>",
+    "scope_id": 9,
+    "key_id": 343
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_invia_pacchetto_es_0x01_0x02_span",
+    "text": "<div class='test-item'><span>Invia Pacchetto (es: 0x01 0x02)</span>",
+    "scope_id": 9,
+    "key_id": 344
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_invia_stringa_es_0x55_0xaa_r_span",
+    "text": "<div class='test-item'><span>Invia Stringa (es: \\\\0x55\\\\0xAA\\\\r\\ )</span>",
+    "scope_id": 9,
+    "key_id": 345
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_invia_stringa_hex_es_08_00_span",
+    "text": "<div class='test-item'><span>Invia Stringa (Hex, es: 08 00)</span>",
+    "scope_id": 9,
+    "key_id": 346
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_invia_stringa_span",
+    "text": "<div class='test-item'><span>Invia Stringa</span>",
+    "scope_id": 9,
+    "key_id": 347
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_seleziona_colore_span",
+    "text": "<div class='test-item'><span>Seleziona Colore:</span>",
+    "scope_id": 9,
+    "key_id": 348
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_class_test_item_span_valori_correnti_span",
+    "text": "<div class='test-item'><span>Valori Correnti:</span>",
+    "scope_id": 9,
+    "key_id": 349
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_div",
+    "text": "</div></div>",
+    "scope_id": 9,
+    "key_id": 150
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_cctalk_status_class_status_box_monitor_div_div",
+    "text": "<div id='cctalk_status' class='status-box'>Monitor:</div></div>",
+    "scope_id": 9,
+    "key_id": 350
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_eeprom_status_class_status_box_pronto_per_test_eeprom_div",
+    "text": "<div id='eeprom_status' class='status-box'>Pronto per test EEPROM</div></div>",
+    "scope_id": 9,
+    "key_id": 351
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_gpios_status_class_status_box_stato_gpio_in_lettura_div_d",
+    "text": "<div id='gpios_status' class='status-box'>Stato GPIO in lettura...</div></div>",
+    "scope_id": 9,
+    "key_id": 352
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_gpios_test_grid_caricamento_div",
+    "text": "<div id='gpios_test_grid'>Caricamento...</div>",
+    "scope_id": 9,
+    "key_id": 353
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_ioexp_status_class_status_box_pronto_per_test_i_o_expande",
+    "text": "<div id='ioexp_status' class='status-box'>Pronto per test I/O Expander</div></div>",
+    "scope_id": 9,
+    "key_id": 354
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_led_status_class_status_box_pronto_per_test_led_div_div",
+    "text": "<div id='led_status' class='status-box'>Pronto per test LED</div></div>",
+    "scope_id": 9,
+    "key_id": 355
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_mdb_status_class_status_box_pronto_per_test_mdb_div_div",
+    "text": "<div id='mdb_status' class='status-box'>Pronto per test MDB</div></div>",
+    "scope_id": 9,
+    "key_id": 356
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_pwm_status_class_status_box_pronto_per_test_pwm_div_div",
+    "text": "<div id='pwm_status' class='status-box'>Pronto per test PWM</div></div>",
+    "scope_id": 9,
+    "key_id": 357
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_rs232_status_class_status_box_monitor_div_div",
+    "text": "<div id='rs232_status' class='status-box'>Monitor:</div></div>",
+    "scope_id": 9,
+    "key_id": 358
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_rs485_status_class_status_box_monitor_div_div",
+    "text": "<div id='rs485_status' class='status-box'>Monitor:</div></div>",
+    "scope_id": 9,
+    "key_id": 359
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_scanner_status_class_status_box_nessuna_lettura_ancora_di",
+    "text": "<div id='scanner_status' class='status-box'>Nessuna lettura ancora.</div></div>",
+    "scope_id": 9,
+    "key_id": 360
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_sd_status_class_status_box_style_display_none_div_div",
+    "text": "<div id='sd_status' class='status-box' style='display:none'></div></div>",
+    "scope_id": 9,
+    "key_id": 361
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_section_gpio33_class_section_collapsed_h2_gpio_ausiliari_",
+    "text": "<div id='section_gpio33' class='section collapsed'><h2>🔘 GPIO Ausiliari (GPIO33)<span class='section-toggle-icon'>▸</span></h2>",
+    "scope_id": 9,
+    "key_id": 362
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_section_scanner_class_section_collapsed_h2_scanner_usb_ba",
+    "text": "<div id='section_scanner' class='section collapsed'><h2>🔍 Scanner USB (Barcode/QR)<span class='section-toggle-icon'>▸</span></h2>",
+    "scope_id": 9,
+    "key_id": 363
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "div_id_sht_status_class_status_box_pronto_per_test_sht40_div_div",
+    "text": "<div id='sht_status' class='status-box'>Pronto per test SHT40</div></div>",
+    "scope_id": 9,
+    "key_id": 364
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "duty",
+    "text": "Duty (%):",
+    "scope_id": 9,
+    "key_id": 365
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "eeprom_24lc16",
+    "text": "💾 EEPROM 24LC16",
+    "scope_id": 9,
+    "key_id": 366
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "elenca",
+    "text": "📂 Elenca",
+    "scope_id": 9,
+    "key_id": 367
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "elenco_file_root",
+    "text": "Elenco File (Root)",
+    "scope_id": 9,
+    "key_id": 368
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "else_out",
+    "text": "else out += '",
+    "scope_id": 9,
+    "key_id": 369
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "errore",
+    "text": "❌ Errore",
+    "scope_id": 9,
+    "key_id": 370
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "errore_comando_scanner",
+    "text": "❌ Errore comando scanner",
+    "scope_id": 9,
+    "key_id": 371
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "formattazione_fat32",
+    "text": "⚠️ Formattazione FAT32",
+    "scope_id": 9,
+    "key_id": 372
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "forza_test_lettura",
+    "text": "🔄 FORZA TEST LETTURA",
+    "scope_id": 9,
+    "key_id": 373
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "freq_hz",
+    "text": "Freq (Hz):",
+    "scope_id": 9,
+    "key_id": 374
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "gpio_ausiliari_gpio33",
+    "text": "🔘 GPIO Ausiliari (GPIO33)",
+    "scope_id": 9,
+    "key_id": 375
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "h",
+    "text": "h+='",
+    "scope_id": 9,
+    "key_id": 376
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "h3_controllo_manuale_h3",
+    "text": "<h3>Controllo Manuale</h3>",
+    "scope_id": 9,
+    "key_id": 377
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "h3_controllo_manuale_pwm_h3",
+    "text": "<h3>Controllo Manuale PWM</h3>",
+    "scope_id": 9,
+    "key_id": 378
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "hex",
+    "text": "HEX",
+    "scope_id": 9,
+    "key_id": 379
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "hex_2",
+    "text": ".' + hex + '",
+    "scope_id": 9,
+    "key_id": 380
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "hide_test_sections_when_corresponding_peripheral_is_disabled_in_",
+    "text": "// Hide /test sections when corresponding peripheral is disabled in /config",
+    "scope_id": 9,
+    "key_id": 381
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "i2c_0x45",
+    "text": "(I2C 0x45)",
+    "scope_id": 9,
+    "key_id": 382
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "i_o_expander",
+    "text": "🔌 I/O Expander",
+    "scope_id": 9,
+    "key_id": 33
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "if_isout_h",
+    "text": "if(isOut) h+='",
+    "scope_id": 9,
+    "key_id": 383
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "indirizzo_0_2047",
+    "text": "Indirizzo (0-2047)",
+    "scope_id": 9,
+    "key_id": 384
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "ingressi_chip_0x44",
+    "text": "Ingressi (Chip 0x44)",
+    "scope_id": 9,
+    "key_id": 385
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "init",
+    "text": "⚡ Init",
+    "scope_id": 9,
+    "key_id": 386
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "inizia_blink",
+    "text": "▶️ Inizia Blink",
+    "scope_id": 9,
+    "key_id": 387
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "inizia_manuale",
+    "text": "🚀 Inizia Manuale",
+    "scope_id": 9,
+    "key_id": 388
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "inizia_rainbow",
+    "text": "▶️ Inizia Rainbow",
+    "scope_id": 9,
+    "key_id": 389
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "inizia_sweep",
+    "text": "▶️ Inizia Sweep",
+    "scope_id": 9,
+    "key_id": 390
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "inizia_test",
+    "text": "▶️ Inizia Test",
+    "scope_id": 9,
+    "key_id": 391
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "invia",
+    "text": "🚀 Invia",
+    "scope_id": 9,
+    "key_id": 219
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "invia_pacchetto_es_0x01_0x02",
+    "text": "Invia Pacchetto (es: 0x01 0x02)",
+    "scope_id": 9,
+    "key_id": 392
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "invia_stringa",
+    "text": "Invia Stringa",
+    "scope_id": 9,
+    "key_id": 393
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "invia_stringa_es_0x55_0xaa",
+    "text": "Invia Stringa (es: \\0x55\\0xAA\\",
+    "scope_id": 9,
+    "key_id": 394
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "invia_stringa_hex_es_08_00",
+    "text": "Invia Stringa (Hex, es: 08 00)",
+    "scope_id": 9,
+    "key_id": 395
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "invio_backup",
+    "text": "➡️ Invio Backup...",
+    "scope_id": 9,
+    "key_id": 396
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "leggi",
+    "text": "📖 Leggi",
+    "scope_id": 9,
+    "key_id": 397
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "leggi_json",
+    "text": "📄 Leggi JSON",
+    "scope_id": 9,
+    "key_id": 398
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "lettura_ok",
+    "text": "✅ Lettura OK",
+    "scope_id": 9,
+    "key_id": 399
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "live_update_to_hardware_short_debounce",
+    "text": "// live update to hardware (short debounce)",
+    "scope_id": 9,
+    "key_id": 400
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "log_operazioni_sd",
+    "text": "Log operazioni SD...",
+    "scope_id": 9,
+    "key_id": 401
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "luminosita",
+    "text": "Luminosità:",
+    "scope_id": 9,
+    "key_id": 402
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "mdb_multi_drop_bus",
+    "text": "🎰 MDB (Multi-Drop Bus)",
+    "scope_id": 9,
+    "key_id": 403
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "monitor",
+    "text": "Monitor:",
+    "scope_id": 9,
+    "key_id": 404
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "nessuna_lettura_ancora",
+    "text": "Nessuna lettura ancora.",
+    "scope_id": 9,
+    "key_id": 405
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "off",
+    "text": "OFF",
+    "scope_id": 9,
+    "key_id": 406
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "ok",
+    "text": "✅ OK",
+    "scope_id": 9,
+    "key_id": 407
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "on",
+    "text": "ON",
+    "scope_id": 9,
+    "key_id": 408
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "out1_gpio47",
+    "text": "OUT1 (GPIO47)",
+    "scope_id": 9,
+    "key_id": 409
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "out2_gpio48",
+    "text": "OUT2 (GPIO48)",
+    "scope_id": 9,
+    "key_id": 410
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pattern_rainbow",
+    "text": "Pattern Rainbow",
+    "scope_id": 9,
+    "key_id": 411
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pin_12_a_17_b",
+    "text": "(PIN 12 A, 17 B)",
+    "scope_id": 9,
+    "key_id": 412
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pin_15_gpio_5",
+    "text": "(PIN 15 / GPIO 5)",
+    "scope_id": 9,
+    "key_id": 413
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pin_23_tx_35_rx",
+    "text": "(PIN 23 TX, 35 RX)",
+    "scope_id": 9,
+    "key_id": 414
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pin_32_37_i2c",
+    "text": "(PIN 32, 37 / I2C)",
+    "scope_id": 9,
+    "key_id": 415
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pin_34_38",
+    "text": "(PIN 34, 38)",
+    "scope_id": 9,
+    "key_id": 416
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pin_39",
+    "text": "(PIN 39)",
+    "scope_id": 9,
+    "key_id": 417
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pin_8_11",
+    "text": "(PIN 8, 11)",
+    "scope_id": 9,
+    "key_id": 418
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "poi_pulisce_lato_server",
+    "text": "// Poi pulisce lato server",
+    "scope_id": 9,
+    "key_id": 419
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pronto_per_test_eeprom",
+    "text": "Pronto per test EEPROM",
+    "scope_id": 9,
+    "key_id": 420
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pronto_per_test_i_o_expander",
+    "text": "Pronto per test I/O Expander",
+    "scope_id": 9,
+    "key_id": 421
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pronto_per_test_led",
+    "text": "Pronto per test LED",
+    "scope_id": 9,
+    "key_id": 422
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pronto_per_test_mdb",
+    "text": "Pronto per test MDB",
+    "scope_id": 9,
+    "key_id": 423
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pronto_per_test_pwm",
+    "text": "Pronto per test PWM",
+    "scope_id": 9,
+    "key_id": 424
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pronto_per_test_sht40",
+    "text": "Pronto per test SHT40",
+    "scope_id": 9,
+    "key_id": 425
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pulisce_immediatamente_l_area_di_testo_lato_client",
+    "text": "// Pulisce immediatamente l'area di testo lato client",
+    "scope_id": 9,
+    "key_id": 426
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pulisci_formatta",
+    "text": "🧨 Pulisci/Formatta",
+    "scope_id": 9,
+    "key_id": 427
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pwm",
+    "text": "⚡ PWM",
+    "scope_id": 9,
+    "key_id": 428
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pwm1_duty_cycle_sweep",
+    "text": "PWM1 Duty Cycle Sweep",
+    "scope_id": 9,
+    "key_id": 429
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "pwm2_duty_cycle_sweep",
+    "text": "PWM2 Duty Cycle Sweep",
+    "scope_id": 9,
+    "key_id": 430
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scanner_off",
+    "text": "Scanner OFF",
+    "scope_id": 9,
+    "key_id": 431
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scanner_on",
+    "text": "Scanner ON",
+    "scope_id": 9,
+    "key_id": 432
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scanner_setup",
+    "text": "Scanner SETUP",
+    "scope_id": 9,
+    "key_id": 433
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scanner_state",
+    "text": "Scanner STATE",
+    "scope_id": 9,
+    "key_id": 434
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scanner_ui_mostra_le_ultime_letture_tag_scanner_e_comandi_on_off",
+    "text": "// Scanner UI: mostra le ultime letture (tag 'SCANNER') e comandi ON/OFF",
+    "scope_id": 9,
+    "key_id": 435
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scanner_usb_barcode_qr",
+    "text": "🔍 Scanner USB (Barcode/QR)",
+    "scope_id": 9,
+    "key_id": 436
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scheda_microsd",
+    "text": "💾 Scheda MicroSD",
+    "scope_id": 9,
+    "key_id": 437
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "schedule_persistence_after_5s_of_inactivity",
+    "text": "// schedule persistence after 5s of inactivity",
+    "scope_id": 9,
+    "key_id": 438
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "script_body_html",
+    "text": "</script></body></html>",
+    "scope_id": 9,
+    "key_id": 176
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "scrivi",
+    "text": "✍️ Scrivi",
+    "scope_id": 9,
+    "key_id": 439
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "select_id_cctalk_mode_onchange_clearserial_cctalk_option_value_h",
+    "text": "<select id='cctalk_mode' onchange=\"clearSerial('cctalk')\"><option value='HEX'>HEX</option><option value='TEXT'>TEXT</option></select>",
+    "scope_id": 9,
+    "key_id": 440
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "select_id_mdb_mode_onchange_clearserial_mdb_option_value_hex_hex",
+    "text": "<select id='mdb_mode' onchange=\"clearSerial('mdb')\"><option value='HEX'>HEX</option><option value='TEXT'>TEXT</option></select>",
+    "scope_id": 9,
+    "key_id": 441
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "select_id_rs232_mode_onchange_clearserial_rs232_option_value_hex",
+    "text": "<select id='rs232_mode' onchange=\"clearSerial('rs232')\"><option value='HEX'>HEX</option><option value='TEXT'>TEXT</option></select>",
+    "scope_id": 9,
+    "key_id": 442
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "select_id_rs485_mode_onchange_clearserial_rs485_option_value_hex",
+    "text": "<select id='rs485_mode' onchange=\"clearSerial('rs485')\"><option value='HEX'>HEX</option><option value='TEXT'>TEXT</option></select>",
+    "scope_id": 9,
+    "key_id": 443
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "seleziona_colore",
+    "text": "Seleziona Colore:",
+    "scope_id": 9,
+    "key_id": 444
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "sensore_sht40",
+    "text": "🌡️ Sensore SHT40",
+    "scope_id": 9,
+    "key_id": 445
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "sensors",
+    "text": "/* sensors */",
+    "scope_id": 9,
+    "key_id": 446
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "seriale_rs232",
+    "text": "📡 Seriale RS232",
+    "scope_id": 9,
+    "key_id": 447
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "seriale_rs485",
+    "text": "📡 Seriale RS485",
+    "scope_id": 9,
+    "key_id": 448
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "span_canale_span",
+    "text": "<span>Canale:</span>",
+    "scope_id": 9,
+    "key_id": 449
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "span_duty_span_input_type_number_id_pwm_duty_value_50_min_0_max_",
+    "text": "<span>Duty (%):</span><input type='number' id='pwm_duty' value='50' min='0' max='100' style='width:60px'>",
+    "scope_id": 9,
+    "key_id": 450
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "span_freq_hz_span_input_type_number_id_pwm_freq_value_1000_min_1",
+    "text": "<span>Freq (Hz):</span><input type='number' id='pwm_freq' value='1000' min='100' max='20000' style='width:80px'>",
+    "scope_id": 9,
+    "key_id": 451
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "span_id_sd_mounted_status_style_font_weight_bold_span_div",
+    "text": "<span id='sd_mounted_status' style='font-weight:bold'>--</span></div>",
+    "scope_id": 9,
+    "key_id": 452
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "span_luminosita_span_input_type_range_id_led_bright_min_0_max_10",
+    "text": "<span>Luminosità:</span><input type='range' id='led_bright' min='0' max='100' value='50' oninput='updateLedRealtime()' style='width:100px'>",
+    "scope_id": 9,
+    "key_id": 453
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "stato_gpio_in_lettura",
+    "text": "Stato GPIO in lettura...",
+    "scope_id": 9,
+    "key_id": 454
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "stato_montaggio",
+    "text": "Stato Montaggio:",
+    "scope_id": 9,
+    "key_id": 455
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "striscia_led_ws2812",
+    "text": "💡 Striscia LED (WS2812)",
+    "scope_id": 9,
+    "key_id": 456
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "test_hardware",
+    "text": "Test Hardware",
+    "scope_id": 9,
+    "key_id": 275
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "test_loopback_0x55_0xaa_0x01_0x07",
+    "text": "Test Loopback: 0x55, 0xAA, 0x01, 0x07",
+    "scope_id": 9,
+    "key_id": 457
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "test_loopback_echo",
+    "text": "Test Loopback/Echo",
+    "scope_id": 9,
+    "key_id": 458
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "test_loopback_invia_pacchetto_di_prova",
+    "text": "Test Loopback: invia pacchetto di prova",
+    "scope_id": 9,
+    "key_id": 459
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "text",
+    "text": "TEXT",
+    "scope_id": 9,
+    "key_id": 460
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "text_2",
+    "text": "' + text + '",
+    "scope_id": 9,
+    "key_id": 461
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "ultime_letture",
+    "text": "Ultime Letture",
+    "scope_id": 9,
+    "key_id": 462
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "ultimo_errore",
+    "text": "Ultimo Errore:",
+    "scope_id": 9,
+    "key_id": 463
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "uscite_chip_0x43",
+    "text": "Uscite (Chip 0x43)",
+    "scope_id": 9,
+    "key_id": 464
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "valori_correnti",
+    "text": "Valori Correnti:",
+    "scope_id": 9,
+    "key_id": 465
+  },
+  {
+    "lang": "it",
+    "scope": "p_test",
+    "key": "web_ui_test_page",
+    "text": "WEB_UI_TEST_PAGE",
+    "scope_id": 9,
+    "key_id": 466
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "out_of_service_title",
+    "text": "Fuori servizio",
+    "scope_id": 2,
+    "key_id": 467
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "out_of_service_sub",
+    "text": "Reboot consecutivi: %lu\nContattare l'assistenza",
+    "scope_id": 2,
+    "key_id": 468
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "credit_label",
+    "text": "Credito",
+    "scope_id": 2,
+    "key_id": 469
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "elapsed_fmt",
+    "text": "Secondi   %s",
+    "scope_id": 2,
+    "key_id": 470
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "pause_fmt",
+    "text": "Pausa: %s",
+    "scope_id": 2,
+    "key_id": 471
+  },
+  {
+    "lang": "it",
+    "scope": "lvgl",
+    "key": "program_btn_fmt",
+    "text": "Programma %d",
+    "scope_id": 2,
+    "key_id": 472
+  }
+]

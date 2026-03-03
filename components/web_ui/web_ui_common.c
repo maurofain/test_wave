@@ -12,6 +12,7 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include "esp_heap_caps.h"
 
 /*
  * @file web_ui_common.c
@@ -29,6 +30,36 @@ static const char *HTML_STYLE_NAV =
 
 static const char *TAG = "WEB_UI_COMMON";
 
+/* PSRAM-backed compact i18n record (matches `i18n_record_t` in header) */
+typedef struct {
+    uint8_t scope_id;
+    uint16_t key_id;
+    uint8_t section;
+    char text[32];
+} ps_i18n_rec_t;
+
+/* Allocate in PSRAM when possible */
+static void *ps_malloc(size_t sz)
+{
+    void *p = NULL;
+#ifdef MALLOC_CAP_SPIRAM
+    p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#endif
+    if (!p) {
+        p = malloc(sz);
+    }
+    return p;
+}
+
+static void ps_free(void *p)
+{
+#ifdef MALLOC_CAP_SPIRAM
+    heap_caps_free(p);
+#else
+    free(p);
+#endif
+}
+
 #define I18N_CACHE_MAX_ENTRIES 8
 
 typedef struct {
@@ -39,6 +70,64 @@ typedef struct {
 
 static i18n_cache_entry_t s_i18n_cache[I18N_CACHE_MAX_ENTRIES];
 static size_t s_i18n_cache_next_slot = 0;
+
+/* PSRAM resident dictionary */
+static i18n_record_t *s_i18n_ps_records = NULL;
+static size_t s_i18n_ps_count = 0;
+
+/* Load language into PSRAM and keep resident */
+esp_err_t web_ui_i18n_load_language_psram(const char *language)
+{
+    if (s_i18n_ps_records) {
+        i18n_free_dictionary_psram(s_i18n_ps_records);
+        s_i18n_ps_records = NULL;
+        s_i18n_ps_count = 0;
+    }
+
+    size_t count = 0;
+    i18n_record_t *arr = i18n_load_full_dictionary_psram(language, &count);
+    if (!arr || count == 0) {
+        return ESP_FAIL;
+    }
+    s_i18n_ps_records = arr;
+    s_i18n_ps_count = count;
+    ESP_LOGI(TAG, "Loaded %zu i18n records into PSRAM for language %s", count, language);
+    return ESP_OK;
+}
+
+/* Concatenate sections for given numeric ids from PSRAM array */
+char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id)
+{
+    if (!s_i18n_ps_records || s_i18n_ps_count == 0) return NULL;
+
+    /* First pass: collect matching sections and total length */
+    size_t total_len = 0;
+    size_t sections = 0;
+    for (size_t i = 0; i < s_i18n_ps_count; ++i) {
+        if (s_i18n_ps_records[i].scope_id == scope_id && s_i18n_ps_records[i].key_id == key_id) {
+            total_len += strnlen(s_i18n_ps_records[i].text, sizeof(s_i18n_ps_records[i].text));
+            sections++;
+        }
+    }
+    if (sections == 0) return NULL;
+
+    char *out = malloc(total_len + 1);
+    if (!out) return NULL;
+
+    /* second pass: append in encounter order using memcpy to avoid
+     * incorrect strncat size usage and warnings treated as errors. */
+    size_t pos = 0;
+    for (size_t i = 0; i < s_i18n_ps_count; ++i) {
+        if (s_i18n_ps_records[i].scope_id == scope_id && s_i18n_ps_records[i].key_id == key_id) {
+            size_t part_len = strnlen(s_i18n_ps_records[i].text, sizeof(s_i18n_ps_records[i].text));
+            if (part_len == 0) continue;
+            memcpy(out + pos, s_i18n_ps_records[i].text, part_len);
+            pos += part_len;
+        }
+    }
+    out[pos] = '\0';
+    return out;
+}
 
 /**
  * @brief Duplica una stringa C in memoria heap
@@ -209,6 +298,113 @@ void web_ui_i18n_cache_invalidate(void)
         s_i18n_cache[i].scope[0] = '\0';
     }
     s_i18n_cache_next_slot = 0;
+}
+
+/*
+ * Load full i18n dictionary for a language into PSRAM as an array of
+ * `i18n_record_t`-compatible records. Caller must free with
+ * `i18n_free_dictionary_psram()`.
+ */
+i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out_count)
+{
+    if (!language) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    char *json = device_config_get_ui_texts_records_json(language);
+    if (!json) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    cJSON *root = cJSON_Parse(json);
+    free(json);
+    if (!root || !cJSON_IsArray(root)) {
+        if (root) cJSON_Delete(root);
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    int total = cJSON_GetArraySize(root);
+    if (total <= 0) {
+        cJSON_Delete(root);
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    ps_i18n_rec_t *arr = ps_malloc((size_t)total * sizeof(ps_i18n_rec_t));
+    if (!arr) {
+        cJSON_Delete(root);
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
+
+    memset(arr, 0, (size_t)total * sizeof(ps_i18n_rec_t));
+
+    int idx = 0;
+    cJSON *item = NULL;
+    cJSON_ArrayForEach(item, root) {
+        if (!cJSON_IsObject(item)) continue;
+
+        uint8_t scope_id = 0;
+        uint16_t key_id = 0;
+        uint8_t section = 0;
+        const char *text = NULL;
+
+        cJSON *j_scope_id = cJSON_GetObjectItemCaseSensitive(item, "scope_id");
+        cJSON *j_key_id = cJSON_GetObjectItemCaseSensitive(item, "key_id");
+        cJSON *j_section = cJSON_GetObjectItemCaseSensitive(item, "section");
+        cJSON *j_section_old = cJSON_GetObjectItemCaseSensitive(item, "section");
+
+        if (cJSON_IsNumber(j_scope_id)) {
+            scope_id = (uint8_t)j_scope_id->valueint;
+        } else {
+            cJSON *j_scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
+            if (cJSON_IsNumber(j_scope)) scope_id = (uint8_t)j_scope->valueint;
+        }
+
+        if (cJSON_IsNumber(j_key_id)) {
+            key_id = (uint16_t)j_key_id->valueint;
+        } else {
+            cJSON *j_key = cJSON_GetObjectItemCaseSensitive(item, "key");
+            if (cJSON_IsNumber(j_key)) key_id = (uint16_t)j_key->valueint;
+        }
+
+        if (cJSON_IsNumber(j_section)) {
+            section = (uint8_t)j_section->valueint;
+        } else if (cJSON_IsNumber(j_section_old)) {
+            section = (uint8_t)j_section_old->valueint;
+        }
+
+        cJSON *j_text = cJSON_GetObjectItemCaseSensitive(item, "text");
+        if (cJSON_IsString(j_text) && j_text->valuestring) {
+            text = j_text->valuestring;
+        }
+
+        arr[idx].scope_id = scope_id;
+        arr[idx].key_id = key_id;
+        arr[idx].section = section;
+        if (text) {
+            strncpy(arr[idx].text, text, sizeof(arr[idx].text) - 1);
+            arr[idx].text[sizeof(arr[idx].text) - 1] = '\0';
+        } else {
+            arr[idx].text[0] = '\0';
+        }
+        idx++;
+        if (idx >= total) break;
+    }
+
+    cJSON_Delete(root);
+
+    if (out_count) *out_count = (size_t)idx;
+    return (i18n_record_t *)arr;
+}
+
+void i18n_free_dictionary_psram(i18n_record_t *records)
+{
+    if (!records) return;
+    ps_free(records);
 }
 
 /**

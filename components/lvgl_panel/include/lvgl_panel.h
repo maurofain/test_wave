@@ -27,6 +27,9 @@
  */
 void lvgl_panel_show(void);
 
+/* Aggiorna i testi visibili in LVGL dopo un cambio lingua */
+void lvgl_panel_refresh_texts(void);
+
 /**
  * @brief Mostra una schermata di blocco "Fuori servizio" a tutto schermo.
  *

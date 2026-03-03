@@ -6,6 +6,16 @@
 #include "web_ui_profile.h"
 #include <stdbool.h>
 
+/* I18n compact record stored in PSRAM
+ * fields: numeric ids for scope/key/section and fixed-size text (32 bytes incl. NUL)
+ */
+typedef struct {
+	uint8_t scope_id;
+	uint16_t key_id;
+	uint8_t section;
+	char text[32];
+} i18n_record_t;
+
 /**
  * @file web_ui_internal.h
  * @brief Dichiarazioni interne condivise tra i file del componente Web UI
@@ -120,6 +130,23 @@ const char *web_ui_profile_view_label(void);
 void web_ui_factory_features_override_set(bool enabled);
 bool web_ui_factory_features_override_get(void);
 void web_ui_i18n_cache_invalidate(void);
+
+/* Load full i18n dictionary for `language` into PSRAM. Returns pointer to
+ * an array of `i18n_record_t` and fills `out_count`. Caller must free with
+ * `i18n_free_dictionary_psram()`.
+ */
+i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out_count);
+void i18n_free_dictionary_psram(i18n_record_t *records);
+
+/* Concatenate sections from PSRAM-loaded dictionary for a given numeric ids.
+ * Returns a heap-allocated string (malloc) or NULL. Caller frees with free().
+ */
+char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id);
+
+/* Load language dictionary into PSRAM and keep it resident until invalidated.
+ * Returns ESP_OK on success. Freed by `web_ui_i18n_cache_invalidate()`.
+ */
+esp_err_t web_ui_i18n_load_language_psram(const char *language);
 
 // Error handler esposto per la registrazione (moved to pages)
 esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error);
