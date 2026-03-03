@@ -12,6 +12,48 @@
     "text": "Time not available"
   },
   {
+    "scope": 2,
+    "key": 467,
+    "section": 0,
+    "text": "Out of service"
+  },
+  {
+    "scope": 2,
+    "key": 468,
+    "section": 0,
+    "text": "Consecutive reboots: %lu\nContac"
+  },
+  {
+    "scope": 2,
+    "key": 468,
+    "section": 1,
+    "text": "t support"
+  },
+  {
+    "scope": 2,
+    "key": 469,
+    "section": 0,
+    "text": "Credit"
+  },
+  {
+    "scope": 2,
+    "key": 470,
+    "section": 0,
+    "text": "Seconds   %s"
+  },
+  {
+    "scope": 2,
+    "key": 471,
+    "section": 0,
+    "text": "Pause: %s"
+  },
+  {
+    "scope": 2,
+    "key": 472,
+    "section": 0,
+    "text": "Program %d"
+  },
+  {
     "scope": 3,
     "key": 3,
     "section": 0,
@@ -685,18 +727,6 @@
   },
   {
     "scope": 5,
-    "key": 473,
-    "section": 0,
-    "text": "Program 9"
-  },
-  {
-    "scope": 5,
-    "key": 474,
-    "section": 0,
-    "text": "Program 10"
-  },
-  {
-    "scope": 5,
     "key": 111,
     "section": 0,
     "text": "Electrical panel"
@@ -784,6 +814,18 @@
     "key": 125,
     "section": 0,
     "text": "Time: 00:00"
+  },
+  {
+    "scope": 5,
+    "key": 473,
+    "section": 0,
+    "text": "Program 9"
+  },
+  {
+    "scope": 5,
+    "key": 474,
+    "section": 0,
+    "text": "Program 10"
   },
   {
     "scope": 6,
@@ -895,6 +937,18 @@
   },
   {
     "scope": 7,
+    "key": 11,
+    "section": 0,
+    "text": "Enabled"
+  },
+  {
+    "scope": 7,
+    "key": 87,
+    "section": 0,
+    "text": "Program Table"
+  },
+  {
+    "scope": 7,
     "key": 139,
     "section": 0,
     "text": "400 Bad Request"
@@ -916,12 +970,6 @@
     "key": 142,
     "section": 0,
     "text": "405 Method Not Allowed"
-  },
-  {
-    "scope": 7,
-    "key": 11,
-    "section": 0,
-    "text": "Enabled"
   },
   {
     "scope": 7,
@@ -1183,12 +1231,6 @@
   },
   {
     "scope": 7,
-    "key": 87,
-    "section": 0,
-    "text": "Program Table"
-  },
-  {
-    "scope": 7,
     "key": 177,
     "section": 0,
     "text": "\n| ID\n|Name\n|Enabled\n|Price\n|Du"
@@ -1219,15 +1261,63 @@
   },
   {
     "scope": 8,
-    "key": 179,
-    "section": 0,
-    "text": "Activity"
-  },
-  {
-    "scope": 8,
     "key": 13,
     "section": 0,
     "text": "🔄 Update Data"
+  },
+  {
+    "scope": 8,
+    "key": 33,
+    "section": 0,
+    "text": "I/O Expander"
+  },
+  {
+    "scope": 8,
+    "key": 45,
+    "section": 0,
+    "text": "MDB Engine"
+  },
+  {
+    "scope": 8,
+    "key": 76,
+    "section": 0,
+    "text": "Temperature Sensor"
+  },
+  {
+    "scope": 8,
+    "key": 87,
+    "section": 0,
+    "text": "Program Table"
+  },
+  {
+    "scope": 8,
+    "key": 89,
+    "section": 0,
+    "text": "UART RS232"
+  },
+  {
+    "scope": 8,
+    "key": 90,
+    "section": 0,
+    "text": "UART RS485"
+  },
+  {
+    "scope": 8,
+    "key": 128,
+    "section": 0,
+    "text": "Configuration"
+  },
+  {
+    "scope": 8,
+    "key": 161,
+    "section": 0,
+    "text": "Name"
+  },
+  {
+    "scope": 8,
+    "key": 179,
+    "section": 0,
+    "text": "Activity"
   },
   {
     "scope": 8,
@@ -1306,12 +1396,6 @@
     "key": 191,
     "section": 0,
     "text": "Loading..."
-  },
-  {
-    "scope": 8,
-    "key": 128,
-    "section": 0,
-    "text": "Configuration"
   },
   {
     "scope": 8,
@@ -1453,12 +1537,6 @@
   },
   {
     "scope": 8,
-    "key": 33,
-    "section": 0,
-    "text": "I/O Expander"
-  },
-  {
-    "scope": 8,
     "key": 215,
     "section": 0,
     "text": "Ethernet IP Address"
@@ -1519,12 +1597,6 @@
   },
   {
     "scope": 8,
-    "key": 45,
-    "section": 0,
-    "text": "MDB Engine"
-  },
-  {
-    "scope": 8,
     "key": 225,
     "section": 0,
     "text": "🎰 MDB Status"
@@ -1534,12 +1606,6 @@
     "key": 226,
     "section": 0,
     "text": "Method"
-  },
-  {
-    "scope": 8,
-    "key": 161,
-    "section": 0,
-    "text": "Name"
   },
   {
     "scope": 8,
@@ -1753,12 +1819,6 @@
   },
   {
     "scope": 8,
-    "key": 76,
-    "section": 0,
-    "text": "Temperature Sensor"
-  },
-  {
-    "scope": 8,
     "key": 262,
     "section": 0,
     "text": "Serial:"
@@ -1825,12 +1885,6 @@
   },
   {
     "scope": 8,
-    "key": 87,
-    "section": 0,
-    "text": "Program Table"
-  },
-  {
-    "scope": 8,
     "key": 273,
     "section": 0,
     "text": "Tasks"
@@ -1852,18 +1906,6 @@
     "key": 276,
     "section": 0,
     "text": "Token:"
-  },
-  {
-    "scope": 8,
-    "key": 89,
-    "section": 0,
-    "text": "UART RS232"
-  },
-  {
-    "scope": 8,
-    "key": 90,
-    "section": 0,
-    "text": "UART RS485"
   },
   {
     "scope": 8,
@@ -1891,21 +1933,33 @@
   },
   {
     "scope": 9,
-    "key": 281,
-    "section": 0,
-    "text": "(4800 baud — PIN 21 RX, 20 TX"
-  },
-  {
-    "scope": 9,
-    "key": 281,
-    "section": 1,
-    "text": ")"
-  },
-  {
-    "scope": 9,
     "key": 12,
     "section": 0,
     "text": "🔄 Update"
+  },
+  {
+    "scope": 9,
+    "key": 33,
+    "section": 0,
+    "text": "🔌 I/O Expander"
+  },
+  {
+    "scope": 9,
+    "key": 148,
+    "section": 0,
+    "text": " "
+  },
+  {
+    "scope": 9,
+    "key": 150,
+    "section": 0,
+    "text": "\n"
+  },
+  {
+    "scope": 9,
+    "key": 176,
+    "section": 0,
+    "text": "\n"
   },
   {
     "scope": 9,
@@ -1918,6 +1972,36 @@
     "key": 186,
     "section": 0,
     "text": "🚀 Apply"
+  },
+  {
+    "scope": 9,
+    "key": 191,
+    "section": 0,
+    "text": "Loading..."
+  },
+  {
+    "scope": 9,
+    "key": 219,
+    "section": 0,
+    "text": "🚀 Send"
+  },
+  {
+    "scope": 9,
+    "key": 275,
+    "section": 0,
+    "text": "Hardware Test"
+  },
+  {
+    "scope": 9,
+    "key": 281,
+    "section": 0,
+    "text": "(4800 baud — PIN 21 RX, 20 TX"
+  },
+  {
+    "scope": 9,
+    "key": 281,
+    "section": 1,
+    "text": ")"
   },
   {
     "scope": 9,
@@ -2197,12 +2281,6 @@
   },
   {
     "scope": 9,
-    "key": 191,
-    "section": 0,
-    "text": "Loading..."
-  },
-  {
-    "scope": 9,
     "key": 301,
     "section": 0,
     "text": "📡 CCtalk"
@@ -2272,12 +2350,6 @@
     "key": 309,
     "section": 2,
     "text": "r idle)"
-  },
-  {
-    "scope": 9,
-    "key": 148,
-    "section": 0,
-    "text": " "
   },
   {
     "scope": 9,
@@ -2709,7 +2781,7 @@
     "scope": 9,
     "key": 345,
     "section": 0,
-    "text": "\nSend String (e.g: \\0x55\\0xAA\\r"
+    "text": "\nSend String (e.g: \\0x55\\0xAA\\\r"
   },
   {
     "scope": 9,
@@ -2740,12 +2812,6 @@
     "key": 349,
     "section": 0,
     "text": "\nCurrent Values:\n"
-  },
-  {
-    "scope": 9,
-    "key": 150,
-    "section": 0,
-    "text": "\n"
   },
   {
     "scope": 9,
@@ -2971,12 +3037,6 @@
   },
   {
     "scope": 9,
-    "key": 33,
-    "section": 0,
-    "text": "🔌 I/O Expander"
-  },
-  {
-    "scope": 9,
     "key": 383,
     "section": 0,
     "text": "if(isOut) h+='"
@@ -3028,12 +3088,6 @@
     "key": 391,
     "section": 0,
     "text": "▶️ Start Test"
-  },
-  {
-    "scope": 9,
-    "key": 219,
-    "section": 0,
-    "text": "🚀 Send"
   },
   {
     "scope": 9,
@@ -3349,12 +3403,6 @@
   },
   {
     "scope": 9,
-    "key": 176,
-    "section": 0,
-    "text": "\n"
-  },
-  {
-    "scope": 9,
     "key": 439,
     "section": 0,
     "text": "✍️ Write"
@@ -3505,12 +3553,6 @@
   },
   {
     "scope": 9,
-    "key": 275,
-    "section": 0,
-    "text": "Hardware Test"
-  },
-  {
-    "scope": 9,
     "key": 457,
     "section": 0,
     "text": "Test Loopback: 0x55, 0xAA, 0x01"
@@ -3574,47 +3616,5 @@
     "key": 466,
     "section": 0,
     "text": "WEB_UI_TEST_PAGE"
-  },
-  {
-    "scope": 2,
-    "key": 467,
-    "section": 0,
-    "text": "Out of service"
-  },
-  {
-    "scope": 2,
-    "key": 468,
-    "section": 0,
-    "text": "Consecutive reboots: %lu\nContac"
-  },
-  {
-    "scope": 2,
-    "key": 468,
-    "section": 1,
-    "text": "t support"
-  },
-  {
-    "scope": 2,
-    "key": 469,
-    "section": 0,
-    "text": "Credit"
-  },
-  {
-    "scope": 2,
-    "key": 470,
-    "section": 0,
-    "text": "Seconds   %s"
-  },
-  {
-    "scope": 2,
-    "key": 471,
-    "section": 0,
-    "text": "Pause: %s"
-  },
-  {
-    "scope": 2,
-    "key": 472,
-    "section": 0,
-    "text": "Program %d"
   }
 ]
