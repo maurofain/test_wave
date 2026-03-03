@@ -1,5 +1,6 @@
 #include "web_ui_programs.h"
 #include "fsm.h"
+#include "device_config.h"
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -120,11 +121,11 @@ static void programs_init_defaults(void)
     }
 
     memset(&s_program_table, 0, sizeof(s_program_table));
-    s_program_table.count = 8;
+    s_program_table.count = 10;
     for (uint8_t index = 0; index < s_program_table.count; ++index) {
         web_ui_program_entry_t *entry = &s_program_table.programs[index];
         entry->program_id = (uint8_t)(index + 1);
-        snprintf(entry->name, sizeof(entry->name), "Programma %u", (unsigned)entry->program_id);
+        snprintf(entry->name, sizeof(entry->name), "__i18n__programma_%u", (unsigned)entry->program_id);
         entry->enabled = true;
         entry->price_units = 10;
         entry->duration_sec = 60;
@@ -177,7 +178,22 @@ char *web_ui_program_table_to_json(void)
             continue;
         }
         cJSON_AddNumberToObject(item, "program_id", entry->program_id);
-        cJSON_AddStringToObject(item, "name", entry->name);
+        // If entry->name uses the __i18n__ prefix, resolve localized text from device i18n
+        if (entry->name[0] == '_' && entry->name[1] == '_' && entry->name[2] == 'i' && entry->name[3] == '1') {
+            // old-style check - keep fallback
+            cJSON_AddStringToObject(item, "name", entry->name);
+        } else if (strncmp(entry->name, "__i18n__", 8) == 0) {
+            const char *keyname = entry->name + 8;
+            char buf[WEB_UI_PROGRAM_NAME_MAX] = {0};
+            // scope for program names is p_emulator
+            if (device_config_get_ui_text_scoped("p_emulator", keyname, entry->name, buf, sizeof(buf)) == ESP_OK) {
+                cJSON_AddStringToObject(item, "name", buf);
+            } else {
+                cJSON_AddStringToObject(item, "name", entry->name);
+            }
+        } else {
+            cJSON_AddStringToObject(item, "name", entry->name);
+        }
         cJSON_AddBoolToObject(item, "enabled", entry->enabled);
         cJSON_AddNumberToObject(item, "price_units", entry->price_units);
         cJSON_AddNumberToObject(item, "duration_sec", entry->duration_sec);

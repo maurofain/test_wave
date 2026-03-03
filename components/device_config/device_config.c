@@ -204,8 +204,11 @@ static const char *_effective_lang(const char *language)
     if (_is_iso2_lang(language)) {
         return language;
     }
-    if (_is_iso2_lang(s_config.ui.language)) {
-        return s_config.ui.language;
+    if (_is_iso2_lang(s_config.ui.user_language)) {
+        return s_config.ui.user_language;
+    }
+    if (_is_iso2_lang(s_config.ui.backend_language)) {
+        return s_config.ui.backend_language;
     }
     return UI_LANG_DEFAULT;
 }
@@ -436,7 +439,7 @@ static void _set_defaults(device_config_t *config)
     config->scanner.dual_pid = (uint16_t)CONFIG_USB_CDC_SCANNER_DUAL_PID;
 
     // Default testi UI / lingua
-    strncpy(config->ui.language, UI_LANG_DEFAULT, sizeof(config->ui.language) - 1);
+    strncpy(config->ui.user_language, UI_LANG_DEFAULT, sizeof(config->ui.user_language) - 1);
     config->ui.texts_json[0] = '\0';
 }
 
@@ -596,16 +599,16 @@ esp_err_t device_config_init(void)
 
     _ensure_default_i18n_it_file();
 
-    char *startup_i18n = _read_i18n_file(s_config.ui.language);
+    char *startup_i18n = _read_i18n_file(s_config.ui.user_language);
     if (startup_i18n) {
-        ESP_LOGI(TAG, "[I18N] Tabella lingua '%s' caricata da SPIFFS all'avvio", _effective_lang(s_config.ui.language));
+        ESP_LOGI(TAG, "[I18N] Tabella lingua user '%s' caricata da SPIFFS all'avvio", _effective_lang(s_config.ui.user_language));
         free(startup_i18n);
     } else {
-        ESP_LOGW(TAG, "[I18N] Tabella lingua '%s' non disponibile all'avvio, uso fallback IT", _effective_lang(s_config.ui.language));
+        ESP_LOGW(TAG, "[I18N] Tabella lingua user '%s' non disponibile all'avvio, uso fallback IT", _effective_lang(s_config.ui.user_language));
     }
 
-    if (_i18n_lookup_cache_build_for_lang(s_config.ui.language) == ESP_OK) {
-        ESP_LOGI(TAG, "[I18N] Cache lookup lingua '%s' precaricata", _effective_lang(s_config.ui.language));
+    if (_i18n_lookup_cache_build_for_lang(s_config.ui.user_language) == ESP_OK) {
+        ESP_LOGI(TAG, "[I18N] Cache lookup lingua user '%s' precaricata", _effective_lang(s_config.ui.user_language));
     }
 
     return ESP_OK;
@@ -815,18 +818,24 @@ esp_err_t device_config_load(device_config_t *config)
                     }
                 }
 
-                // Analisi tabella UI (solo lingua corrente; i testi sono su SPIFFS)
+                // Analisi tabella UI (lingue: pannello utente e backend)
                 cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
                 if (ui_obj) {
-                    cJSON *language = cJSON_GetObjectItem(ui_obj, "language");
-                    if (language && cJSON_IsString(language) && language->valuestring) {
-                        strncpy(config->ui.language, language->valuestring, sizeof(config->ui.language) - 1);
+                    cJSON *user_lang = cJSON_GetObjectItem(ui_obj, "user_language");
+                    if (!user_lang) user_lang = cJSON_GetObjectItem(ui_obj, "language"); /* compat */
+                    if (user_lang && cJSON_IsString(user_lang) && user_lang->valuestring) {
+                        strncpy(config->ui.user_language, user_lang->valuestring, sizeof(config->ui.user_language) - 1);
+                    }
+
+                    cJSON *backend_lang = cJSON_GetObjectItem(ui_obj, "backend_language");
+                    if (backend_lang && cJSON_IsString(backend_lang) && backend_lang->valuestring) {
+                        strncpy(config->ui.backend_language, backend_lang->valuestring, sizeof(config->ui.backend_language) - 1);
                     }
                 }
 
                 cJSON *ui_lang_flat = cJSON_GetObjectItem(root, "ui_language");
                 if (ui_lang_flat && cJSON_IsString(ui_lang_flat) && ui_lang_flat->valuestring) {
-                    strncpy(config->ui.language, ui_lang_flat->valuestring, sizeof(config->ui.language) - 1);
+                    strncpy(config->ui.user_language, ui_lang_flat->valuestring, sizeof(config->ui.user_language) - 1);
                 }
 
             cJSON_Delete(root);
@@ -970,11 +979,13 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddItemToObject(gpios_obj, "gpio33", g33_obj);
     cJSON_AddItemToObject(root, "gpios", gpios_obj);
 
-    // UI multilingua (solo lingua; tabelle su SPIFFS per file lingua)
+    // UI multilingua (due linguaggi: pannello utente e backend; tabelle su SPIFFS per file lingua)
     cJSON *ui_obj = cJSON_CreateObject();
-    cJSON_AddStringToObject(ui_obj, "language", config->ui.language);
+    cJSON_AddStringToObject(ui_obj, "user_language", config->ui.user_language);
+    cJSON_AddStringToObject(ui_obj, "backend_language", config->ui.backend_language);
     cJSON_AddItemToObject(root, "ui", ui_obj);
-    cJSON_AddStringToObject(root, "ui_language", config->ui.language);
+    /* backward-compatible single field: ui_language -> user_language */
+    cJSON_AddStringToObject(root, "ui_language", config->ui.user_language);
 
     char *json_str = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -1139,12 +1150,17 @@ const char* device_config_get_running_app_name(void)
 
 const char* device_config_get_ui_language(void)
 {
-    return s_config.ui.language;
+    return s_config.ui.user_language;
 }
 
-const char* device_config_get_ui_texts_json(void)
+const char* device_config_get_ui_user_language(void)
 {
-    return s_config.ui.texts_json;
+    return s_config.ui.user_language;
+}
+
+const char* device_config_get_ui_backend_language(void)
+{
+    return s_config.ui.backend_language;
 }
 
 char* device_config_get_ui_texts_records_json(const char *language)
@@ -1254,33 +1270,4 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
     }
 
     return ret;
-}
-
-esp_err_t device_config_get_ui_text(const char *key, const char *fallback, char *out, size_t out_len)
-{
-    if (!key || !out || out_len == 0) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    const char *sep = strchr(key, '_');
-    if (!sep || sep == key || *(sep + 1) == '\0') {
-        if (fallback) {
-            strncpy(out, fallback, out_len - 1);
-            out[out_len - 1] = '\0';
-        } else {
-            out[0] = '\0';
-        }
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    char scope[32] = {0};
-    size_t scope_len = (size_t)(sep - key);
-    if (scope_len >= sizeof(scope)) {
-        scope_len = sizeof(scope) - 1;
-    }
-    memcpy(scope, key, scope_len);
-    scope[scope_len] = '\0';
-    const char *subkey = sep + 1;
-
-    return device_config_get_ui_text_scoped(scope, subkey, fallback, out, out_len);
 }

@@ -547,8 +547,10 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "<h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🆔 Identità Dispositivo<span class='section-toggle-icon'>▸</span></h2>"
         "<div class='form-group'><label>Nome Dispositivo</label>"
         "<input type='text' id='dev_name' name='dev_name' placeholder='es: TestWave-01' style='font-size:1.1em; font-weight:bold;'></div>"
-        "<div class='form-group'><label>Lingua UI</label>"
-        "<select id='ui_language' name='ui_language' style='width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;'><option value='it'>Italiano (IT)</option></select></div>"
+        "<div class='form-group'><label>Lingua Pannello Utente (LCD)</label>"
+        "<select id='ui_user_language' name='ui_user_language' style='width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;'><option value='it'>Italiano (IT)</option></select></div>"
+        "<div class='form-group'><label>Lingua Backend (Web UI/Server)</label>"
+        "<select id='ui_backend_language' name='ui_backend_language' style='width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;'><option value='it'>Italiano (IT)</option></select></div>"
         "</div>"
 
         "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🌐 Ethernet<span class='section-toggle-icon'>▸</span></h2>"
@@ -728,27 +730,29 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "const table=buildI18nTableFromRecords(data.records,baseRecords);"
         "if(window.uiI18n){window.uiI18n.language=target;window.uiI18n.table=table;if(typeof window.uiI18n.apply==='function'){window.uiI18n.apply(document.body);}}"
         "}"
-        "async function loadUiLanguages(selectedLang){"
-        "const uiLangEl=document.getElementById('ui_language');"
-        "if(!uiLangEl) return;"
-        "const target=(selectedLang?String(selectedLang):'it').toLowerCase();"
-        "let list=[];"
-        "try{const r=await fetch('/api/ui/languages');if(r.ok){const data=await r.json();if(Array.isArray(data.languages))list=data.languages;}}catch(e){console.warn('ui languages fetch failed',e);}"
-        "if(!Array.isArray(list)||!list.length){list=[{code:'it',label:'Italiano (IT)'}];}"
-        "uiLangEl.innerHTML='';"
-        "const seen={};"
-        "for(const item of list){if(!item||!item.code)continue;const code=String(item.code).toLowerCase();if(seen[code])continue;seen[code]=true;const opt=document.createElement('option');opt.value=code;opt.textContent=item.label?String(item.label):code.toUpperCase();uiLangEl.appendChild(opt);}"
-        "if(!seen.it){const opt=document.createElement('option');opt.value='it';opt.textContent='Italiano (IT)';uiLangEl.appendChild(opt);}"
-        "uiLangEl.value=target;"
-        "if(!uiLangEl.value)uiLangEl.value='it';"
-        "}"
+        "async function loadUiLanguages(selectedLang, elId){"
+            "const uiLangEl=document.getElementById(elId||'ui_language');"
+            "if(!uiLangEl) return;"
+            "const target=(selectedLang?String(selectedLang):'it').toLowerCase();"
+            "let list=[];"
+            "try{const r=await fetch('/api/ui/languages');if(r.ok){const data=await r.json();if(Array.isArray(data.languages))list=data.languages;}}catch(e){console.warn('ui languages fetch failed',e);}" 
+            "if(!Array.isArray(list)||!list.length){list=[{code:'it',label:'Italiano (IT)'}];}"
+            "uiLangEl.innerHTML='';"
+            "const seen={};"
+            "for(const item of list){if(!item||!item.code)continue;const code=String(item.code).toLowerCase();if(seen[code])continue;seen[code]=true;const opt=document.createElement('option');opt.value=code;opt.textContent=item.label?String(item.label):code.toUpperCase();uiLangEl.appendChild(opt);}" 
+            "if(!seen.it){const opt=document.createElement('option');opt.value='it';opt.textContent='Italiano (IT)';uiLangEl.appendChild(opt);}" 
+            "uiLangEl.value=target;"
+            "if(!uiLangEl.value)uiLangEl.value='it';"
+            "}"
         "async function loadConfig(){"
         "ensureFactorySections();"
         "try{const r=await fetch('/api/config');if(!r.ok)throw new Error('HTTP '+r.status);"
         "const c=await r.json();"
         "document.getElementById('dev_name').value=c.device_name || '';"
-        "const uiLangEl=document.getElementById('ui_language');"
-        "if(uiLangEl){const lang=(c.ui&&c.ui.language)?String(c.ui.language).toLowerCase():'it';await loadUiLanguages(lang);window.__configOriginalLang=lang;}"
+        "const userLang=(c.ui&&c.ui.user_language)?String(c.ui.user_language).toLowerCase():'it';"
+        "const backendLang=(c.ui&&c.ui.backend_language)?String(c.ui.backend_language).toLowerCase():'it';"
+        "await loadUiLanguages(userLang,'ui_user_language');window.__configOriginalUserLang=userLang;"
+        "await loadUiLanguages(backendLang,'ui_backend_language');window.__configOriginalBackendLang=backendLang;"
         "document.getElementById('eth_en').checked=c.eth.enabled;"
         "document.getElementById('eth_dhcp').checked=c.eth.dhcp_enabled;"
         "document.getElementById('eth_ip').value=c.eth.ip;"
@@ -823,13 +827,16 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "try{const r=await fetch('/api/security/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:current.value,new_password:next.value})});const t=await r.text();if(r.ok){alert('✅ Password aggiornata');current.value='';next.value='';confirm.value='';}else{alert('❌ '+(t||('HTTP '+r.status)));}}catch(e){alert('❌ Errore: '+e);}"
         "}"
         "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
-        "const prevLang=(window.__configOriginalLang?String(window.__configOriginalLang):'it').toLowerCase();"
-        "const newLang=(document.getElementById('ui_language').value?String(document.getElementById('ui_language').value):'it').toLowerCase();"
-        "const langChanged=(prevLang!==newLang);"
-        "if(langChanged&&!confirm('Confermi il cambio lingua? Verranno ricaricate le tabelle di traduzione.')) return;"
+        "const prevUser=(window.__configOriginalUserLang?String(window.__configOriginalUserLang):'it').toLowerCase();"
+        "const prevBackend=(window.__configOriginalBackendLang?String(window.__configOriginalBackendLang):'it').toLowerCase();"
+        "const newUser=(document.getElementById('ui_user_language').value?String(document.getElementById('ui_user_language').value):'it').toLowerCase();"
+        "const newBackend=(document.getElementById('ui_backend_language').value?String(document.getElementById('ui_backend_language').value):'it').toLowerCase();"
+        "const userChanged=(prevUser!==newUser);"
+        "const backendChanged=(prevBackend!==newBackend);"
+        "if((userChanged||backendChanged)&&!confirm('Confermi il cambio lingua? Verranno ricaricate le tabelle di traduzione per le interfacce modificate.')) return;"
         "const cfg={"
         "device_name:document.getElementById('dev_name').value,"
-        "ui:{language:document.getElementById('ui_language').value},"
+        "ui:{user_language:document.getElementById('ui_user_language').value,backend_language:document.getElementById('ui_backend_language').value},"
         "eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},"
         "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
         "ntp_enabled:document.getElementById('ntp_en').checked,"
@@ -847,8 +854,8 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "};"
         "const r=await fetch('/api/config/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});"
         "if(r.ok){"
-        "try{if(langChanged){await reloadLanguageTables(newLang);window.__configOriginalLang=newLang;}}catch(err){console.warn('reloadLanguageTables failed',err);}"
-        "if(langChanged){alert('✅ Configurazione salvata. Lingua aggiornata!');const u=new URL(window.location.href);u.pathname='/config';u.searchParams.set('lang',newLang);u.searchParams.set('_ts',String(Date.now()));window.location.replace(u.toString());return;}"
+        "try{if(userChanged){await reloadLanguageTables(newUser);window.__configOriginalUserLang=newUser;}}catch(err){console.warn('reloadLanguageTables failed',err);}"
+        "if(userChanged||backendChanged){alert('✅ Configurazione salvata. Lingue aggiornate!');const u=new URL(window.location.href);u.pathname='/config';u.searchParams.set('lang',newBackend);u.searchParams.set('_ts',String(Date.now()));window.location.replace(u.toString());return;}"
         "alert('✅ Configurazione salvata!');"
         "} else alert('❌ Errore durante il salvataggio!');"
         "}"
@@ -998,10 +1005,6 @@ esp_err_t api_config_get(httpd_req_t *req)
 {
     ESP_LOGD(TAG, "[C] GET /api/config");
     device_config_t *cfg = device_config_get();
-    char prev_lang[8] = {0};
-    const char *cfg_lang_before = device_config_get_ui_language();
-    if (cfg_lang_before) strncpy(prev_lang, cfg_lang_before, sizeof(prev_lang)-1);
-    
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "device_name", cfg->device_name);
     
@@ -1113,10 +1116,11 @@ esp_err_t api_config_get(httpd_req_t *req)
 
     // UI multilingua
     cJSON *ui = cJSON_CreateObject();
-    cJSON_AddStringToObject(ui, "language", cfg->ui.language);
+    cJSON_AddStringToObject(ui, "user_language", cfg->ui.user_language);
+    cJSON_AddStringToObject(ui, "backend_language", cfg->ui.backend_language);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
-    cJSON_AddStringToObject(root, "ui_language", cfg->ui.language);
+    cJSON_AddStringToObject(root, "ui_language", cfg->ui.user_language);
     
     char *json = cJSON_Print(root);
     httpd_resp_set_type(req, "application/json");
@@ -1131,7 +1135,8 @@ esp_err_t api_ui_texts_get(httpd_req_t *req)
 {
     device_config_t *cfg = device_config_get();
     char language[8] = {0};
-    strncpy(language, cfg->ui.language, sizeof(language) - 1);
+    /* default to backend language for texts served to the web UI */
+    strncpy(language, cfg->ui.backend_language, sizeof(language) - 1);
 
     char query[128] = {0};
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
@@ -1337,10 +1342,11 @@ esp_err_t api_config_backup(httpd_req_t *req)
 
     // UI multilingua
     cJSON *ui = cJSON_CreateObject();
-    cJSON_AddStringToObject(ui, "language", cfg->ui.language);
+    cJSON_AddStringToObject(ui, "user_language", cfg->ui.user_language);
+    cJSON_AddStringToObject(ui, "backend_language", cfg->ui.backend_language);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
-    cJSON_AddStringToObject(root, "ui_language", cfg->ui.language);
+    cJSON_AddStringToObject(root, "ui_language", cfg->ui.user_language);
 
     char *json = cJSON_Print(root);
     esp_err_t err = sd_card_write_file("/sdcard/config.jsn", json);
@@ -1569,9 +1575,15 @@ esp_err_t api_config_save(httpd_req_t *req)
     // UI multilingua
     cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
     if (ui_obj) {
-        cJSON *language = cJSON_GetObjectItem(ui_obj, "language");
-        if (language && cJSON_IsString(language) && language->valuestring) {
-            strncpy(cfg->ui.language, language->valuestring, sizeof(cfg->ui.language) - 1);
+        cJSON *user_lang = cJSON_GetObjectItem(ui_obj, "user_language");
+        if (!user_lang) user_lang = cJSON_GetObjectItem(ui_obj, "language"); /* compat */
+        if (user_lang && cJSON_IsString(user_lang) && user_lang->valuestring) {
+            strncpy(cfg->ui.user_language, user_lang->valuestring, sizeof(cfg->ui.user_language) - 1);
+        }
+
+        cJSON *backend_lang = cJSON_GetObjectItem(ui_obj, "backend_language");
+        if (backend_lang && cJSON_IsString(backend_lang) && backend_lang->valuestring) {
+            strncpy(cfg->ui.backend_language, backend_lang->valuestring, sizeof(cfg->ui.backend_language) - 1);
         }
 
         cJSON *records = cJSON_GetObjectItem(ui_obj, "records");
@@ -1581,16 +1593,18 @@ esp_err_t api_config_save(httpd_req_t *req)
         if (records && cJSON_IsArray(records)) {
             char *records_json = cJSON_PrintUnformatted(records);
             if (records_json) {
-                device_config_set_ui_texts_records_json(cfg->ui.language, records_json);
+                /* Save records associated with the user language (compat) */
+                device_config_set_ui_texts_records_json(cfg->ui.user_language, records_json);
                 web_ui_i18n_cache_invalidate();
                 free(records_json);
             }
         }
     }
 
+    /* root-level compatibility: ui_language -> user_language */
     cJSON *ui_lang_flat = cJSON_GetObjectItem(root, "ui_language");
     if (ui_lang_flat && cJSON_IsString(ui_lang_flat) && ui_lang_flat->valuestring) {
-        strncpy(cfg->ui.language, ui_lang_flat->valuestring, sizeof(cfg->ui.language) - 1);
+        strncpy(cfg->ui.user_language, ui_lang_flat->valuestring, sizeof(cfg->ui.user_language) - 1);
     }
     
     cfg->updated = true;
@@ -1600,16 +1614,27 @@ esp_err_t api_config_save(httpd_req_t *req)
     /* Se la lingua è cambiata: carica la nuova tabella in PSRAM, invalida cache e
      * aggiorna i testi LVGL in runtime. Il client web si ricaricherà da sola. */
     {
-        char prev_lang_local[8] = {0};
-        const char *cfg_lang_before_local = device_config_get_ui_language();
-        if (cfg_lang_before_local) strncpy(prev_lang_local, cfg_lang_before_local, sizeof(prev_lang_local)-1);
-        if (strncmp(prev_lang_local, cfg->ui.language, sizeof(prev_lang_local)) != 0) {
-            ESP_LOGI(TAG, "[C] Lingua cambiata: '%s' -> '%s'", prev_lang_local, cfg->ui.language);
+        char prev_user[8] = {0};
+        char prev_backend[8] = {0};
+        const char *cfg_user_before = device_config_get_ui_user_language();
+        const char *cfg_backend_before = device_config_get_ui_backend_language();
+        if (cfg_user_before) strncpy(prev_user, cfg_user_before, sizeof(prev_user)-1);
+        if (cfg_backend_before) strncpy(prev_backend, cfg_backend_before, sizeof(prev_backend)-1);
+
+        /* Backend language changed -> invalidate web i18n cache and load PSRAM for backend */
+        if (strncmp(prev_backend, cfg->ui.backend_language, sizeof(prev_backend)) != 0) {
+            ESP_LOGI(TAG, "[C] Backend lingua cambiata: '%s' -> '%s'", prev_backend, cfg->ui.backend_language);
             web_ui_i18n_cache_invalidate();
-            if (web_ui_i18n_load_language_psram(cfg->ui.language) != ESP_OK) {
-                ESP_LOGW(TAG, "[C] Impossibile caricare tabella lingua '%s' in PSRAM", cfg->ui.language);
+            if (web_ui_i18n_load_language_psram(cfg->ui.backend_language) != ESP_OK) {
+                ESP_LOGW(TAG, "[C] Impossibile caricare tabella lingua backend '%s' in PSRAM", cfg->ui.backend_language);
             }
-            /* Aggiorna testi sul display LVGL (se attivo) */
+        }
+
+        /* User panel language changed -> refresh LVGL texts (uses device_config_get_ui_text_scoped)
+         * and invalidate lookup cache so subsequent lookups use new language. */
+        if (strncmp(prev_user, cfg->ui.user_language, sizeof(prev_user)) != 0) {
+            ESP_LOGI(TAG, "[C] Pannello lingua cambiata: '%s' -> '%s'", prev_user, cfg->ui.user_language);
+            web_ui_i18n_cache_invalidate();
             lvgl_panel_refresh_texts();
         }
     }
@@ -2161,8 +2186,8 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_config = {.uri = "/config", .method = HTTP_GET, .handler = config_page_handler};
     httpd_register_uri_handler(server, &uri_config);
 
-    /* Load i18n dictionary into PSRAM for current UI language */
-    const char *lang = device_config_get_ui_language();
+    /* Load i18n dictionary into PSRAM for current backend language */
+    const char *lang = device_config_get_ui_backend_language();
     if (!lang) lang = "en";
     if (web_ui_i18n_load_language_psram(lang) != ESP_OK) {
         ESP_LOGW(TAG, "Failed to load i18n into PSRAM for language %s", lang);

@@ -631,7 +631,7 @@ static char *escape_script_end_tag(const char *src)
 
 static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
 {
-    const char *lang = device_config_get_ui_language();
+    const char *lang = device_config_get_ui_backend_language();
     const char *page_scope = i18n_scope_for_uri(req ? req->uri : NULL);
 
     char *table_json = i18n_cache_get(lang, page_scope);

@@ -134,10 +134,15 @@ typedef struct {
 
 /**
  * @brief Configurazione testi UI per multilingua
+ *
+ * Now supports two separate language selectors:
+ * - user_language: language used by the LVGL user panel
+ * - backend_language: language used by the backend / web UI
  */
 typedef struct {
-    char language[8];        ///< Lingua corrente (es: "it", "en")
-    char texts_json[512];    ///< Deprecated: non usato (i18n ora su SPIFFS per lingua)
+    char user_language[8];     ///< Lingua Pannello Utente (es: "it", "en")
+    char backend_language[8];  ///< Lingua Backend/Web UI (es: "it", "en")
+    char texts_json[512];      ///< Deprecated: non usato (i18n ora su SPIFFS per lingua)
 } device_ui_texts_config_t;
 
 /**
@@ -249,14 +254,19 @@ void device_config_reboot_ota1(void);
 const char* device_config_get_running_app_name(void);
 
 /**
- * @brief Restituisce la lingua UI corrente
+ * @brief Restituisce la lingua UI corrente (compat, ritorna user_language)
  */
 const char* device_config_get_ui_language(void);
 
 /**
- * @brief Restituisce il JSON della tabella testi UI
+ * @brief Restituisce la lingua usata dal pannello utente (LVGL)
  */
-const char* device_config_get_ui_texts_json(void);
+const char* device_config_get_ui_user_language(void);
+
+/**
+ * @brief Restituisce la lingua usata dal backend / web UI
+ */
+const char* device_config_get_ui_backend_language(void);
 
 /**
  * @brief Restituisce la tabella i18n (array record) della lingua richiesta, letta da SPIFFS
@@ -283,13 +293,3 @@ esp_err_t device_config_set_ui_texts_records_json(const char *language, const ch
  * @return ESP_OK se trovata, ESP_ERR_NOT_FOUND se usa fallback
  */
 esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, const char *fallback, char *out, size_t out_len);
-
-/**
- * @brief Recupera un testo UI dalla tabella in base alla chiave
- * @param key Chiave testuale
- * @param fallback Testo fallback se chiave non trovata
- * @param out Buffer destinazione
- * @param out_len Dimensione buffer destinazione
- * @return ESP_OK se trovata, ESP_ERR_NOT_FOUND se usa fallback
- */
-esp_err_t device_config_get_ui_text(const char *key, const char *fallback, char *out, size_t out_len);
