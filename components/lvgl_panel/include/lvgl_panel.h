@@ -6,11 +6,10 @@
  * @brief Pannello LVGL emulatore per display 7" 800×1280 verticale.
  *
  * Mostra:
- *  - Header con titolo e orologio
- *  - Box stato/credito con colore in base a stato FSM
- *  - 8 pulsanti programma (2 colonne × 4 righe)
- *  - Sezione inserimento credito: QR, Tessera, Monete
- *  - Area messaggi coda FSM aggiornata ogni 700 ms
+ *  - Landing `select_language` con 5 pulsanti lingua (bandiera + nome)
+ *  - Schermata principale a 4 colonne:
+ *    | programmi 1-5 | counter | barra tempo | programmi 6-10 |
+ *  - Aggiornamento runtime da snapshot FSM ogni 700 ms
  *
  * I pulsanti pubblicano sulla coda FSM gli stessi eventi del pannello web
  * emulatore (ACTION_ID_PAYMENT_ACCEPTED, ACTION_ID_PROGRAM_SELECTED, …).

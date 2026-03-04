@@ -2,11 +2,9 @@
  * @file lvgl_panel.c
  * @brief Pannello LVGL emulatore — display 7" 800×1280 verticale.
  *
- * Layout (colonna unica, 800 px wide, 1280 px tall):
- *
- *   y=  0  h=  70  Header: orologio
- *   y= 70  h= 890  Status box GRANDE: countdown/credito + gauge verticale dx
- *   y=960  h= 320  Pulsanti programma (2 col × 4 righe) — in fondo
+ * Layout runtime:
+ *   - Landing select_language con 5 pulsanti verticali
+ *   - Main screen: | pulsanti 1-5 | counter | barra | pulsanti 6-10 |
  */
 
 #include "lvgl_panel.h"
@@ -118,16 +116,23 @@ void lvgl_panel_show_out_of_service(uint32_t reboots)
 /* =========================================================================
  * Costanti layout
  * ========================================================================= */
-#define PROG_COUNT       8
-#define PROG_COLS        2
-#define PROG_ROWS        4
+#define PROG_COUNT       10
+#define PROG_ROWS        5
 
-#define SECT_HDR_Y       0
-#define SECT_HDR_H       70
-#define SECT_STATUS_Y    70
-#define SECT_STATUS_H    890
-#define SECT_PROGS_Y     960
-#define SECT_PROGS_H     320
+#define PANEL_W          800
+#define PANEL_H          1280
+#define PANEL_PAD_X      14
+#define PANEL_PAD_Y      14
+#define PANEL_COL_GAP    10
+#define PANEL_LEFT_W     150
+#define PANEL_RIGHT_W    150
+#define PANEL_BAR_W      64
+#define PANEL_CONTENT_H  (PANEL_H - (PANEL_PAD_Y * 2))
+#define PANEL_COUNTER_W  (PANEL_W - (PANEL_PAD_X * 2) - PANEL_LEFT_W - PANEL_RIGHT_W - PANEL_BAR_W - (PANEL_COL_GAP * 3))
+#define PANEL_LEFT_X     PANEL_PAD_X
+#define PANEL_COUNTER_X  (PANEL_LEFT_X + PANEL_LEFT_W + PANEL_COL_GAP)
+#define PANEL_BAR_X      (PANEL_COUNTER_X + PANEL_COUNTER_W + PANEL_COL_GAP)
+#define PANEL_RIGHT_X    (PANEL_BAR_X + PANEL_BAR_W + PANEL_COL_GAP)
 
 /* Font disponibili. Se il build fallisce per font mancante,
  * abilitarlo in sdkconfig con CONFIG_LV_FONT_MONTSERRAT_XX=y */
@@ -150,6 +155,7 @@ static lv_obj_t *s_gauge       = NULL;    /* barra verticale a destra */
 static lv_obj_t *s_counter_fill = NULL;   /* sfondo countdown pieno (mode DNA_LVGL_COUNTDOWN_BG=1) */
 static lv_obj_t *s_prog_btns[PROG_COUNT];
 static lv_obj_t *s_prog_lbls[PROG_COUNT];
+static lv_timer_t *s_panel_timer = NULL;
 
 /* Stato runtime locale */
 static uint8_t s_active_prog = 0;
@@ -160,7 +166,25 @@ static uint8_t s_active_prog = 0;
 typedef struct { uint8_t prog_id; } prog_btn_ud_t;
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
+typedef struct {
+    const char *code;
+    const char *label;
+} panel_language_option_t;
+
+static const panel_language_option_t s_panel_lang_opts[] = {
+    {.code = "it", .label = "🇮🇹 Italiano"},
+    {.code = "en", .label = "🇬🇧 English"},
+    {.code = "de", .label = "🇩🇪 Deutsch"},
+    {.code = "fr", .label = "🇫🇷 Français"},
+    {.code = "es", .label = "🇪🇸 Español"},
+};
+
+static char s_selected_user_lang[8] = "it";
+
 static void btn_style(lv_obj_t *btn, lv_color_t bg);
+static void panel_timer_cb(lv_timer_t *t);
+static void panel_show_main_screen(void);
+static void panel_show_language_select_screen(void);
 
 /* Cerca metadati programma per id */
 static const web_ui_program_entry_t *find_program_entry(uint8_t pid)
@@ -272,6 +296,19 @@ static void update_state(const fsm_ctx_t *snap)
     bool running = (snap->state == FSM_STATE_RUNNING);
     bool paused  = (snap->state == FSM_STATE_PAUSED);
 
+    char tr_credit[32] = {0};
+    char tr_elapsed_fmt[32] = {0};
+    char tr_pause_fmt[32] = {0};
+    if (device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", tr_credit, sizeof(tr_credit)) != ESP_OK) {
+        strncpy(tr_credit, "Credito", sizeof(tr_credit) - 1);
+    }
+    if (device_config_get_ui_text_scoped("lvgl", "elapsed_fmt", "Secondi   %s", tr_elapsed_fmt, sizeof(tr_elapsed_fmt)) != ESP_OK) {
+        strncpy(tr_elapsed_fmt, "Secondi   %s", sizeof(tr_elapsed_fmt) - 1);
+    }
+    if (device_config_get_ui_text_scoped("lvgl", "pause_fmt", "Pausa: %s", tr_pause_fmt, sizeof(tr_pause_fmt)) != ESP_OK) {
+        strncpy(tr_pause_fmt, "Pausa: %s", sizeof(tr_pause_fmt) - 1);
+    }
+
     /* sfondo status box — aggiorna solo se lo stato FSM è cambiato */
     static fsm_state_t s_last_fsm_state = (fsm_state_t)-1;
     if (s_status_box && snap->state != s_last_fsm_state) {
@@ -312,9 +349,9 @@ static void update_state(const fsm_ctx_t *snap)
         if (running || paused) {
             char mm[10];
             fmt_mm_ss(mm, sizeof(mm), snap->running_elapsed_ms);
-            snprintf(buf, sizeof(buf), "Secondi   %s", mm);
+            snprintf(buf, sizeof(buf), tr_elapsed_fmt, mm);
         } else {
-            snprintf(buf, sizeof(buf), "Credito");
+            snprintf(buf, sizeof(buf), "%s", tr_credit);
         }
         if (strcmp(s_last_elapsed, buf) != 0) {
             lv_label_set_text(s_elapsed_lbl, buf);
@@ -329,7 +366,7 @@ static void update_state(const fsm_ctx_t *snap)
         if (paused && snap->pause_elapsed_ms > 0) {
             char mm[10];
             fmt_mm_ss(mm, sizeof(mm), snap->pause_elapsed_ms);
-            snprintf(buf, sizeof(buf), "Pausa: %s", mm);
+            snprintf(buf, sizeof(buf), tr_pause_fmt, mm);
         } else {
             buf[0] = '\0';
         }
@@ -355,8 +392,8 @@ static void update_state(const fsm_ctx_t *snap)
     if (s_counter_fill) {
         static int32_t s_last_pct = -1;
         if (pct != s_last_pct) {
-            int32_t h = (SECT_STATUS_H * pct) / 100;
-            lv_obj_set_size(s_counter_fill, 800, h);
+            int32_t h = (PANEL_CONTENT_H * pct) / 100;
+            lv_obj_set_size(s_counter_fill, PANEL_COUNTER_W, h);
             lv_obj_align(s_counter_fill, LV_ALIGN_BOTTOM_LEFT, 0, 0);
             s_last_pct = pct;
         }
@@ -366,6 +403,10 @@ static void update_state(const fsm_ctx_t *snap)
     if (s_gauge) {
         static int32_t s_last_pct = -1;
         if (pct != s_last_pct) {
+            lv_color_t gauge_col = (pct > 30) ? COL_PROG_ACT : COL_PROG_LOW;
+            lv_obj_set_style_bg_color(s_gauge, gauge_col, LV_PART_INDICATOR);
+            lv_obj_set_style_bg_grad_color(s_gauge, gauge_col, LV_PART_INDICATOR);
+            lv_obj_set_style_bg_grad_dir(s_gauge, LV_GRAD_DIR_NONE, LV_PART_INDICATOR);
             lv_bar_set_value(s_gauge, pct, LV_ANIM_OFF);
             s_last_pct = pct;
         }
@@ -483,22 +524,11 @@ static void on_prog_btn(lv_event_t *e)
 
 static void build_header(lv_obj_t *scr)
 {
-    lv_obj_t *hdr = lv_obj_create(scr);
-    lv_obj_set_pos(hdr, 0, SECT_HDR_Y);
-    lv_obj_set_size(hdr, 800, SECT_HDR_H);
-    lv_obj_set_style_bg_color(hdr, COL_HDR, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(hdr, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(hdr, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(hdr, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(hdr, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(hdr, LV_OBJ_FLAG_SCROLLABLE);
-
-
-    s_time_lbl = lv_label_create(hdr);
+    s_time_lbl = lv_label_create(scr);
     lv_label_set_text(s_time_lbl, "--:--:--");
     lv_obj_set_style_text_color(s_time_lbl, COL_GREY, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_time_lbl, FONT_TIME, LV_PART_MAIN);
-    lv_obj_align(s_time_lbl, LV_ALIGN_RIGHT_MID, -18, 0);
+    lv_obj_set_pos(s_time_lbl, PANEL_COUNTER_X + PANEL_COUNTER_W - 98, PANEL_PAD_Y + 10);
 }
 
 /* =========================================================================
@@ -507,30 +537,19 @@ static void build_header(lv_obj_t *scr)
 
 static void build_status(lv_obj_t *scr)
 {
-    /* ---- contenitore principale ---------------------------------------- */
     s_status_box = lv_obj_create(scr);
-    lv_obj_set_pos(s_status_box, 0, SECT_STATUS_Y);
-    lv_obj_set_size(s_status_box, 800, SECT_STATUS_H);
+    lv_obj_set_pos(s_status_box, PANEL_COUNTER_X, PANEL_PAD_Y);
+    lv_obj_set_size(s_status_box, PANEL_COUNTER_W, PANEL_CONTENT_H);
     lv_obj_set_style_bg_color(s_status_box, COL_STATE_IDL, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_status_box, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_status_box, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_status_box, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_status_box, 8, LV_PART_MAIN);
     lv_obj_set_style_pad_all(s_status_box, 0, LV_PART_MAIN);
     lv_obj_remove_flag(s_status_box, LV_OBJ_FLAG_SCROLLABLE);
 
-    /* colonne: info + gauge (mode barra) */
 #if DNA_LVGL_COUNTDOWN_BG == 1
-#define GAUGE_W   0
-#else
-#define GAUGE_W   180
-#endif
-#define INFO_W    (800 - GAUGE_W)
-#define GAUGE_PAD 12
-
-#if DNA_LVGL_COUNTDOWN_BG == 1
-    /* Sfondo countdown pieno (il livello scende dall'alto verso il basso) */
     s_counter_fill = lv_obj_create(s_status_box);
-    lv_obj_set_size(s_counter_fill, 800, 0);
+    lv_obj_set_size(s_counter_fill, PANEL_COUNTER_W, 0);
     lv_obj_align(s_counter_fill, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_obj_set_style_bg_color(s_counter_fill, COL_PROG_ACT, LV_PART_MAIN);
     lv_obj_set_style_bg_grad_color(s_counter_fill, COL_PROG_LOW, LV_PART_MAIN);
@@ -544,56 +563,46 @@ static void build_status(lv_obj_t *scr)
     s_counter_fill = NULL;
 #endif
 
-#if DNA_LVGL_COUNTDOWN_BG == 0
-    /* ---- barra di progressione — posizionata con coordinate assolute ---- */
-    /* Evitare sub-container intermedi: in LVGL v9 possono creare problemi
-     * di clipping/offset. La barra va direttamente su s_status_box. */
-    s_gauge = lv_bar_create(s_status_box);
-    lv_obj_set_pos(s_gauge, INFO_W + GAUGE_PAD, GAUGE_PAD);
-    lv_obj_set_size(s_gauge, GAUGE_W - GAUGE_PAD * 2, SECT_STATUS_H - GAUGE_PAD * 2);
+    s_gauge = lv_bar_create(scr);
+    lv_obj_set_pos(s_gauge, PANEL_BAR_X, PANEL_PAD_Y);
+    lv_obj_set_size(s_gauge, PANEL_BAR_W, PANEL_CONTENT_H);
     lv_bar_set_range(s_gauge, 0, 100);
-    lv_bar_set_value(s_gauge, 30, LV_ANIM_OFF);   /* valore visibile iniziale */
+    lv_bar_set_value(s_gauge, 100, LV_ANIM_OFF);
     lv_bar_set_orientation(s_gauge, LV_BAR_ORIENTATION_VERTICAL);
     lv_obj_set_style_bg_color(s_gauge, lv_color_make(0x40, 0x40, 0x70), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_gauge, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_pad_all(s_gauge, 0, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_gauge, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_gauge, 3, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_gauge, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(s_gauge, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_radius(s_gauge, 8, LV_PART_MAIN);
     lv_obj_set_style_bg_color(s_gauge, COL_PROG_ACT, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_grad_color(s_gauge, COL_PROG_LOW, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_grad_dir(s_gauge, LV_GRAD_DIR_VER, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_color(s_gauge, COL_PROG_ACT, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_dir(s_gauge, LV_GRAD_DIR_NONE, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(s_gauge, LV_OPA_COVER, LV_PART_INDICATOR);
     lv_obj_set_style_pad_all(s_gauge, 0, LV_PART_INDICATOR);
     lv_obj_set_style_border_width(s_gauge, 0, LV_PART_INDICATOR);
     lv_obj_set_style_radius(s_gauge, 8, LV_PART_INDICATOR);
     lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_INDICATOR);
     lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_MAIN);
-#else
-    s_gauge = NULL;
-#endif
 
-    /* ---- testi centrati nell'area sinistra (0..INFO_W) ---- */
-    /* lv_obj_align su s_status_box centra in 800px; offset -GAUGE_W/2 sposta
-     * il centro di visualizzazione nella zona sinistra 700px */
     s_credit_lbl = lv_label_create(s_status_box);
     lv_label_set_text(s_credit_lbl, "0");
     lv_obj_set_style_text_color(s_credit_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_credit_lbl, FONT_BIGNUM, LV_PART_MAIN);
-    lv_obj_align(s_credit_lbl, LV_ALIGN_CENTER, -(GAUGE_W / 2), -60);
+    lv_obj_align(s_credit_lbl, LV_ALIGN_CENTER, 0, -90);
 
-    /* etichetta contestuale */
     s_elapsed_lbl = lv_label_create(s_status_box);
     lv_label_set_text(s_elapsed_lbl, "Credito");
     lv_obj_set_style_text_color(s_elapsed_lbl, COL_GREY, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_elapsed_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_obj_align(s_elapsed_lbl, LV_ALIGN_CENTER, -(GAUGE_W / 2), 80);
+    lv_obj_align(s_elapsed_lbl, LV_ALIGN_CENTER, 0, 70);
 
-    /* timer pausa */
     s_pause_lbl = lv_label_create(s_status_box);
     lv_label_set_text(s_pause_lbl, "");
     lv_obj_set_style_text_color(s_pause_lbl, COL_PROG_PAUSE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_pause_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_LEFT, 20, -20);
+    lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_MID, 0, -24);
 }
 
 
@@ -601,52 +610,182 @@ static void build_status(lv_obj_t *scr)
  * Costruzione UI — Pulsanti programma
  * ========================================================================= */
 
+static void create_prog_button(lv_obj_t *scr, uint8_t pid, int32_t x, int32_t y, int32_t w, int32_t h)
+{
+    if (pid == 0 || pid > PROG_COUNT) {
+        return;
+    }
+
+    lv_obj_t *btn = lv_button_create(scr);
+    lv_obj_set_pos(btn, x, y);
+    lv_obj_set_size(btn, w, h);
+    btn_style(btn, COL_PROG);
+
+    lv_obj_t *lbl = lv_label_create(btn);
+    char txt[8] = {0};
+    snprintf(txt, sizeof(txt), "%u", (unsigned)pid);
+    lv_label_set_text(lbl, txt);
+    lv_obj_set_style_text_color(lbl, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl, FONT_PROG_BTN, LV_PART_MAIN);
+    lv_obj_center(lbl);
+
+    int idx = (int)pid - 1;
+    s_prog_ud[idx].prog_id = pid;
+    lv_obj_set_user_data(btn, &s_prog_ud[idx]);
+    lv_obj_add_event_cb(btn, on_prog_btn, LV_EVENT_CLICKED, NULL);
+
+    s_prog_btns[idx] = btn;
+    s_prog_lbls[idx] = lbl;
+}
+
 static void build_prog_buttons(lv_obj_t *scr)
 {
-    /* Container opaco come sfondo della sezione */
-    lv_obj_t *cont = lv_obj_create(scr);
-    lv_obj_set_pos(cont, 0, SECT_PROGS_Y);
-    lv_obj_set_size(cont, 800, SECT_PROGS_H);
-    lv_obj_set_style_bg_color(cont, COL_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(cont, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(cont, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(cont, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+    const int32_t btn_gap = 10;
+    const int32_t btn_h = (PANEL_CONTENT_H - (btn_gap * (PROG_ROWS - 1))) / PROG_ROWS;
 
-    const int32_t PAD = 12;
-    const int32_t GAP = 10;
-    int32_t btn_w = (800 - PAD * 2 - GAP) / 2;           /* ~383 */
-    int32_t btn_h = (SECT_PROGS_H - PAD * 2 - GAP * 3) / 4; /* ~79 */
+    for (int row = 0; row < PROG_ROWS; row++) {
+        int32_t y = PANEL_PAD_Y + row * (btn_h + btn_gap);
+        uint8_t pid_left = (uint8_t)(row + 1);
+        uint8_t pid_right = (uint8_t)(row + 6);
+        create_prog_button(scr, pid_left, PANEL_LEFT_X, y, PANEL_LEFT_W, btn_h);
+        create_prog_button(scr, pid_right, PANEL_RIGHT_X, y, PANEL_RIGHT_W, btn_h);
+    }
+}
 
+static void clear_panel_handles(void)
+{
+    s_time_lbl = NULL;
+    s_status_box = NULL;
+    s_credit_lbl = NULL;
+    s_elapsed_lbl = NULL;
+    s_pause_lbl = NULL;
+    s_gauge = NULL;
+    s_counter_fill = NULL;
     for (int i = 0; i < PROG_COUNT; i++) {
-        int col = i % PROG_COLS;
-        int row = i / PROG_COLS;
-        int32_t x = PAD + col * (btn_w + GAP);
-        int32_t y = PAD + row * (btn_h + GAP);
+        s_prog_btns[i] = NULL;
+        s_prog_lbls[i] = NULL;
+    }
+}
 
-        lv_obj_t *btn = lv_button_create(cont);
-        lv_obj_set_pos(btn, x, y);
+static void panel_apply_selected_language_async(void *arg)
+{
+    (void)arg;
+
+    device_config_t *cfg = device_config_get();
+    if (cfg) {
+        strncpy(cfg->ui.user_language, s_selected_user_lang, sizeof(cfg->ui.user_language) - 1);
+        cfg->ui.user_language[sizeof(cfg->ui.user_language) - 1] = '\0';
+        cfg->updated = true;
+        if (device_config_save(cfg) != ESP_OK) {
+            ESP_LOGW(TAG, "[C] Salvataggio lingua pannello fallito (%s)", s_selected_user_lang);
+        }
+    }
+
+    panel_show_main_screen();
+}
+
+static void on_lang_btn(lv_event_t *e)
+{
+    lv_obj_t *btn = lv_event_get_target(e);
+    const panel_language_option_t *opt = (const panel_language_option_t *)lv_obj_get_user_data(btn);
+    if (!opt || !opt->code) {
+        return;
+    }
+
+    strncpy(s_selected_user_lang, opt->code, sizeof(s_selected_user_lang) - 1);
+    s_selected_user_lang[sizeof(s_selected_user_lang) - 1] = '\0';
+    lv_async_call(panel_apply_selected_language_async, NULL);
+}
+
+static void panel_show_main_screen(void)
+{
+    lv_obj_t *scr = lv_scr_act();
+    clear_panel_handles();
+    lv_obj_clean(scr);
+
+    lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_active_prog = 0;
+
+    build_status(scr);
+    build_header(scr);
+    build_prog_buttons(scr);
+
+    update_time();
+
+    fsm_ctx_t snap = {0};
+    if (fsm_runtime_snapshot(&snap)) {
+        update_state(&snap);
+        refresh_prog_buttons(&snap);
+    }
+
+    if (s_panel_timer) {
+        lv_timer_del(s_panel_timer);
+        s_panel_timer = NULL;
+    }
+    s_panel_timer = lv_timer_create(panel_timer_cb, 700, NULL);
+
+    ESP_LOGI(TAG, "[C] Pannello LVGL principale visualizzato");
+}
+
+static void panel_show_language_select_screen(void)
+{
+    lv_obj_t *scr = lv_scr_act();
+    clear_panel_handles();
+    lv_obj_clean(scr);
+
+    lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+
+    if (s_panel_timer) {
+        lv_timer_del(s_panel_timer);
+        s_panel_timer = NULL;
+    }
+
+    const char *current_lang = device_config_get_ui_user_language();
+    if (current_lang && strlen(current_lang) == 2) {
+        strncpy(s_selected_user_lang, current_lang, sizeof(s_selected_user_lang) - 1);
+        s_selected_user_lang[sizeof(s_selected_user_lang) - 1] = '\0';
+    }
+
+    lv_obj_t *title = lv_label_create(scr);
+    lv_label_set_text(title, "Seleziona lingua");
+    lv_obj_set_style_text_color(title, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(title, FONT_TITLE, LV_PART_MAIN);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 40);
+
+    const int32_t btn_w = 560;
+    const int32_t btn_h = 150;
+    const int32_t gap = 14;
+    const int32_t start_y = 120;
+    for (size_t i = 0; i < (sizeof(s_panel_lang_opts) / sizeof(s_panel_lang_opts[0])); i++) {
+        const panel_language_option_t *opt = &s_panel_lang_opts[i];
+        bool selected = (strcmp(s_selected_user_lang, opt->code) == 0);
+
+        lv_obj_t *btn = lv_button_create(scr);
         lv_obj_set_size(btn, btn_w, btn_h);
-        btn_style(btn, COL_PROG);
+        lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, start_y + (int32_t)i * (btn_h + gap));
+        btn_style(btn, selected ? COL_PROG_ACT : COL_PROG);
+        lv_obj_set_style_border_width(btn, selected ? 3 : 0, LV_PART_MAIN);
+        lv_obj_set_style_border_color(btn, COL_WHITE, LV_PART_MAIN);
+        lv_obj_set_style_border_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
 
         lv_obj_t *lbl = lv_label_create(btn);
-        char txt[32];
-        snprintf(txt, sizeof(txt), "Programma %d", i + 1);
-        lv_label_set_text(lbl, txt);
+        lv_label_set_text(lbl, opt->label);
         lv_obj_set_style_text_color(lbl, COL_WHITE, LV_PART_MAIN);
-        lv_obj_set_style_text_font(lbl, FONT_PROG_BTN, LV_PART_MAIN);
-        lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
-        lv_obj_set_width(lbl, btn_w - 8);
+        lv_obj_set_style_text_font(lbl, FONT_LABEL, LV_PART_MAIN);
         lv_obj_center(lbl);
 
-        s_prog_ud[i].prog_id = (uint8_t)(i + 1);
-        lv_obj_set_user_data(btn, &s_prog_ud[i]);
-        lv_obj_add_event_cb(btn, on_prog_btn, LV_EVENT_CLICKED, NULL);
-
-        s_prog_btns[i] = btn;
-        s_prog_lbls[i] = lbl;
+        lv_obj_set_user_data(btn, (void *)opt);
+        lv_obj_add_event_cb(btn, on_lang_btn, LV_EVENT_CLICKED, NULL);
     }
+
+    ESP_LOGI(TAG, "[C] Landing select_language visualizzata");
 }
 
 
@@ -676,69 +815,30 @@ void lvgl_panel_show(void)
         return;
     }
 
-    lv_obj_t *scr = lv_scr_act();
-    lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-
-    s_active_prog = 0;
-
-    build_header(scr);
-    build_status(scr);
-    build_prog_buttons(scr);
-
-    /* Prima esecuzione immediata per popolare i dati */
-    update_time();
-    fsm_ctx_t snap = {0};
-    if (fsm_runtime_snapshot(&snap)) {
-        update_state(&snap);
-        refresh_prog_buttons(&snap);
-    }
-
-    /* Timer periodico 700 ms */
-    lv_timer_create(panel_timer_cb, 700, NULL);
+    panel_show_language_select_screen();
 
     bsp_display_unlock();
 
-    ESP_LOGI(TAG, "[C] Pannello emulatore LVGL visualizzato (800x1280)");
+    ESP_LOGI(TAG, "[C] Pannello LVGL avviato (landing select_language)");
 }
 
 void lvgl_panel_refresh_texts(void)
 {
     if (!bsp_display_lock(100)) return;
 
-    /* Aggiorna etichette dinamiche con i testi localizzati */
-    char buf[128];
-
-    if (s_elapsed_lbl) {
-        if (device_config_get_ui_text_scoped("lvgl", "elapsed_label", "Credito", buf, sizeof(buf)) == ESP_OK) {
-            lv_label_set_text(s_elapsed_lbl, buf);
-        } else {
-            lv_label_set_text(s_elapsed_lbl, "Credito");
-        }
-    }
-
-    if (s_pause_lbl) {
-        if (device_config_get_ui_text_scoped("lvgl", "pause_label", "", buf, sizeof(buf)) == ESP_OK) {
-            lv_label_set_text(s_pause_lbl, buf);
-        } else {
-            lv_label_set_text(s_pause_lbl, "");
-        }
-    }
-
-    /* Aggiorna etichette pulsanti programmi (usa formato con %d) */
     for (int i = 0; i < PROG_COUNT; ++i) {
-        if (!s_prog_lbls[i]) continue;
-        if (device_config_get_ui_text_scoped("lvgl", "program", "Programma %d", buf, sizeof(buf)) == ESP_OK) {
-            char tmp[64];
-            snprintf(tmp, sizeof(tmp), buf, i + 1);
-            lv_label_set_text(s_prog_lbls[i], tmp);
-        } else {
-            char tmp[32];
-            snprintf(tmp, sizeof(tmp), "Programma %d", i + 1);
-            lv_label_set_text(s_prog_lbls[i], tmp);
+        if (!s_prog_lbls[i]) {
+            continue;
         }
+        char tmp[8] = {0};
+        snprintf(tmp, sizeof(tmp), "%d", i + 1);
+        lv_label_set_text(s_prog_lbls[i], tmp);
+    }
+
+    fsm_ctx_t snap = {0};
+    if (fsm_runtime_snapshot(&snap)) {
+        update_state(&snap);
+        refresh_prog_buttons(&snap);
     }
 
     bsp_display_unlock();

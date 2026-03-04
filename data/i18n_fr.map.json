@@ -484,6 +484,8 @@
     "471": "pause_fmt",
     "472": "program_btn_fmt",
     "473": "programma_9",
-    "474": "programma_10"
+    "474": "programma_10",
+    "475": "lingua_pannello_utente_lcd",
+    "476": "lingua_backend_web_ui_server"
   }
 }

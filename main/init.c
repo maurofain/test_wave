@@ -101,6 +101,16 @@ static uint32_t s_consecutive_reboots = 0;
 
 #define COREDUMP_MIN_FREE_MARGIN_BYTES (64 * 1024)
 
+
+/**
+ * @brief Verifica se il motivo del reset è un motivo di reset non pulito.
+ *
+ * Questa funzione verifica se il motivo del reset fornito è uno dei motivi di reset
+ * considerati non puliti.
+ *
+ * @param reason Il motivo del reset da verificare.
+ * @return true se il motivo del reset è un motivo di reset non pulito, false altrimenti.
+ */
 static bool is_unclean_reset_reason(esp_reset_reason_t reason)
 {
     switch (reason)
@@ -117,6 +127,16 @@ static bool is_unclean_reset_reason(esp_reset_reason_t reason)
     }
 }
 
+
+/**
+ * @brief Aggiorna il guardiano del riavvio del boot.
+ *
+ * Questa funzione aggiorna il guardiano del riavvio del boot per garantire che il dispositivo non venga riavviato in modo non controllato.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione non riuscita.
+ */
 static esp_err_t update_boot_reboot_guard(void)
 {
     nvs_handle_t handle;
@@ -189,6 +209,16 @@ static esp_err_t update_boot_reboot_guard(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Aggiorna il record di crash in sospeso.
+ *
+ * Questa funzione aggiorna il record di crash in sospeso nel sistema.
+ *
+ * @return esp_err_t
+ * @retval ESP_OK Se l'operazione ha successo.
+ * @retval ESP_FAIL Se l'operazione ha fallito.
+ */
 static esp_err_t update_crash_pending_record(void)
 {
     esp_reset_reason_t reason = esp_reset_reason();
@@ -224,6 +254,20 @@ static esp_err_t update_crash_pending_record(void)
 }
 
 #if !DNA_SERVER_POST
+
+/**
+ * @brief Costruisce l'URL per l'attività del dispositivo.
+ *
+ * Questa funzione prende una URL di base e la modifica per includere l'endpoint
+ * relativo all'attività del dispositivo. Il risultato viene memorizzato nella stringa
+ * di output fornita.
+ *
+ * @param [out] out Puntatore alla stringa di output dove verrà memorizzato l'URL completo.
+ * @param out_len Lunghezza massima della stringa di output.
+ * @param [in] base_url URL di base da cui viene costruito l'URL finale.
+ *
+ * @return Niente.
+ */
 static void build_deviceactivity_url(char *out, size_t out_len, const char *base_url)
 {
     if (!out || out_len == 0)
@@ -248,6 +292,16 @@ static void build_deviceactivity_url(char *out, size_t out_len, const char *base
 }
 #endif
 
+
+/**
+ * @brief Tenta di inviare un record di crash in sospeso.
+ *
+ * Questa funzione si occupa di inviare un record di crash che è in sospeso.
+ * Se l'invio ha successo, la funzione restituirà ESP_OK. In caso di errore,
+ * verrà restituito un codice d'errore specifico.
+ *
+ * @return esp_err_t - Codice di errore che indica il successo o la causa dell'errore.
+ */
 static esp_err_t try_send_pending_crash_record(void)
 {
 #if DNA_SERVER_POST
@@ -340,6 +394,14 @@ static esp_err_t try_send_pending_crash_record(void)
 #endif
 }
 
+
+/**
+ * @brief Controlla se la scheda SD ha spazio libero sufficiente.
+ *
+ * @param bytes_needed Numero di byte necessari.
+ * @return true Se la scheda SD ha spazio libero sufficiente.
+ * @return false Se la scheda SD non ha spazio libero sufficiente.
+ */
 static bool has_sd_free_space(size_t bytes_needed)
 {
     if (!sd_card_is_mounted())
@@ -359,6 +421,18 @@ static bool has_sd_free_space(size_t bytes_needed)
     return free_bytes > required;
 }
 
+
+/**
+ * @brief Trasferisce il coredump in memoria flash al dispositivo SD.
+ *
+ * Questa funzione trasferisce il coredump, memorizzato in memoria flash, al dispositivo SD.
+ * Il trasferimento avviene in modo asincrono e viene gestito dal sistema operativo.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ * - Altri errori specifici: errore generico.
+ */
 static esp_err_t transfer_coredump_flash_to_sd(void)
 {
     const esp_partition_t *core_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
@@ -553,6 +627,14 @@ static esp_err_t transfer_coredump_flash_to_sd(void)
 // Rete + HTTP + OTA (factory)
 // -----------------------------------------------------------------------------
 
+
+/**
+ * @brief Lista tutte le entry presenti nel namespace NVS.
+ *
+ * Questa funzione elenca tutte le entry di configurazione presenti nel namespace NVS.
+ * Non accetta parametri di input.
+ * Non restituisce alcun valore.
+ */
 static void nvs_list_entries(void)
 {
     nvs_iterator_t it = NULL;
@@ -587,6 +669,18 @@ static void nvs_list_entries(void)
     ESP_LOGI(TAG, "=== Totale: %d voci ===", count);
 }
 
+
+/**
+ * @brief Inizializza il sistema NVS (Non-Volatile Storage).
+ *
+ * Questa funzione inizializza il sistema NVS, che è utilizzato per la memorizzazione
+ * non volatili dei dati persistenti. Questo è fondamentale per la gestione dei
+ * parametri di configurazione e dei dati di stato dell'applicazione.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: Inizializzazione avvenuta con successo.
+ *         - ESP_FAIL: Inizializzazione fallita.
+ */
 static esp_err_t init_nvs(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -603,6 +697,18 @@ static esp_err_t init_nvs(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza il sistema di file SPIFFS.
+ *
+ * Questa funzione inizializza il sistema di file SPIFFS (SPI Flash File System)
+ * sul dispositivo. Questo è necessario per utilizzare il file system SPIFFS per
+ * la memorizzazione dei dati.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 static esp_err_t init_spiffs(void)
 {
     esp_vfs_spiffs_conf_t conf = {
@@ -666,6 +772,14 @@ static esp_err_t init_spiffs(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Funzione che registra le partizioni.
+ * 
+ * Questa funzione si occupa di registrare tutte le partizioni presenti nel sistema.
+ * 
+ * @return void Non restituisce alcun valore.
+ */
 static void log_partitions(void)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -674,6 +788,15 @@ static void log_partitions(void)
     ESP_LOGI(TAG, "[M] Partizione boot      : %s (tipo %d, sottotipo %d)", boot ? boot->label : "?", boot ? boot->type : -1, boot ? boot->subtype : -1);
 }
 
+
+/**
+ * @brief Callback chiamata quando la sincronizzazione NTP è completata.
+ *
+ * Questa funzione viene invocata quando il sistema ha completato la sincronizzazione NTP.
+ *
+ * @param tv Puntatore al tempo sincronizzato.
+ * @return Nessun valore di ritorno.
+ */
 static void ntp_sync_callback(struct timeval *tv)
 {
     device_config_t *cfg = device_config_get();
@@ -702,6 +825,14 @@ static void ntp_sync_callback(struct timeval *tv)
 /* forward declarations */
 static void init_sntp(void);
 
+
+/**
+ * @brief Inizializza il servizio SNTP.
+ *
+ * Questa funzione configura e avvia il servizio SNTP per sincronizzare l'orario del dispositivo con un server SNTP.
+ *
+ * @return Nessun valore di ritorno.
+ */
 static void init_sntp(void)
 {
     device_config_t *cfg = device_config_get();
@@ -733,6 +864,16 @@ static void init_sntp(void)
  * @brief Forza la sincronizzazione NTP manuale
  * @return ESP_OK se la sincronizzazione è iniziata, ESP_FAIL altrimenti
  */
+
+/**
+ * @brief Inizializza la sincronizzazione NTP.
+ *
+ * Questa funzione inizializza il servizio di sincronizzazione NTP per ottenere l'ora corrente.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: operazione riuscita
+ *         - ESP_FAIL: operazione fallita
+ */
 esp_err_t init_sync_ntp(void)
 {
     device_config_t *cfg = device_config_get();
@@ -758,6 +899,17 @@ esp_err_t init_sync_ntp(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Gestore degli eventi IP.
+ *
+ * Questa funzione viene chiamata quando si verifica un evento IP.
+ *
+ * @param arg Puntatore agli argomenti passati alla funzione.
+ * @param event_base Base dell'evento.
+ * @param event_id ID dell'evento.
+ * @param event_data Dati dell'evento.
+ */
 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     (void)arg;
@@ -809,6 +961,17 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
     }
 }
 
+
+/**
+ * @brief Gestore degli eventi Ethernet.
+ *
+ * Questa funzione viene chiamata quando si verifica un evento Ethernet.
+ *
+ * @param arg Puntatore a un argomento specifico, utilizzato per passare informazioni aggiuntive.
+ * @param event_base Base dell'evento Ethernet.
+ * @param event_id ID dell'evento Ethernet.
+ * @param event_data Dati associati all'evento Ethernet.
+ */
 static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     (void)arg;
@@ -839,6 +1002,16 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t ev
     }
 }
 
+
+/**
+ * @brief Inizializza il loop degli eventi.
+ *
+ * Questa funzione inizializza il loop degli eventi necessario per la gestione degli eventi asincroni.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: inizializzazione avvenuta con successo.
+ *         - ESP_FAIL: inizializzazione fallita.
+ */
 static esp_err_t init_event_loop(void)
 {
     // Nota: esp_netif_init() e esp_event_loop_create_default() vengono chiamati in start_ethernet()
@@ -860,6 +1033,14 @@ static esp_err_t init_event_loop(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza l'handle interno per l'ethernet.
+ *
+ * Questa funzione inizializza l'handle interno necessario per la gestione dell'ethernet.
+ *
+ * @return esp_eth_handle_t Handle interno per l'ethernet.
+ */
 static esp_eth_handle_t eth_init_internal(void)
 {
     esp_err_t ret __attribute__((unused)) = ESP_OK;
@@ -905,6 +1086,16 @@ err:
     return NULL;
 }
 
+
+/**
+ * @brief Avvia la connessione Ethernet.
+ *
+ * Questa funzione inizializza e avvia la connessione Ethernet del dispositivo.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione fallita.
+ */
 static esp_err_t start_ethernet(void)
 {
 #if CONFIG_APP_ETH_ENABLED
@@ -995,6 +1186,17 @@ static esp_err_t start_ethernet(void)
 // Public API
 // -----------------------------------------------------------------------------
 
+
+/**
+ * @brief Inizializza il display utilizzando la libreria LVGL in modalità minima.
+ * 
+ * Questa funzione configura il display per l'uso con la libreria LVGL in modalità minima,
+ * preparando il sistema per l'uso di interfacce grafiche minimaliste.
+ * 
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 static esp_err_t init_display_lvgl_minimal(void)
 {
     ESP_LOGI(TAG, "Heap before display init:");
@@ -1070,6 +1272,17 @@ static esp_err_t init_display_lvgl_minimal(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza il display in modalità solo lettura.
+ *
+ * Questa funzione configura il display per la modalità solo lettura, preparandolo
+ * per la visualizzazione di contenuti senza la possibilità di modifiche.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t init_run_display_only(void)
 {
 #if defined(DNA_LVGL) && (DNA_LVGL == 1)
@@ -1101,6 +1314,17 @@ esp_err_t init_run_display_only(void)
 #endif
 }
 
+
+/**
+ * @brief Inizializza il sistema di produzione in modalità factory.
+ *
+ * Questa funzione configura il sistema per l'operazione in modalità factory,
+ * preparando tutti i componenti necessari per la produzione di massa.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t init_run_factory(void)
 {
     ESP_ERROR_CHECK(init_nvs());
@@ -1370,11 +1594,31 @@ esp_err_t init_run_factory(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza e restituisce un handle per la gestione di un LED strip WS2812.
+ *
+ * @return led_strip_handle_t Handle per la gestione del LED strip WS2812.
+ */
 led_strip_handle_t init_get_ws2812_handle(void)
 {
     return led_get_handle();
 }
 
+
+/**
+ * @brief Inizializza i puntatori ai diversi tipi di interfaccie di rete.
+ *
+ * Questa funzione inizializza i puntatori ai diversi tipi di interfaccie di rete
+ * disponibili nel sistema, come le reti access point (AP), le reti di accesso
+ * (STA) e le reti Ethernet (ETH).
+ *
+ * @param [out] ap Puntatore al puntatore all'interfaccia di rete AP.
+ * @param [out] sta Puntatore al puntatore all'interfaccia di rete STA.
+ * @param [out] eth Puntatore al puntatore all'interfaccia di rete Ethernet.
+ *
+ * @return Nessun valore di ritorno.
+ */
 void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
 {
     if (ap)
@@ -1385,6 +1629,14 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
         *eth = s_netif_eth;
 }
 
+
+/** @brief Inizializza il bus I2C e l'estenders I/O.
+ *  
+ *  Questa funzione configura il bus I2C e l'estenders I/O per consentire la comunicazione con dispositivi collegati.
+ *  
+ *  @param [in] Nessun parametro di input.
+ *  @return Nessun valore di ritorno.
+ */
 void init_i2c_and_io_expander(void) {
 #if defined(CONFIG_BSP_I2C_NUM)
     ESP_LOGI(TAG, "[M] [I2C] Avvio init bus I2C BSP (port=%d)", CONFIG_BSP_I2C_NUM);
@@ -1471,16 +1723,40 @@ void init_i2c_and_io_expander(void) {
     }
 }
 
+
+/**
+ * @brief Controlla se l'errore di blocco è attivo.
+ *
+ * Questa funzione verifica lo stato del blocco di errore.
+ *
+ * @return true se il blocco di errore è attivo, false altrimenti.
+ */
 bool init_is_error_lock_active(void)
 {
     return s_error_lock_active;
 }
 
+
+/**
+ * @brief Inizializza la funzione per ottenere il conteggio di riavvii consecutivi.
+ *
+ * @return uint32_t Il conteggio di riavvii consecutivi.
+ */
 uint32_t init_get_consecutive_reboots(void)
 {
     return s_consecutive_reboots;
 }
 
+
+/**
+ * @brief Inizializza la variabile di boot completato.
+ *
+ * Questa funzione imposta la variabile di stato per indicare che il boot del sistema è stato completato.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: operazione riuscita
+ *         - ESP_FAIL: operazione fallita
+ */
 esp_err_t init_mark_boot_completed(void)
 {
     nvs_handle_t handle;
@@ -1508,6 +1784,16 @@ esp_err_t init_mark_boot_completed(void)
     return ret;
 }
 
+
+/**
+ * @brief Inizializza una richiesta di forzato crash.
+ *
+ * Questa funzione inizializza una richiesta di forzato crash, preparando il sistema
+ * per un crash imminente. Questo può essere utilizzato per testare la gestione del crash
+ * o per altri scopi specifici.
+ *
+ * @return esp_err_t - Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t init_mark_forced_crash_request(void)
 {
     nvs_handle_t handle;

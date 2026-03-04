@@ -95,8 +95,21 @@
     7. mantenere i vecchi json ed aggiornarle i record con un campo id da popolare con il nuovo id generato dalla conversione
     8. creare nuove funzioni per la ricerca e la concatenazione e restituzione delle stringhe
     9. rivedere in tutto il codice tutti gli utilizzi delle stringhe vecchio formato e cambiare il metodo di ricerca da scope+key alfanumerici a numerici usando i vecchi file che hanno tutti i riferimenti (nuovo id / scope+key)
-    10. Crea uno script pythom confronta i testi della vecchia struttura con i testi della nuova per tutte le lingue
- 2. modifica della Coda di eventi da utilizzare nell FSM e nei moduli di controllo: 
+    10. Crea uno script python confronta i testi della vecchia struttura con i testi della nuova per tutte le lingue: partendo dai file .bak estrai ogni record e in base alla tabella sync ricostruisci le stringhe e confrontale e genera un file .md con i confronti.
+    11. perfetto è proprio quello che volevo suggerire. aggiungerei che questo header abbia anche funzioni di verifica e di rigenerazione dei file json, in pratica il vero documento di origine delle tabelle json  : ci potrebbe essere per ogni stringa il suo define (es. I18N_SCOPE_NAV e I18N_KEY_NAV ),  scope_id, key_id, valori letterali ereditati (ora nel file *.map.*), testi in tutte le lingue (dobbiamo prevedere sicuramente it, en, de, fr, es e lasiare aperto a future aggiunte, quindi metterei in testa al file i codici nell'ordine delle lingue).
+    ```
+      ecco un esempio di una voce:
+      #define LANGUAGES "{["it","en","de",....]}
+      // element _NAV
+      #define I18N_SCOPE_NAV 23
+      #define I18N_KEY_NAV 223
+      #define I18N_SCOPE_TEXT "nav"
+      #define I18N_KEY_TEXT "testolabel"
+      #define I18N_VALUES "{"it":"casa","en":"home","de":"haus"......}"
+      ```
+    12. dobbiamo gestire 2 ambienti con lingue diverse : interfaccia web e pannello/LVGL. il file delle linghe è sempre completo (web e lvgl). all'avvio si carica tutti i file di localizzazione in un array di strutture composte da il codice lingua e l'array con le stringhe. la parte di localizzazione per il pannello deve caricare tutte le lingue in memoria all'avvio per permettere un cambio rapido della lingua . La parte per il WEB può avere una lingua diversa ed utilizzarla nella composizione delle pagine. modifichiamo /config sezione Device mettendo una nuova combo per la scelta della lingua per 'Pannello Utente' e una combo per 'Backend'. Avremo quindi 2 diverse interfacce e lingue nel sistema : una per comporre i testi lato Utente (sul pannello LCD con LVGL) e una per indicare la lingua del backend. Verifica poi che ogni interfaccia usi la sua lingua 
+    13. 
+ 1. modifica della Coda di eventi da utilizzare nell FSM e nei moduli di controllo: 
     1. partendo dalla definizione attuale di fsm_input_event_t definiamo che ogni agente (task o funzione di origine o destinazione di un messaggio) deve possedere un suo id unico chiamato agn_id di tipo uint8_t, quindi aggiungiamo dei campi alla struttura:
        1. From : agente che ha generato il messaggio
        2. To : destinatari del messaggio rappresentati da un array di 10 agn_id;
@@ -110,9 +123,9 @@
     3. venno identificati tutti gli agenti, metterli in una tabella ed assegnare gli agn_id
     4. preparare una tabella con tutte le azioni ed assegnare gli action_id
     5. tutti i messaggi includono automaticamente l'agente per i log
- 3. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare scaricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
- 4. ✅ aggiungiamo altri tasti di pagamento all'emulatore : quelli attuali li definiamo come 'Crediti QR', mettiamo nella linea sotto una serie uguale con gli stessi valori come 'Crediti Tessera', poi sotto 2 tasti 'Monete' con valore 1 coin e 2 coins
- 5. funzionamento macchina 
+ 2. Crea un mini file manager per ispezionare il contenuto della SD e deiSPIFFS , con possibilità di caricare scaricare e cancellare file - solo sulla root senza folder. Si accede a questa funzione con un tasto nella Home. E' disponibile sia in App che in Factory.
+ 3. ✅ aggiungiamo altri tasti di pagamento all'emulatore : quelli attuali li definiamo come 'Crediti QR', mettiamo nella linea sotto una serie uguale con gli stessi valori come 'Crediti Tessera', poi sotto 2 tasti 'Monete' con valore 1 coin e 2 coins
+ 4. funzionamento macchina 
     1. credito: il credito è espresso in coin ed ha una corrispondenza economica di un dato valore (per ora assumiamo 1€ per coin). Il programma ha come unità il tempo (in secondi) e un prezzo indivisibile (per ora consideriamo 1 programma = 1 coin ma potrebbe essere un valore qualsiasi). 
        1. il credito può arrivare da 
           1. 1 o più gettoni/monete (non è previsto resto o restituzzione di monete inserite nella gettoniera)
@@ -161,7 +174,7 @@
        3. la barra laterale (con replica sulla striscia LED) mostra la progressione del consumo del cliente in percentuale (ticks totali - ticks usati) * 100 7 ticks totali.
    
        4.  viene inserito un certo credito (es. 20€) - il valore viene mostrato nel riquadro centrale. Quando viene scelto un programma si calcola il tempo massimo di uso del programma (crediti / costo ciclo * tempo ciclo). L'indicatore del tempo disponibile si aggiorna in base a questo valore. La barra va al 100% e comincia a scendere (percentuale = (tempo totale - tempo trascorso)/tempo totale ). Il credito viene scalato di 1 unità (es. 1€) che varrà in base al 
- 6. Analisi criticità (riferita al punto 2 - coda eventi FSM):
+ 5. Analisi criticità (riferita al punto 2 - coda eventi FSM):
       1. Modello coda non compatibile con destinatari multipli: la FIFO con receive distruttivo non supporta la logica `To[10]` + rimozione destinatario + eliminazione messaggio a somma destinatari zero.
         - Azione (SCELTA DECISIVA): introdurre mailbox condivisa con lock e stato destinatari per messaggio.
       2. Mancano i campi strutturali del messaggio: `from_agn_id`, `to_agn_id[10]`, `action_id`.
@@ -179,7 +192,7 @@
       8. Strategia migrazione API: servono API di claim/ack per agente mantenendo compatibilità con publish/receive attuali.
         - Azione: introdurre nuove API (`publish_ex`, `claim_for_agent`, `ack_for_agent`) mantenendo le API correnti come wrapper.
 
- 7. Piano test endpoint e funzioni (da riprendere)
+ 6. Piano test endpoint e funzioni (da riprendere)
 
     - Strutturare i test in 4 livelli:
       - Smoke: endpoint raggiungibile, status code atteso, JSON valido.
@@ -201,7 +214,7 @@
       - Smoke completo di tutte le route `/api/test/*` e `/api/config/*` usate dalla UI.
       - 3 flow critici: SD, seriale unificato, backup config su SD.
       - Report `junit.xml` + riepilogo markdown.
- 8. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
+ 7. Chiamate server remoto: completare hardening/integrazione (gap analisi codice)
 
     - Autenticazione/token
       - Generare sempre header `Date` runtime (ora è hardcoded in `http_services.c`).
@@ -228,9 +241,9 @@
     - Osservabilità e test
       - Aggiungere metriche minime (`last_ok`, `last_err`, `queue_len`, `last_status_code`) esposte via API/UI.
       - Preparare test contract/flow dedicati alle route remote con mock server.
- 9.  lo scanner USB è gestito tramite la coda mesaggi?  
- 10. la lettura di un codice QR deve passare a http_services che deve eseguire , se non già acquisito, il token tramite la chiamata login e quindi eseguire una chiamata a api_payment_post
- 11. ✅ crea una funzione per visualizzare sullo schermo con il carattere a 48px la scritta 'Fuori servizio' ed eseguila nel caso di 'APP: [F] ERROR_LOCK attivo: avvio task inibito (reboot consecutivi=3)
+ 8.  lo scanner USB è gestito tramite la coda mesaggi?  
+ 9.  la lettura di un codice QR deve passare a http_services che deve eseguire , se non già acquisito, il token tramite la chiamata login e quindi eseguire una chiamata a api_payment_post
+ 10. ✅ crea una funzione per visualizzare sullo schermo con il carattere a 48px la scritta 'Fuori servizio' ed eseguila nel caso di 'APP: [F] ERROR_LOCK attivo: avvio task inibito (reboot consecutivi=3)
 '
       
  ```

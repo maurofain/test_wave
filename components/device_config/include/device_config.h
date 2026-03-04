@@ -278,7 +278,9 @@ char* device_config_get_ui_texts_records_json(const char *language);
 /**
  * @brief Salva la tabella i18n (array record) su SPIFFS nel file della lingua indicata
  * @param language Codice lingua ISO 2 caratteri
- * @param records_json JSON array di record {lang,scope,key,text}
+ * @param records_json JSON array di record i18n.
+ *        Formato principale: {scope:<uint8>, key:<uint16>, section:<uint8>, text:<string>}.
+ *        Compatibilità legacy mantenuta per record testuali.
  * @return ESP_OK se salvato correttamente
  */
 esp_err_t device_config_set_ui_texts_records_json(const char *language, const char *records_json);

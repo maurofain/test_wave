@@ -14,6 +14,16 @@ static const char *TAG = "AUX_GPIO";
 /* Codice reale — escluso se mockup attivo */
 #if DNA_GPIO == 0
 
+
+/**
+ * @brief Inizializza la GPIO.
+ *
+ * Questa funzione inizializza la GPIO per l'utilizzo successivo.
+ *
+ * @return
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t aux_gpio_init(void)
 {
     device_config_t *cfg = device_config_get();
@@ -41,6 +51,16 @@ esp_err_t aux_gpio_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ottiene lo stato di tutti i GPIO in formato JSON.
+ *
+ * Questa funzione popola un buffer JSON con lo stato corrente di tutti i GPIO.
+ *
+ * @param json_buffer Puntatore al buffer in cui verrà scritto il JSON.
+ * @param max_len Lunghezza massima del buffer.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t aux_gpio_get_all_json(char *json_buffer, size_t max_len)
 {
     device_config_t *cfg = device_config_get();
@@ -64,6 +84,16 @@ esp_err_t aux_gpio_get_all_json(char *json_buffer, size_t max_len)
     return ESP_FAIL;
 }
 
+
+/**
+ * @brief Imposta il livello di un pin GPIO.
+ * 
+ * @param pin Numero del pin GPIO da impostare.
+ * @param level Livello da impostare sul pin (0 o 1).
+ * @return esp_err_t Codice di errore.
+ * 
+ * @note Se il pin è 33, l'operazione viene ignorata.
+ */
 esp_err_t aux_gpio_set_level(int pin, int level)
 {
     if (pin == 33) {
@@ -80,12 +110,30 @@ esp_err_t aux_gpio_set_level(int pin, int level)
  */
 #if defined(DNA_GPIO) && (DNA_GPIO == 1)
 
+
+/**
+ * @brief Inizializza la GPIO.
+ *
+ * Questa funzione inizializza la GPIO utilizzando le impostazioni predefinite.
+ *
+ * @return esp_err_t
+ * @retval ESP_OK Se l'inizializzazione è stata completata con successo.
+ * @retval ESP_FAIL Se l'inizializzazione è stata completata con un errore.
+ */
 esp_err_t aux_gpio_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] aux_gpio_init: GPIO simulati");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ottiene tutti i valori dei GPIO in formato JSON.
+ *
+ * @param json_buffer Puntatore al buffer dove verrà memorizzato il JSON.
+ * @param max_len Lunghezza massima del buffer.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t aux_gpio_get_all_json(char *json_buffer, size_t max_len)
 {
     const char *mock_json = "{\"33\":{\"mode\":0,\"level\":0}}";
@@ -95,6 +143,14 @@ esp_err_t aux_gpio_get_all_json(char *json_buffer, size_t max_len)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Imposta il livello del segnale GPIO.
+ *
+ * @param [in] pin Numero del pin GPIO da impostare.
+ * @param [in] level Livello del segnale da impostare (0 o 1).
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t aux_gpio_set_level(int pin, int level)
 {
     ESP_LOGI(TAG, "[C] [MOCK] aux_gpio_set_level: pin=%d level=%d", pin, level);

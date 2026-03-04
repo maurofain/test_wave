@@ -34,11 +34,30 @@ static const char *TAG = "TASKS";
 static float s_temperature = 0.0f;
 static float s_humidity = 0.0f;
 
+
+/**
+ * @brief Ottiene la temperatura corrente.
+ * 
+ * @return float La temperatura in gradi Celsius.
+ */
 float tasks_get_temperature(void) { return s_temperature; }
+
+/**
+ * @brief Ottiene l'umidità del sistema.
+ * 
+ * @return float La umidità corrente del sistema, espressa in percento.
+ */
 float tasks_get_humidity(void) { return s_humidity; }
 
 /* Wrapper: crea il task allocando lo stack in DRAM interna o PSRAM
  * in base al campo stack_caps del descrittore. */
+
+/**
+ * @brief Crea un nuovo task.
+ *
+ * @param [in] t Puntatore ai parametri del task da creare.
+ * @return BaseType_t Valore di ritorno che indica il successo o l'errore dell'operazione.
+ */
 static BaseType_t task_create(task_param_t *t)
 {
     return xTaskCreatePinnedToCoreWithCaps(
@@ -55,6 +74,15 @@ static BaseType_t task_create(task_param_t *t)
 #endif
 
 #if DNA_LED_STRIP == 0
+
+/**
+ * @brief Gestisce il task per la comunicazione con il dispositivo WS2812.
+ *
+ * Questa funzione si occupa di inviare i dati di colore ai LED WS2812
+ * in base alle istruzioni ricevute.
+ *
+ * @param arg Puntatore a dati aggiuntivi (non utilizzato in questo contesto).
+ */
 static void ws2812_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -87,6 +115,14 @@ static void ws2812_task(void *arg)
  * Attiva quando DNA_LED_STRIP == 1
  * ============================================================ */
 #if defined(DNA_LED_STRIP) && (DNA_LED_STRIP == 1)
+
+/**
+ * @brief Gestisce la task per la comunicazione con il dispositivo WS2812.
+ * 
+ * Questa funzione si occupa di inviare i dati di colore ai LED WS2812.
+ * 
+ * @param arg Puntatore agli argomenti passati alla task.
+ */
 static void ws2812_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -99,6 +135,16 @@ static void ws2812_task(void *arg)
 
 // Task scheletro (solo struttura, logica da implementare)
 
+
+/**
+ * @brief Gestisce il task per l'accesso all'EEPROM.
+ * 
+ * Questa funzione viene eseguita come task e si occupa di leggere e scrivere
+ * dati sull'EEPROM in base alle richieste ricevute.
+ * 
+ * @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
+ * @return void Nessun valore di ritorno.
+ */
 static void eeprom_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -108,6 +154,15 @@ static void eeprom_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Gestisce il task di espansione I/O.
+ *
+ * Questa funzione si occupa di gestire il task di espansione I/O, elaborando i dati ricevuti e aggiornando lo stato del sistema.
+ *
+ * @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
+ * @return Nessun valore di ritorno.
+ */
 static void io_expander_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -117,6 +172,15 @@ static void io_expander_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Gestisce il task per la comunicazione con il sensore SHT40.
+ * 
+ * Questa funzione si occupa di iniziare la misurazione del temperatura e
+ * dell'umidità, di leggere i dati e di inviarli al server.
+ * 
+ * @param arg Puntatore agli argomenti del task.
+ */
 static void sht40_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -134,6 +198,15 @@ static void sht40_task(void *arg)
     }
 }
 
+
+/** @brief Gestisce il task per la comunicazione RS232.
+ *  
+ *  Questa funzione si occupa di gestire il task per la comunicazione RS232. 
+ *  Legge i dati ricevuti e li invia, gestendo eventuali errori.
+ *  
+ *  @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
+ *  @return Nessun valore di ritorno.
+ */
 static void rs232_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -143,6 +216,16 @@ static void rs232_task(void *arg)
     }
 }
 
+
+/** @brief Gestisce il task per la comunicazione RS485.
+ *  
+ *  Questa funzione gestisce il task dedicato alla comunicazione RS485. 
+ *  Si occupa di inviare e ricevere dati tramite la linea RS485.
+ *  
+ *  @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 static void rs485_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -152,6 +235,15 @@ static void rs485_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Gestisce il task per la gestione del database.
+ *
+ * Questa funzione viene eseguita come task e si occupa della gestione
+ * dei dati del database, come la lettura, la scrittura e la sincronizzazione.
+ *
+ * @param arg Puntatore a dati aggiuntivi passati al task.
+ */
 static void mdb_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -161,6 +253,15 @@ static void mdb_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Gestisce il task PWM.
+ * 
+ * Questa funzione viene eseguita come task e si occupa di gestire il controllo PWM.
+ * 
+ * @param arg Puntatore a dati di input utilizzati dal task.
+ * @return Nessun valore di ritorno.
+ */
 static void pwm_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -170,6 +271,15 @@ static void pwm_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Gestisce il task del Finite State Machine (FSM).
+ *
+ * Questa funzione è responsabile della gestione del task del FSM. Viene eseguita in un contesto di sistema operativo e gestisce lo stato corrente del sistema.
+ *
+ * @param arg Puntatore a dati aggiuntivi passati al task. In questo caso, non viene utilizzato.
+ * @return Nessun valore di ritorno.
+ */
 static void fsm_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -239,6 +349,16 @@ static void fsm_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Gestisce il task per la gestione del touchscreen.
+ *
+ * Questa funzione si occupa di monitorare e interpretare gli eventi del touchscreen,
+ * aggiornando lo stato dell'interfaccia utente di conseguenza.
+ *
+ * @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
+ * @return Nessun valore di ritorno.
+ */
 static void touchscreen_task(void *arg)
 {
     esp_lcd_touch_handle_t touch_handle = (esp_lcd_touch_handle_t)arg;
@@ -306,6 +426,10 @@ static void touchscreen_task(void *arg)
     }
 }
 
+
+/** @brief Gestisce la task LVGL.
+ *  @param arg Argomento della task, non utilizzato.
+ *  @return Nessun valore di ritorno. */
 static void lvgl_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -315,6 +439,16 @@ static void lvgl_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Gestisce il task per l'aggiornamento del tempo NTP.
+ *
+ * Questa funzione viene eseguita in un task separato e si occupa di sincronizzare
+ * l'orologio del sistema con un server NTP.
+ *
+ * @param arg Puntatore a dati di input (non utilizzato in questa funzione).
+ * @return Nessun valore di ritorno.
+ */
 static void ntp_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
@@ -347,6 +481,15 @@ static void ntp_task(void *arg)
 }
 
 // wrapper per lo scanner USB: inizializza il driver e poi entra nella sua routine
+
+/**
+ * @brief Callback chiamata quando viene rilevato un barcode.
+ *
+ * Questa funzione viene invocata dal sistema quando viene rilevato un barcode.
+ * 
+ * @param barcode [in] Il codice barcode rilevato.
+ * @return void Non restituisce alcun valore.
+ */
 static void scanner_on_barcode_cb(const char *barcode)
 {
     ESP_LOGI("SCANNER", "Barcode: %s", barcode);
@@ -369,6 +512,16 @@ static void scanner_on_barcode_cb(const char *barcode)
     }
 }
 
+
+/**
+ * @brief Wrapper per la gestione del task del scanner USB.
+ *
+ * Questa funzione viene utilizzata per avviare e gestire il task del scanner USB.
+ * È responsabile della creazione e del lancio del task che si occupa della scansione dei dispositivi USB.
+ *
+ * @param arg Puntatore a dati aggiuntivi che possono essere passati al task.
+ * @return Nessun valore di ritorno.
+ */
 static void usb_scanner_task_wrapper(void *arg)
 {
     usb_cdc_scanner_config_t cfg = {.on_barcode = scanner_on_barcode_cb};
@@ -379,6 +532,16 @@ static void usb_scanner_task_wrapper(void *arg)
 
 /* Wrapper CCtalk: l'hardware UART è già inizializzato da init.c (cctalk_driver_init).
  * Questo wrapper entra direttamente nel loop di ricezione. */
+
+/**
+ * @brief Wrapper per l'engine CCTalk.
+ *
+ * Questa funzione agisce come un wrapper per l'engine CCTalk, gestendo
+ * le operazioni di comunicazione e processamento dei dati.
+ *
+ * @param arg Puntatore a dati aggiuntivi necessari per l'operazione.
+ * @return Nessun valore di ritorno.
+ */
 static void cctalk_engine_wrapper(void *arg)
 {
     cctalk_task_run(NULL);
@@ -386,6 +549,17 @@ static void cctalk_engine_wrapper(void *arg)
 
 /* Wrapper MDB engine: l'hardware UART è già inizializzato da init.c (mdb_init).
  * Questo wrapper entra direttamente nel loop di polling. */
+
+/**
+ * @brief Wrapper per l'engine di gestione del database.
+ *
+ * Questa funzione agisce come un wrapper per l'engine di gestione del database,
+ * permettendo di eseguire operazioni di lettura e scrittura su un database.
+ *
+ * @param arg Puntatore a un argomento generico che può essere utilizzato per passare
+ *            informazioni aggiuntive alla funzione.
+ * @return Nessun valore di ritorno.
+ */
 static void mdb_engine_wrapper(void *arg)
 {
     mdb_engine_run(NULL);
@@ -393,6 +567,16 @@ static void mdb_engine_wrapper(void *arg)
 
 /* Wrapper SD monitor: non richiede init hardware preventivo (il task configura
  * autonomamente il GPIO di card-detect). */
+
+/**
+ * @brief Wrapper per la funzione di monitoraggio.
+ *
+ * Questa funzione agisce come un wrapper per la funzione di monitoraggio,
+ * permettendo di passare un argomento generico a una funzione di monitoraggio.
+ *
+ * @param arg Puntatore a un argomento generico da passare alla funzione di monitoraggio.
+ * @return Nessun valore di ritorno.
+ */
 static void sd_monitor_wrapper(void *arg)
 {
     sd_card_monitor_run(NULL);
@@ -615,6 +799,17 @@ static task_param_t *find_task_by_name(const char *name)
     return NULL;
 }
 
+
+/**
+ * @brief Analizza lo stato di una task.
+ *
+ * Questa funzione prende una stringa che rappresenta lo stato di una task e lo converte in un valore di tipo task_state_t.
+ * Se la stringa non è valida, viene restituito lo stato di default.
+ *
+ * @param [in] s Puntatore alla stringa che rappresenta lo stato della task.
+ * @param [in] def Valore di default da restituire se la stringa non è valida.
+ * @return Lo stato di tipo task_state_t corrispondente alla stringa fornita, o lo stato di default se la stringa non è valida.
+ */
 static task_state_t parse_state(const char *s, task_state_t def)
 {
     if (!s) return def;
@@ -624,6 +819,13 @@ static task_state_t parse_state(const char *s, task_state_t def)
     return def;
 }
 
+
+/** @brief Imposta il gestore del touchscreen.
+ *  
+ *  @param [in] handle Puntatore al gestore del touchscreen.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void tasks_set_touchscreen_handle(void *handle)
 {
     task_param_t *t = find_task_by_name("touchscreen");
@@ -632,6 +834,16 @@ void tasks_set_touchscreen_handle(void *handle)
     }
 }
 
+
+/**
+ * @brief Carica la configurazione delle attività da un file.
+ *
+ * Questa funzione carica la configurazione delle attività dal file specificato
+ * dal percorso passato come parametro.
+ *
+ * @param [in] path Percorso del file da cui caricare la configurazione.
+ * @return Nessun valore di ritorno.
+ */
 void tasks_load_config(const char *path)
 {
     FILE *f = fopen(path, "r");
@@ -717,6 +929,14 @@ void tasks_load_config(const char *path)
  * in modo che il CSV non possa sovrascrivere la decisione.
  * Aggiungere qui una riga per ogni nuovo mock DNA_*.
  * ============================================================ */
+
+/**
+ * @brief Imposta lo stato delle attività su "idle" per i mock.
+ *
+ * Questa funzione imposta lo stato delle attività su "idle" per i mock.
+ * Non ha parametri di input o output.
+ * Non restituisce alcun valore.
+ */
 static void tasks_set_state_idle_for_mocks(void)
 {
 #if DNA_LED_STRIP == 1
@@ -730,6 +950,13 @@ static void tasks_set_state_idle_for_mocks(void)
      */
 }
 
+
+/** @brief Avvia tutte le attività del sistema.
+ *  
+ *  Questa funzione avvia tutte le attività del sistema, preparando il sistema per l'esecuzione.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void tasks_start_all(void)
 {
     tasks_set_state_idle_for_mocks();
@@ -767,6 +994,16 @@ void tasks_start_all(void)
     }
 }
 
+
+/** @brief Esegue tutte le attività pianificate e le esegue.
+ * 
+ * @param [in/out] Nessun parametro specifico.
+ * 
+ * @return Nessun valore di ritorno.
+ * 
+ * Questa funzione si occupa di eseguire tutte le attività pianificate in anticipo.
+ * Non richiede parametri di input o output specifici e non restituisce alcun valore.
+ */
 void tasks_apply_n_run(void)
 {
     ESP_LOGI(TAG, "Applicazione nuovi stati task... (display.enabled=%d)", (int)device_config_get()->display.enabled);

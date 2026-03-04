@@ -3,6 +3,7 @@ build/
 *.o
 *.a
 *.lib
+*.c.bak
 
 # ESP-IDF generated files
 sdkconfig

@@ -41,6 +41,16 @@ static SemaphoreHandle_t s_mb_signal = NULL;
 
 static uint32_t to_mask_from_event(const fsm_input_event_t *e);
 
+
+/**
+ * @brief Converte un evento di input in una maschera.
+ *
+ * Questa funzione prende un evento di input e lo converte in una maschera
+ * utilizzabile per la gestione degli stati di un automa finito.
+ *
+ * @param [in] e Puntatore all'evento di input da convertire.
+ * @return Maschera corrispondente all'evento di input.
+ */
 static uint32_t to_mask_from_event(const fsm_input_event_t *e)
 {
     uint32_t mask = 0;
@@ -83,6 +93,13 @@ static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type)
     }
 }
 
+
+/**
+ * @brief Aggiunge un messaggio alla coda di messaggi pendenti in modalità locked.
+ * 
+ * @param [in] message Puntatore al messaggio da aggiungere. Deve essere diverso da NULL.
+ * @return Nessun valore di ritorno.
+ */
 static void fsm_pending_push_text_locked(const char *message)
 {
     if (!message) {
@@ -100,6 +117,13 @@ static void fsm_pending_push_text_locked(const char *message)
     }
 }
 
+
+/**
+ * @brief Inserisce un evento di input nella coda di eventi pendenti.
+ * 
+ * @param [in] event Puntatore all'evento di input da inserire.
+ * @return void Nessun valore di ritorno.
+ */
 static void fsm_pending_push(const fsm_input_event_t *event)
 {
     if (!s_fsm_pending_lock || !event) {
@@ -120,6 +144,16 @@ static void fsm_pending_push(const fsm_input_event_t *event)
     xSemaphoreGive(s_fsm_pending_lock);
 }
 
+
+/**
+ * @brief Inizializza il contesto del finite state machine.
+ * 
+ * @param [in/out] ctx Puntatore al contesto del finite state machine da inizializzare.
+ * @return Nessun valore di ritorno.
+ * 
+ * Questa funzione inizializza il contesto del finite state machine utilizzando il puntatore fornito.
+ * Se il puntatore è nullo, la funzione non ha alcun effetto.
+ */
 void fsm_init(fsm_ctx_t *ctx)
 {
     if (!ctx) {
@@ -144,6 +178,15 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->splash_screen_time_ms = FSM_DEFAULT_SPLASH_TIMEOUT_MS;
 }
 
+
+/**
+ * @brief Gestisce un evento per lo stato finito.
+ * 
+ * @param [in] ctx Contesto del finite state machine.
+ * @param [in] event Evento da gestire.
+ * @return true Se l'evento è stato gestito con successo.
+ * @return false Se l'evento non è stato gestito o se il contesto è nullo.
+ */
 bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
 {
     if (!ctx || event == FSM_EVENT_NONE) {
@@ -230,6 +273,15 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
     return prev != ctx->state;
 }
 
+
+/**
+ * @brief Gestisce un evento di input per la macchina a stati finiti.
+ * 
+ * @param [in] ctx Puntatore al contesto della macchina a stati finiti.
+ * @param [in] event Puntatore all'evento di input da gestire.
+ * @return true Se l'evento è stato gestito con successo.
+ * @return false Se l'evento non è stato gestito o se i parametri sono invalidi.
+ */
 bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 {
     if (!ctx || !event) {
@@ -393,6 +445,17 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
     return false;
 }
 
+
+/**
+ * @brief Esegue un tick del finite state machine (FSM).
+ * 
+ * Questa funzione aggiorna lo stato dell'FSM in base al tempo trascorso.
+ * 
+ * @param [in] ctx Puntatore al contesto dell'FSM.
+ * @param [in] elapsed_ms Numero di millisecondi trascorsi dall'ultimo tick.
+ * @return true Se lo stato dell'FSM è stato aggiornato con successo.
+ * @return false Se il contesto è nullo o l'aggiornamento non è stato possibile.
+ */
 bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
 {
     if (!ctx) {
@@ -453,6 +516,13 @@ const char *fsm_state_to_string(fsm_state_t state)
     }
 }
 
+
+/**
+ * @brief Inizializza la coda degli eventi del finite state machine.
+ *
+ * @param queue_len Dimensione massima della coda degli eventi.
+ * @return true se l'inizializzazione è stata completata con successo, false altrimenti.
+ */
 bool fsm_event_queue_init(size_t queue_len)
 {
     /* mailbox size is fixed, ignore parameter */
@@ -509,6 +579,16 @@ bool fsm_event_queue_init(size_t queue_len)
     return true;
 }
 
+
+/**
+ * @brief Pubblica un evento all'interno del gestore di stati.
+ * 
+ * Questa funzione pubblica un evento all'interno del gestore di stati e attende fino a un massimo di timeout_ticks per un segnale di completamento.
+ * 
+ * @param [in] event Puntatore all'evento da pubblicare.
+ * @param [in] timeout_ticks Numero di ticks di timeout per l'attesa del completamento.
+ * @return true se l'evento è stato pubblicato con successo, false altrimenti.
+ */
 bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks)
 {
     if (!s_mb_mutex || !event) {
@@ -555,6 +635,16 @@ bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks)
     return ok;
 }
 
+
+/**
+ * @brief Pubblica un evento all'interno di un contesto ISR.
+ * 
+ * Questa funzione viene utilizzata per pubblicare un evento all'interno di un contesto di Service Routine Interrupt (ISR).
+ * 
+ * @param [in] event Puntatore all'evento da pubblicare.
+ * @param [out] task_woken Puntatore alla variabile che indica se è stata attivata una task.
+ * @return true se l'evento è stato pubblicato con successo, false altrimenti.
+ */
 bool fsm_event_publish_from_isr(const fsm_input_event_t *event, BaseType_t *task_woken)
 {
     if (!s_mb_mutex || !event) {
@@ -585,6 +675,18 @@ bool fsm_event_publish_from_isr(const fsm_input_event_t *event, BaseType_t *task
     return false;
 }
 
+
+/**
+ * @brief Gestisce l'arrivo di un evento all'interno del sistema di gestione degli stati.
+ * 
+ * Questa funzione riceve un evento e lo invia al destinatario specificato. Se il destinatario
+ * non è valido o se non ci sono risorse disponibili, la funzione restituisce false.
+ * 
+ * @param [in] event Puntatore all'evento da inviare.
+ * @param [in] receiver_id ID dell'agente che riceverà l'evento.
+ * @param [in] timeout_ticks Numero di ticks di timeout per l'attesa.
+ * @return true se l'evento è stato inviato con successo, false altrimenti.
+ */
 bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_t timeout_ticks)
 {
     /* #8 fix: receiver_id parametrico — qualunque agent può ricevere messaggi
@@ -625,6 +727,20 @@ bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_
     return false;
 }
 
+
+/**
+ * @brief Pubblica un evento semplice nella macchina a stati finiti.
+ *
+ * Questa funzione pubblica un evento semplice nella macchina a stati finiti (FSM),
+ * che può essere utilizzato per gestire vari tipi di eventi.
+ *
+ * @param type [in] Tipo dell'evento da pubblicare.
+ * @param value_i32 [in] Valore intero associato all'evento.
+ * @param text [in] Testo associato all'evento.
+ * @param timeout_ticks [in] Numero di ticks di timeout per l'evento.
+ *
+ * @return true se l'evento è stato pubblicato con successo, false altrimenti.
+ */
 bool fsm_publish_simple_event(fsm_input_event_type_t type, int32_t value_i32, const char *text, TickType_t timeout_ticks)
 {
     /* helper for legacy callers; populate mailbox fields, defaulting to FSM */
@@ -649,6 +765,13 @@ bool fsm_publish_simple_event(fsm_input_event_type_t type, int32_t value_i32, co
     return fsm_event_publish(&event, timeout_ticks);
 }
 
+
+/**
+ * @brief Aggiunge un messaggio alla coda di messaggi in attesa.
+ * 
+ * @param [in] message Il messaggio da aggiungere. Deve essere una stringa non vuota.
+ * @return void Non restituisce alcun valore.
+ */
 void fsm_append_message(const char *message)
 {
     if (!s_fsm_pending_lock || !message || message[0] == '\0') {
@@ -663,6 +786,17 @@ void fsm_append_message(const char *message)
     xSemaphoreGive(s_fsm_pending_lock);
 }
 
+
+/**
+ * @brief Copia i messaggi pendenti in un buffer di output.
+ * 
+ * @param out Buffer di output dove verranno copiati i messaggi pendenti. Ogni messaggio deve avere una lunghezza massima di FSM_EVENT_TEXT_MAX_LEN.
+ * @param max_count Numero massimo di messaggi da copiare.
+ * @return size_t Numero di messaggi effettivamente copiati.
+ * 
+ * @note La funzione copia i messaggi pendenti in un buffer di output fornito. Se il buffer è NULL o il numero massimo di messaggi è zero, la funzione restituirà 0.
+ * @note La funzione utilizza una lock per proteggere l'accesso ai messaggi pendenti. Se la lock non è disponibile, la funzione restituirà 0.
+ */
 size_t fsm_pending_messages_copy(char out[][FSM_EVENT_TEXT_MAX_LEN], size_t max_count)
 {
     if (!out || max_count == 0 || !s_fsm_pending_lock) {
@@ -684,6 +818,16 @@ size_t fsm_pending_messages_copy(char out[][FSM_EVENT_TEXT_MAX_LEN], size_t max_
     return n;
 }
 
+
+/**
+ * @brief Pubblica lo stato corrente del contesto del gestore di stati.
+ * 
+ * @param [in] ctx Puntatore al contesto del gestore di stati.
+ * @return void Nessun valore di ritorno.
+ * 
+ * Questa funzione pubblica lo stato corrente del contesto del gestore di stati.
+ * Se il contesto o il lock del gestore di stati non sono validi, la funzione non fa nulla.
+ */
 void fsm_runtime_publish(const fsm_ctx_t *ctx)
 {
     if (!ctx || !s_fsm_runtime_lock) {
@@ -699,6 +843,14 @@ void fsm_runtime_publish(const fsm_ctx_t *ctx)
     xSemaphoreGive(s_fsm_runtime_lock);
 }
 
+
+/**
+ * @brief Cattura uno snapshot del contesto di runtime del finite state machine.
+ * 
+ * @param [out] out_ctx Puntatore al contesto di output dove verrà salvato lo stato corrente del finite state machine.
+ * @return true Se lo snapshot è stato catturato con successo.
+ * @return false Se il contesto di output è nullo o se la lock del runtime del finite state machine non è valida.
+ */
 bool fsm_runtime_snapshot(fsm_ctx_t *out_ctx)
 {
     if (!out_ctx || !s_fsm_runtime_lock) {

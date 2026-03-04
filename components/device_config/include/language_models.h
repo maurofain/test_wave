@@ -504,6 +504,8 @@ static const char *const I18N_LANG_CODES[I18N_LANG_COUNT] = {"it", "en", "de", "
 #define I18N_KEY_PROGRAM_BTN_FMT 472
 #define I18N_KEY_PROGRAMMA_9 473
 #define I18N_KEY_PROGRAMMA_10 474
+#define I18N_KEY_LINGUA_PANNELLO_UTENTE_LCD 475
+#define I18N_KEY_LINGUA_BACKEND_WEB_UI_SERVER 476
 
 typedef struct {
     const char *symbol;
@@ -514,7 +516,7 @@ typedef struct {
     const char *values[I18N_LANG_COUNT];
 } i18n_language_model_t;
 
-#define I18N_MODEL_COUNT 495
+#define I18N_MODEL_COUNT 497
 /*
  * Dataset i18n completo usato dagli script di generazione JSON.
  * Non viene compilato come array C per evitare uso memoria nel firmware.
@@ -1920,6 +1922,34 @@ typedef struct {
  *         "📡 WiFi STA",
  *         "📡 WiFi STA",
  *         "📡 WiFi STA"
+ *       ]
+ *     },
+ *     {
+ *       "key_id": 475,
+ *       "key_text": "lingua_pannello_utente_lcd",
+ *       "scope_id": 4,
+ *       "scope_text": "p_config",
+ *       "symbol": "P_CONFIG_LINGUA_PANNELLO_UTENTE_LCD",
+ *       "values": [
+ *         "Lingua Pannello Utente (LCD)",
+ *         "User Panel Language (LCD)",
+ *         "Benutzerpanel-Sprache (LCD)",
+ *         "Langue panneau utilisateur (LCD)",
+ *         "Idioma panel de usuario (LCD)"
+ *       ]
+ *     },
+ *     {
+ *       "key_id": 476,
+ *       "key_text": "lingua_backend_web_ui_server",
+ *       "scope_id": 4,
+ *       "scope_text": "p_config",
+ *       "symbol": "P_CONFIG_LINGUA_BACKEND_WEB_UI_SERVER",
+ *       "values": [
+ *         "Lingua Backend (Web UI/Server)",
+ *         "Backend Language (Web UI/Server)",
+ *         "Backend-Sprache (Web UI/Server)",
+ *         "Langue backend (Web UI/Serveur)",
+ *         "Idioma backend (Web UI/Servidor)"
  *       ]
  *     },
  *     {

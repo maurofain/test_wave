@@ -34,6 +34,16 @@ static const char *TAG = "APP";
  * Regola: livello globale = ERROR all'avvio.
  * In seguito il livello può essere rialzato dinamicamente via codice/API.
  */
+
+/**
+ * @brief Applica la politica di log del boot.
+ *
+ * Questa funzione si occupa di configurare e attivare la politica di log
+ * relativa al boot del sistema. La politica di log definisce come vengono
+ * gestiti i log generati durante il processo di avvio.
+ *
+ * @return Niente.
+ */
 static void apply_boot_log_policy(void)
 {
 #if COMPILE_APP
@@ -53,6 +63,15 @@ static void apply_boot_log_policy(void)
  * Dopo il boot, abilitiamo INFO per vedere lo stato operativo,
  * mantenendo USB/CDC più silenziosi per evitare flood.
  */
+
+/**
+ * @brief Applica la politica di registrazione dei log post-boot.
+ *
+ * Questa funzione si occupa di configurare e attivare la politica di registrazione dei log
+ * che vengono generati dopo il completamento del processo di avvio del sistema.
+ *
+ * @return Niente.
+ */
 static void apply_post_boot_log_policy(void)
 {
     esp_log_level_set("*", ESP_LOG_INFO);
@@ -67,6 +86,15 @@ static void apply_post_boot_log_policy(void)
     esp_log_level_set("httpd",      ESP_LOG_ERROR);
 }
 
+
+/**
+ * @brief Potenzialmente forza un crash all'avvio del sistema.
+ *
+ * Questa funzione controlla se è necessario forzare un crash all'avvio del sistema.
+ * Se la condizione di forzatura del crash è soddisfatta, il sistema verrà forzato a crashare.
+ *
+ * @return Nessun valore di ritorno.
+ */
 static void maybe_force_crash_at_boot(void)
 {
 #if DEBUG_FORCE_CRASH_AT_BOOT
@@ -107,6 +135,15 @@ static void maybe_force_crash_at_boot(void)
 #endif
 }
 
+
+/**
+ * @brief Funzione principale dell'applicazione.
+ * 
+ * Questa funzione è l'entry point dell'applicazione e viene chiamata automaticamente
+ * dal sistema operativo al boot.
+ * 
+ * @return void Non restituisce alcun valore.
+ */
 void app_main(void)
 {
     apply_boot_log_policy();

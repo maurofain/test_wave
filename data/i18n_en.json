@@ -618,6 +618,24 @@
     "text": "📡 WiFi STA"
   },
   {
+    "scope": 4,
+    "key": 475,
+    "section": 0,
+    "text": "User Panel Language (LCD)"
+  },
+  {
+    "scope": 4,
+    "key": 476,
+    "section": 0,
+    "text": "Backend Language (Web UI/Server"
+  },
+  {
+    "scope": 4,
+    "key": 476,
+    "section": 1,
+    "text": ")"
+  },
+  {
     "scope": 5,
     "key": 95,
     "section": 0,

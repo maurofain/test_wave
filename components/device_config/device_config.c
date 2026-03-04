@@ -130,6 +130,69 @@ static void _i18n_lookup_cache_clear(void)
     s_i18n_lookup_lang[0] = '\0';
 }
 
+static const char *_lookup_map_text_from_id(cJSON *map_section, int id)
+{
+    if (!cJSON_IsObject(map_section) || id <= 0) {
+        return NULL;
+    }
+
+    char id_key[16] = {0};
+    snprintf(id_key, sizeof(id_key), "%d", id);
+    cJSON *item = cJSON_GetObjectItemCaseSensitive(map_section, id_key);
+    if (cJSON_IsString(item) && item->valuestring) {
+        return item->valuestring;
+    }
+    return NULL;
+}
+
+static bool _append_json_text(cJSON *object, const char *key, const char *text)
+{
+    if (!object || !key || key[0] == '\0') {
+        return false;
+    }
+
+    const char *chunk = text ? text : "";
+    cJSON *existing = cJSON_GetObjectItemCaseSensitive(object, key);
+    if (!existing) {
+        cJSON_AddStringToObject(object, key, chunk);
+        return true;
+    }
+
+    if (!cJSON_IsString(existing) || !existing->valuestring) {
+        return false;
+    }
+
+    size_t old_len = strlen(existing->valuestring);
+    size_t add_len = strlen(chunk);
+    char *merged = malloc(old_len + add_len + 1);
+    if (!merged) {
+        return false;
+    }
+
+    memcpy(merged, existing->valuestring, old_len);
+    memcpy(merged + old_len, chunk, add_len);
+    merged[old_len + add_len] = '\0';
+
+    cJSON *new_item = cJSON_CreateString(merged);
+    free(merged);
+    if (!new_item) {
+        return false;
+    }
+
+    cJSON_ReplaceItemInObjectCaseSensitive(object, key, new_item);
+    return true;
+}
+
+static void _add_lookup_mapping_if_missing(cJSON *table, const char *key, const char *value)
+{
+    if (!table || !key || !value || key[0] == '\0') {
+        return;
+    }
+    if (!cJSON_GetObjectItemCaseSensitive(table, key)) {
+        cJSON_AddStringToObject(table, key, value);
+    }
+}
+
 static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
 {
     const char *lang = _effective_lang(language);
@@ -154,9 +217,31 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
     }
 
     cJSON *table = cJSON_CreateObject();
-    if (!table) {
+    cJSON *aggregated = cJSON_CreateObject();
+    cJSON *aggregated_scope = cJSON_CreateObject();
+    cJSON *aggregated_key = cJSON_CreateObject();
+    if (!table || !aggregated || !aggregated_scope || !aggregated_key) {
+        if (table) {
+            cJSON_Delete(table);
+        }
+        if (aggregated) {
+            cJSON_Delete(aggregated);
+        }
+        if (aggregated_scope) {
+            cJSON_Delete(aggregated_scope);
+        }
+        if (aggregated_key) {
+            cJSON_Delete(aggregated_key);
+        }
         cJSON_Delete(records);
         return ESP_ERR_NO_MEM;
+    }
+
+    cJSON *map_scopes = NULL;
+    cJSON *map_keys = NULL;
+    if (_i18n_map_cache_build_for_lang(lang) == ESP_OK && s_i18n_map_cache) {
+        map_scopes = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "scopes");
+        map_keys = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "keys");
     }
 
     cJSON *item = NULL;
@@ -165,28 +250,86 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
             continue;
         }
 
-        cJSON *scope = cJSON_GetObjectItem(item, "scope");
-        cJSON *key = cJSON_GetObjectItem(item, "key");
-        cJSON *text = cJSON_GetObjectItem(item, "text");
+        cJSON *text = cJSON_GetObjectItemCaseSensitive(item, "text");
+        if (!cJSON_IsString(text) || !text->valuestring) {
+            continue;
+        }
+
+        cJSON *scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
+        cJSON *key = cJSON_GetObjectItemCaseSensitive(item, "key");
+        if (cJSON_IsNumber(scope) && cJSON_IsNumber(key)) {
+            int scope_id = scope->valueint;
+            int key_id = key->valueint;
+            if (scope_id <= 0 || key_id <= 0) {
+                continue;
+            }
+
+            char scoped_key[96] = {0};
+            snprintf(scoped_key, sizeof(scoped_key), "%d.%d", scope_id, key_id);
+            _append_json_text(aggregated, scoped_key, text->valuestring);
+
+            const char *scope_text = _lookup_map_text_from_id(map_scopes, scope_id);
+            const char *key_text = _lookup_map_text_from_id(map_keys, key_id);
+            if (scope_text && !cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key)) {
+                cJSON_AddStringToObject(aggregated_scope, scoped_key, scope_text);
+            }
+            if (key_text && !cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key)) {
+                cJSON_AddStringToObject(aggregated_key, scoped_key, key_text);
+            }
+            continue;
+        }
+
         if (!cJSON_IsString(scope) || !scope->valuestring ||
-            !cJSON_IsString(key) || !key->valuestring ||
-            !cJSON_IsString(text) || !text->valuestring) {
+            !cJSON_IsString(key) || !key->valuestring) {
             continue;
         }
 
         char scoped_key[96] = {0};
         snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope->valuestring, key->valuestring);
 
-        if (!cJSON_GetObjectItemCaseSensitive(table, scoped_key)) {
-            cJSON_AddStringToObject(table, scoped_key, text->valuestring);
+        _append_json_text(aggregated, scoped_key, text->valuestring);
+        if (!cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key)) {
+            cJSON_AddStringToObject(aggregated_scope, scoped_key, scope->valuestring);
+        }
+        if (!cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key)) {
+            cJSON_AddStringToObject(aggregated_key, scoped_key, key->valuestring);
+        }
+    }
+
+    cJSON *entry = NULL;
+    cJSON_ArrayForEach(entry, aggregated) {
+        if (!cJSON_IsString(entry) || !entry->string || !entry->valuestring) {
+            continue;
         }
 
-        if (!cJSON_GetObjectItemCaseSensitive(table, key->valuestring)) {
-            cJSON_AddStringToObject(table, key->valuestring, text->valuestring);
+        const char *scoped_key = entry->string;
+        const char *value = entry->valuestring;
+        _add_lookup_mapping_if_missing(table, scoped_key, value);
+
+        const char *dot = strchr(scoped_key, '.');
+        if (dot && dot[1] != '\0') {
+            _add_lookup_mapping_if_missing(table, dot + 1, value);
+        }
+
+        cJSON *scope_text = cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key);
+        cJSON *key_text = cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key);
+        if (cJSON_IsString(scope_text) && scope_text->valuestring &&
+            cJSON_IsString(key_text) && key_text->valuestring) {
+            char textual_scoped_key[128] = {0};
+            snprintf(textual_scoped_key,
+                     sizeof(textual_scoped_key),
+                     "%s.%s",
+                     scope_text->valuestring,
+                     key_text->valuestring);
+            _add_lookup_mapping_if_missing(table, textual_scoped_key, value);
+            _add_lookup_mapping_if_missing(table, key_text->valuestring, value);
         }
     }
 
     cJSON_Delete(records);
+    cJSON_Delete(aggregated);
+    cJSON_Delete(aggregated_scope);
+    cJSON_Delete(aggregated_key);
 
     s_i18n_lookup_cache = table;
     strncpy(s_i18n_lookup_lang, lang, sizeof(s_i18n_lookup_lang) - 1);
@@ -239,16 +382,33 @@ static bool _is_valid_i18n_records_json(const char *records_json)
             valid = false;
             break;
         }
-        cJSON *lang = cJSON_GetObjectItem(item, "lang");
-        cJSON *scope = cJSON_GetObjectItem(item, "scope");
-        cJSON *key = cJSON_GetObjectItem(item, "key");
-        cJSON *text = cJSON_GetObjectItem(item, "text");
-        if (!cJSON_IsString(lang) || !lang->valuestring ||
-            !cJSON_IsString(scope) || !scope->valuestring ||
-            !cJSON_IsString(key) || !key->valuestring ||
-            !cJSON_IsString(text) || !text->valuestring) {
+        cJSON *scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
+        cJSON *key = cJSON_GetObjectItemCaseSensitive(item, "key");
+        cJSON *section = cJSON_GetObjectItemCaseSensitive(item, "section");
+        cJSON *text = cJSON_GetObjectItemCaseSensitive(item, "text");
+
+        if (!cJSON_IsString(text) || !text->valuestring) {
             valid = false;
             break;
+        }
+
+        bool numeric_schema = cJSON_IsNumber(scope) && cJSON_IsNumber(key);
+        bool legacy_schema = cJSON_IsString(scope) && scope->valuestring &&
+                             cJSON_IsString(key) && key->valuestring;
+        if (!numeric_schema && !legacy_schema) {
+            valid = false;
+            break;
+        }
+
+        if (numeric_schema) {
+            if (scope->valueint <= 0 || key->valueint <= 0) {
+                valid = false;
+                break;
+            }
+            if (section && !cJSON_IsNumber(section)) {
+                valid = false;
+                break;
+            }
         }
     }
 
