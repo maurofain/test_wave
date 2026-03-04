@@ -13,6 +13,14 @@ static const char *TAG = "PWM_CTRL";
 /* Codice reale — escluso se mockup attivo */
 #if DNA_PWM == 0
 
+
+/**
+ * @brief Imposta il duty cycle del segnale PWM.
+ * 
+ * @param channel [in] Il canale PWM su cui impostare il duty cycle.
+ * @param duty_percent [in] Il valore del duty cycle in percentuale (0-100).
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t pwm_set_duty(int channel, int duty_percent) {
     if (duty_percent < 0) duty_percent = 0;
     if (duty_percent > 100) duty_percent = 100;
@@ -26,12 +34,29 @@ esp_err_t pwm_set_duty(int channel, int duty_percent) {
     return ledc_update_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)channel);
 }
 
+
+/**
+ * @brief Ottiene il valore del duty cycle per un canale PWM.
+ * 
+ * @param channel [in] Il numero del canale PWM per cui si desidera ottenere il duty cycle.
+ * @return int Il valore del duty cycle corrispondente al canale specificato.
+ */
 int pwm_get_duty(int channel) {
     uint32_t duty = ledc_get_duty(LEDC_LOW_SPEED_MODE, (ledc_channel_t)channel);
     // Riconverti in percentuale (risoluzione 10 bit = 1023)
     return (int)((duty * 100) / 1023);
 }
 
+
+/**
+ * @brief Inizializza il sistema PWM.
+ * 
+ * Questa funzione inizializza il sistema PWM, configurando i registri necessari e preparando il sistema per l'uso del PWM.
+ * 
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t pwm_init(void) {
     ledc_timer_config_t timer_cfg = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
@@ -76,6 +101,14 @@ esp_err_t pwm_init(void) {
 
 static int s_mock_duty[2] = {0, 0};
 
+
+/**
+ * @brief Imposta il duty cycle del segnale PWM.
+ *
+ * @param [in] channel Numero del canale PWM da configurare.
+ * @param [in] duty_percent Percentuale del duty cycle da impostare (0-100).
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t pwm_set_duty(int channel, int duty_percent)
 {
     if (channel < 0 || channel > 1) return ESP_ERR_INVALID_ARG;
@@ -86,12 +119,29 @@ esp_err_t pwm_set_duty(int channel, int duty_percent)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ottiene il valore del duty cycle per un canale PWM.
+ *
+ * @param channel [in] Il numero del canale PWM per cui si desidera ottenere il valore del duty cycle.
+ * @return int Il valore del duty cycle corrente per il canale specificato.
+ */
 int pwm_get_duty(int channel)
 {
     if (channel < 0 || channel > 1) return 0;
     return s_mock_duty[channel];
 }
 
+
+/**
+ * @brief Inizializza il sistema PWM.
+ *
+ * Questa funzione inizializza il sistema PWM, preparandolo per l'uso successivo.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t pwm_init(void)
 {
     s_mock_duty[0] = 0;

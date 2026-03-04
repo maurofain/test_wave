@@ -39,7 +39,8 @@ Questo documento riassume l'assegnazione di tutti i GPIO utilizzati nel progetto
 | Periferica | Pin TX | Pin RX | Altri Pin | Note |
 |---|---|---|---|---|
 | **RS232** | GPIO 36 | GPIO 46 | - | UART 1 |
-| **RS485** | GPIO 4 | GPIO 19 | GPIO 21 (DE) | DE = Driver Enable |
+| **RS485** | GPIO 4 | GPIO 3 | GPIO 2 (DE) | DE = Driver Enable |
+| **CCTALK** | GPIO 20 | GPIO 21 | - | CCTTX/CCTRX |
 | **MDB** | GPIO 22 | GPIO 23 | - | Protocollo MDB |
 
 ## 🚌 Bus Sensori e I/O Expander (I2C 0)
@@ -67,8 +68,8 @@ Questo documento riassume l'assegnazione di tutti i GPIO utilizzati nel progetto
 |:---:|:---:|---|---|:---:|
 | **0** | **24** | GPIO 0 | Digital I/O (Ex RS232 TX) | LIBERO |
 | **1** | **21** | GPIO 1 | Digital I/O | LIBERO |
-| **2** | **22** | GPIO 2 | Digital I/O | LIBERO |
-| **3** | **20** | GPIO 3 | Digital I/O | LIBERO |
+| **2** | **22** | **RS485 DE** | Driver Enable (Controllo direzione 485) | **USATO** |
+| **3** | **20** | **RS485 RX** | Ricezione dati RS485 | **USATO** |
 | **4** | **17** | **RS485 TX** | Trasmissione dati RS485 | **USATO** |
 | **5** | **15** | **WS2812** | Segnale per LED RGB indirizzabili | **USATO** |
 | **6** | **16** | GPIO 6 | Digital I/O | LIBERO |
@@ -84,9 +85,9 @@ Questo documento riassume l'assegnazione di tutti i GPIO utilizzati nel progetto
 | 16 | - | GPIO 16 | Digital I/O | LIBERO |
 | 17 | - | GPIO 17 | Non riportato su header | - |
 | 18 | - | GPIO 18 | Non riportato su header | - |
-| **19** | - | **RS485 RX** | Ricezione dati RS485 | **USATO** |
-| **20** | **14** | GPIO 20 | Digital I/O | LIBERO |
-| **21** | **12** | **RS485 DE** | Driver Enable (Controllo direzione 485) | **USATO** |
+| **19** | - | GPIO 19 | Digital I/O | LIBERO |
+| **20** | **14** | **CCT TX** | Trasmissione dati CCTalk | **USATO** |
+| **21** | **12** | **CCT RX** | Ricezione dati CCTalk | **USATO** |
 | **22** | **11** | **MDB TX** | Trasmissione dati Master MDB | **USATO** |
 | **23** | **8** | **MDB RX** | Ricezione dati Master MDB | **USATO** |
 | **24** | **28** | GPIO 24 / USB_P | Condiviso USB | LIBERO |
@@ -130,14 +131,14 @@ Questo documento riassume l'assegnazione di tutti i GPIO utilizzati nel progetto
 | **1** | **VCC_5V** | **2** | **ESP_3V3** |
 | **3** | **VCC_5V** | **4** | **GPIO 7** |
 | **5** | **GND** | **6** | **GPIO 8** |
-| **7** | **GPIO 37** | **8** | **GPIO 23** |
+| **7** | **GPIO 37** | **8** | **GPIO 23** (MDB RX) |
 | **9** | **GPIO 38** | **10** | **GND** |
-| **11** | **GPIO 22** | **12** | **GPIO 21** |
-| **13** | **GND** | **14** | **GPIO 20** |
+| **11** | **GPIO 22** (MDB TX) | **12** | **GPIO 21** (CCT RX) |
+| **13** | **GND** | **14** | **GPIO 20** (CCT TX) |
 | **15** | **GPIO 5** (WS2812) | **16** | **GPIO 6** |
-| **17** | **GPIO 4** | **18** | **ESP_3V3** |
-| **19** | **GND** | **20** | **GPIO 3** |
-| **21** | **GPIO 1** | **22** | **GPIO 2** |
+| **17** | **GPIO 4** (RS485 TX) | **18** | **ESP_3V3** |
+| **19** | **GND** | **20** | **GPIO 3** (RS485 RX) |
+| **21** | **GPIO 1** | **22** | **GPIO 2** (RS485 DE) |
 | **23** | **GPIO 36** (RS232 TX) | **24** | **GPIO 0** |
 | **25** | **GPIO 32** (ETH RST) | **26** | **GND** |
 | **27** | **GPIO 25** / USB_P | **28** | **GPIO 24** / USB_N |

@@ -39,6 +39,8 @@ static lv_indev_t *disp_indev = NULL;
 sdmmc_card_t *bsp_sdcard = NULL;    // Global uSD card handler
 static bool i2c_initialized = false;
 static TaskHandle_t usb_host_task;  // USB Host Library task
+static bool s_usb_host_installed = false;
+static volatile bool s_usb_lib_task_running = false;
 #if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0))
 static i2c_master_bus_handle_t i2c_handle = NULL;  // I2C Handle
 #endif
@@ -69,6 +71,16 @@ static bool s_display_i2c_diag_logged = false;
         .gpio_cfg = BSP_I2S_GPIO_CFG,                                                                 \
     }
 
+
+/**
+ * @brief Esegue la registrazione di un log di diagnostica I2C una volta.
+ *
+ * Questa funzione controlla se il log di diagnostica I2C è già stato registrato.
+ * Se non è stato registrato, procede con la registrazione.
+ *
+ * @param [in/out] s_display_i2c_diag_logged Flag che indica se il log è già stato registrato.
+ * @return Nessun valore di ritorno.
+ */
 static void bsp_display_i2c_diagnostic_log_once(void)
 {
     if (s_display_i2c_diag_logged) {
@@ -101,6 +113,16 @@ static void bsp_display_i2c_diagnostic_log_once(void)
     }
 }
 
+
+/**
+ * @brief Inizializza il bus I2C.
+ * 
+ * Questa funzione inizializza il bus I2C se non è già stato inizializzato.
+ * 
+ * @return esp_err_t
+ * @retval ESP_OK Se l'inizializzazione è stata completata con successo.
+ * @retval ESP_FAIL Se l'inizializzazione ha fallito.
+ */
 esp_err_t bsp_i2c_init(void)
 {
     /* I2C was initialized before */
@@ -121,6 +143,16 @@ esp_err_t bsp_i2c_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Desinizializza il driver I2C.
+ *
+ * Questa funzione desinizializza il driver I2C, liberando tutte le risorse allocate.
+ *
+ * @return
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t bsp_i2c_deinit(void)
 {
     BSP_ERROR_CHECK_RETURN_ERR(i2c_del_master_bus(i2c_handle));
@@ -128,11 +160,29 @@ esp_err_t bsp_i2c_deinit(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ottiene il handle del bus I2C master.
+ *
+ * Questa funzione restituisce il handle del bus I2C master utilizzato per le operazioni di comunicazione I2C.
+ *
+ * @return i2c_master_bus_handle_t Handle del bus I2C master.
+ */
 i2c_master_bus_handle_t bsp_i2c_get_handle(void)
 {
     return i2c_handle;
 }
 
+
+/**
+ * @brief Monta il dispositivo SD card.
+ *
+ * Questa funzione monta il dispositivo SD card collegato al sistema.
+ *
+ * @return
+ * - ESP_OK: Se la montaggio è riuscito con successo.
+ * - ESP_FAIL: Se si è verificato un errore durante il montaggio.
+ */
 esp_err_t bsp_sdcard_mount(void)
 {
     const esp_vfs_fat_sdmmc_mount_config_t mount_config = {
@@ -171,11 +221,29 @@ esp_err_t bsp_sdcard_mount(void)
     return esp_vfs_fat_sdmmc_mount(BSP_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &bsp_sdcard);
 }
 
+
+/**
+ * @brief Desmonta il dispositivo SD card.
+ *
+ * Questa funzione desmonta il dispositivo SD card collegato al sistema.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione non riuscita.
+ */
 esp_err_t bsp_sdcard_unmount(void)
 {
     return esp_vfs_fat_sdcard_unmount(BSP_SD_MOUNT_POINT, bsp_sdcard);
 }
 
+
+/**
+ * @brief Monta il file system SPIFFS.
+ *
+ * @return esp_err_t
+ * @retval ESP_OK se il montaggio è riuscito con successo.
+ * @retval ESP_FAIL se il montaggio ha fallito.
+ */
 esp_err_t bsp_spiffs_mount(void)
 {
     esp_vfs_spiffs_conf_t conf = {
@@ -204,11 +272,28 @@ esp_err_t bsp_spiffs_mount(void)
     return ret_val;
 }
 
+
+/**
+ * @brief Desmonta il file system SPIFFS.
+ *
+ * Questa funzione desmonta il file system SPIFFS utilizzato per la memorizzazione dei dati.
+ *
+ * @return
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t bsp_spiffs_unmount(void)
 {
     return esp_vfs_spiffs_unregister(CONFIG_BSP_SPIFFS_PARTITION_LABEL);
 }
 
+
+/**
+ * @brief Inizializza il sistema audio utilizzando la configurazione I2S fornita.
+ * 
+ * @param [in] i2s_config Puntatore alla configurazione I2S da utilizzare per l'inizializzazione.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore dell'operazione.
+ */
 esp_err_t bsp_audio_init(const i2s_std_config_t *i2s_config)
 {
     if (i2s_tx_chan && i2s_rx_chan) {
@@ -248,6 +333,15 @@ esp_err_t bsp_audio_init(const i2s_std_config_t *i2s_config)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza il decodificatore audio del parlante.
+ * 
+ * Questa funzione inizializza il decodificatore audio del parlante utilizzando l'interfaccia I2S.
+ * 
+ * @param [in] Nessun parametro di input.
+ * @return esp_codec_dev_handle_t Handle del decodificatore audio del parlante, NULL in caso di errore.
+ */
 esp_codec_dev_handle_t bsp_audio_codec_speaker_init(void)
 {
     if (i2s_data_if == NULL) {
@@ -297,6 +391,15 @@ esp_codec_dev_handle_t bsp_audio_codec_speaker_init(void)
     return esp_codec_dev_new(&codec_dev_cfg);
 }
 
+
+/**
+ * @brief Inizializza il decodificatore audio del microfono.
+ * 
+ * Questa funzione inizializza il decodificatore audio del microfono utilizzando l'interfaccia I2S.
+ * 
+ * @param [in] Nessun parametro di input.
+ * @return esp_codec_dev_handle_t Handle del decodificatore audio del microfono inizializzato, NULL in caso di errore.
+ */
 esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 {
     if (i2s_data_if == NULL) {
@@ -350,6 +453,17 @@ esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 // Bit number used to represent command and parameter
 #define LCD_LEDC_CH            CONFIG_BSP_DISPLAY_BRIGHTNESS_LEDC_CH
 
+
+/**
+ * @brief Inizializza il sistema di controllo della luminosità del display.
+ *
+ * Questa funzione inizializza il sistema di controllo della luminosità del display,
+ * preparandolo per la gestione della sua intensità.
+ *
+ * @return
+ * - ESP_OK: Se l'inizializzazione ha avuto successo.
+ * - ESP_FAIL: Se l'inizializzazione ha fallito.
+ */
 esp_err_t bsp_display_brightness_init(void)
 {
     esp_err_t ret = bsp_i2c_init();
@@ -359,6 +473,13 @@ esp_err_t bsp_display_brightness_init(void)
     return ret;
 }
 
+
+/**
+ * @brief Imposta la luminosità del display.
+ * 
+ * @param brightness_percent Percentuale di luminosità (0-100).
+ * @return esp_err_t Errore se la percentuale non è valida, altrimenti ESP_OK.
+ */
 esp_err_t bsp_display_brightness_set(int brightness_percent)
 {
     if (brightness_percent > 100) {
@@ -435,16 +556,46 @@ esp_err_t bsp_display_brightness_set(int brightness_percent)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Spegni il retroilluminazione del display.
+ *
+ * Questa funzione spegne la retroilluminazione del display.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t bsp_display_backlight_off(void)
 {
     return bsp_display_brightness_set(0);
 }
 
+
+/**
+ * @brief Accende lo schermo del display.
+ *
+ * Questa funzione accende lo schermo del display collegato al sistema.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t bsp_display_backlight_on(void)
 {
     return bsp_display_brightness_set(100);
 }
 
+
+/**
+ * @brief Abilita la potenza del PHY DSI.
+ *
+ * Questa funzione abilita la potenza del PHY DSI per l'interfaccia di comunicazione.
+ *
+ * @return esp_err_t
+ * @retval ESP_OK Se la potenza del PHY DSI è stata abilitata con successo.
+ * @retval ESP_FAIL Se si è verificato un errore durante l'abilitazione della potenza del PHY DSI.
+ */
 static esp_err_t bsp_enable_dsi_phy_power(void)
 {
 #if BSP_MIPI_DSI_PHY_PWR_LDO_CHAN > 0
@@ -461,6 +612,15 @@ static esp_err_t bsp_enable_dsi_phy_power(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Crea una nuova istanza di un display utilizzando la configurazione specificata.
+ *
+ * @param config Puntatore alla configurazione del display.
+ * @param ret_panel Puntatore al buffer dove verrà memorizzato il handle del panel.
+ * @param ret_io Puntatore al buffer dove verrà memorizzato il handle dell'IO del panel.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 esp_err_t bsp_display_new(const bsp_display_config_t *config, esp_lcd_panel_handle_t *ret_panel, esp_lcd_panel_io_handle_t *ret_io)
 {
     esp_err_t ret = ESP_OK;
@@ -473,6 +633,14 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config, esp_lcd_panel_hand
     return ret;
 }
 
+
+/**
+ * @brief Crea una nuova istanza di display utilizzando i gestori specificati.
+ *
+ * @param [in] config Puntatore alla configurazione del display.
+ * @param [out] ret_handles Puntatore alla struttura in cui verranno memorizzati i gestori del display.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_lcd_handles_t *ret_handles)
 {
     esp_err_t ret = ESP_OK;
@@ -710,6 +878,14 @@ err:
     return ret;
 }
 
+
+/**
+ * @brief Crea una nuova istanza del driver del touch screen.
+ *
+ * @param [in] config Puntatore alla configurazione del touch screen.
+ * @param [out] ret_touch Puntatore al buffer dove verrà memorizzato il handle del touch screen.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t *ret_touch)
 {
     /* Initilize I2C */
@@ -918,16 +1094,43 @@ lv_indev_t *bsp_display_get_input_dev(void)
     return disp_indev;
 }
 
+
+/** @brief Rotola la visualizzazione di un display LVGL.
+ *  
+ *  @param disp Puntatore al display da ruotare.
+ *  @param rotation Valore di rotazione del display.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
 {
     lv_disp_set_rotation(disp, rotation);
 }
 
+
+/**
+ * @brief Acquisisce un blocco sulla visualizzazione del display.
+ *
+ * Questa funzione acquisisce un blocco sulla visualizzazione del display
+ * per un periodo massimo specificato in millisecondi. Se il blocco non
+ * può essere acquisito entro il tempo limite, la funzione restituisce false.
+ *
+ * @param [in] timeout_ms Il tempo massimo in millisecondi per cui acquisire il blocco.
+ * @return true se il blocco è stato acquisito, false altrimenti.
+ */
 bool bsp_display_lock(uint32_t timeout_ms)
 {
     return lvgl_port_lock(timeout_ms);
 }
 
+
+/** @brief Sblocca la visualizzazione del display.
+ *  
+ *  Questa funzione sblocca la visualizzazione del display, consentendo
+ *  l'aggiornamento e la visualizzazione dei contenuti.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void bsp_display_unlock(void)
 {
     lvgl_port_unlock();
@@ -935,46 +1138,132 @@ void bsp_display_unlock(void)
 
 #endif // (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
 
+
+/**
+ * @brief Gestisce il task per la libreria USB.
+ * 
+ * Questa funzione esegue un ciclo infinito che gestisce le operazioni della libreria USB.
+ * 
+ * @param arg Argomento passato alla funzione, non utilizzato in questo contesto.
+ * @return void Nessun valore di ritorno.
+ */
 static void usb_lib_task(void *arg)
 {
-    while (1) {
+    while (s_usb_lib_task_running) {
         // Avvia la gestione degli eventi di sistema
         uint32_t event_flags;
-        usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
+        esp_err_t err = usb_host_lib_handle_events(pdMS_TO_TICKS(100), &event_flags);
+        if (err != ESP_OK) {
+            if (err != ESP_ERR_TIMEOUT && err != ESP_ERR_INVALID_STATE) {
+                ESP_LOGW(TAG, "USB: handle_events failed: %s", esp_err_to_name(err));
+            }
+            continue;
+        }
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
-            ESP_ERROR_CHECK(usb_host_device_free_all());
+            esp_err_t free_err = usb_host_device_free_all();
+            if (free_err != ESP_OK && free_err != ESP_ERR_INVALID_STATE) {
+                ESP_LOGW(TAG, "USB: device_free_all failed: %s", esp_err_to_name(free_err));
+            }
         }
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) {
             ESP_LOGI(TAG, "USB: All devices freed");
         }
     }
+
+    ESP_LOGI(TAG, "USB: usb_lib task stopped");
+    vTaskDelete(NULL);
 } 
 
+
+/**
+ * @brief Avvia il gestore USB host.
+ *
+ * @param [in] mode Modalità di alimentazione USB host.
+ * @param [in] limit_500mA Se true, limita l'alimentazione alla 500mA.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t bsp_usb_host_start(bsp_usb_host_power_mode_t mode, bool limit_500mA)
 {
+    (void)mode;
+    (void)limit_500mA;
+
+    if (s_usb_host_installed) {
+        ESP_LOGI(TAG, "USB Host already installed");
+        if (usb_host_task == NULL) {
+            s_usb_lib_task_running = true;
+            if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE) {
+                s_usb_lib_task_running = false;
+                ESP_LOGE(TAG, "Creating USB host lib task failed");
+                return ESP_ERR_NO_MEM;
+            }
+        }
+        return ESP_OK;
+    }
+
     // Installa il driver USB Host. Deve essere chiamato una sola volta nell'applicazione
     ESP_LOGI(TAG, "Installing USB Host");
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
-    BSP_ERROR_CHECK_RETURN_ERR(usb_host_install(&host_config));
+    esp_err_t err = usb_host_install(&host_config);
+    if (err == ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "USB Host already installed by another caller");
+        s_usb_host_installed = true;
+    } else if (err != ESP_OK) {
+        ESP_LOGE(TAG, "usb_host_install failed: %s", esp_err_to_name(err));
+        return err;
+    } else {
+        s_usb_host_installed = true;
+    }
 
     // Crea un task che gestirà gli eventi della libreria USB
-    if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE) {
-        ESP_LOGE(TAG, "Creating USB host lib task failed");
-        abort();
+    if (usb_host_task == NULL) {
+        s_usb_lib_task_running = true;
+        if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE) {
+            s_usb_lib_task_running = false;
+            ESP_LOGE(TAG, "Creating USB host lib task failed");
+            (void)usb_host_uninstall();
+            s_usb_host_installed = false;
+            return ESP_ERR_NO_MEM;
+        }
     }
 
     return ESP_OK;
 }
 
+
+/**
+ * @brief Arresta il gestore USB.
+ *
+ * Questa funzione interrompe l'elaborazione delle richieste USB in corso e libera tutte le risorse allocate.
+ *
+ * @return
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t bsp_usb_host_stop(void)
 {
-    usb_host_uninstall();
+    s_usb_lib_task_running = false;
+
     if (usb_host_task) {
-        vTaskSuspend(usb_host_task);
-        vTaskDelete(usb_host_task);
+        TaskHandle_t task_to_delete = usb_host_task;
+        usb_host_task = NULL;
+        vTaskDelete(task_to_delete);
     }
+
+    esp_err_t err = usb_host_uninstall();
+    if (err == ESP_ERR_INVALID_STATE) {
+        s_usb_host_installed = false;
+        ESP_LOGI(TAG, "USB Host already uninstalled");
+        return ESP_OK;
+    }
+
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "usb_host_uninstall failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    s_usb_host_installed = false;
     return ESP_OK;
 }

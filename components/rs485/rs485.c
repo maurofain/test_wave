@@ -95,18 +95,49 @@ int rs485_send(const uint8_t *data, size_t len) {
  */
 #if defined(DNA_RS485) && (DNA_RS485 == 1)
 
+
+/**
+ * @brief Inizializza la comunicazione RS485.
+ *
+ * Questa funzione configura e inizializza il periferico RS485 per la comunicazione.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t rs485_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] rs485_init: bus RS485 simulato");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Riceve dati tramite RS485.
+ *
+ * Questa funzione riceve dati tramite la linea RS485 e li memorizza nel buffer fornito.
+ *
+ * @param [in/out] data Puntatore al buffer dove memorizzare i dati ricevuti.
+ * @param max_len Lunghezza massima del buffer.
+ * @param timeout_ms Timeout in millisecondi per la ricezione dei dati.
+ * @return Numero di byte ricevuti, o -1 in caso di errore.
+ */
 int rs485_receive(uint8_t *data, size_t max_len, uint32_t timeout_ms)
 {
     (void)data; (void)max_len; (void)timeout_ms;
     return 0; /* nessun dato sul bus */
 }
 
+
+/**
+ * @brief Invia dati tramite RS485.
+ *
+ * Questa funzione invia un buffer di dati tramite la linea RS485.
+ *
+ * @param [in] data Puntatore al buffer di dati da inviare.
+ * @param [in] len Lunghezza del buffer di dati.
+ * @return Numero di byte inviati, o un valore negativo in caso di errore.
+ */
 int rs485_send(const uint8_t *data, size_t len)
 {
     ESP_LOGI(TAG, "[C] [MOCK] rs485_send: %zu byte ignorati", len);

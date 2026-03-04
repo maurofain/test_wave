@@ -33,6 +33,13 @@ typedef struct {
 // Variabili globali
 static QueueHandle_t log_queue = NULL;
 // Helper to log heap statistics at various points
+
+/**
+ * @brief Dumpa lo stato dell'heap.
+ *
+ * @param [in] ctx Contesto di riferimento per il dump.
+ * @return Nessun valore di ritorno.
+ */
 static void dump_heap(const char *ctx)
 {
     size_t internal = heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
@@ -53,6 +60,16 @@ static TickType_t last_udp_error_time = 0;
 static FILE *s_sd_log_file = NULL;
 static char s_sd_log_path[64] = {0};
 
+
+/**
+ * @brief Controlla se il tempo NTP è valido.
+ * 
+ * Questa funzione verifica se il tempo NTP fornito è valido.
+ * 
+ * @param [in] now Il tempo NTP da verificare.
+ * @return true Se il tempo NTP è valido.
+ * @return false Se il tempo NTP non è valido.
+ */
 static bool is_ntp_time_valid(time_t now)
 {
     if (now <= 0) {
@@ -63,6 +80,17 @@ static bool is_ntp_time_valid(time_t now)
     return (tm_info.tm_year >= (2024 - 1900));
 }
 
+
+/**
+ * @brief Costruisce un percorso SD utilizzando la data e l'ora attuali.
+ * 
+ * @param [out] out Puntatore alla stringa di output dove verrà memorizzato il percorso SD.
+ * @param out_len Lunghezza massima della stringa di output.
+ * @param now Tempo attuale in formato time_t.
+ * 
+ * @return true Se il percorso è stato costruito correttamente.
+ * @return false Se il percorso non può essere costruito (parametri non validi o tempo non valido).
+ */
 static bool build_sd_path_with_datetime(char *out, size_t out_len, time_t now)
 {
     if (!out || out_len == 0 || !is_ntp_time_valid(now)) {
@@ -78,6 +106,18 @@ static bool build_sd_path_with_datetime(char *out, size_t out_len, time_t now)
     return true;
 }
 
+
+/**
+ * @brief Costruisce il percorso SD utilizzando un fallback.
+ * 
+ * Questa funzione tenta di costruire il percorso SD utilizzando un metodo di fallback.
+ * Se l'output non è valido o la lunghezza dell'output è zero, la funzione restituirà false.
+ * 
+ * @param [out] out Puntatore al buffer dove verrà memorizzato il percorso SD.
+ * @param out_len Lunghezza del buffer di output.
+ * @return true Se il percorso SD è stato costruito con successo.
+ * @return false Se l'output non è valido o la lunghezza dell'output è zero.
+ */
 static bool build_sd_path_fallback(char *out, size_t out_len)
 {
     if (!out || out_len == 0) {
@@ -95,6 +135,17 @@ static bool build_sd_path_fallback(char *out, size_t out_len)
     return false;
 }
 
+
+/**
+ * @brief Assicura che il file di log SD sia presente e aggiornato.
+ *
+ * Questa funzione controlla se il file di log SD esiste e se è aggiornato
+ * rispetto alla data e ora fornite. Se il file non esiste o è obsoleto,
+ * viene creato o aggiornato.
+ *
+ * @param [in] now La data e ora corrente per il controllo dell'aggiornamento.
+ * @return true se il file di log è assicurato, false in caso di errore.
+ */
 static bool ensure_sd_log_file(time_t now)
 {
     device_config_t *cfg = device_config_get();
@@ -463,12 +514,28 @@ esp_err_t remote_logging_send(const char *level, const char *tag, const char *me
     return ESP_OK;
 }
 
+
+/**
+ * @brief Controlla se il logging remoto è abilitato.
+ *
+ * Questa funzione verifica lo stato del logging remoto.
+ *
+ * @return true se il logging remoto è abilitato, false altrimenti.
+ */
 bool remote_logging_is_enabled(void)
 {
     // Il logging locale è sempre attivo quando il componente è inizializzato
     return initialized;
 }
 
+
+/**
+ * @brief Interrompe il processo di logging remoto.
+ * 
+ * Questa funzione interrompe il processo di logging remoto, se in corso.
+ * 
+ * @return void Nessun valore di ritorno.
+ */
 void remote_logging_stop(void)
 {
     if (!initialized) {

@@ -102,6 +102,13 @@ componenti.
   Per attivare, decommentare in `components/led/CMakeLists.txt`:
   `target_compile_definitions(__idf_led PRIVATE DNA_LED_STRIP=1)`
 
+### `DNA_CCTALK`
+- **File:** `main/app_version.h`, `components/cctalk/cctalk_driver.c`, `components/cctalk/cctalk.c`
+- **Valori:** `1` = mockup attivo (nessuna UART CCtalk reale), `0` = driver reale
+- **Impatto:** quando impostato a `0`, il driver CCtalk usa pin dedicati `GPIO20/GPIO21`
+  su `CONFIG_APP_RS232_UART_PORT` con default seriale **9600, N, 8, 1**.
+  Quando impostato a `1`, il driver viene simulato e non tocca hardware UART.
+
 ### `DNA_SD_CARD`
 - **File:** `main/app_version.h`, `components/sd_card/sd_card.c`
 - **Valori:** `1` = mockup attivo (nessun hardware reale), `0` = driver SD reale
@@ -137,6 +144,16 @@ Questi simboli arrivano da `sdkconfig`/Kconfig e abilitano percorsi compilati co
 - `CONFIG_ESP_MAIN_TASK_STACK_SIZE` (stack del task `main`, critico durante init/registrazione handler)
 - `CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE`
 
+### LVGL file/decoder logo boot
+- `CONFIG_LV_USE_FS_STDIO`
+- `CONFIG_LV_FS_STDIO_LETTER`
+- `CONFIG_LV_FS_STDIO_PATH`
+- `CONFIG_LV_USE_TJPGD`
+
+Impatto runtime associato:
+- abilita in LVGL il driver file `stdio` (mount VFS già disponibile su `/spiffs`), quindi percorsi come `S:/spiffs/logo.jpg`.
+- abilita il decoder JPEG TJPGD usato dalla splash screen per mostrare `logo.jpg` dalla prima pagina.
+
 ### Crash dump / diagnostica
 - `CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH`
 - `CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF`
@@ -146,10 +163,28 @@ Impatto runtime associato:
 - il core dump in partizione viene cancellato solo dopo scrittura SD completata correttamente;
 - se SD non è montata o non ha spazio sufficiente, il trasferimento viene saltato e il core dump resta in partizione (nessuna saturazione SPIFFS).
 
+### TAG: Serial ports
+- `CONFIG_APP_MDB_UART_PORT`
+- `CONFIG_APP_RS232_UART_PORT`
+- `CONFIG_APP_RS485_UART_PORT`
+
+Impatto runtime associato:
+- RS232/RS485/MDB usano rispettivamente i `CONFIG_APP_*_UART_PORT` e la mappatura pin da `sdkconfig`.
+- CCTALK usa UART `CONFIG_APP_RS232_UART_PORT` con pin dedicati `GPIO20/GPIO21` e default `9600, N, 8, 1`.
+
 ### Test API Web UI
 - `CONFIG_APP_MDB_UART_PORT`
 - `CONFIG_APP_RS232_UART_PORT`
 - `CONFIG_APP_RS485_UART_PORT`
+
+### Mappatura pin seriali (compile-time)
+- `CONFIG_APP_RS232_TX_GPIO`
+- `CONFIG_APP_RS232_RX_GPIO`
+- `CONFIG_APP_RS485_TX_GPIO`
+- `CONFIG_APP_RS485_RX_GPIO`
+- `CONFIG_APP_RS485_DE_GPIO`
+- `CONFIG_APP_MDB_TX_GPIO`
+- `CONFIG_APP_MDB_RX_GPIO`
 
 ### USB CDC scanner
 - `CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST`

@@ -130,7 +130,7 @@ static void append_stored_log(const char *level, const char *tag, const char *me
  */
 esp_err_t api_logs_receive(httpd_req_t *req)
 {
-    ESP_LOGD(TAG, "[C] POST /api/logs");
+    //ESP_LOGD(TAG, "[C] POST /api/logs");
 
     // Headers CORS per permettere richieste dal browser
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -242,8 +242,6 @@ void web_ui_add_log(const char *level, const char *tag, const char *message)
  */
 esp_err_t api_logs_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/logs - Processing request");
-
     // Headers CORS per permettere richieste dal browser
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -306,7 +304,7 @@ esp_err_t api_logs_get(httpd_req_t *req)
  */
 esp_err_t api_logs_levels_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/logs/levels");
+//    ESP_LOGI(TAG, "[C] GET /api/logs/levels");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, OPTIONS");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
@@ -380,7 +378,7 @@ esp_err_t api_logs_levels_get(httpd_req_t *req)
  */
 esp_err_t api_logs_set_level(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST /api/logs/level");
+    //ESP_LOGI(TAG, "[C] POST /api/logs/level");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "POST, OPTIONS");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
@@ -429,7 +427,7 @@ esp_err_t api_logs_set_level(httpd_req_t *req)
  */
 esp_err_t api_logs_options(httpd_req_t *req)
 {
-    ESP_LOGD(TAG, "[C] OPTIONS /api/logs");
+    //ESP_LOGD(TAG, "[C] OPTIONS /api/logs");
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");

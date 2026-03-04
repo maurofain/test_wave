@@ -54,7 +54,6 @@ static const char *TAG = "USB_CDC_SCANNER";
 static usb_cdc_scanner_callback_t s_on_barcode = NULL;
 
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
-static TaskHandle_t s_usb_host_lib_task = NULL;
 static TaskHandle_t s_usb_open_task = NULL;
 static cdc_acm_dev_hdl_t s_cdc_dev = NULL;
 static const char *SCN_CMD_SETUP = "0000#SCNMOD3;RRDENA1;CIDENA1;SCNENA0;RRDDUR3000;";
@@ -62,17 +61,18 @@ static const char *SCN_CMD_STATE = "0000#SCNENA*;";
 static const char *SCN_CMD_ON = "0000#SCNENA1;";
 static const char *SCN_CMD_OFF = "0000#SCNENA0;";
 
-static void usb_host_lib_task(void *arg)
-{
-    while (1) {
-        uint32_t event_flags;
-        usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
-        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
-            ESP_ERROR_CHECK(usb_host_device_free_all());
-        }
-    }
-}
 
+/**
+ * @brief Callback per la gestione dei dati CDC.
+ *
+ * Questa funzione viene chiamata quando ci sono dati disponibili per essere letti.
+ *
+ * @param [in] data Puntatore ai dati ricevuti.
+ * @param [in] data_len Lunghezza dei dati ricevuti.
+ * @param [in] arg Puntatore agli argomenti aggiuntivi.
+ *
+ * @return true se la gestione dei dati è stata completata con successo, false altrimenti.
+ */
 static bool cdc_data_cb(const uint8_t *data, size_t data_len, void *arg)
 {
     static char buf[BARCODE_BUF_SIZE];
@@ -92,6 +92,17 @@ static bool cdc_data_cb(const uint8_t *data, size_t data_len, void *arg)
     return true;
 }
 
+
+/**
+ * @brief Callback di gestione degli eventi del dispositivo CDC-ACM.
+ * 
+ * Questa funzione viene chiamata quando si verifica un evento sul dispositivo CDC-ACM.
+ * 
+ * @param [in] event Puntatore ai dati dell'evento del dispositivo CDC-ACM.
+ * @param [in] user_ctx Puntatore al contesto utente passato alla funzione di callback.
+ * 
+ * @return Nessun valore di ritorno.
+ */
 static void cdc_event_cb(const cdc_acm_host_dev_event_data_t *event, void *user_ctx)
 {
     switch (event->type) {
@@ -189,6 +200,15 @@ static void usb_host_event_cb(const usb_host_client_event_msg_t *event_msg, void
 
 /* Sperimentali: task che monitora periodicamente la lista dispositivi e notifica cambiamenti */
 static TaskHandle_t s_usb_monitor_task = NULL;
+
+/**
+ * @brief Gestisce la monitorizzazione del dispositivo USB.
+ *
+ * Questa funzione esegue il monitoraggio continuo del dispositivo USB e gestisce gli eventi relativi.
+ *
+ * @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
+ * @return Nessun valore di ritorno.
+ */
 static void usb_host_monitor_task(void *arg)
 {
     uint8_t prev_list[16] = {0};
@@ -224,11 +244,31 @@ static void usb_host_monitor_task(void *arg)
     }
 }
 
+
+/**
+ * @brief Verifica se due coppie di VID (Vendor ID) e PID (Product ID) sono uguali.
+ *
+ * @param [in] vid_a Primo VID da confrontare.
+ * @param [in] pid_a Primo PID da confrontare.
+ * @param [in] vid_b Secondo VID da confrontare.
+ * @param [in] pid_b Secondo PID da confrontare.
+ * @return true Se le coppie di VID e PID sono uguali.
+ * @return false Se le coppie di VID e PID sono diverse.
+ */
 static bool is_same_vid_pid(uint16_t vid_a, uint16_t pid_a, uint16_t vid_b, uint16_t pid_b)
 {
     return (vid_a == vid_b) && (pid_a == pid_b);
 }
 
+
+/**
+ * @brief Invia un comando in formato framinizzato tramite USB CDC.
+ * 
+ * @param [in] payload Puntatore al buffer contenente il payload del comando.
+ * @return esp_err_t Codice di errore.
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_ERR_INVALID_ARG: Payload non valido (NULL).
+ */
 static esp_err_t usb_cdc_scanner_send_framed_command(const char *payload)
 {
     if (payload == NULL) {
@@ -255,6 +295,16 @@ static esp_err_t usb_cdc_scanner_send_framed_command(const char *payload)
     return err;
 }
 
+
+/**
+ * @brief Gestisce la funzione di apertura del task scanner USB CDC.
+ *
+ * Questa funzione viene eseguita come task e si occupa di aprire e inizializzare
+ * il dispositivo USB CDC per la scansione.
+ *
+ * @param arg Puntatore a dati di input passati al task.
+ * @return Nessun valore di ritorno.
+ */
 static void usb_cdc_scanner_open_task(void *arg)
 {
     /* Attendi che l'USB host completi l'enumerazione dei dispositivi già collegati */
@@ -315,6 +365,15 @@ static void usb_cdc_scanner_open_task(void *arg)
         if (err == ESP_OK) {
             ESP_LOGI(TAG, "CDC device opened");
             s_cdc_dev = cdc_dev;
+
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_err_t on_err = usb_cdc_scanner_send_on_command();
+            if (on_err == ESP_OK) {
+                ESP_LOGI(TAG, "Scanner ON command sent after CDC open");
+            } else {
+                ESP_LOGW(TAG, "Scanner ON command after open failed: %s", esp_err_to_name(on_err));
+            }
+
             // wait until disconnect; the event callback will handle closing
             // simply block here waiting a bit and allow callbacks to run
             while (s_cdc_dev != NULL) {
@@ -390,6 +449,14 @@ static void usb_cdc_scanner_open_task(void *arg)
                                 if (err == ESP_OK) {
                                     ESP_LOGI(TAG, "CDC device opened via fallback VID:PID %04X:%04X", enum_vid, enum_pid);
                                     s_cdc_dev = cdc_dev;
+
+                                    vTaskDelay(pdMS_TO_TICKS(100));
+                                    esp_err_t on_err = usb_cdc_scanner_send_on_command();
+                                    if (on_err == ESP_OK) {
+                                        ESP_LOGI(TAG, "Scanner ON command sent after fallback open");
+                                    } else {
+                                        ESP_LOGW(TAG, "Scanner ON command after fallback open failed: %s", esp_err_to_name(on_err));
+                                    }
 
                                     /* Persist detected VID/PID into runtime config (NVS) */
                                     device_config_t *cfg = device_config_get();
@@ -474,12 +541,7 @@ void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
         ESP_LOGW(TAG, "Failed to register USB host diagnostic client (Sperimentali)");
     }
 
-    /* Ensure usb_host lib event loop task is running so callbacks are delivered */
-    if (s_usb_host_lib_task == NULL) {
-        if (xTaskCreate(usb_host_lib_task, "usb_host_lib", 4096, NULL, 17, &s_usb_host_lib_task) != pdTRUE) {
-            ESP_LOGW(TAG, "Failed to create usb_host_lib_task");
-        }
-    }
+    /* Il loop usb_host_lib è già gestito dal BSP (bsp_usb_host_start). */
 
     /* Sperimentali: start monitor task that periodically polls device list */
     if (s_usb_monitor_task == NULL) {
@@ -501,6 +563,16 @@ void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
 #endif
 }
 
+
+/**
+ * @brief Task per lo scanner USB CDC.
+ * 
+ * Questa funzione gestisce il task per lo scanner USB CDC. 
+ * Si occupa di leggere i dati inviati dal dispositivo USB CDC e di elaborarli.
+ * 
+ * @param param Puntatore a parametri di input per il task.
+ * @return void Nessun valore di ritorno.
+ */
 void usb_cdc_scanner_task(void *param) {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
     // If using real CDC-ACM host, the data callback handles incoming bytes.
@@ -526,6 +598,15 @@ void usb_cdc_scanner_task(void *param) {
 #endif
 }
 
+
+/**
+ * @brief Invia un comando di configurazione all'USB CDC Scanner.
+ *
+ * Questa funzione invia un comando di configurazione all'USB CDC Scanner per iniziare la scansione.
+ *
+ * @param [in] Nessun parametro di input.
+ * @return esp_err_t Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t usb_cdc_scanner_send_setup_command(void)
 {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
@@ -535,6 +616,16 @@ esp_err_t usb_cdc_scanner_send_setup_command(void)
 #endif
 }
 
+
+/**
+ * @brief Invia un comando di stato al dispositivo USB CDC scanner.
+ *
+ * Questa funzione invia un comando di stato al dispositivo USB CDC scanner per ottenere
+ * l'attuale stato del dispositivo.
+ *
+ * @param [in/out] None
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t usb_cdc_scanner_send_state_command(void)
 {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
@@ -544,6 +635,18 @@ esp_err_t usb_cdc_scanner_send_state_command(void)
 #endif
 }
 
+
+/**
+ * @brief Invia dati tramite USB CDC in risposta a un comando.
+ *
+ * Questa funzione invia dati tramite l'interfaccia USB CDC in risposta a un comando specifico.
+ *
+ * @param [in] data Puntatore ai dati da inviare.
+ * @param [in] length Lunghezza dei dati da inviare.
+ * @return esp_err_t Codice di errore.
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t usb_cdc_scanner_send_on_command(void)
 {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
@@ -553,6 +656,17 @@ esp_err_t usb_cdc_scanner_send_on_command(void)
 #endif
 }
 
+
+/**
+ * @brief Invia il comando di spegnimento alla scanner USB CDC.
+ *
+ * Questa funzione invia un comando di spegnimento alla scanner USB CDC.
+ *
+ * @param [in] Nessun parametro di input.
+ * @return esp_err_t Codice di errore.
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t usb_cdc_scanner_send_off_command(void)
 {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
@@ -572,12 +686,31 @@ esp_err_t usb_cdc_scanner_send_off_command(void)
 
 static const char *TAG_MOCK = "USB_SCN";
 
+
+/**
+ * @brief Inizializza il scanner USB CDC.
+ *
+ * Questa funzione inizializza il scanner USB CDC utilizzando la configurazione fornita.
+ *
+ * @param [in] config Puntatore alla struttura di configurazione del scanner USB CDC.
+ * @return Nessun valore di ritorno.
+ */
 void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config)
 {
     (void)config;
     ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_init: scanner USB simulato");
 }
 
+
+/**
+ * @brief Gestisce il task per lo scanner USB CDC.
+ *
+ * Questa funzione si occupa di gestire il task per lo scanner USB CDC, che si occupa di leggere i dati
+ * inviati dal dispositivo USB CDC e di elaborarli.
+ *
+ * @param param Puntatore a un parametro di input utilizzato dal task.
+ * @return Nessun valore di ritorno.
+ */
 void usb_cdc_scanner_task(void *param)
 {
     (void)param;
@@ -585,24 +718,67 @@ void usb_cdc_scanner_task(void *param)
     vTaskDelete(NULL);
 }
 
+
+/**
+ * @brief Invia un comando di configurazione all'USB CDC scanner.
+ *
+ * Questa funzione invia un comando di configurazione all'USB CDC scanner per iniziare la scansione.
+ *
+ * @param [in] Nessun parametro di input.
+ * @return esp_err_t Errore di ritorno.
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione non riuscita.
+ */
 esp_err_t usb_cdc_scanner_send_setup_command(void)
 {
     ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_setup_command");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Invia un comando di stato al dispositivo USB CDC scanner.
+ *
+ * Questa funzione invia un comando di stato al dispositivo USB CDC scanner per ottenere
+ * l'attuale stato del dispositivo.
+ *
+ * @param [in/out] None
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t usb_cdc_scanner_send_state_command(void)
 {
     ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_state_command");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Invia dati tramite USB CDC in risposta a un comando.
+ *
+ * Questa funzione invia dati tramite l'interfaccia USB CDC in risposta a un comando specifico.
+ *
+ * @param [in] data Puntatore ai dati da inviare.
+ * @param [in] length Lunghezza dei dati da inviare.
+ * @return esp_err_t Codice di errore.
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t usb_cdc_scanner_send_on_command(void)
 {
     ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_on_command");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Invia il comando di spegnimento alla scanner USB CDC.
+ *
+ * Questa funzione invia un comando di spegnimento alla scanner USB CDC.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: il comando è stato inviato con successo.
+ *         - ESP_FAIL: si è verificato un errore durante l'invio del comando.
+ */
 esp_err_t usb_cdc_scanner_send_off_command(void)
 {
     ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_off_command");

@@ -48,11 +48,11 @@ config APP_RS485_TX_GPIO
 
 config APP_RS485_RX_GPIO
     int "RS485 RX GPIO"
-    default 19
+    default 3
 
 config APP_RS485_DE_GPIO
     int "RS485 DE GPIO"
-    default 21
+    default 2
 
 config APP_MDB_UART_PORT
     int "MDB UART port"

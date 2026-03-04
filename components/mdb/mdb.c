@@ -30,11 +30,30 @@ const mdb_status_t* mdb_get_status(void) {
 }
 
 // Helper per calcolare la parità di un byte (ritorna true se dispari)
+
+/**
+ * @brief Calcola la parità di un byte.
+ * 
+ * Questa funzione calcola la parità di un byte fornito come input.
+ * La parità è definita come il numero di bit 1 nel byte. Se il numero di bit 1 è pari, la parità è pari; se è dispari, la parità è dispari.
+ * 
+ * @param [in] data Byte di cui calcolare la parità.
+ * @return true se la parità è pari, false se la parità è dispari.
+ */
 static bool get_byte_parity(uint8_t data) {
     return __builtin_parity(data);
 }
 
 // Helper: Invia ACK
+
+/**
+ * @brief Invia un ACK (Acknowledgment) al dispositivo.
+ *
+ * Questa funzione invia un ACK al dispositivo per confermare la ricezione di un pacchetto.
+ *
+ * @param [in/out] Nessun parametro specifico.
+ * @return Nessun valore di ritorno.
+ */
 static void mdb_send_ack(void) {
     uint8_t ack = MDB_ACK;
     // ACK è un data byte, quindi 9° bit = 0
@@ -45,6 +64,15 @@ static void mdb_send_ack(void) {
 }
 
 // Logica per la Macchina a Stati della Gettoniera (Coin Acceptor)
+
+/**
+ * @brief Gestisce lo stato di coin per il sistema di monete.
+ * 
+ * Questa funzione si occupa di gestire lo stato delle monete inserite nel sistema.
+ * 
+ * @param [in/out] coin_state Stato corrente delle monete.
+ * @return void Nessun valore di ritorno.
+ */
 static void mdb_coin_sm(void) {
     uint8_t rx[36];
     size_t rx_len;
@@ -153,6 +181,13 @@ static void mdb_coin_sm(void) {
     }
 }
 
+
+/** @brief Avvia il motore di database.
+ *  
+ *  @param [in] arg Puntatore a dati di configurazione o contesto necessari per l'avvio del motore.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void mdb_engine_run(void *arg) {
     ESP_LOGI(TAG, "Motore di polling MDB avviato");
     while (1) {
@@ -162,6 +197,16 @@ void mdb_engine_run(void *arg) {
     }
 }
 
+
+/**
+ * @brief Avvia il motore del database.
+ * 
+ * Questa funzione avvia il motore del database e prepara l'ambiente per l'accesso ai dati.
+ * 
+ * @return esp_err_t
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t mdb_start_engine(void) {
     /* Il task mdb_engine è ora gestito da tasks.c tramite mdb_engine_run().
      * Questa funzione è mantenuta per retrocompatibilità ma non crea il task. */
@@ -169,6 +214,16 @@ esp_err_t mdb_start_engine(void) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza il database.
+ *
+ * Questa funzione inizializza il database e prepara tutti i componenti necessari per l'uso successivo.
+ *
+ * @return
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t mdb_init(void)
 {
     device_config_t *d_cfg = device_config_get();
@@ -196,6 +251,14 @@ esp_err_t mdb_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Invia un byte tramite la comunicazione MDB.
+ *
+ * @param [in] data Byte da inviare.
+ * @param [in] mode_bit Bit di modalità da inviare.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t mdb_send_byte(uint8_t data, bool mode_bit)
 {
     // Simulazione 9° bit tramite parità
@@ -223,6 +286,16 @@ static esp_err_t mdb_send_byte(uint8_t data, bool mode_bit)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Invia un pacchetto tramite la libreria MDB.
+ *
+ * @param [in] address L'indirizzo del dispositivo a cui inviare il pacchetto.
+ * @param [in] data Un puntatore al buffer contenente i dati del pacchetto.
+ * @param [in] len La lunghezza del buffer dei dati.
+ *
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
     uint8_t checksum = address;
@@ -247,6 +320,23 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Riceve un pacchetto da una coda di messaggi.
+ *
+ * Questa funzione riceve un pacchetto da una coda di messaggi e lo memorizza in un buffer fornito.
+ *
+ * @param [out] out_data Puntatore al buffer dove memorizzare il pacchetto ricevuto.
+ * @param max_len Lunghezza massima del buffer out_data.
+ * @param [out] out_len Puntatore alla variabile dove memorizzare la lunghezza effettiva del pacchetto ricevuto.
+ * @param timeout_ms Timeout in millisecondi per l'attesa del pacchetto.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_ERR_INVALID_ARG: Argomento non valido.
+ * - ESP_ERR_TIMEOUT: Timeout scaduto.
+ * - ESP_FAIL: Operazione non riuscita per altri motivi.
+ */
 esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len, uint32_t timeout_ms)
 {
     if (!out_data || !out_len) return ESP_ERR_INVALID_ARG;
@@ -301,24 +391,63 @@ const mdb_status_t *mdb_get_status(void)
     return &s_mock_mdb_status;
 }
 
+
+/**
+ * @brief Inizializza il database.
+ *
+ * Questa funzione inizializza il database e prepara tutti i componenti necessari per l'uso successivo.
+ *
+ * @return
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t mdb_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] mdb_init: bus MDB simulato");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Avvia il motore di database.
+ *
+ * Questa funzione avvia il motore di database e prepara l'ambiente per l'accesso ai dati.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t mdb_start_engine(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] mdb_start_engine: polling disabilitato");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Avvia il motore del database.
+ * 
+ * Questa funzione avvia il motore del database e gestisce il suo ciclo di vita.
+ * 
+ * @param arg Puntatore a dati aggiuntivi necessari per l'avvio del motore.
+ * @return Nessun valore di ritorno.
+ */
 void mdb_engine_run(void *arg)
 {
     /* Mockup: MDB disabilitato — task in attesa indefinita */
     while (1) { vTaskDelay(pdMS_TO_TICKS(5000)); }
 }
 
+
+/**
+ * @brief Invia un pacchetto tramite la libreria MDB.
+ *
+ * @param [in] address L'indirizzo del dispositivo a cui inviare il pacchetto.
+ * @param [in] data Un puntatore al buffer contenente i dati del pacchetto.
+ * @param [in] len La lunghezza del buffer dei dati.
+ *
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
     ESP_LOGI(TAG, "[C] [MOCK] mdb_send_packet: addr=0x%02X len=%zu ignorato", address, len);
@@ -326,6 +455,23 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Riceve un pacchetto da una coda di messaggi.
+ *
+ * Questa funzione riceve un pacchetto da una coda di messaggi e lo memorizza in un buffer fornito.
+ *
+ * @param [out] out_data Puntatore al buffer dove memorizzare il pacchetto ricevuto.
+ * @param max_len Lunghezza massima del buffer di destinazione.
+ * @param [out] out_len Puntatore alla variabile dove memorizzare la lunghezza effettiva del pacchetto ricevuto.
+ * @param timeout_ms Timeout in millisecondi per l'attesa del pacchetto.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_ERR_INVALID_ARG: Argomento non valido.
+ * - ESP_ERR_TIMEOUT: Timeout scaduto.
+ * - ESP_FAIL: Operazione non riuscita per altri motivi.
+ */
 esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len, uint32_t timeout_ms)
 {
     (void)out_data; (void)max_len; (void)timeout_ms;

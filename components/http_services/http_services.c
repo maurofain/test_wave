@@ -25,13 +25,58 @@ static const char *TAG = "HTTP_SERVICES";
 #define DNA_SERVER_POST 0
 #endif
 
+#define HTTP_SERVICES_AUTH_TOKEN_MAX_LEN 2048
+
 // Global variable to store the token
-char g_auth_token[256] = {0};
+char g_auth_token[HTTP_SERVICES_AUTH_TOKEN_MAX_LEN] = {0};
+
+static esp_err_t http_services_login_if_needed(bool force_refresh);
 
 // Temporary implementation of validate_token
+
+/**
+ * @brief Valida un token.
+ * 
+ * Questa funzione verifica la validità di un token fornito come input.
+ * 
+ * @param [in] token Puntatore al token da validare.
+ * @return true se il token è valido, false altrimenti.
+ */
 bool validate_token(const char *token) {
     // Add actual token validation logic here
     return token != NULL && strlen(token) > 0;
+}
+
+/**
+ * @brief Salva in modo sicuro il token JWT remoto nel buffer globale.
+ *
+ * @param [in] token Token da salvare.
+ * @param [in] source Origine logica del token (solo per log diagnostico).
+ * @return ESP_OK se salvato correttamente, errore in caso di token non valido/troncabile.
+ */
+static esp_err_t store_auth_token(const char *token, const char *source)
+{
+    if (!token || token[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    size_t token_len = strlen(token);
+    if (token_len >= sizeof(g_auth_token)) {
+        g_auth_token[0] = '\0';
+        ESP_LOGE(TAG,
+                 "[C] access_token troppo lungo (%u >= %u) da %s",
+                 (unsigned)token_len,
+                 (unsigned)sizeof(g_auth_token),
+                 source ? source : "unknown");
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    memcpy(g_auth_token, token, token_len + 1);
+    ESP_LOGI(TAG,
+             "[C] access_token salvato da %s (len=%u)",
+             source ? source : "unknown",
+             (unsigned)token_len);
+    return ESP_OK;
 }
 
 /* Read the whole request body into a NUL-terminated buffer (caller frees) */
@@ -72,6 +117,15 @@ static void format_full_datetime(char *out, size_t len)
  * When enabled, long messages are chunked to fit the `web_ui` store.
  */
 #ifdef HTTP_SERVICES_LOG_TO_UI
+
+/**
+ * @brief Registra un blocco di log in modo chunked.
+ *
+ * @param [in] level Livello di log (ad esempio, "INFO", "WARNING", "ERROR").
+ * @param [in] tag Etichetta associata al log.
+ * @param [in] label Etichetta del blocco di log.
+ * @param [in] msg Messaggio di log da registrare.
+ */
 static void webui_log_chunked(const char *level, const char *tag, const char *label, const char *msg)
 {
     if (!msg) return;
@@ -257,6 +311,17 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
     char *resp = NULL;
     size_t total = 0;
     bool use_fallback_headers = false;
+    char *generated_auth_header = NULL;
+
+    if ((!auth_header || auth_header[0] == '\0') && g_auth_token[0] != '\0') {
+        size_t token_len = strlen(g_auth_token);
+        size_t needed_len = strlen("Bearer ") + token_len + 1;
+        generated_auth_header = malloc(needed_len);
+        if (!generated_auth_header) {
+            return ESP_ERR_NO_MEM;
+        }
+        snprintf(generated_auth_header, needed_len, "Bearer %s", g_auth_token);
+    }
 
     for (int attempt = 0; attempt < max_attempts; ++attempt) {
         if (client) {
@@ -284,13 +349,11 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
             ESP_LOGI(TAG, "Using fallback headers: Connection: close, Accept-Encoding: identity (attempt %d)", attempt + 1);
         }
 
-        char abuf[320] = {0};
         const char *hdr_authorization = NULL;
         if (auth_header && strlen(auth_header) > 0) {
             hdr_authorization = auth_header;
-        } else if (g_auth_token[0] != '\0') {
-            snprintf(abuf, sizeof(abuf), "Bearer %s", g_auth_token);
-            hdr_authorization = abuf;
+        } else if (generated_auth_header) {
+            hdr_authorization = generated_auth_header;
         }
         if (hdr_authorization) {
             esp_http_client_set_header(client, "Authorization", hdr_authorization);
@@ -311,7 +374,10 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
             web_ui_add_log("INFO", TAG, date_hdr);
 #endif
         }
-        if (hdr_authorization) ESP_LOGI(TAG, "OUT Header: Authorization: %s", hdr_authorization);
+        if (hdr_authorization) {
+            ESP_LOGI(TAG, "OUT Header: Authorization: %s", hdr_authorization);
+            ESP_LOGI(TAG, "[C] OUT Authorization length=%u", (unsigned)strlen(hdr_authorization));
+        }
         ESP_LOGI(TAG, "OUT Header: Content-Type: %s", hdr_content_type);
 
 #ifdef HTTP_SERVICES_LOG_TO_UI
@@ -465,7 +531,12 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
         break;
     }
 
-    if (!client) return ESP_ERR_NO_MEM;
+    if (!client) {
+        if (generated_auth_header) {
+            free(generated_auth_header);
+        }
+        return ESP_ERR_NO_MEM;
+    }
 
     /* LOG: response summary */
     ESP_LOGI(TAG, "<<< HTTP RESP: status=%d content_len=%u", status, (unsigned)total);
@@ -504,6 +575,9 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 
     if (out_resp) *out_resp = resp; else if (resp) free(resp);
     if (out_status) *out_status = status;
+    if (generated_auth_header) {
+        free(generated_auth_header);
+    }
     return err;
 #endif
 }
@@ -540,6 +614,21 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
     log_httpd_request(req, incoming_body);
     ESP_LOGI(TAG, "Forwarding to remote path: %s", remote_path);
 
+    bool force_refresh_login = (remote_path != NULL) && (strcmp(remote_path, "/api/login") != 0);
+    if (force_refresh_login) {
+        esp_err_t login_err = http_services_login_if_needed(true);
+        if (login_err != ESP_OK) {
+            if (incoming_body) free(incoming_body);
+            ESP_LOGE(TAG, "[C] Login forzato pre-chiamata fallito per %s: %s",
+                     remote_path,
+                     esp_err_to_name(login_err));
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_send(req,
+                                   "{\"iserror\":true,\"codeerror\":401,\"deserror\":\"login_refresh_failed\"}",
+                                   -1);
+        }
+    }
+
     /* try to forward Authorization header from incoming request */
     size_t auth_len = httpd_req_get_hdr_value_len(req, "Authorization");
     char *auth_hdr = NULL;
@@ -574,7 +663,15 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
     char *remote_resp = NULL;
     int status = 0;
     size_t remote_len = 0;
-    esp_err_t err = remote_post(remote_path, send_body, auth_hdr, &remote_resp, &status, &remote_len);
+    const char *auth_to_send = auth_hdr;
+    if (force_refresh_login) {
+        auth_to_send = NULL;
+        if (auth_hdr && auth_hdr[0] != '\0') {
+            ESP_LOGI(TAG, "[C] Authorization inbound ignorata: uso token aggiornato da /api/login");
+        }
+    }
+
+    esp_err_t err = remote_post(remote_path, send_body, auth_to_send, &remote_resp, &status, &remote_len);
 
     if (auth_hdr) free(auth_hdr);
     if (incoming_body) free(incoming_body);
@@ -603,10 +700,14 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
         if (rj) {
             cJSON *at = cJSON_GetObjectItemCaseSensitive(rj, "access_token");
             if (cJSON_IsString(at) && at->valuestring) {
-                snprintf(g_auth_token, sizeof(g_auth_token), "%s", at->valuestring);
-                ESP_LOGI(TAG, "Stored access_token (len=%d)", (int)strlen(g_auth_token));
+                esp_err_t token_store_err = store_auth_token(at->valuestring, "forward_post/login");
+                if (token_store_err != ESP_OK) {
+                    ESP_LOGE(TAG, "[C] Salvataggio access_token fallito: %s", esp_err_to_name(token_store_err));
+                }
 #ifdef HTTP_SERVICES_LOG_TO_UI
-                webui_log_chunked("INFO", TAG, "Stored access_token", g_auth_token);
+                if (token_store_err == ESP_OK) {
+                    webui_log_chunked("INFO", TAG, "Stored access_token", g_auth_token);
+                }
 #endif
             }
             cJSON_Delete(rj);
@@ -624,12 +725,26 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
     return ESP_OK;
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per l'autenticazione.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_login_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/login -> proxy to remote server");
     return forward_post(req, "/api/login", NULL, true);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per mantenere attiva la connessione.
+ *
+ * @param req Puntatore alla richiesta HTTPD.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_keepalive_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/keepalive -> processing request");
@@ -754,46 +869,154 @@ static esp_err_t api_keepalive_post(httpd_req_t *req)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per ottenere immagini.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_getimages_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/getimages -> proxy to remote server");
     return forward_post(req, "/api/getimages", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per ottenere la configurazione.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_getconfig_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/getconfig -> proxy to remote server");
     return forward_post(req, "/api/getconfig", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per ottenere le traduzioni.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_gettranslations_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/gettranslations -> proxy to remote server");
     return forward_post(req, "/api/gettranslations", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per ottenere il firmware.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_getfirmware_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/getfirmware -> proxy to remote server");
     return forward_post(req, "/api/getfirmware", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per l'API di pagamento.
+ *
+ * @param req Puntatore alla richiesta HTTPD.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_payment_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/payment -> proxy to remote server");
     return forward_post(req, "/api/payment", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per l'API serviceused.
+ *
+ * @param req Puntatore alla richiesta HTTPD.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_serviceused_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/serviceused -> proxy to remote server");
     return forward_post(req, "/api/serviceused", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per il pagamento offline.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_paymentoffline_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/paymentoffline -> proxy to remote server");
     return forward_post(req, "/api/paymentoffline", NULL, false);
+}
+
+static esp_err_t http_services_login_if_needed(bool force_refresh)
+{
+    if (!force_refresh && validate_token(g_auth_token)) {
+        return ESP_OK;
+    }
+
+    device_config_t *cfg = device_config_get();
+    if (!cfg || cfg->server.serial[0] == '\0' || cfg->server.password[0] == '\0') {
+        ESP_LOGE(TAG, "[C] Login non possibile: credenziali server non configurate");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    char login_body[256];
+    snprintf(login_body,
+             sizeof(login_body),
+             "{\"serial\":\"%s\",\"password\":\"%s\"}",
+             cfg->server.serial,
+             cfg->server.password);
+
+    char *resp = NULL;
+    int status = 0;
+    size_t resp_len = 0;
+    esp_err_t err = remote_post("/api/login", login_body, NULL, &resp, &status, &resp_len);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Login remoto fallito: %s", esp_err_to_name(err));
+        if (resp) free(resp);
+        return err;
+    }
+
+    if (status < 200 || status >= 300 || !resp) {
+        ESP_LOGE(TAG, "[C] Login remoto HTTP non valido: status=%d", status);
+        if (resp) free(resp);
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(resp);
+    free(resp);
+    if (!root) {
+        ESP_LOGE(TAG, "[C] Login remoto: risposta JSON non valida");
+        return ESP_FAIL;
+    }
+
+    cJSON *at = cJSON_GetObjectItemCaseSensitive(root, "access_token");
+    if (!cJSON_IsString(at) || !at->valuestring || at->valuestring[0] == '\0') {
+        cJSON_Delete(root);
+        ESP_LOGE(TAG, "[C] Login remoto: access_token mancante");
+        return ESP_FAIL;
+    }
+
+    esp_err_t store_err = store_auth_token(at->valuestring, "login_if_needed");
+    cJSON_Delete(root);
+    if (store_err != ESP_OK) {
+        return store_err;
+    }
+
+    ESP_LOGI(TAG, "[C] Token remoto acquisito (len=%u)", (unsigned)strlen(g_auth_token));
+    return ESP_OK;
 }
 
 /* =========================================================================
@@ -805,6 +1028,17 @@ esp_err_t http_services_getcustomers(const char *code, const char *telephone,
 {
     if (!code || !out) return ESP_ERR_INVALID_ARG;
     memset(out, 0, sizeof(*out));
+
+    esp_err_t token_err = http_services_login_if_needed(true);
+    if (token_err != ESP_OK) {
+        out->common.iserror = true;
+        out->common.codeerror = -10;
+        snprintf(out->common.deserror,
+                 sizeof(out->common.deserror),
+                 "login_failed:%s",
+                 esp_err_to_name(token_err));
+        return token_err;
+    }
 
     /* --- build request body -------------------------------------------- */
     cJSON *req_json = cJSON_CreateObject();
@@ -821,7 +1055,30 @@ esp_err_t http_services_getcustomers(const char *code, const char *telephone,
     char *resp = NULL;
     int status = 0;
     size_t resp_len = 0;
-    esp_err_t err = remote_post("/api/getcustomers", body, NULL, &resp, &status, &resp_len);
+    esp_err_t err = ESP_FAIL;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        err = remote_post("/api/getcustomers", body, NULL, &resp, &status, &resp_len);
+        if (err != ESP_OK) {
+            break;
+        }
+
+        if ((status == 401 || status == 403) && attempt == 0) {
+            ESP_LOGW(TAG, "[C] getcustomers non autorizzato (HTTP %d), rinnovo token", status);
+            g_auth_token[0] = '\0';
+            if (resp) {
+                free(resp);
+                resp = NULL;
+            }
+            token_err = http_services_login_if_needed(true);
+            if (token_err != ESP_OK) {
+                err = token_err;
+                break;
+            }
+            continue;
+        }
+
+        break;
+    }
     free(body);
 
     if (err != ESP_OK) {
@@ -832,6 +1089,14 @@ esp_err_t http_services_getcustomers(const char *code, const char *telephone,
         if (resp) free(resp);
         return err;
     }
+    if (status < 200 || status >= 300) {
+        out->common.iserror = true;
+        out->common.codeerror = status;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "http_%d", status);
+        if (resp) free(resp);
+        return ESP_FAIL;
+    }
+
     if (!resp) {
         out->common.iserror = true;
         out->common.codeerror = -2;
@@ -911,24 +1176,217 @@ esp_err_t http_services_getcustomers(const char *code, const char *telephone,
     return ESP_OK;
 }
 
+/* =========================================================================
+ * Direct C call: payment
+ * Builds request body, calls remote_post(), parses response.
+ * ========================================================================= */
+esp_err_t http_services_payment(const http_services_customer_t *customer,
+                                int32_t amount,
+                                const char *service_code,
+                                http_services_payment_response_t *out)
+{
+    if (!out) return ESP_ERR_INVALID_ARG;
+    memset(out, 0, sizeof(*out));
+
+    if (amount < 0) {
+        amount = 0;
+    }
+
+    const char *service = (service_code && service_code[0] != '\0') ? service_code : "SER1";
+
+    esp_err_t token_err = http_services_login_if_needed(true);
+    if (token_err != ESP_OK) {
+        out->common.iserror = true;
+        out->common.codeerror = -10;
+        snprintf(out->common.deserror,
+                 sizeof(out->common.deserror),
+                 "login_failed:%s",
+                 esp_err_to_name(token_err));
+        return token_err;
+    }
+
+    cJSON *req = cJSON_CreateObject();
+    if (!req) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON *cust = cJSON_CreateObject();
+    if (!cust) {
+        cJSON_Delete(req);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddStringToObject(cust, "code", (customer && customer->code[0] != '\0') ? customer->code : "");
+    cJSON_AddStringToObject(cust, "telephone", (customer && customer->telephone[0] != '\0') ? customer->telephone : "");
+    if (customer && customer->email[0] != '\0') {
+        cJSON_AddStringToObject(cust, "email", customer->email);
+    } else {
+        cJSON_AddNullToObject(cust, "email");
+    }
+    cJSON_AddStringToObject(cust, "surname", (customer && customer->surname[0] != '\0') ? customer->surname : "");
+    cJSON_AddStringToObject(cust, "name", (customer && customer->name[0] != '\0') ? customer->name : "");
+    cJSON_AddItemToObject(req, "customer", cust);
+
+    char datetime_iso[40] = {0};
+    format_full_datetime(datetime_iso, sizeof(datetime_iso));
+    cJSON_AddStringToObject(req, "datetime", datetime_iso);
+    cJSON_AddNumberToObject(req, "amount", amount);
+    cJSON_AddStringToObject(req, "paymenttype", "CASH");
+    cJSON_AddStringToObject(req, "paymentdata", "");
+
+    cJSON *cashreturned = cJSON_CreateArray();
+    cJSON_AddItemToObject(req, "cashreturned", cashreturned);
+
+    cJSON *cashentered = cJSON_CreateArray();
+    if (!cashentered) {
+        cJSON_Delete(req);
+        return ESP_ERR_NO_MEM;
+    }
+    if (amount > 0) {
+        cJSON *ce = cJSON_CreateObject();
+        if (!ce) {
+            cJSON_Delete(req);
+            return ESP_ERR_NO_MEM;
+        }
+        cJSON_AddNumberToObject(ce, "value", amount);
+        cJSON_AddNumberToObject(ce, "quantity", 1);
+        cJSON_AddNumberToObject(ce, "position", 99);
+        cJSON_AddItemToArray(cashentered, ce);
+    }
+    cJSON_AddItemToObject(req, "cashentered", cashentered);
+
+    cJSON *services = cJSON_CreateArray();
+    if (!services) {
+        cJSON_Delete(req);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON *srv = cJSON_CreateObject();
+    if (!srv) {
+        cJSON_Delete(req);
+        return ESP_ERR_NO_MEM;
+    }
+    cJSON_AddStringToObject(srv, "code", service);
+    cJSON_AddNumberToObject(srv, "amount", amount);
+    cJSON_AddNumberToObject(srv, "quantity", 1);
+    cJSON_AddBoolToObject(srv, "used", true);
+    cJSON_AddBoolToObject(srv, "recharge", false);
+    cJSON_AddItemToArray(services, srv);
+    cJSON_AddItemToObject(req, "services", services);
+
+    char *body = cJSON_PrintUnformatted(req);
+    cJSON_Delete(req);
+    if (!body) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGI(TAG, "payment: body=%s", body);
+
+    char *resp = NULL;
+    int status = 0;
+    size_t resp_len = 0;
+    esp_err_t err = remote_post("/api/payment", body, NULL, &resp, &status, &resp_len);
+    free(body);
+
+    if (err != ESP_OK) {
+        out->common.iserror = true;
+        out->common.codeerror = -1;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "%s", esp_err_to_name(err));
+        if (resp) free(resp);
+        return err;
+    }
+
+    if (status < 200 || status >= 300) {
+        out->common.iserror = true;
+        out->common.codeerror = status;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "http_%d", status);
+        if (resp) free(resp);
+        return ESP_FAIL;
+    }
+
+    if (!resp) {
+        out->common.iserror = true;
+        out->common.codeerror = -2;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "no_response");
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(resp);
+    free(resp);
+    if (!root) {
+        out->common.iserror = true;
+        out->common.codeerror = -3;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "json_parse_error");
+        return ESP_FAIL;
+    }
+
+    cJSON *je = cJSON_GetObjectItemCaseSensitive(root, "iserror");
+    out->common.iserror = cJSON_IsTrue(je);
+    cJSON *jce = cJSON_GetObjectItemCaseSensitive(root, "codeerror");
+    if (cJSON_IsNumber(jce)) out->common.codeerror = (int32_t)jce->valueint;
+    cJSON *jde = cJSON_GetObjectItemCaseSensitive(root, "deserror");
+    if (cJSON_IsString(jde) && jde->valuestring) {
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "%s", jde->valuestring);
+    }
+
+    cJSON *jdt = cJSON_GetObjectItemCaseSensitive(root, "datetime");
+    if (cJSON_IsString(jdt) && jdt->valuestring) {
+        snprintf(out->datetime, sizeof(out->datetime), "%s", jdt->valuestring);
+    }
+
+    cJSON *jpid = cJSON_GetObjectItemCaseSensitive(root, "paymentid");
+    if (cJSON_IsNumber(jpid)) {
+        out->paymentid = (int32_t)jpid->valueint;
+    }
+
+    cJSON_Delete(root);
+    return out->common.iserror ? ESP_FAIL : ESP_OK;
+}
+
+
+/**
+ * @brief Gestisce la richiesta POST per ottenere i clienti.
+ *
+ * @param req Puntatore alla richiesta HTTPD.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_getcustomers_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/getcustomers -> proxy to remote server");
     return forward_post(req, "/api/getcustomers", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per ottenere gli operatori.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_getoperators_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/getoperators -> proxy to remote server");
     return forward_post(req, "/api/getoperators", NULL, false);
 }
 
+
+/**
+ * @brief Gestisce la richiesta POST per l'attività.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_activity_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/activity -> proxy to remote server");
     return forward_post(req, "/api/activity", NULL, false);
 }
 
+
+/** @brief Gestisce la richiesta POST per l'attività del dispositivo.
+ *  
+ *  @param [in] req Puntatore alla richiesta HTTP.
+ *  
+ *  @return esp_err_t Codice di errore.
+ */
 static esp_err_t api_deviceactivity_post(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "POST /api/deviceactivity -> proxy to remote server");
@@ -936,6 +1394,15 @@ static esp_err_t api_deviceactivity_post(httpd_req_t *req)
 }
 
 
+
+/**
+ * @brief Registra i gestori HTTP per il server.
+ *
+ * Questa funzione registra i gestori HTTP necessari per il server.
+ *
+ * @param [in] server Handle del server HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t http_services_register_handlers(httpd_handle_t server)
 {
     httpd_uri_t uri_login = {

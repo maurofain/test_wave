@@ -67,6 +67,13 @@
  */
 #define FORCE_VIDEO_DISABLED 0
 
+#define WEB_UI_CCTALK_BAUD      9600
+#define WEB_UI_CCTALK_DATA_BITS 8
+#define WEB_UI_CCTALK_PARITY    0
+#define WEB_UI_CCTALK_STOP_BITS 1
+#define WEB_UI_CCTALK_RX_BUF    256
+#define WEB_UI_CCTALK_TX_BUF    256
+
 /* Log store e handler spostati in components/web_ui/web_ui_logs.c */
 
 
@@ -604,10 +611,18 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='sd_card' name='sd_card'><span class='slider'></span></label><span>Scheda SD</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm1' name='pwm1'><span class='slider'></span></label><span>PWM Canale 1</span></div>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm2' name='pwm2'><span class='slider'></span></label><span>PWM Canale 2</span></div>"
+        "</div>"
+
+        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🔍 Scanner USB (CDC)<span class='section-toggle-icon'>▸</span></h2>"
         "<div class='sw-row'><label class='switch'><input type='checkbox' id='scanner_en' name='scanner_en'><span class='slider'></span></label><span>Scanner USB (CDC)</span></div>"
         "<div class='form-group indent'><label>VID</label><input type='text' id='scanner_vid' name='scanner_vid' placeholder='0x1EAB' style='width:120px'></div>"
         "<div class='form-group indent'><label>PID</label><input type='text' id='scanner_pid' name='scanner_pid' placeholder='0x0006' style='width:120px'></div>"
         "<div class='form-group indent'><label>Dual PID (opzionale)</label><input type='text' id='scanner_dual_pid' name='scanner_dual_pid' placeholder='0x0000' style='width:120px'></div>"
+        "<div class='form-group indent'><label>Attesa post-lettura (ms)</label><input type='number' id='scanner_cooldown_ms' name='scanner_cooldown_ms' min='500' max='60000' step='100' value='10000' style='width:140px'></div>"
+        "</div>"
+
+        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>⏱️ Timeouts<span class='section-toggle-icon'>▸</span></h2>"
+        "<div class='form-group'><label>Ritorno a scelta lingua dopo inattività (s)</label><input type='number' id='timeout_language_return_s' name='timeout_language_return_s' min='1' max='600' step='1' value='10' style='width:140px'></div>"
         "</div>"
 
         "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>📺 Display<span class='section-toggle-icon'>▸</span></h2>"
@@ -688,7 +703,27 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "pwd.innerHTML=\"<h2>🔐 Password boot/emulatore</h2><p style='margin:8px 0 12px 0;color:#566573;'>Modifica password richiesta per /emulator e reboot FACTORY.</p><div class='form-group'><label>Password attuale</label><input type='password' id='boot_pwd_current' placeholder='password attuale'></div><div class='form-group'><label>Nuova password</label><input type='password' id='boot_pwd_new' placeholder='min 4 caratteri'></div><div class='form-group'><label>Conferma nuova password</label><input type='password' id='boot_pwd_confirm' placeholder='ripeti password'></div><button type='button' onclick='saveBootPassword()' style='background:#8e44ad;'>💾 Salva password boot</button>\";"
         "nameSection.insertAdjacentElement('afterend',pwd);"
         "}"
+        "function ensureCctalkConfigSections(){"
+        "const sections=Array.from(document.querySelectorAll('.section'));"
+        "const hwSection=sections.find(function(s){const h=s.querySelector('h2');return h&&h.textContent&&h.textContent.indexOf('Periferiche Hardware')!==-1;});"
+        "if(hwSection && !document.getElementById('cctalk')){"
+        "const row=document.createElement('div');"
+        "row.className='sw-row';"
+        "row.innerHTML=\"<label class='switch'><input type='checkbox' id='cctalk' name='cctalk'><span class='slider'></span></label><span>CCtalk</span>\";"
+        "const mdbEl=document.getElementById('mdb');"
+        "const mdbRow=mdbEl?mdbEl.closest('.sw-row'):null;"
+        "if(mdbRow && mdbRow.parentNode){mdbRow.parentNode.insertBefore(row,mdbRow.nextSibling);}else{hwSection.appendChild(row);}"
+        "}"
+        "const serialSection=sections.find(function(s){const h=s.querySelector('h2');return h&&h.textContent&&h.textContent.indexOf('(TAG) Porte Seriali')!==-1;});"
+        "if(serialSection && !document.getElementById('cctalk_baud')){"
+        "const details=document.createElement('details');"
+        "details.style.marginTop='10px';"
+        "details.innerHTML=\"<summary><b>CCTalk Configuration</b></summary><div class='form-group'><label>Baudrate</label><input type='text' id='cctalk_baud' readonly></div><div class='form-group'><label>Data Bits</label><input type='text' id='cctalk_bits' readonly></div><div class='form-group'><label>Parità (0:None, 1:Odd, 2:Even)</label><input type='text' id='cctalk_par' readonly></div><div class='form-group'><label>Stop Bits (1, 2)</label><input type='text' id='cctalk_stop' readonly></div><div class='form-group'><label>Buffer RX</label><input type='text' id='cctalk_rx' readonly></div><div class='form-group'><label>Buffer TX</label><input type='text' id='cctalk_tx' readonly></div><div style='font-size:12px;color:#7f8c8d;margin-top:6px;'>Configurazione fissa driver CCTalk (GPIO20/GPIO21, 9600 8N1).</div>\";"
+        "serialSection.appendChild(details);"
+        "}"
+        "}"
         "ensureFactorySections();"
+        "ensureCctalkConfigSections();"
         "window.__configOriginalLang='it';"
         "window.addEventListener('load',loadConfig);"
         "function indexI18nRecords(records){"
@@ -746,6 +781,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
             "}"
         "async function loadConfig(){"
         "ensureFactorySections();"
+        "ensureCctalkConfigSections();"
         "try{const r=await fetch('/api/config');if(!r.ok)throw new Error('HTTP '+r.status);"
         "const c=await r.json();"
         "document.getElementById('dev_name').value=c.device_name || '';"
@@ -780,6 +816,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('rs232').checked=c.sensors.rs232_enabled;"
         "document.getElementById('rs485').checked=c.sensors.rs485_enabled;"
         "document.getElementById('mdb').checked=c.sensors.mdb_enabled;"
+        "document.getElementById('cctalk').checked=(typeof c.sensors.cctalk_enabled==='undefined')?true:!!c.sensors.cctalk_enabled;"
         "document.getElementById('eeprom').checked=(typeof c.sensors.eeprom_enabled==='undefined')?true:!!c.sensors.eeprom_enabled;"
         "document.getElementById('sd_card').checked=c.sensors.sd_card_enabled;"
         "document.getElementById('pwm1').checked=c.sensors.pwm1_enabled;"
@@ -789,7 +826,12 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "    document.getElementById('scanner_vid').value = c.scanner.vid ? ('0x' + c.scanner.vid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
         "    document.getElementById('scanner_pid').value = c.scanner.pid ? ('0x' + c.scanner.pid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
         "    document.getElementById('scanner_dual_pid').value = c.scanner.dual_pid ? ('0x' + c.scanner.dual_pid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
+        "    document.getElementById('scanner_cooldown_ms').value = c.scanner.cooldown_ms ? c.scanner.cooldown_ms : 10000;"
+        "} else {"
+        "    document.getElementById('scanner_cooldown_ms').value = 10000;"
         "}"
+        "const languageTimeoutMs=(c.timeouts&&c.timeouts.language_return_ms)?parseInt(c.timeouts.language_return_ms,10):10000;"
+        "document.getElementById('timeout_language_return_s').value=Math.max(1,Math.min(600,Math.round(languageTimeoutMs/1000)));"
         "if (typeof c.display.enabled === 'undefined') { try { const s = await (await fetch('/status')).json(); document.getElementById('display_en').checked = s.config && s.config.display ? !!s.config.display.enabled : true; } catch(e) { document.getElementById('display_en').checked = true; } } else { document.getElementById('display_en').checked = c.display.enabled; }" 
         "document.getElementById('lcd_bright').value=c.display.lcd_brightness;"
         "document.getElementById('bright_val').innerText=c.display.lcd_brightness;"
@@ -811,6 +853,13 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('mdb_baud').value=c.mdb_serial.baud;"
         "document.getElementById('mdb_rx').value=c.mdb_serial.rx_buf;"
         "document.getElementById('mdb_tx').value=c.mdb_serial.tx_buf;"
+        "const cct=(c.cctalk_serial&&typeof c.cctalk_serial==='object')?c.cctalk_serial:{baud:9600,data_bits:8,parity:0,stop_bits:1,rx_buf:256,tx_buf:256};"
+        "document.getElementById('cctalk_baud').value=(typeof cct.baud==='undefined')?9600:cct.baud;"
+        "document.getElementById('cctalk_bits').value=(typeof cct.data_bits==='undefined')?8:cct.data_bits;"
+        "document.getElementById('cctalk_par').value=(typeof cct.parity==='undefined')?0:cct.parity;"
+        "document.getElementById('cctalk_stop').value=(typeof cct.stop_bits==='undefined')?1:cct.stop_bits;"
+        "document.getElementById('cctalk_rx').value=(typeof cct.rx_buf==='undefined')?256:cct.rx_buf;"
+        "document.getElementById('cctalk_tx').value=(typeof cct.tx_buf==='undefined')?256:cct.tx_buf;"
         "document.getElementById('g33_mode').value=c.gpios.gpio33.mode;"
         "document.getElementById('g33_state').checked=c.gpios.gpio33.state;"
         "if(c.remote_log.use_broadcast){const ipEl=document.getElementById('remote_log_ip'); if(ipEl){ipEl.disabled=true; ipEl.value='255.255.255.255';}}"
@@ -843,8 +892,9 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "ntp:{server1:document.getElementById('ntp_server1').value,server2:document.getElementById('ntp_server2').value,timezone_offset:parseInt(document.getElementById('ntp_timezone_offset').value)},"
         "server:{enabled:document.getElementById('server_en').checked,url:document.getElementById('server_url').value,serial:document.getElementById('server_serial').value,password:document.getElementById('server_password').value},"
         "remote_log:{server_port:parseInt(document.getElementById('remote_log_port').value),use_broadcast:document.getElementById('remote_log_broadcast').checked,write_to_sd:document.getElementById('remote_log_sd').checked},"
-        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,eeprom_enabled:document.getElementById('eeprom').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
-"scanner:{enabled:document.getElementById('scanner_en').checked,vid:document.getElementById('scanner_vid').value,pid:document.getElementById('scanner_pid').value,dual_pid:document.getElementById('scanner_dual_pid').value},"
+        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,cctalk_enabled:document.getElementById('cctalk').checked,eeprom_enabled:document.getElementById('eeprom').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
+"scanner:{enabled:document.getElementById('scanner_en').checked,vid:document.getElementById('scanner_vid').value,pid:document.getElementById('scanner_pid').value,dual_pid:document.getElementById('scanner_dual_pid').value,cooldown_ms:parseInt(document.getElementById('scanner_cooldown_ms').value)||10000},"
+        "timeouts:{language_return_ms:(Math.max(1,Math.min(600,parseInt(document.getElementById('timeout_language_return_s').value)||10))*1000)},"
         "display:{enabled:document.getElementById('display_en').checked,lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
         "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
         "rs485:{baud:parseInt(document.getElementById('rs485_baud').value),data_bits:parseInt(document.getElementById('rs485_bits').value),parity:parseInt(document.getElementById('rs485_par').value),stop_bits:parseInt(document.getElementById('rs485_stop').value),rx_buf:parseInt(document.getElementById('rs485_rx').value),tx_buf:parseInt(document.getElementById('rs485_tx').value)},"
@@ -920,6 +970,15 @@ esp_err_t config_page_handler(httpd_req_t *req)
 }
 
 // Handler API GET /api/debug/usb/enumerate
+
+/**
+ * @brief Abilita l'enumerazione USB.
+ *
+ * Questa funzione abilita l'enumerazione USB tramite la richiesta HTTP fornita.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_debug_usb_enumerate(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /api/debug/usb/enumerate");
@@ -977,6 +1036,15 @@ esp_err_t api_debug_usb_enumerate(httpd_req_t *req)
 }
 
 // Sperimentali: POST /api/debug/usb/restart -> forces bsp_usb_host_stop + bsp_usb_host_start
+
+/**
+ * @brief Riavvia il dispositivo USB.
+ *
+ * Questa funzione riavvia il dispositivo USB in risposta a una richiesta HTTP.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_debug_usb_restart(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST /api/debug/usb/restart (Sperimentali)");
@@ -1001,6 +1069,15 @@ esp_err_t api_debug_usb_restart(httpd_req_t *req)
 }
 
 // Handler API GET /api/config
+
+/**
+ * @brief Ottiene la configurazione dell'API.
+ *
+ * Questa funzione viene utilizzata per recuperare la configurazione corrente dell'API.
+ *
+ * @param [in] req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_config_get(httpd_req_t *req)
 {
     ESP_LOGD(TAG, "[C] GET /api/config");
@@ -1051,6 +1128,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "cctalk_enabled", cfg->sensors.cctalk_enabled);
     cJSON_AddBoolToObject(sensors, "eeprom_enabled", cfg->sensors.eeprom_enabled);
     cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
     cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
@@ -1091,6 +1169,17 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(mdb_s, "tx_buf", cfg->mdb_serial.tx_buf_size);
     cJSON_AddItemToObject(root, "mdb_serial", mdb_s);
 
+    // CCTalk Serial (configurazione fissa attuale)
+    cJSON *cctalk_s = cJSON_CreateObject();
+    cJSON_AddNumberToObject(cctalk_s, "baud", WEB_UI_CCTALK_BAUD);
+    cJSON_AddNumberToObject(cctalk_s, "data_bits", WEB_UI_CCTALK_DATA_BITS);
+    cJSON_AddNumberToObject(cctalk_s, "parity", WEB_UI_CCTALK_PARITY);
+    cJSON_AddNumberToObject(cctalk_s, "stop_bits", WEB_UI_CCTALK_STOP_BITS);
+    cJSON_AddNumberToObject(cctalk_s, "rx_buf", WEB_UI_CCTALK_RX_BUF);
+    cJSON_AddNumberToObject(cctalk_s, "tx_buf", WEB_UI_CCTALK_TX_BUF);
+    cJSON_AddBoolToObject(cctalk_s, "read_only", true);
+    cJSON_AddItemToObject(root, "cctalk_serial", cctalk_s);
+
     // GPIOs
     cJSON *gpios = cJSON_CreateObject();
     cJSON *g33 = cJSON_CreateObject();
@@ -1112,7 +1201,13 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(scanner, "vid", cfg->scanner.vid);
     cJSON_AddNumberToObject(scanner, "pid", cfg->scanner.pid);
     cJSON_AddNumberToObject(scanner, "dual_pid", cfg->scanner.dual_pid);
+    cJSON_AddNumberToObject(scanner, "cooldown_ms", cfg->scanner.cooldown_ms);
     cJSON_AddItemToObject(root, "scanner", scanner);
+
+    // Timeout applicativi
+    cJSON *timeouts = cJSON_CreateObject();
+    cJSON_AddNumberToObject(timeouts, "language_return_ms", cfg->timeouts.language_return_ms);
+    cJSON_AddItemToObject(root, "timeouts", timeouts);
 
     // UI multilingua
     cJSON *ui = cJSON_CreateObject();
@@ -1131,6 +1226,15 @@ esp_err_t api_config_get(httpd_req_t *req)
 }
 
 // Handler API GET /api/ui/texts
+
+/**
+ * @brief Ottiene i testi dell'interfaccia utente.
+ *
+ * Questa funzione gestisce la richiesta per ottenere i testi dell'interfaccia utente.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_ui_texts_get(httpd_req_t *req)
 {
     device_config_t *cfg = device_config_get();
@@ -1186,6 +1290,13 @@ esp_err_t api_ui_texts_get(httpd_req_t *req)
 }
 
 // Handler API GET /api/ui/languages
+
+/**
+ * @brief Ottiene la lista delle lingue supportate dall'interfaccia utente.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_ui_languages_get(httpd_req_t *req)
 {
     cJSON *root = cJSON_CreateObject();
@@ -1259,6 +1370,15 @@ esp_err_t api_ui_languages_get(httpd_req_t *req)
 }
 
 // Handler API POST /api/config/backup
+
+/**
+ * @brief Configura il backup dell'API.
+ *
+ * Questa funzione configura il backup dell'API utilizzando la richiesta HTTP fornita.
+ *
+ * @param [in] req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_config_backup(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST /api/config/backup");
@@ -1300,6 +1420,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "cctalk_enabled", cfg->sensors.cctalk_enabled);
     cJSON_AddBoolToObject(sensors, "eeprom_enabled", cfg->sensors.eeprom_enabled);
     cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
     cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
@@ -1340,6 +1461,17 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddNumberToObject(mdb_s, "tx_buf", cfg->mdb_serial.tx_buf_size);
     cJSON_AddItemToObject(root, "mdb_serial", mdb_s);
 
+    // CCTalk Serial (configurazione fissa attuale)
+    cJSON *cctalk_s = cJSON_CreateObject();
+    cJSON_AddNumberToObject(cctalk_s, "baud", WEB_UI_CCTALK_BAUD);
+    cJSON_AddNumberToObject(cctalk_s, "data_bits", WEB_UI_CCTALK_DATA_BITS);
+    cJSON_AddNumberToObject(cctalk_s, "parity", WEB_UI_CCTALK_PARITY);
+    cJSON_AddNumberToObject(cctalk_s, "stop_bits", WEB_UI_CCTALK_STOP_BITS);
+    cJSON_AddNumberToObject(cctalk_s, "rx_buf", WEB_UI_CCTALK_RX_BUF);
+    cJSON_AddNumberToObject(cctalk_s, "tx_buf", WEB_UI_CCTALK_TX_BUF);
+    cJSON_AddBoolToObject(cctalk_s, "read_only", true);
+    cJSON_AddItemToObject(root, "cctalk_serial", cctalk_s);
+
     // UI multilingua
     cJSON *ui = cJSON_CreateObject();
     cJSON_AddStringToObject(ui, "user_language", cfg->ui.user_language);
@@ -1366,6 +1498,16 @@ esp_err_t api_config_backup(httpd_req_t *req)
 }
 
 // Handler API POST /api/config/save
+
+/**
+ * @brief Salva la configurazione dell'API.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Errore generato dalla funzione.
+ * 
+ * @note La funzione controlla se la funzionalità WEB_UI_FEATURE_ENDPOINT_PROGRAMS è abilitata.
+ * Se non è abilitata, la funzione restituisce un errore.
+ */
 esp_err_t api_config_save(httpd_req_t *req)
 {
     if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
@@ -1454,6 +1596,7 @@ esp_err_t api_config_save(httpd_req_t *req)
         cfg->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled"));
         cfg->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled"));
         cfg->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
+        cfg->sensors.cctalk_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "cctalk_enabled"));
         cJSON *eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom_enabled");
         if (eeprom_enabled) {
             cfg->sensors.eeprom_enabled = cJSON_IsTrue(eeprom_enabled);
@@ -1570,7 +1713,32 @@ esp_err_t api_config_save(httpd_req_t *req)
             if (cJSON_IsNumber(sdual)) cfg->scanner.dual_pid = (uint16_t)sdual->valueint;
             else if (cJSON_IsString(sdual) && sdual->valuestring) cfg->scanner.dual_pid = (uint16_t)strtoul(sdual->valuestring, NULL, 0);
         }
+        cJSON *scool = cJSON_GetObjectItem(scanner_obj, "cooldown_ms");
+        if (scool) {
+            if (cJSON_IsNumber(scool) && scool->valueint > 0) {
+                cfg->scanner.cooldown_ms = (uint32_t)scool->valueint;
+            } else if (cJSON_IsString(scool) && scool->valuestring) {
+                cfg->scanner.cooldown_ms = (uint32_t)strtoul(scool->valuestring, NULL, 0);
+            }
+            if (cfg->scanner.cooldown_ms < 500) cfg->scanner.cooldown_ms = 500;
+            if (cfg->scanner.cooldown_ms > 60000) cfg->scanner.cooldown_ms = 60000;
+        }
     }
+
+    // Timeout applicativi
+    cJSON *timeouts_obj = cJSON_GetObjectItem(root, "timeouts");
+    if (timeouts_obj) {
+        cJSON *language_return = cJSON_GetObjectItem(timeouts_obj, "language_return_ms");
+        if (language_return) {
+            if (cJSON_IsNumber(language_return) && language_return->valueint > 0) {
+                cfg->timeouts.language_return_ms = (uint32_t)language_return->valueint;
+            } else if (cJSON_IsString(language_return) && language_return->valuestring) {
+                cfg->timeouts.language_return_ms = (uint32_t)strtoul(language_return->valuestring, NULL, 0);
+            }
+        }
+    }
+    if (cfg->timeouts.language_return_ms < 1000U) cfg->timeouts.language_return_ms = 1000U;
+    if (cfg->timeouts.language_return_ms > 600000U) cfg->timeouts.language_return_ms = 600000U;
 
     // UI multilingua
     cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
@@ -1650,6 +1818,15 @@ esp_err_t api_config_save(httpd_req_t *req)
 
 
 // Handler API GET /api/tasks
+
+/**
+ * @brief Ottiene le informazioni sulle attività.
+ *
+ * Questa funzione gestisce la richiesta HTTP per ottenere le informazioni sulle attività.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_tasks_get(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] GET /api/tasks (Lettura da SPIFFS)");
@@ -1687,6 +1864,13 @@ esp_err_t api_tasks_get(httpd_req_t *req)
 }
 
 // Handler API POST /api/tasks/save
+
+/**
+ * @brief Salva le informazioni delle attività in un file.
+ *
+ * @param [in] req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_tasks_save(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST /api/tasks/save");
@@ -1811,6 +1995,13 @@ esp_err_t api_tasks_save(httpd_req_t *req)
 }
 
 // Handler API POST /api/tasks/apply
+
+/**
+ * @brief Applica le impostazioni alle attività.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t api_tasks_apply(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "[C] POST /api/tasks/apply");
@@ -1831,6 +2022,14 @@ esp_err_t api_tasks_apply(httpd_req_t *req)
 
 
 // Handler API POST /api/config/reset
+
+/**
+ * @brief Resetta la configurazione dell'API.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ * @note La funzione verifica se la funzionalità WEB_UI_FEATURE_ENDPOINT_PROGRAMS è abilitata.
+ */
 esp_err_t api_config_reset(httpd_req_t *req)
 {
     if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
@@ -1847,6 +2046,14 @@ esp_err_t api_config_reset(httpd_req_t *req)
 }
 
 // Handler API POST /api/ntp/sync
+
+/**
+ * @brief Sincronizza l'orologio del dispositivo con il server NTP.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ * @note La funzione verifica se la funzionalità WEB_UI_FEATURE_ENDPOINT_PROGRAMS è abilitata prima di procedere con la sincronizzazione NTP.
+ */
 esp_err_t api_ntp_sync(httpd_req_t *req)
 {
     if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
@@ -1868,6 +2075,17 @@ esp_err_t api_ntp_sync(httpd_req_t *req)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Gestisce la richiesta di crash di debug.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ * 
+ * @note Questa funzione viene chiamata quando viene ricevuta una richiesta di crash di debug.
+ *       Controlla se la funzionalità di endpoint dei programmi è abilitata.
+ *       Se la funzionalità non è abilitata, restituisce un errore.
+ */
 esp_err_t api_debug_crash(httpd_req_t *req)
 {
     if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
@@ -1886,6 +2104,15 @@ esp_err_t api_debug_crash(httpd_req_t *req)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ripristina la configurazione di debug.
+ *
+ * Questa funzione ripristina la configurazione di debug utilizzando i parametri forniti nella richiesta HTTP.
+ *
+ * @param req Puntatore alla richiesta HTTP contenente i parametri di configurazione di debug.
+ * @return esp_err_t Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t api_debug_restore(httpd_req_t *req)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -1973,6 +2200,13 @@ esp_err_t api_debug_restore(httpd_req_t *req)
     return httpd_resp_send(req, resp, -1);
 }
 
+
+/**
+ * @brief Promuove un dispositivo alla modalità di produzione utilizzando le informazioni fornite nel corpo della richiesta HTTP.
+ *
+ * @param req Puntatore alla struttura httpd_req_t che contiene le informazioni della richiesta HTTP.
+ * @return esp_err_t Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t api_debug_promote_factory(httpd_req_t *req)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();

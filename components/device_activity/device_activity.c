@@ -13,6 +13,16 @@ static size_t s_count = 0;
 
 static const char *ACTIVITY_FILE = "/spiffs/activity.json";
 
+
+/**
+ * @brief Crea la tabella di default.
+ *
+ * Questa funzione crea la tabella di default utilizzata per memorizzare i dati.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione fallita.
+ */
 static esp_err_t create_default_table(void)
 {
     // create a small default JSON with few entries
@@ -44,6 +54,15 @@ static esp_err_t create_default_table(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Carica una tabella da un file.
+ *
+ * Questa funzione legge i dati di una tabella da un file e li carica in memoria.
+ *
+ * @param [in] file_path Percorso del file da cui caricare la tabella.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 static esp_err_t load_table_from_file(void)
 {
     FILE *f = fopen(ACTIVITY_FILE, "r");
@@ -101,6 +120,16 @@ static esp_err_t load_table_from_file(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza la tabella di attività del dispositivo.
+ * 
+ * Questa funzione inizializza la tabella di attività del dispositivo. Se la tabella è già stata inizializzata, la funzione non ha alcun effetto.
+ * 
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t device_activity_init(void)
 {
     if (s_table) {

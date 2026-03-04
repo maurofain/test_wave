@@ -6,6 +6,16 @@
 
 static const char *TAG = "PWM_TEST";
 
+
+/** 
+ * @brief Gestisce il task di sweep PWM.
+ * 
+ * Questa funzione esegue un sweep PWM sui canali specificati.
+ * 
+ * @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
+ * 
+ * @return Nessun valore di ritorno.
+ */
 static void pwm_sweep_task(void *arg) {
     int channel = (int)arg;
     ledc_channel_t ch = (channel == 1) ? LEDC_CHANNEL_0 : LEDC_CHANNEL_1;
@@ -23,6 +33,13 @@ static void pwm_sweep_task(void *arg) {
 
 static TaskHandle_t s_pwm1_h = NULL, s_pwm2_h = NULL;
 
+
+/**
+ * @brief Avvia il test del PWM.
+ * 
+ * @param channel [in] Il canale del PWM da utilizzare.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t pwm_test_start(int channel) {
     if (channel == 1) xTaskCreate(pwm_sweep_task, "p1test",
             /* lots of delay loops but also logging; allocate more to be safe */
@@ -32,6 +49,13 @@ esp_err_t pwm_test_start(int channel) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Arresta il PWM sul canale specificato.
+ * 
+ * @param [in] channel Numero del canale PWM da arrestare. Il canale 1 è gestito da s_pwm1_h.
+ * @return esp_err_t Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t pwm_test_stop(int channel) {
     if (channel == 1 && s_pwm1_h) { vTaskDelete(s_pwm1_h); s_pwm1_h = NULL; }
     if (channel == 2 && s_pwm2_h) { vTaskDelete(s_pwm2_h); s_pwm2_h = NULL; }
@@ -40,6 +64,15 @@ esp_err_t pwm_test_stop(int channel) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Imposta i parametri del PWM per un canale specifico.
+ * 
+ * @param [in] channel Numero del canale PWM da configurare.
+ * @param [in] freq Frequenza del segnale PWM in Hertz.
+ * @param [in] duty_percent Percentuale del ciclo di impulso del segnale PWM.
+ * @return esp_err_t Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t pwm_test_set_param(int channel, uint32_t freq, uint32_t duty_percent) {
     // Ferma i test automatici se attivi
     pwm_test_stop(channel);

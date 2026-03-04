@@ -13,6 +13,13 @@ static const char *TAG = "ERROR_LOG";
 static FILE *s_error_file = NULL;
 static bool s_sd_available = false; // indica se la SD è montata con successo
 
+
+/**
+ * @brief Svuota il buffer del file di log.
+ *
+ * @param [in/out] f Puntatore al file di log da svuotare.
+ * @return Nessun valore di ritorno.
+ */
 static void flush_log_file(FILE *f)
 {
     sd_card_fflush(f);
@@ -20,6 +27,14 @@ static void flush_log_file(FILE *f)
 
 
 // generatore nome file basato su timestamp (UTC/boot se non disponibile)
+
+/**
+ * @brief Genera un nome di file nella stringa fornita.
+ *
+ * @param [out] buf Puntatore alla stringa in cui memorizzare il nome del file.
+ * @param len Lunghezza massima della stringa di destinazione.
+ * @return void
+ */
 static void generate_file_name(char *buf, size_t len)
 {
     time_t now = time(NULL);
@@ -38,6 +53,18 @@ static void generate_file_name(char *buf, size_t len)
              tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
+
+/**
+ * @brief Wrapper per la funzione vprintf.
+ *
+ * Questa funzione è un wrapper per la funzione standard vprintf, permettendo di
+ * personalizzare o estendere il suo comportamento senza modificare il codice
+ * originale.
+ *
+ * @param fmt La stringa di formato, come per la funzione vprintf.
+ * @param args La lista di argomenti variabili, come per la funzione vprintf.
+ * @return Il numero di caratteri stampati, o un valore negativo in caso di errore.
+ */
 static int vprintf_wrapper(const char *fmt, va_list args)
 {
     char msg[1024];
@@ -81,6 +108,16 @@ static int vprintf_wrapper(const char *fmt, va_list args)
     return res;
 }
 
+
+/**
+ * @brief Inizializza il sistema di logging degli errori.
+ *
+ * Questa funzione inizializza il sistema di logging degli errori, preparando
+ * l'ambiente per la registrazione di eventuali errori che potrebbero verificarsi
+ * durante l'esecuzione del programma.
+ *
+ * @return Niente.
+ */
 void error_log_init(void)
 {
 #if defined(DNA_ERROR_DUMP) && (DNA_ERROR_DUMP == 1)
@@ -101,6 +138,13 @@ void error_log_init(void)
     ESP_LOGI(TAG, "Modulo error_log inizializzato");
 }
 
+
+/**
+ * @brief Scrive un messaggio di errore nel registro degli errori.
+ *
+ * @param [in] msg Il messaggio di errore da scrivere nel registro.
+ * @return void Non restituisce alcun valore.
+ */
 void error_log_write_msg(const char *msg)
 {
     if (!msg) return;

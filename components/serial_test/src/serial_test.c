@@ -25,10 +25,27 @@ static int  s_ptr_cctalk = 0;
 
 static SemaphoreHandle_t s_monitor_mux = NULL;
 
+
+/** @brief Inizializza il test seriale.
+ *  
+ *  Questa funzione inizializza le impostazioni necessarie per eseguire i test seriale.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void serial_test_init(void) {
     if (!s_monitor_mux) s_monitor_mux = xSemaphoreCreateMutex();
 }
 
+
+/**
+ * @brief Aggiunge i dati al monitor.
+ * 
+ * @param [in] port Numero di porta su cui inviare i dati.
+ * @param [in] data Puntatore ai dati da inviare.
+ * @param [in] len Lunghezza dei dati da inviare.
+ * @param [in] prefix Prefisso da aggiungere ai dati.
+ * @return void Non restituisce alcun valore.
+ */
 static void add_to_monitor(int port, const uint8_t *data, size_t len, const char *prefix) {
     if (!s_monitor_mux) serial_test_init();
     if (!s_monitor_mux) return;
@@ -56,6 +73,16 @@ static void add_to_monitor(int port, const uint8_t *data, size_t len, const char
 }
 
 // Pubblica una voce di monitor per CCtalk (o etichetta custom)
+
+/**
+ * @brief Inserisce una nuova voce di monitoraggio nella coda di test seriale.
+ *
+ * @param [in] label Etichetta associata alla voce di monitoraggio.
+ * @param [in] data Dati da inserire nella voce di monitoraggio.
+ * @param [in] len Lunghezza dei dati da inserire.
+ *
+ * @return Niente.
+ */
 void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size_t len) {
     if (!s_monitor_mux) serial_test_init();
     if (!s_monitor_mux) return;
@@ -78,6 +105,15 @@ const char* serial_test_get_cctalk_monitor(void) {
     return s_monitor_cctalk;
 }
 
+
+/**
+ * @brief Cancella il monitor CCTalk.
+ * 
+ * Questa funzione si occupa di svuotare il buffer di monitor CCTalk, preparando il sistema per una nuova sessione di comunicazione.
+ * 
+ * @param Nessun parametro.
+ * @return Nessun valore di ritorno.
+ */
 void serial_test_clear_cctalk_monitor(void) {
     if (!s_monitor_mux) serial_test_init();
     if (!s_monitor_mux) return;
@@ -88,6 +124,14 @@ void serial_test_clear_cctalk_monitor(void) {
     }
 }
 
+
+/**
+ * @brief Analizza una stringa di escape e la serializza in un buffer di destinazione.
+ * 
+ * @param [in] src Puntatore alla stringa di escape da analizzare.
+ * @param [out] dest Puntatore al buffer dove verrà serializzata la stringa di escape.
+ * @return size_t Numero di byte serializzati nel buffer di destinazione.
+ */
 size_t serial_test_parse_escape(const char *src, uint8_t *dest) {
     size_t d_idx = 0;
     for (size_t s_idx = 0; src[s_idx] != '\0'; ) {
@@ -106,6 +150,16 @@ size_t serial_test_parse_escape(const char *src, uint8_t *dest) {
     return d_idx;
 }
 
+
+/**
+ * @brief Invia dati tramite UART.
+ * 
+ * Questa funzione invia una stringa di dati tramite la porta UART specificata.
+ * 
+ * @param [in] port Numero della porta UART su cui inviare i dati.
+ * @param [in] data_str Puntatore alla stringa di dati da inviare.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 esp_err_t serial_test_send_uart(int port, const char *data_str) {
     uint8_t buf[256];
     size_t len = serial_test_parse_escape(data_str, buf);
@@ -117,6 +171,14 @@ esp_err_t serial_test_send_uart(int port, const char *data_str) {
     return ESP_FAIL;
 }
 
+
+/**
+ * @brief Invia una stringa in formato esadecimale tramite UART.
+ * 
+ * @param [in] port Numero del porto UART su cui inviare i dati.
+ * @param [in] hex_str Puntatore alla stringa in formato esadecimale da inviare.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 esp_err_t serial_test_send_hex_uart(int port, const char *hex_str) {
     if (!hex_str) return ESP_ERR_INVALID_ARG;
 
@@ -159,6 +221,16 @@ esp_err_t serial_test_send_hex_uart(int port, const char *hex_str) {
     return ESP_FAIL;
 }
 
+
+/**
+ * @brief Legge dati dalla UART specificata.
+ * 
+ * @param [in] port Numero del porto UART da cui leggere i dati.
+ * @param [out] out Puntatore al buffer dove memorizzare i dati letti.
+ * @param [in] max_len Lunghezza massima del buffer di destinazione.
+ * @param [out] out_len Puntatore alla variabile dove memorizzare la lunghezza effettiva dei dati letti.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t serial_test_read_uart(int port, uint8_t *out, size_t max_len, size_t *out_len) {
     int len = uart_read_bytes(port, out, max_len, pdMS_TO_TICKS(50));
     if (len > 0) {
@@ -176,6 +248,17 @@ const char* serial_test_get_monitor(int port) {
     return "";
 }
 
+
+/**
+ * @brief Cancella il monitor seriale per la porta specificata.
+ * 
+ * Questa funzione si occupa di svuotare il buffer di ricezione del monitor seriale
+ * associato alla porta specificata. Questo è utile per preparare la porta per
+ * nuove comunicazioni.
+ * 
+ * @param port [in] Numero della porta seriale da cui svuotare il monitor.
+ * @return void Non restituisce alcun valore.
+ */
 void serial_test_clear_monitor(int port) {
     if (!s_monitor_mux) serial_test_init();
     if (!s_monitor_mux) return;

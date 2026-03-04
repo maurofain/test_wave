@@ -86,18 +86,46 @@ int rs232_send(const uint8_t *data, size_t len) {
  */
 #if defined(DNA_RS232) && (DNA_RS232 == 1)
 
+
+/**
+ * @brief Inizializza la comunicazione RS232.
+ *
+ * Questa funzione inizializza la comunicazione RS232, configurando i parametri di comunicazione
+ * come la velocità di trasmissione, il numero di dati, i bit di parità e i bit di stop.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: Inizializzazione avvenuta con successo.
+ *         - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t rs232_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] rs232_init: porta RS232 simulata");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Riceve dati tramite interfaccia RS-232.
+ *
+ * @param [out] data Puntatore al buffer dove memorizzare i dati ricevuti.
+ * @param max_len Lunghezza massima del buffer.
+ * @param timeout_ms Timeout in millisecondi per l'attesa della ricezione.
+ * @return Numero di byte ricevuti, o -1 in caso di errore.
+ */
 int rs232_receive(uint8_t *data, size_t max_len, uint32_t timeout_ms)
 {
     (void)data; (void)max_len; (void)timeout_ms;
     return 0; /* nessun dato disponibile */
 }
 
+
+/**
+ * @brief Invia dati tramite interfaccia RS-232.
+ *
+ * @param [in] data Puntatore ai dati da inviare.
+ * @param [in] len Lunghezza dei dati da inviare.
+ * @return int Numero di byte inviati, o un valore negativo in caso di errore.
+ */
 int rs232_send(const uint8_t *data, size_t len)
 {
     ESP_LOGI(TAG, "[C] [MOCK] rs232_send: %zu byte ignorati", len);

@@ -41,6 +41,15 @@
 
 static volatile bool s_sd_init_in_progress = false;
 
+
+/**
+ * @brief Inizializza la task del worker.
+ *
+ * Questa funzione inizializza la task del worker, preparandola per l'esecuzione.
+ *
+ * @param pv Puntatore a dati di input necessari per l'inizializzazione.
+ * @return Nessun valore di ritorno.
+ */
 static void sd_init_worker_task(void *pv)
 {
     (void)pv;

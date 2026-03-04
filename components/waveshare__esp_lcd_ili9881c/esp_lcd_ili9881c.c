@@ -66,6 +66,15 @@ static esp_err_t panel_ili9881c_swap_xy(esp_lcd_panel_t *panel, bool swap_x_y);
 static esp_err_t panel_ili9881c_disp_on_off(esp_lcd_panel_t *panel, bool on_off);
 static esp_err_t panel_ili9881c_sleep(esp_lcd_panel_t *panel, bool sleep);
 
+
+/**
+ * Crea un nuovo pannello LCD utilizzando l'interfaccia ILI9881C.
+ *
+ * @param io Handle dell'interfaccia di comunicazione con il pannello.
+ * @param panel_dev_config Configurazione del dispositivo del pannello.
+ * @param ret_panel Puntatore al handle del pannello creato.
+ * @return Errore generato dalla funzione.
+ */
 esp_err_t esp_lcd_new_panel_ili9881c(const esp_lcd_panel_io_handle_t io, const esp_lcd_panel_dev_config_t *panel_dev_config,
                                      esp_lcd_panel_handle_t *ret_panel)
 {
@@ -392,6 +401,15 @@ static const ili9881c_lcd_init_cmd_t vendor_specific_init_default[] = {
     //============ Gamma END===========
 };
 
+
+/**
+ * @brief Elimina un pannello ILI9881C.
+ *
+ * Questa funzione elimina un pannello ILI9881C specificato.
+ *
+ * @param [in] panel Puntatore al pannello ILI9881C da eliminare.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t panel_ili9881c_del(esp_lcd_panel_t *panel)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;
@@ -408,6 +426,15 @@ static esp_err_t panel_ili9881c_del(esp_lcd_panel_t *panel)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inizializza il pannello ILI9881C.
+ *
+ * Questa funzione inizializza il pannello ILI9881C utilizzando le impostazioni specifiche del pannello.
+ *
+ * @param [in] panel Puntatore al pannello LCD da inizializzare.
+ * @return esp_err_t Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 static esp_err_t panel_ili9881c_init(esp_lcd_panel_t *panel)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;
@@ -527,6 +554,15 @@ static esp_err_t panel_ili9881c_init(esp_lcd_panel_t *panel)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Resetta il pannello ILI9881C.
+ *
+ * Questa funzione invia un comando di reset al pannello ILI9881C.
+ *
+ * @param [in] panel Puntatore al pannello LCD.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t panel_ili9881c_reset(esp_lcd_panel_t *panel)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;
@@ -549,6 +585,14 @@ static esp_err_t panel_ili9881c_reset(esp_lcd_panel_t *panel)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inverte il colore dei dati sul pannello ILI9881C.
+ *
+ * @param [in] panel Puntatore al pannello LCD.
+ * @param [in] invert_color_data Flag booleano per attivare o disattivare l'inversione dei colori.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t panel_ili9881c_invert_color(esp_lcd_panel_t *panel, bool invert_color_data)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;
@@ -570,6 +614,15 @@ static esp_err_t panel_ili9881c_invert_color(esp_lcd_panel_t *panel, bool invert
     return ESP_OK;
 }
 
+
+/**
+ * @brief Inverte l'orientamento del display del pannello ILI9881C.
+ *
+ * @param panel Puntatore al pannello LCD.
+ * @param mirror_x Se true, attiva l'inversione orizzontale.
+ * @param mirror_y Se true, attiva l'inversione verticale.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 static esp_err_t panel_ili9881c_mirror(esp_lcd_panel_t *panel, bool mirror_x, bool mirror_y)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;
@@ -602,6 +655,14 @@ static esp_err_t panel_ili9881c_mirror(esp_lcd_panel_t *panel, bool mirror_x, bo
     return ESP_OK;
 }
 
+
+/**
+ * @brief Scambia gli assi X e Y del pannello ILI9881C.
+ *
+ * @param [in] panel Puntatore al pannello LCD.
+ * @param [in] swap_x_y Flag booleano per attivare o disattivare lo scambio degli assi X e Y.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 static esp_err_t panel_ili9881c_swap_xy(esp_lcd_panel_t *panel, bool swap_x_y)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;
@@ -626,6 +687,14 @@ static esp_err_t panel_ili9881c_swap_xy(esp_lcd_panel_t *panel, bool swap_x_y)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Attiva o disattiva il display del pannello ILI9881C.
+ *
+ * @param [in] panel Puntatore al pannello LCD.
+ * @param [in] on_off Flag booleano per attivare (true) o disattivare (false) il display.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t panel_ili9881c_disp_on_off(esp_lcd_panel_t *panel, bool on_off)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;
@@ -644,6 +713,17 @@ static esp_err_t panel_ili9881c_disp_on_off(esp_lcd_panel_t *panel, bool on_off)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Sospende o risveglia il display ILI9881C.
+ *
+ * Questa funzione permette di sospendere o risvegliare il display ILI9881C
+ * collegato al pannello LCD.
+ *
+ * @param [in] panel Puntatore al pannello LCD.
+ * @param [in] sleep Flag booleano che indica se sospendere (true) o risvegliare (false) il display.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t panel_ili9881c_sleep(esp_lcd_panel_t *panel, bool sleep)
 {
     ili9881c_panel_t *ili9881c = (ili9881c_panel_t *)panel->user_data;

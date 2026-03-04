@@ -20,7 +20,7 @@ static const char *TAG = "APP";
  * 1 = reset posticipato dopo finestra di stabilità
  */
 #define BOOT_COUNTER_RESET_DELAYED 1
-#define BOOT_COUNTER_STABLE_WINDOW_MS (30000)
+#define BOOT_COUNTER_STABLE_WINDOW_MS (10000)
 
 /*
  * Debug: forza un crash subito al boot per validare il flusso crash-log/boot-guard.
@@ -236,6 +236,14 @@ void app_main(void)
             remaining_ms -= this_step;
         }
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' completata (%d ms)", BOOT_COUNTER_STABLE_WINDOW_MS);
+    }
+
+    device_config_t *cfg = device_config_get();
+    if (cfg && cfg->display.enabled) {
+        lvgl_panel_show_language_select();
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: pagina selezione lingua attivata");
+    } else {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto pagina selezione lingua");
     }
 
     esp_err_t boot_done_ret = init_mark_boot_completed();

@@ -16,6 +16,17 @@
 
 static int cctalk_uart_num = 1;
 
+
+/** 
+ * @brief Inizializza la comunicazione CCTalk su una specifica UART.
+ * 
+ * @param [in] uart_num Numero del canale UART da utilizzare per la comunicazione CCTalk.
+ * @param [in] tx_pin Numero del pin TX da utilizzare per la comunicazione CCTalk.
+ * @param [in] rx_pin Numero del pin RX da utilizzare per la comunicazione CCTalk.
+ * @param [in] baudrate Velocità di comunicazione in baud per la UART.
+ * 
+ * @return Nessun valore di ritorno.
+ */
 void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate) {
     cctalk_uart_num = uart_num;
     uart_config_t uart_config = {
@@ -30,6 +41,16 @@ void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate) {
     uart_driver_install(uart_num, CCTALK_UART_BUF_SIZE, CCTALK_UART_BUF_SIZE, 0, NULL, 0);
 }
 
+
+/**
+ * @brief Invia dati tramite la protocollo CCTalk.
+ * 
+ * @param [in] dest_addr L'indirizzo destinatario del pacchetto.
+ * @param [in] data Un puntatore al buffer contenente i dati da inviare.
+ * @param [in] len La lunghezza del buffer dei dati.
+ * @return true Se l'invio è stato completato con successo.
+ * @return false Se l'invio è fallito.
+ */
 bool cctalk_send(uint8_t dest_addr, const uint8_t *data, uint8_t len) {
     uint8_t packet[260];
     packet[0] = dest_addr;
@@ -42,6 +63,17 @@ bool cctalk_send(uint8_t dest_addr, const uint8_t *data, uint8_t len) {
     return sent == to_send;
 }
 
+
+/**
+ * @brief Riceve dati tramite il protocollo CCTalk.
+ * 
+ * @param [in] src_addr Puntatore all'indirizzo sorgente.
+ * @param [out] data Puntatore al buffer dove memorizzare i dati ricevuti.
+ * @param [out] len Puntatore alla lunghezza dei dati ricevuti.
+ * @param timeout_ms Timeout in millisecondi per l'attesa della ricezione.
+ * @return true Se la ricezione ha avuto successo.
+ * @return false Se la ricezione ha fallito o è scaduto il timeout.
+ */
 bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t timeout_ms) {
     uint8_t buf[260];
     int idx = 0;
@@ -68,6 +100,16 @@ bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t tim
     return false;
 }
 
+
+/**
+ * @brief Calcola il checksum di un pacchetto CCTalk.
+ * 
+ * Questa funzione calcola il checksum di un pacchetto CCTalk utilizzando l'algoritmo specifico.
+ * 
+ * @param [in] packet Puntatore al pacchetto di dati per cui calcolare il checksum.
+ * @param [in] len Lunghezza del pacchetto di dati.
+ * @return uint8_t Il valore del checksum calcolato.
+ */
 uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len) {
     uint16_t sum = 0;
     for (int i = 0; i < len; ++i) sum += packet[i];
@@ -82,24 +124,66 @@ uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len) {
  */
 #if defined(DNA_CCTALK) && (DNA_CCTALK == 1)
 
+
+/**
+ * @brief Inizializza la comunicazione CCTalk.
+ *
+ * @param [in] uart_num Numero del canale UART da utilizzare.
+ * @param [in] tx_pin Numero del pin TX per la comunicazione UART.
+ * @param [in] rx_pin Numero del pin RX per la comunicazione UART.
+ * @param [in] baudrate Velocità di trasmissione in baud.
+ *
+ * @return Nessun valore di ritorno.
+ */
 void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate)
 {
     (void)uart_num; (void)tx_pin; (void)rx_pin; (void)baudrate;
     /* MOCK: nessuna inizializzazione hardware */
 }
 
+
+/**
+ * @brief Invia dati tramite protocollo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo del destinatario.
+ * @param [in] data Puntatore ai dati da inviare.
+ * @param [in] len Lunghezza dei dati da inviare.
+ * @return true Se l'invio è stato completato con successo.
+ * @return false Se l'invio è fallito.
+ */
 bool cctalk_send(uint8_t dest_addr, const uint8_t *data, uint8_t len)
 {
     (void)dest_addr; (void)data; (void)len;
     return true; /* simulazione invio riuscito */
 }
 
+
+/**
+ * @brief Riceve dati tramite la protocollo CCTalk.
+ *
+ * @param [in] src_addr Indirizzo sorgente del pacchetto ricevuto.
+ * @param [out] data Buffer per memorizzare i dati ricevuti.
+ * @param [out] len Puntatore alla lunghezza del buffer dei dati ricevuti.
+ * @param timeout_ms Timeout in millisecondi per l'attesa della ricezione.
+ *
+ * @return true se la ricezione è stata completata con successo, false altrimenti.
+ */
 bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t timeout_ms)
 {
     (void)src_addr; (void)data; (void)len; (void)timeout_ms;
     return false; /* nessun dato disponibile */
 }
 
+
+/**
+ * @brief Calcola il checksum di un pacchetto CCTalk.
+ *
+ * Questa funzione calcola il checksum di un pacchetto CCTalk utilizzando l'algoritmo specifico.
+ *
+ * @param [in] packet Puntatore al pacchetto di dati per cui calcolare il checksum.
+ * @param [in] len Lunghezza del pacchetto di dati.
+ * @return Il valore del checksum calcolato.
+ */
 uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len)
 {
     uint16_t sum = 0;

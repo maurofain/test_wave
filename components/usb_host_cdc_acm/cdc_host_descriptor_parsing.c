@@ -110,6 +110,24 @@ static cdc_func_array_t *cdc_parse_functional_descriptors(const usb_intf_desc_t 
     return func_desc;
 }
 
+
+/**
+ * @brief Analizza il descrittore dell'interfaccia CDC.
+ *
+ * Questa funzione analizza il descrittore dell'interfaccia CDC (Communication Device Class) 
+ * all'interno del descrittore del dispositivo USB e del descrittore di configurazione.
+ *
+ * @param [in] device_desc Puntatore al descrittore del dispositivo USB.
+ * @param [in] config_desc Puntatore al descrittore di configurazione USB.
+ * @param [in] intf_idx Indice dell'interfaccia CDC da analizzare.
+ * @param [out] info_ret Puntatore alla struttura in cui verranno memorizzate le informazioni analizzate.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_ERR_INVALID_ARG: Argomento non valido.
+ * - ESP_ERR_NOT_FOUND: Interfaccia CDC non trovata.
+ * - Altri errori: Errore generico.
+ */
 esp_err_t cdc_parse_interface_descriptor(const usb_device_desc_t *device_desc, const usb_config_desc_t *config_desc, uint8_t intf_idx, cdc_parsed_info_t *info_ret)
 {
     int desc_offset = 0;
@@ -177,6 +195,15 @@ esp_err_t cdc_parse_interface_descriptor(const usb_device_desc_t *device_desc, c
     return (info_ret->in_ep && info_ret->out_ep) ? ESP_OK : ESP_ERR_NOT_FOUND;
 }
 
+
+/**
+ * @brief Stampa la descrizione di un descrittore standard USB.
+ * 
+ * Questa funzione verifica se il tipo di descrittore è quello di un'interfaccia di classe di comunicazione.
+ * 
+ * @param [in] _desc Puntatore al descrittore standard USB da verificare.
+ * @return Nessun valore di ritorno.
+ */
 void cdc_print_desc(const usb_standard_desc_t *_desc)
 {
     if (_desc->bDescriptorType != ((USB_CLASS_COMM << 4) | USB_B_DESCRIPTOR_TYPE_INTERFACE )) {

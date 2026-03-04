@@ -100,3 +100,17 @@ esp_err_t http_services_register_handlers(httpd_handle_t server);
  */
 esp_err_t http_services_getcustomers(const char *code, const char *telephone,
                                      http_services_getcustomers_response_t *out);
+
+/**
+ * Call remote /api/payment with payload generated from runtime context.
+ *
+ * @param customer      Optional customer context (NULL -> empty customer fields).
+ * @param amount        Payment amount (>= 0).
+ * @param service_code  Optional service identifier (fallback: "SER1").
+ * @param out           Output response struct. Must not be NULL.
+ * @return ESP_OK on HTTP 200 + valid JSON response, ESP_ERR_* otherwise.
+ */
+esp_err_t http_services_payment(const http_services_customer_t *customer,
+								int32_t amount,
+								const char *service_code,
+								http_services_payment_response_t *out);

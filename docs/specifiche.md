@@ -100,3 +100,11 @@ Per l'implementazione futura del monitor e del touchscreen si adotterà un appro
 3.  **Bus I2C Condiviso**: Il touchscreen verrà integrato sul bus I2C principale (GPIO 26/27) insieme agli expander e ai sensori esistenti.
 4.  **Interfaccia Grafica**: Si utilizzerà la libreria LVGL per lo sviluppo della UI, che girerà in un task dedicato coordinandosi con gli altri task di sistema tramite le strutture `task_param` e code di messaggi.
 5.  **Risorse GPIO**: L'uso dell'interfaccia MIPI-DSI nativa dell'ESP32-P4 permetterà di pilotare il display senza sottrarre GPIO alle periferiche critiche già configurate.
+## Uso Font
+- lv_font_montserrat_48: warning icon + “Fuori servizio” in lvgl_panel.c:71-78.
+- lv_font_montserrat_20: sottotitolo fuori servizio in lvgl_panel.c:88.
+FONT_DATETIME (lv_font_unscii_16 o fallback lv_font_montserrat_16): definizione in lvgl_panel.c:149-152, uso in lvgl_panel.c:542.
+- sevensegments_300: valore credito grande in lvgl_panel.c:143 e lvgl_panel.c:607.
+lv_font_montserrat_32: elapsed/pausa/pulsanti programma in lvgl_panel.c:613-644.
+-DroidSansMono24: nome lingue nella landing language-select in lvgl_panel.c:864.
+lv_font_montserrat_24: titolo schermata lingua in lvgl_panel.c:141 e lvgl_panel.c:831.

@@ -27,6 +27,14 @@ Questo documento descrive le chiamate previste dal file `servizi2.docx`, lo stat
 - Proxy remoto implementato per tutte le route sopra.
 - Aggiunto anche handler locale esplicito per `POST /api/deviceactivity`.
 - È mantenuta la route `POST /api/activity` per compatibilità con specifiche precedenti.
+- Disponibili chiamate C dirette per integrazione task/FSM:
+  - `http_services_getcustomers(code, telephone, out)`
+  - `http_services_payment(customer, amount, service_code, out)`
+- Flusso runtime attivo in `main/tasks.c`:
+  - evento scanner QR -> `getcustomers`
+  - cache ultimo customer valido
+  - transizione FSM `CREDIT -> RUNNING` su `PROGRAM_SELECTED` -> chiamata `payment`
+  - nessuna chiamata `payment` su `PROGRAM_SWITCH`.
 
 ## Strutture C di risposta
 Definite in `components/http_services/include/http_services.h`.
@@ -201,6 +209,12 @@ Response (schema):
 Invio pagamento online/offline.
 
 Body include cliente, importi, contanti inseriti/resto, servizi acquistati.
+
+Nota implementativa attuale (`http_services_payment`):
+- `paymenttype` impostato a `CASH`
+- `paymentdata` impostato a stringa vuota
+- `cashentered` valorizzato con una voce (`value=amount`, `quantity=1`, `position=99`) se `amount > 0`
+- `services[0]` valorizzato con `code=service_code`, `amount`, `quantity=1`, `used=true`, `recharge=false`.
 
 Response (schema):
 ```json

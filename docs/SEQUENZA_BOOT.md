@@ -72,6 +72,8 @@ z. sd_card_mount() + transfer_coredump_flash_to_sd() — se sd_card_enabled
 
 **7. Finestra di stabilità (`BOOT_COUNTER_RESET_DELAYED=1`)**
 - loop 30 s in step da 5 s con log heap residuo
+- durante questa finestra il display mostra la splash LVGL con logo **MicroHard** centrato
+- al termine della finestra viene mostrata la pagina LVGL di selezione lingua
 - `init_mark_boot_completed()` — azzera NVS `consecutive_reboots`
 
 **8. Main loop**

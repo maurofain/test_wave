@@ -327,6 +327,13 @@ static esp_err_t cdc_acm_find_and_open_usb_device(uint16_t vid, uint16_t pid, in
     return ESP_ERR_NOT_FOUND;
 }
 
+
+/**
+ * @brief Installa il driver CDC-ACM host.
+ *
+ * @param [in] driver_config Puntatore alla configurazione del driver CDC-ACM host.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t cdc_acm_host_install(const cdc_acm_host_driver_config_t *driver_config)
 {
     CDC_ACM_CHECK(!p_cdc_acm_obj, ESP_ERR_INVALID_STATE);
@@ -401,6 +408,16 @@ err: // Clean-up
     return ret;
 }
 
+
+/**
+ * @brief Disinstalla il driver CDC-ACM host.
+ *
+ * Questa funzione disinstalla il driver CDC-ACM host, rimuovendo tutte le risorse allocate.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione non riuscita.
+ */
 esp_err_t cdc_acm_host_uninstall()
 {
     esp_err_t ret;
@@ -441,6 +458,13 @@ unblock:
     return ret;
 }
 
+
+/**
+ * @brief Registra una callback per la gestione di nuovi dispositivi CDC-ACM.
+ *
+ * @param new_dev_cb Puntatore alla funzione di callback che gestisce i nuovi dispositivi CDC-ACM.
+ * @return esp_err_t Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t cdc_acm_host_register_new_dev_callback(cdc_acm_new_dev_callback_t new_dev_cb)
 {
     CDC_ACM_ENTER_CRITICAL();
@@ -568,6 +592,24 @@ err:
     return ret;
 }
 
+
+/**
+ * @brief Apre una connessione CDC-ACM host.
+ *
+ * Questa funzione apre una connessione CDC-ACM host utilizzando i valori di Vendor ID (vid) e Product ID (pid) specificati.
+ *
+ * @param [in] vid Identificatore del Vendor ID del dispositivo.
+ * @param [in] pid Identificatore del Product ID del dispositivo.
+ * @param [in] interface_idx Indice dell'interfaccia CDC-ACM da utilizzare.
+ * @param [in] dev_config Puntatore alla configurazione del dispositivo CDC-ACM.
+ * @param [out] cdc_hdl_ret Puntatore al handle del dispositivo CDC-ACM aperto.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_ERR_INVALID_ARG: Argomento non valido.
+ * - ESP_ERR_NOT_FOUND: Dispositivo non trovato.
+ * - Altri errori specifici.
+ */
 esp_err_t cdc_acm_host_open(uint16_t vid, uint16_t pid, uint8_t interface_idx, const cdc_acm_host_device_config_t *dev_config, cdc_acm_dev_hdl_t *cdc_hdl_ret)
 {
     esp_err_t ret;
@@ -634,6 +676,15 @@ exit:
     return ret;
 }
 
+
+/**
+ * @brief Chiude la connessione CDC-ACM host.
+ *
+ * Questa funzione chiude la connessione CDC-ACM host specificata.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC-ACM.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t cdc_acm_host_close(cdc_acm_dev_hdl_t cdc_hdl)
 {
     CDC_ACM_CHECK(p_cdc_acm_obj, ESP_ERR_INVALID_STATE);
@@ -687,6 +738,15 @@ esp_err_t cdc_acm_host_close(cdc_acm_dev_hdl_t cdc_hdl)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Stampa la descrizione del dispositivo CDC-ACM.
+ *
+ * Questa funzione stampa la descrizione del dispositivo CDC-ACM utilizzando il gestore del dispositivo fornito.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC-ACM.
+ * @return Nessun valore di ritorno.
+ */
 void cdc_acm_host_desc_print(cdc_acm_dev_hdl_t cdc_hdl)
 {
     assert(cdc_hdl);
@@ -740,6 +800,15 @@ static bool cdc_acm_is_transfer_completed(usb_transfer_t *transfer)
     return completed;
 }
 
+
+/**
+ * @brief Callback di trasferimento USB.
+ *
+ * Questa funzione viene chiamata quando un trasferimento USB è completato.
+ *
+ * @param transfer Puntatore alla struttura usb_transfer_t che rappresenta il trasferimento completato.
+ * @return Nessun valore di ritorno.
+ */
 static void in_xfer_cb(usb_transfer_t *transfer)
 {
     ESP_LOGD(TAG, "in xfer cb");
@@ -796,6 +865,17 @@ static void in_xfer_cb(usb_transfer_t *transfer)
     usb_host_transfer_submit(cdc_dev->data.in_xfer);
 }
 
+
+/**
+ * @brief Callback chiamata quando una trasferimento USB è completato.
+ *
+ * Questa funzione viene invocata quando un trasferimento USB è completato.
+ * Gestisce l'evento di completamento del trasferimento e potrebbe eseguire
+ * operazioni di post-trasferimento.
+ *
+ * @param transfer Puntatore alla struttura usb_transfer_t che rappresenta il trasferimento completato.
+ * @return Nessun valore di ritorno.
+ */
 static void notif_xfer_cb(usb_transfer_t *transfer)
 {
     ESP_LOGD(TAG, "notif xfer cb");
@@ -838,6 +918,15 @@ static void notif_xfer_cb(usb_transfer_t *transfer)
     }
 } 
 
+
+/**
+ * @brief Callback di trasferimento USB per l'output.
+ *
+ * Questa funzione viene chiamata quando un trasferimento USB di output è completato.
+ *
+ * @param transfer Puntatore alla struttura usb_transfer_t che rappresenta il trasferimento completato.
+ * @return Nessun valore di ritorno.
+ */
 static void out_xfer_cb(usb_transfer_t *transfer)
 {
     ESP_LOGD(TAG, "out/ctrl xfer cb");
@@ -854,6 +943,16 @@ static void out_xfer_cb(usb_transfer_t *transfer)
  * @return esp_err_t
  */
 #ifdef CDC_HOST_SUSPEND_RESUME_API_SUPPORTED
+
+/**
+ * @brief Ripristina la funzionalità del dispositivo CDC-ACM.
+ *
+ * Questa funzione ripristina la funzionalità del dispositivo CDC-ACM, che è stata
+ * potenzialmente interrotta da un evento di sospensione.
+ *
+ * @param [in] cdc_dev Puntatore al dispositivo CDC-ACM.
+ * @return Nessun valore di ritorno.
+ */
 static void cdc_acm_resume(cdc_dev_t *cdc_dev)
 {
     assert(cdc_dev);
@@ -870,6 +969,16 @@ static void cdc_acm_resume(cdc_dev_t *cdc_dev)
 }
 #endif // CDC_HOST_SUSPEND_RESUME_API_SUPPORTED
 
+
+/**
+ * @brief Callback di gestione degli eventi USB.
+ * 
+ * Questa funzione viene chiamata quando si verifica un evento USB.
+ * 
+ * @param event_msg Puntatore al messaggio di evento USB.
+ * @param arg Puntatore agli argomenti associati all'evento.
+ * @return Nessun valore di ritorno.
+ */
 static void usb_event_cb(const usb_host_client_event_msg_t *event_msg, void *arg)
 {
     switch (event_msg->event) {
@@ -962,6 +1071,23 @@ static void usb_event_cb(const usb_host_client_event_msg_t *event_msg, void *arg
     }
 }
 
+
+/**
+ * @brief Invia dati in blocco tramite l'host CDC-ACM.
+ *
+ * Questa funzione invia dati in blocco all'host CDC-ACM specificato.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC-ACM.
+ * @param [in] data Puntatore ai dati da inviare.
+ * @param [in] data_len Lunghezza dei dati da inviare.
+ * @param [in] timeout_ms Timeout in millisecondi per l'invio dei dati.
+ *
+ * @return
+ * - ESP_OK: Invio completato con successo.
+ * - ESP_ERR_INVALID_ARG: Argomento non valido.
+ * - ESP_ERR_TIMEOUT: Timeout durante l'invio dei dati.
+ * - Altri errori: Errore generico.
+ */
 esp_err_t cdc_acm_host_data_tx_blocking(cdc_acm_dev_hdl_t cdc_hdl, const uint8_t *data, size_t data_len, uint32_t timeout_ms)
 {
     esp_err_t ret = ESP_OK;
@@ -1026,6 +1152,20 @@ unblock:
     return ret;
 }
 
+
+/**
+ * @brief Invia una richiesta personalizzata all'host CDC-ACM.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC-ACM.
+ * @param [in] bmRequestType Tipo di richiesta da inviare.
+ * @param [in] bRequest Codice della richiesta da inviare.
+ * @param [in] wValue Valore da inviare nella richiesta.
+ * @param [in] wIndex Indice da inviare nella richiesta.
+ * @param [in] wLength Lunghezza dei dati da inviare.
+ * @param [in] data Puntatore ai dati da inviare.
+ *
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t cdc_acm_host_send_custom_request(cdc_acm_dev_hdl_t cdc_hdl, uint8_t bmRequestType, uint8_t bRequest, uint16_t wValue, uint16_t wIndex, uint16_t wLength, uint8_t *data)
 {
     CDC_ACM_CHECK(cdc_hdl, ESP_ERR_INVALID_ARG);
@@ -1083,6 +1223,20 @@ unblock:
     return ret;
 }
 
+
+/**
+ * @brief Ottiene i protocolli di comunicazione e dati per un dispositivo CDC-ACM.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC-ACM.
+ * @param [out] comm Puntatore alla struttura che riceverà il protocollo di comunicazione.
+ * @param [out] data Puntatore alla struttura che riceverà il protocollo di dati.
+ *
+ * @return
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_ERR_INVALID_ARG: Argomento non valido.
+ * - ESP_ERR_NOT_FOUND: Dispositivo non trovato.
+ * - Altri errori: Errore generico.
+ */
 esp_err_t cdc_acm_host_protocols_get(cdc_acm_dev_hdl_t cdc_hdl, cdc_comm_protocol_t *comm, cdc_data_protocol_t *data)
 {
     CDC_ACM_CHECK(cdc_hdl, ESP_ERR_INVALID_ARG);
@@ -1097,6 +1251,15 @@ esp_err_t cdc_acm_host_protocols_get(cdc_acm_dev_hdl_t cdc_hdl, cdc_comm_protoco
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ottiene una descrizione CDC specifica per un dispositivo CDC ACM.
+ *
+ * @param cdc_hdl Handle del dispositivo CDC ACM.
+ * @param desc_type Tipo di descrizione CDC da ottenere.
+ * @param desc_out Puntatore a un puntatore a una descrizione standard USB.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t cdc_acm_host_cdc_desc_get(cdc_acm_dev_hdl_t cdc_hdl, cdc_desc_subtype_t desc_type, const usb_standard_desc_t **desc_out)
 {
     CDC_ACM_CHECK(cdc_hdl, ESP_ERR_INVALID_ARG);

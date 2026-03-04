@@ -49,6 +49,9 @@ typedef struct {
     uint16_t version;
 } eeprom_header_t;
 
+#define EEPROM_STORAGE_SIZE_BYTES 2048U
+#define EEPROM_JSON_MAX_LENGTH (EEPROM_STORAGE_SIZE_BYTES - sizeof(eeprom_header_t))
+
 static device_config_t s_config = {0};
 static bool s_initialized = false;
 
@@ -61,6 +64,16 @@ static char s_i18n_lookup_lang[8] = {0};
 static cJSON *s_i18n_map_cache = NULL;
 static char s_i18n_map_lang[8] = {0};
 
+
+/**
+ * @brief Cancella la cache del mappatore internazionale.
+ * 
+ * Questa funzione svuota la cache del mappatore internazionale, deallocando
+ * eventuali risorse allocate e reimpostando il puntatore alla cache a NULL.
+ * 
+ * @param [in/out] s_i18n_map_cache Puntatore alla cache del mappatore internazionale.
+ * @return void Nessun valore di ritorno.
+ */
 static void _i18n_map_cache_clear(void)
 {
     if (s_i18n_map_cache) {
@@ -70,11 +83,31 @@ static void _i18n_map_cache_clear(void)
     s_i18n_map_lang[0] = '\0';
 }
 
+
+/**
+ * @brief Costruisce il percorso del file di mappatura i18n.
+ *
+ * @param [in] language Il codice del linguaggio per cui costruire il percorso.
+ * @param [out] out Buffer in cui memorizzare il percorso del file.
+ * @param [in] out_len Dimensione del buffer di output.
+ *
+ * @return void
+ */
 static void _build_i18n_map_path(const char *language, char *out, size_t out_len)
 {
     snprintf(out, out_len, "/spiffs/i18n_%s.map.json", _effective_lang(language));
 }
 
+
+/**
+ * @brief Costruisce la mappa di cache per un determinato linguaggio.
+ *
+ * Questa funzione prende in input un puntatore a una stringa che rappresenta il codice del linguaggio
+ * e costruisce una mappa di cache utilizzata per memorizzare i dati localizzati per quel linguaggio.
+ *
+ * @param [in] language Puntatore a una stringa che rappresenta il codice del linguaggio.
+ * @return esp_err_t Valore di ritorno dell'operazione, ESP_OK in caso di successo, altrimenti un errore.
+ */
 static esp_err_t _i18n_map_cache_build_for_lang(const char *language)
 {
     const char *lang = _effective_lang(language);
@@ -121,6 +154,15 @@ static esp_err_t _i18n_map_cache_build_for_lang(const char *language)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Cancella la cache di ricerca internazionale.
+ * 
+ * Questa funzione svuota la cache di ricerca internazionale, se presente.
+ * 
+ * @param [in/out] s_i18n_lookup_cache Puntatore alla cache di ricerca internazionale.
+ * @return void Nessun valore di ritorno.
+ */
 static void _i18n_lookup_cache_clear(void)
 {
     if (s_i18n_lookup_cache) {
@@ -145,6 +187,16 @@ static const char *_lookup_map_text_from_id(cJSON *map_section, int id)
     return NULL;
 }
 
+
+/**
+ * @brief Aggiunge un testo JSON all'oggetto cJSON.
+ * 
+ * @param object Puntatore all'oggetto cJSON a cui aggiungere il testo.
+ * @param key Chiave del campo JSON da aggiungere.
+ * @param text Testo da aggiungere.
+ * @return true Se l'aggiunta è stata effettuata con successo.
+ * @return false Se l'aggiunta non è stata effettuata (oggetto o chiave non validi).
+ */
 static bool _append_json_text(cJSON *object, const char *key, const char *text)
 {
     if (!object || !key || key[0] == '\0') {
@@ -183,6 +235,15 @@ static bool _append_json_text(cJSON *object, const char *key, const char *text)
     return true;
 }
 
+
+/**
+ * @brief Aggiunge una mappatura di ricerca se non esiste già.
+ * 
+ * @param [in] table Puntatore alla tabella JSON in cui aggiungere la mappatura.
+ * @param [in] key Chiave della mappatura da aggiungere.
+ * @param [in] value Valore della mappatura da aggiungere.
+ * @return void Nessun valore di ritorno.
+ */
 static void _add_lookup_mapping_if_missing(cJSON *table, const char *key, const char *value)
 {
     if (!table || !key || !value || key[0] == '\0') {
@@ -193,6 +254,13 @@ static void _add_lookup_mapping_if_missing(cJSON *table, const char *key, const 
     }
 }
 
+
+/**
+ * @brief Costruisce il cache per la traduzione per un determinato linguaggio.
+ *
+ * @param [in] language Il codice del linguaggio per cui costruire il cache.
+ * @return esp_err_t Errore se la costruzione del cache fallisce, altrimenti ESP_OK.
+ */
 static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
 {
     const char *lang = _effective_lang(language);
@@ -337,6 +405,13 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Controlla se la lingua specificata è un ISO 639-1 codice di due lettere.
+ *
+ * @param [in] language Puntatore alla stringa che rappresenta la lingua.
+ * @return true se la lingua è un ISO 639-1 codice di due lettere, false altrimenti.
+ */
 static bool _is_iso2_lang(const char *language)
 {
     return language && strlen(language) == 2;
@@ -356,11 +431,29 @@ static const char *_effective_lang(const char *language)
     return UI_LANG_DEFAULT;
 }
 
+
+/**
+ * @brief Costruisce il percorso del file di traduzione per un determinato linguaggio.
+ *
+ * @param [in] language Il codice del linguaggio per cui si desidera costruire il percorso.
+ * @param [out] out Buffer in cui verrà memorizzato il percorso del file di traduzione.
+ * @param [in] out_len Dimensione del buffer di output.
+ *
+ * @return void
+ */
 static void _build_i18n_path(const char *language, char *out, size_t out_len)
 {
     snprintf(out, out_len, "/spiffs/i18n_%s.json", _effective_lang(language));
 }
 
+
+/**
+ * @brief Controlla se la stringa JSON rappresenta una serie di record i18n validi.
+ * 
+ * @param [in] records_json Puntatore alla stringa JSON contenente i record i18n.
+ * @return true Se la stringa JSON rappresenta una serie di record i18n validi.
+ * @return false Altrimenti.
+ */
 static bool _is_valid_i18n_records_json(const char *records_json)
 {
     if (!records_json) {
@@ -416,6 +509,14 @@ static bool _is_valid_i18n_records_json(const char *records_json)
     return valid;
 }
 
+
+/**
+ * @brief Scrive i record di traduzione in un file.
+ * 
+ * @param [in] language Codice ISO 639-1 del linguaggio.
+ * @param [in] records_json Stringa JSON contenente i record di traduzione.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 static esp_err_t _write_i18n_file(const char *language, const char *records_json)
 {
     if (!_is_iso2_lang(language) || !_is_valid_i18n_records_json(records_json)) {
@@ -483,6 +584,16 @@ static char *_read_i18n_file(const char *language)
     return buffer;
 }
 
+
+/**
+ * @brief Assicura che il file di traduzione in italiano sia presente.
+ *
+ * Questa funzione controlla se il file di traduzione in italiano esiste e, se non lo fa,
+ * lo crea con i valori di default.
+ *
+ * @param [in/out] Nessun parametro specifico.
+ * @return Nessun valore di ritorno.
+ */
 static void _ensure_default_i18n_it_file(void)
 {
     char *existing = _read_i18n_file(UI_LANG_DEFAULT);
@@ -497,6 +608,13 @@ static void _ensure_default_i18n_it_file(void)
 }
 
 // Configurazione predefinita
+
+/**
+ * @brief Imposta i valori di default per la configurazione del dispositivo.
+ *
+ * @param [in/out] config Puntatore alla struttura di configurazione del dispositivo.
+ * @return Nessun valore di ritorno.
+ */
 static void _set_defaults(device_config_t *config)
 {
     memset(config, 0, sizeof(device_config_t));
@@ -597,12 +715,25 @@ static void _set_defaults(device_config_t *config)
     config->scanner.vid = (uint16_t)CONFIG_USB_CDC_SCANNER_VID;
     config->scanner.pid = (uint16_t)CONFIG_USB_CDC_SCANNER_PID;
     config->scanner.dual_pid = (uint16_t)CONFIG_USB_CDC_SCANNER_DUAL_PID;
+    config->scanner.cooldown_ms = 10000;
+
+    // Default timeout applicativi
+    config->timeouts.language_return_ms = 10000;
 
     // Default testi UI / lingua
     strncpy(config->ui.user_language, UI_LANG_DEFAULT, sizeof(config->ui.user_language) - 1);
     config->ui.texts_json[0] = '\0';
 }
 
+
+/**
+ * @brief Calcola il CRC32 di una stringa JSON.
+ *
+ * Questa funzione calcola il valore CRC32 di una stringa JSON fornita in input.
+ *
+ * @param [in] json_str Puntatore alla stringa JSON di cui calcolare il CRC32.
+ * @return Il valore CRC32 calcolato.
+ */
 static uint32_t _calculate_crc(const char *json_str)
 {
     if (!json_str) return 0;
@@ -613,27 +744,65 @@ static uint32_t _calculate_crc(const char *json_str)
 // Helper EEProm
 // -----------------------------------------------------------------------------
 
+
+/**
+ * @brief Scrive una stringa JSON in EEPROM.
+ *
+ * @param [in] json_str Puntatore alla stringa JSON da scrivere in EEPROM.
+ * @param [in] modified Flag che indica se i dati sono stati modificati.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
 {
+    if (!json_str) return ESP_ERR_INVALID_ARG;
     if (!eeprom_24lc16_is_available()) return ESP_ERR_INVALID_STATE;
+
+    size_t json_len = strlen(json_str);
+    if (json_len == 0 || json_len > EEPROM_JSON_MAX_LENGTH) {
+        ESP_LOGE(TAG,
+                 "[C] JSON troppo grande per EEPROM (len=%lu, max=%lu)",
+                 (unsigned long)json_len,
+                 (unsigned long)EEPROM_JSON_MAX_LENGTH);
+        return ESP_ERR_INVALID_SIZE;
+    }
 
     eeprom_header_t header;
     header.magic = EEPROM_MAGIC;
-    header.length = strlen(json_str);
+    header.length = (uint32_t)json_len;
     header.crc = _calculate_crc(json_str);
     header.modified = modified ? 1 : 0;
     header.version = 1;
 
     // Scrivi header
-    ESP_RETURN_ON_ERROR(eeprom_24lc16_write(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header)), TAG, "Scrittura header EEPROM fallita");
+    esp_err_t wr_err = eeprom_24lc16_write(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header));
+    if (wr_err != ESP_OK) {
+        ESP_LOGE(TAG,
+                 "[C] Scrittura header EEPROM fallita (len=%lu, err=%s)",
+                 (unsigned long)header.length,
+                 esp_err_to_name(wr_err));
+        return wr_err;
+    }
+
     // Scrivi dati subito dopo l'header
-    ESP_RETURN_ON_ERROR(eeprom_24lc16_write(EEPROM_HEADER_ADDR + sizeof(header), (const uint8_t *)json_str, header.length), TAG, "Scrittura JSON EEPROM fallita");
+    wr_err = eeprom_24lc16_write(EEPROM_HEADER_ADDR + sizeof(header), (const uint8_t *)json_str, header.length);
+    if (wr_err != ESP_OK) {
+        ESP_LOGE(TAG,
+                 "[C] Scrittura JSON EEPROM fallita (len=%lu, err=%s)",
+                 (unsigned long)header.length,
+                 esp_err_to_name(wr_err));
+        return wr_err;
+    }
 
     ESP_LOGI(TAG, "[C] Config salvata in EEPROM (len=%lu, crc=0x%08lX, modified=%d)", 
              (unsigned long)header.length, (unsigned long)header.crc, header.modified);
     return ESP_OK;
 }
 
+
+/** Legge i dati dalla EEPROM.
+ * @param [out] out_modified Indica se i dati sono stati modificati.
+ * @return Puntatore alla stringa letta dalla EEPROM, NULL in caso di errore.
+ */
 static char* _read_from_eeprom(bool *out_modified)
 {
     if (!eeprom_24lc16_is_available()) return NULL;
@@ -646,7 +815,7 @@ static char* _read_from_eeprom(bool *out_modified)
         return NULL;
     }
 
-    if (header.length == 0 || header.length > 2000) {
+    if (header.length == 0 || header.length > EEPROM_JSON_MAX_LENGTH) {
         ESP_LOGW(TAG, "[C] Lunghezza JSON EEPROM non valida (%lu)", (unsigned long)header.length);
         return NULL;
     }
@@ -677,6 +846,13 @@ static char* _read_from_eeprom(bool *out_modified)
 // Helper NVS
 // -----------------------------------------------------------------------------
 
+
+/**
+ * @brief Scrive una stringa JSON in NVS (Non-Volatile Storage).
+ *
+ * @param json_str [in] La stringa JSON da scrivere in NVS.
+ * @return esp_err_t Errore restituito dal sistema.
+ */
 static esp_err_t _write_to_nvs(const char *json_str)
 {
     nvs_handle_t handle;
@@ -698,6 +874,14 @@ static esp_err_t _write_to_nvs(const char *json_str)
     return ret;
 }
 
+
+/**
+ * @brief Legge i dati da NVS (Non-Volatile Storage).
+ *
+ * @param [in] Non ci sono parametri di input per questa funzione.
+ *
+ * @return char* Un puntatore alla stringa contenente i dati letti, o NULL in caso di errore.
+ */
 static char* _read_from_nvs(void)
 {
     nvs_handle_t handle;
@@ -747,6 +931,16 @@ static char* _read_from_nvs(void)
     return json_str;
 }
 
+
+/**
+ * @brief Inizializza la configurazione del dispositivo.
+ *
+ * Questa funzione inizializza la configurazione del dispositivo, preparandola per l'uso successivo.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t device_config_init(void)
 {
     ESP_LOGI(TAG, "[C] Inizializzazione sistema configurazione");
@@ -774,6 +968,20 @@ esp_err_t device_config_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Carica la configurazione del dispositivo.
+ *
+ * Questa funzione carica la configurazione del dispositivo da una fonte specifica
+ * e la memorizza nella struttura device_config_t fornita.
+ *
+ * @param [in/out] config Puntatore alla struttura device_config_t dove verrà
+ *                        memorizzata la configurazione del dispositivo.
+ *
+ * @return
+ * - ESP_OK: La configurazione è stata caricata con successo.
+ * - ESP_FAIL: Si è verificato un errore durante il caricamento della configurazione.
+ */
 esp_err_t device_config_load(device_config_t *config)
 {
     if (!config) return ESP_ERR_INVALID_ARG;
@@ -783,6 +991,7 @@ esp_err_t device_config_load(device_config_t *config)
     bool eeprom_modified = false;
     char *json_str = _read_from_eeprom(&eeprom_modified);
     bool source_is_eeprom = false;
+    bool source_is_nvs = false;
 
     if (json_str) {
         // EEPROM valida
@@ -802,8 +1011,7 @@ esp_err_t device_config_load(device_config_t *config)
         json_str = _read_from_nvs();
         if (json_str) {
             ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
-            // Sincronizza NVS -> EEPROM e imposta flag 'modified' (come da specifica 2.1)
-            _write_to_eeprom(json_str, true);
+            source_is_nvs = true;
         } else {
             // Niente né in EEPROM né in NVS: Defaults
             ESP_LOGI(TAG, "[C] Nessun config trovato: inizializzo Defaults su NVS e EEPROM");
@@ -818,8 +1026,10 @@ esp_err_t device_config_load(device_config_t *config)
     }
 
     if (json_str) {
+        bool parse_ok = false;
         cJSON *root = cJSON_Parse(json_str);
         if (root) {
+            parse_ok = true;
             // Nome dispositivo
             cJSON *name = cJSON_GetObjectItem(root, "device_name");
             if (name && name->valuestring) strncpy(config->device_name, name->valuestring, sizeof(config->device_name) - 1);
@@ -917,9 +1127,28 @@ esp_err_t device_config_load(device_config_t *config)
                     cJSON *vid = cJSON_GetObjectItem(scanner_obj, "vid");
                     cJSON *pid = cJSON_GetObjectItem(scanner_obj, "pid");
                     cJSON *dual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
+                    cJSON *cooldown = cJSON_GetObjectItem(scanner_obj, "cooldown_ms");
                     if (vid && cJSON_IsNumber(vid)) config->scanner.vid = (uint16_t)vid->valueint;
                     if (pid && cJSON_IsNumber(pid)) config->scanner.pid = (uint16_t)pid->valueint;
                     if (dual && cJSON_IsNumber(dual)) config->scanner.dual_pid = (uint16_t)dual->valueint;
+                    if (cooldown && cJSON_IsNumber(cooldown) && cooldown->valueint > 0) {
+                        config->scanner.cooldown_ms = (uint32_t)cooldown->valueint;
+                    }
+                }
+
+                // Analisi timeout applicativi
+                cJSON *timeouts_obj = cJSON_GetObjectItem(root, "timeouts");
+                if (timeouts_obj) {
+                    cJSON *language_return = cJSON_GetObjectItem(timeouts_obj, "language_return_ms");
+                    if (language_return && cJSON_IsNumber(language_return) && language_return->valueint > 0) {
+                        config->timeouts.language_return_ms = (uint32_t)language_return->valueint;
+                    }
+                }
+                if (config->timeouts.language_return_ms < 1000U) {
+                    config->timeouts.language_return_ms = 1000U;
+                }
+                if (config->timeouts.language_return_ms > 600000U) {
+                    config->timeouts.language_return_ms = 600000U;
                 }
 
                 // Analisi config MDB
@@ -1003,12 +1232,33 @@ esp_err_t device_config_load(device_config_t *config)
         } else {
             ESP_LOGE(TAG, "[C] Errore parsing JSON!");
         }
+
+        if (parse_ok && source_is_nvs && eeprom_24lc16_is_available()) {
+            /* Sincronizza NVS -> EEPROM usando JSON canonico ridotto,
+             * evitando payload legacy potenzialmente troppo grandi. */
+            char *canonical_json = device_config_to_json(config);
+            if (canonical_json) {
+                esp_err_t sync_err = _write_to_eeprom(canonical_json, true);
+                if (sync_err != ESP_OK) {
+                    ESP_LOGW(TAG, "[C] Sync NVS->EEPROM fallita: %s", esp_err_to_name(sync_err));
+                }
+                free(canonical_json);
+            }
+        }
+
         free(json_str);
     }
 
     return ESP_OK;
 }
 
+
+/**
+ * @brief Converte una configurazione di dispositivo in un formato JSON.
+ *
+ * @param [in] config Puntatore alla struttura di configurazione del dispositivo.
+ * @return char* Puntatore alla stringa JSON rappresentante la configurazione del dispositivo.
+ */
 char* device_config_to_json(const device_config_t *config)
 {
     if (!config) return NULL;
@@ -1086,7 +1336,13 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(scanner_obj, "vid", config->scanner.vid);
     cJSON_AddNumberToObject(scanner_obj, "pid", config->scanner.pid);
     cJSON_AddNumberToObject(scanner_obj, "dual_pid", config->scanner.dual_pid);
+    cJSON_AddNumberToObject(scanner_obj, "cooldown_ms", config->scanner.cooldown_ms);
     cJSON_AddItemToObject(root, "scanner", scanner_obj);
+
+    // Timeouts
+    cJSON *timeouts_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(timeouts_obj, "language_return_ms", config->timeouts.language_return_ms);
+    cJSON_AddItemToObject(root, "timeouts", timeouts_obj);
 
     // MDB
     cJSON *mdb_obj = cJSON_CreateObject();
@@ -1152,12 +1408,28 @@ char* device_config_to_json(const device_config_t *config)
     return json_str;
 }
 
+
+/**
+ * @brief Legge la configurazione del dispositivo in formato JSON dalla EEPROM.
+ *
+ * @param [out] Nessun parametro di input.
+ * @return char* Puntatore alla stringa JSON contenente la configurazione del dispositivo, o NULL in caso di errore.
+ */
 char* device_config_read_json_from_eeprom(void)
 {
     bool eeprom_modified = false;
     return _read_from_eeprom(&eeprom_modified);
 }
 
+
+/**
+ * @brief Salva la configurazione del dispositivo.
+ *
+ * Questa funzione salva la configurazione del dispositivo in una memoria persistente.
+ *
+ * @param [in] config Puntatore alla struttura di configurazione del dispositivo.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 esp_err_t device_config_save(const device_config_t *config)
 {
     if (!config) return ESP_ERR_INVALID_ARG;
@@ -1192,10 +1464,22 @@ esp_err_t device_config_save(const device_config_t *config)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ottiene un puntatore alla configurazione del dispositivo.
+ *
+ * @return device_config_t* Puntatore alla configurazione del dispositivo.
+ */
 device_config_t* device_config_get(void)
 {
     return &s_config;
 }
+
+/**
+ * @brief Ottiene il CRC della configurazione del dispositivo.
+ *
+ * @return uint32_t Il valore del CRC della configurazione del dispositivo.
+ */
 uint32_t device_config_get_crc(void)
 {
     char *json = device_config_to_json(&s_config);
@@ -1205,16 +1489,44 @@ uint32_t device_config_get_crc(void)
     return crc;
 }
 
+
+/**
+ * @brief Controlla se la configurazione del dispositivo è stata aggiornata.
+ *
+ * Questa funzione verifica lo stato della configurazione del dispositivo e restituisce
+ * un valore booleano che indica se la configurazione è stata aggiornata o meno.
+ *
+ * @return bool - TRUE se la configurazione è stata aggiornata, FALSE altrimenti.
+ */
 bool device_config_is_updated(void)
 {
     return s_config.updated;
 }
+
+/**
+ * @brief Resetta i valori di configurazione del dispositivo ai valori predefiniti.
+ *
+ * Questa funzione reimposta tutti i parametri di configurazione del dispositivo ai loro valori predefiniti.
+ *
+ * @return esp_err_t
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione non riuscita.
+ */
 esp_err_t device_config_reset_defaults(void)
 {
     _set_defaults(&s_config);
     return device_config_save(&s_config);
 }
 
+
+/**
+ * @brief Riavvia il dispositivo alla configurazione di fabbrica.
+ *
+ * Questa funzione riavvia il dispositivo, reimpostando tutte le sue impostazioni
+ * su quelle di fabbrica.
+ *
+ * @return Niente.
+ */
 void device_config_reboot_factory(void)
 {
     const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
@@ -1230,11 +1542,29 @@ void device_config_reboot_factory(void)
     }
 }
 
+
+/**
+ * @brief Riavvia l'applicazione del dispositivo.
+ *
+ * Questa funzione riavvia l'applicazione del dispositivo, reimpostando tutte le impostazioni a quelle di default.
+ *
+ * @return Nessun valore di ritorno.
+ */
 void device_config_reboot_app(void)
 {
     device_config_reboot_app_last();
 }
 
+
+/**
+ * @brief Riavvia il dispositivo utilizzando l'immagine OTA0.
+ *
+ * Questa funzione invia un comando di riavvio al dispositivo, utilizzando l'immagine di sistema
+ * memorizzata nell'area OTA0. Questo comando causa il riavvio del dispositivo, che successivamente
+ * avvierà con l'immagine di sistema OTA0.
+ *
+ * @return Nessun valore di ritorno.
+ */
 void device_config_reboot_ota0(void)
 {
     const esp_partition_t *ota0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
@@ -1250,6 +1580,14 @@ void device_config_reboot_ota0(void)
     }
 }
 
+
+/**
+ * @brief Riavvia il dispositivo utilizzando l'aggiornamento OTA1.
+ *
+ * Questa funzione invia un comando di riavvio al dispositivo, utilizzando il protocollo di aggiornamento OTA1.
+ *
+ * @return Niente.
+ */
 void device_config_reboot_ota1(void)
 {
     const esp_partition_t *ota1 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, NULL);
@@ -1265,6 +1603,16 @@ void device_config_reboot_ota1(void)
     }
 }
 
+
+/**
+ * @brief Riavvia l'applicazione con la configurazione dell'ultimo dispositivo.
+ *
+ * Questa funzione riavvia l'applicazione utilizzando la configurazione dell'ultimo dispositivo
+ * che ha interagito con il sistema. Questo garantisce che l'applicazione si avvii con le impostazioni
+ * corrette e le preferenze dell'utente.
+ *
+ * @return Niente.
+ */
 void device_config_reboot_app_last(void)
 {
     const esp_partition_t *boot = esp_ota_get_boot_partition();
@@ -1323,6 +1671,13 @@ const char* device_config_get_ui_backend_language(void)
     return s_config.ui.backend_language;
 }
 
+
+/**
+ * @brief Ottiene i record di testo dell'interfaccia utente in formato JSON per un determinato linguaggio.
+ *
+ * @param [in] language Il codice del linguaggio per cui si desidera ottenere i record di testo dell'interfaccia utente.
+ * @return char* Un puntatore a una stringa JSON contenente i record di testo dell'interfaccia utente, oppure NULL in caso di errore.
+ */
 char* device_config_get_ui_texts_records_json(const char *language)
 {
     _ensure_default_i18n_it_file();
@@ -1343,6 +1698,15 @@ char* device_config_get_ui_texts_records_json(const char *language)
     return strdup(UI_TEXTS_DEFAULT_IT_JSON);
 }
 
+
+/**
+ * @brief Imposta i testi UI per i record JSON in base alla lingua specificata.
+ *
+ * @param [in] language La lingua per cui impostare i testi UI.
+ * @param [in] records_json I record JSON contenenti i testi UI.
+ *
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t device_config_set_ui_texts_records_json(const char *language, const char *records_json)
 {
     esp_err_t ret = _write_i18n_file(language, records_json);
@@ -1352,6 +1716,17 @@ esp_err_t device_config_set_ui_texts_records_json(const char *language, const ch
     return ret;
 }
 
+
+/**
+ * @brief Ottiene il testo dell'interfaccia utente per un determinato ambito e chiave.
+ * 
+ * @param [in] scope L'ambito per cui si desidera ottenere il testo dell'interfaccia utente.
+ * @param [in] key La chiave per cui si desidera ottenere il testo dell'interfaccia utente.
+ * @param [in] fallback Il testo di fallback da utilizzare se non viene trovato il testo dell'interfaccia utente.
+ * @param [out] out Il buffer in cui verrà memorizzato il testo dell'interfaccia utente.
+ * @param [in] out_len La dimensione del buffer di output.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, const char *fallback, char *out, size_t out_len)
 {
     if (!scope || !key || !out || out_len == 0) {

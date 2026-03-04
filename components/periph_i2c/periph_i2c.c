@@ -7,6 +7,17 @@ static const char *TAG = "PERIPH_I2C";
 
 static i2c_master_bus_handle_t s_periph_i2c_handle = NULL;
 
+
+/**
+ * @brief Inizializza il periferico I2C.
+ * 
+ * Questa funzione inizializza il periferico I2C e restituisce un errore se già inizializzato.
+ * 
+ * @param [in] Nessun parametro di input.
+ * @return esp_err_t Errore generato dalla funzione.
+ *         - ESP_OK: Inizializzazione avvenuta con successo.
+ *         - ESP_FAIL: Inizializzazione fallita perché il periferico è già inizializzato.
+ */
 esp_err_t periph_i2c_init(void)
 {
     if (s_periph_i2c_handle != NULL) {
@@ -37,6 +48,15 @@ esp_err_t periph_i2c_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Ottiene il handle del bus I2C master.
+ *
+ * Questa funzione restituisce il handle del bus I2C master utilizzato per
+ * le operazioni di comunicazione I2C.
+ *
+ * @return i2c_master_bus_handle_t Handle del bus I2C master.
+ */
 i2c_master_bus_handle_t periph_i2c_get_handle(void)
 {
     return s_periph_i2c_handle;

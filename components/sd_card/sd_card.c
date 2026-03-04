@@ -269,11 +269,23 @@ bool sd_card_is_present(void) {
     return (gpio_get_level(SD_CD_GPIO) == 0);
 }
 
+
+/**
+ * @brief Ottiene la dimensione totale della scheda SD.
+ * 
+ * @return uint64_t La dimensione totale della scheda SD in byte.
+ */
 uint64_t sd_card_get_total_size(void) {
     if (!s_mounted || !s_card) return 0;
     return (uint64_t)s_card->csd.capacity * s_card->csd.sector_size / 1024;
 }
 
+
+/**
+ * @brief Ottiene la dimensione utilizzata della scheda SD.
+ * 
+ * @return uint64_t La dimensione in byte della parte della scheda SD che è stata utilizzata.
+ */
 uint64_t sd_card_get_used_size(void) {
     if (!s_mounted) return 0;
     FATFS *fs;
@@ -285,6 +297,16 @@ uint64_t sd_card_get_used_size(void) {
     return (uint64_t)(tot_sect - fre_sect) * fs->ssize / 1024;
 }
 
+
+/**
+ * @brief Gestisce il timer per la formattazione del sistema.
+ * 
+ * Questa funzione viene eseguita come task in un sistema operativo RTOS.
+ * Si occupa della formattazione del sistema in base al timer configurato.
+ * 
+ * @param pvParameters Puntatore ai parametri del task, non utilizzato in questa funzione.
+ * @return void Nessun valore di ritorno.
+ */
 static void sd_format_timer_task(void *pvParameters) {
     int elapsed = 0;
     while (s_is_formatting) {
@@ -296,6 +318,15 @@ static void sd_format_timer_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+
+/**
+ * @brief Gestisce il task di formattazione del dispositivo SD.
+ * 
+ * Questa funzione viene eseguita come task in un sistema operativo RTOS e si occupa della formattazione del dispositivo SD.
+ * 
+ * @param pvParameters Puntatore ai parametri passati al task. In questo caso, non viene utilizzato.
+ * @return void Non restituisce alcun valore.
+ */
 static void sd_format_worker_task(void *pvParameters) {
     ESP_LOGW(TAG, "Lavoro di formattazione iniziato (bloccante)...");
     esp_err_t err = esp_vfs_fat_sdcard_format(MOUNT_POINT, s_card);
@@ -588,37 +619,123 @@ int sd_card_stat(const char *path, struct stat *st)
 
 static bool s_mock_mounted = true;
 
+
+/**
+ * @brief Monta la scheda SD.
+ * 
+ * @return esp_err_t 
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione non riuscita.
+ */
 esp_err_t sd_card_mount(void) {
     s_mock_mounted = true;
     snprintf(s_last_error, sizeof(s_last_error), "mock mount");
     return ESP_OK;
 }
 
+
+/**
+ * @brief Sfalia la scheda SD.
+ * 
+ * Questa funzione si occupa di smontare la scheda SD collegata al sistema.
+ * 
+ * @return esp_err_t
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t sd_card_unmount(void) {
     s_mock_mounted = false;
     snprintf(s_last_error, sizeof(s_last_error), "mock unmount");
     return ESP_OK;
 }
 
+
+/** @brief Inizializza il monitor della scheda SD.
+ *  
+ *  Questa funzione inizializza il monitor della scheda SD, ma non esegue alcuna operazione hardware.
+ *  
+ *  @return Niente.
+ */
+ 
+/** @brief Avvia il monitor della scheda SD.
+ *  
+ *  Questa funzione avvia il monitor della scheda SD in un ciclo infinito.
+ *  
+ *  @param pvParameters Puntatore ai parametri passati alla funzione.
+ *  @return Niente.
+ */
 void sd_card_init_monitor(void) { /* no hardware, nothing to watch */ }
 void sd_card_monitor_run(void *pvParameters) { while (1) { vTaskDelay(pdMS_TO_TICKS(5000)); } }
 
+
+/**
+ * @brief Controlla se la scheda SD è montata.
+ * 
+ * Questa funzione verifica lo stato della scheda SD e restituisce true se la scheda è montata, altrimenti false.
+ * 
+ * @return true se la scheda SD è montata, false altrimenti.
+ */
 bool sd_card_is_mounted(void) { return s_mock_mounted; }
 
+
+/**
+ * @brief Controlla se la scheda SD è presente.
+ * 
+ * Questa funzione verifica se la scheda SD è attualmente collegata e accessibile.
+ * 
+ * @return true se la scheda SD è presente, false altrimenti.
+ */
 bool sd_card_is_present(void) { return s_mock_mounted; }
 
+
+/**
+ * @brief Ottiene la dimensione totale della scheda SD.
+ * 
+ * @return uint64_t La dimensione totale della scheda SD in byte.
+ */
 uint64_t sd_card_get_total_size(void) { return s_mock_mounted ? (32UL * 1024UL) : 0; }
 
+
+/**
+ * @brief Ottiene la dimensione utilizzata della scheda SD.
+ * 
+ * @return uint64_t La dimensione utilizzata della scheda SD in byte.
+ */
 uint64_t sd_card_get_used_size(void) { return s_mock_mounted ? (1UL * 1024UL) : 0; }
 
 const char* sd_card_get_last_error(void) { return "OK"; }
 
+
+/**
+ * @brief Formatta la scheda SD.
+ * 
+ * Questa funzione formatta la scheda SD collegata al dispositivo.
+ * 
+ * @return esp_err_t 
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t sd_card_format(void) {
     /* pretend format succeeds and leaves card mounted */
     s_mock_mounted = true;
     return ESP_OK;
 }
 
+
+/**
+ * @brief Lista i file e directory nella directory specificata.
+ *
+ * @param [in] path Percorso della directory da elencare.
+ * @param [out] out_buf Buffer in cui memorizzare i risultati della lista.
+ * @param [in] out_size Dimensione del buffer di output.
+ *
+ * @return
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ * - ESP_ERR_INVALID_ARG: Argomento non valido.
+ * - ESP_ERR_NO_MEM: Memoria insufficiente.
+ * - ESP_ERR_NOT_FOUND: Directory non trovata.
+ */
 esp_err_t sd_card_list_dir(const char *path, char *out_buf, size_t out_size) {
     /* mockup operation:
      * pretend that the directory contains four files; this allows higher-
@@ -651,6 +768,14 @@ void *sd_card_read_file(const char *path, size_t *out_size) {
     return buf;
 }
 
+
+/**
+ * @brief Scrive i dati in un file sulla scheda SD.
+ * 
+ * @param [in] path Percorso del file su cui scrivere i dati.
+ * @param [in] data Puntatore ai dati da scrivere.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t sd_card_write_file(const char *path, const char *data) {
     if (!s_mock_mounted) return ESP_ERR_INVALID_STATE;
     return ESP_OK;
@@ -670,11 +795,26 @@ FILE *sd_card_fopen(const char *path, const char *mode)
     return (FILE *)&s_mock_file_sentinel;
 }
 
+
+/** Chiude il file aperto in modalità SD card.
+ * @param [in] f Puntatore al file da chiudere.
+ * @return 0 in caso di successo, -1 in caso di errore. */
 void sd_card_fclose(FILE *f)
 {
     (void)f; /* handle fittizio: no-op */
 }
 
+
+/**
+ * @brief Scrive dati in un file SD.
+ *
+ * Questa funzione scrive un blocco di dati in un file SD aperto.
+ *
+ * @param [in] f Puntatore al file SD aperto in modalità scrittura.
+ * @param [in] buf Puntatore ai dati da scrivere nel file.
+ * @param [in] size Numero di byte da scrivere.
+ * @return Numero di byte effettivamente scritti, o 0 in caso di errore.
+ */
 size_t sd_card_fwrite(FILE *f, const void *buf, size_t size)
 {
     (void)buf;
@@ -682,12 +822,28 @@ size_t sd_card_fwrite(FILE *f, const void *buf, size_t size)
     return (f == (FILE *)&s_mock_file_sentinel) ? size : 0;
 }
 
+
+/**
+ * @brief Legge dati dal file aperto in modalità lettura.
+ *
+ * @param [in] f Puntatore al file aperto in modalità lettura.
+ * @param [out] buf Puntatore al buffer dove verranno memorizzati i dati letti.
+ * @param [in] size Numero di byte da leggere.
+ * @return Numero di byte effettivamente letti, o 0 se si verifica un errore.
+ */
 size_t sd_card_fread(FILE *f, void *buf, size_t size)
 {
     (void)f; (void)buf; (void)size;
     return 0; /* EOF immediato in modalità mock */
 }
 
+
+/** @brief Svuota il buffer di scrittura del file specificato.
+ *  
+ *  @param [in] f Puntatore al file su cui eseguire il flush.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void sd_card_fflush(FILE *f)
 {
     (void)f; /* no-op */
@@ -722,11 +878,28 @@ struct dirent *sd_card_readdir(DIR *dir)
     return &s_mock_dirent;
 }
 
+
+/**
+ * @brief Chiude il directory stream aperto per la lettura della directory SD card.
+ *
+ * @param [in] dir Puntatore al directory stream da chiudere.
+ * @return void Nessun valore di ritorno.
+ */
 void sd_card_closedir(DIR *dir)
 {
     (void)dir; /* no-op */
 }
 
+
+/**
+ * @brief Ottiene lo stato del file system della scheda SD.
+ *
+ * Questa funzione restituisce informazioni sul file system della scheda SD specificata.
+ *
+ * @param [in] path Percorso del file system della scheda SD.
+ * @param [out] st Struttura di output contenente le informazioni sul file system.
+ * @return 0 in caso di successo, -1 in caso di errore.
+ */
 int sd_card_stat(const char *path, struct stat *st)
 {
     if (!path || !st) return -1;

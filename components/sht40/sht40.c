@@ -26,6 +26,16 @@ static bool s_sht40_ready = false;
 
 static i2c_master_dev_handle_t sht_dev;
 
+
+/**
+ * @brief Prepara il dispositivo SHT40 per l'utilizzo.
+ *
+ * Questa funzione configura il dispositivo SHT40 per iniziare a misurare le temperature e l'umidità.
+ *
+ * @return esp_err_t
+ * @retval ESP_OK Se la preparazione del dispositivo è stata completata con successo.
+ * @retval ESP_FAIL Se si è verificato un errore durante la preparazione del dispositivo.
+ */
 static esp_err_t sht40_prepare_device(void)
 {
     i2c_master_bus_handle_t bus = periph_i2c_get_handle();
@@ -52,6 +62,15 @@ static esp_err_t sht40_prepare_device(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Disconnette il dispositivo SHT40.
+ * 
+ * Questa funzione disconnette il dispositivo SHT40 dal sistema.
+ * 
+ * @param [in/out] sht_dev Puntatore al dispositivo SHT40 da disconnettere.
+ * @return Niente.
+ */
 static void sht40_drop_device(void)
 {
     if (sht_dev == NULL) {
@@ -62,6 +81,16 @@ static void sht40_drop_device(void)
     s_sht40_ready = false;
 }
 
+
+/**
+ * @brief Calcola il valore CRC8 per un blocco di dati.
+ * 
+ * Questa funzione calcola il valore CRC8 utilizzando il polinomio 0x07.
+ * 
+ * @param [in] data Puntatore al blocco di dati per cui calcolare il CRC8.
+ * @param [in] len Lunghezza del blocco di dati.
+ * @return uint8_t Il valore CRC8 calcolato.
+ */
 static uint8_t crc8(const uint8_t *data, size_t len) {
     uint8_t crc = 0xFF;
     for (size_t i = 0; i < len; i++) {
@@ -77,6 +106,16 @@ static uint8_t crc8(const uint8_t *data, size_t len) {
     return crc;
 }
 
+
+/**
+ * @brief Inizializza il sensore SHT40.
+ * 
+ * Questa funzione inizializza il sensore SHT40 per la misurazione delle temperature e umidità.
+ * 
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione avvenuta con successo.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t sht40_init(void) {
     s_sht40_ready = false;
 
@@ -105,6 +144,17 @@ esp_err_t sht40_init(void) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Legge la temperatura e l'umidità dal sensore SHT40.
+ * 
+ * @param [out] temp Puntatore alla variabile dove verrà memorizzata la temperatura.
+ * @param [out] hum Puntatore alla variabile dove verrà memorizzata l'umidità.
+ * @return esp_err_t Errore generato dalla funzione.
+ *         - ESP_OK: Operazione riuscita.
+ *         - ESP_FAIL: Operazione fallita.
+ *         - ESP_ERR_INVALID_STATE: Il sensore non è pronto o non è stato inizializzato.
+ */
 esp_err_t sht40_read(float *temp, float *hum) {
     if (!s_sht40_ready || sht_dev == NULL) {
         esp_err_t init_ret = sht40_init();
@@ -199,6 +249,12 @@ esp_err_t sht40_read(float *temp, float *hum) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Controlla se il sensore SHT40 è pronto per l'acquisizione dei dati.
+ *
+ * @return true se il sensore è pronto, false altrimenti.
+ */
 bool sht40_is_ready(void)
 {
     return s_sht40_ready;
@@ -215,6 +271,16 @@ bool sht40_is_ready(void)
 #define SHT40_MOCK_TEMP_C   25.0f
 #define SHT40_MOCK_HUM_PCT  50.0f
 
+
+/**
+ * @brief Inizializza il sensore SHT40.
+ *
+ * Questa funzione inizializza il sensore SHT40 per la misurazione delle temperature e umidità.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Inizializzazione riuscita.
+ * - ESP_FAIL: Inizializzazione fallita.
+ */
 esp_err_t sht40_init(void)
 {
     s_sht40_ready = true;
@@ -223,6 +289,14 @@ esp_err_t sht40_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Legge la temperatura e l'umidità dal sensore SHT40.
+ * 
+ * @param [out] temp Puntatore alla variabile dove verrà memorizzata la temperatura in gradi Celsius.
+ * @param [out] hum Puntatore alla variabile dove verrà memorizzata l'umidità in percentuale.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 esp_err_t sht40_read(float *temp, float *hum)
 {
     if (!s_sht40_ready) {
@@ -235,6 +309,15 @@ esp_err_t sht40_read(float *temp, float *hum)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Controlla se il sensore SHT40 è pronto.
+ *
+ * Questa funzione verifica lo stato del sensore SHT40 per determinare
+ * se è pronto a ricevere nuove richieste di misurazione.
+ *
+ * @return true se il sensore è pronto, false altrimenti.
+ */
 bool sht40_is_ready(void)
 {
     return s_sht40_ready;

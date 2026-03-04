@@ -66,6 +66,14 @@ IRAM_ATTR static bool test_notify_refresh_ready(esp_lcd_panel_handle_t panel, es
     return (need_yield == pdTRUE);
 }
 
+
+/**
+ * @brief Inizializza il display LCD.
+ * 
+ * Questa funzione si occupa di inizializzare il display LCD, preparandolo per la visualizzazione di informazioni.
+ * 
+ * @return void Non restituisce alcun valore.
+ */
 static void test_init_lcd(void)
 {
 #if TEST_PIN_NUM_BK_LIGHT >= 0
@@ -123,6 +131,16 @@ static void test_init_lcd(void)
     TEST_ESP_OK(esp_lcd_dpi_panel_register_event_callbacks(panel_handle, &cbs, refresh_finish));
 }
 
+
+/**
+ * @brief Funzione per deallocare e deallocare risorse utilizzate dal display LCD.
+ *
+ * Questa funzione si occupa di deallocare e deallocare tutte le risorse utilizzate dal display LCD,
+ * assicurandosi che tutte le risorse siano rilasciate correttamente.
+ *
+ * @param Nessun parametro.
+ * @return Nessun valore di ritorno.
+ */
 static void test_deinit_lcd(void)
 {
     TEST_ESP_OK(esp_lcd_panel_del(panel_handle));
@@ -146,6 +164,15 @@ static void test_deinit_lcd(void)
 #endif
 }
 
+
+/**
+ * @brief Testa il disegno di una barra di colori sull'LCD.
+ *
+ * @param [in] panel_handle Handle del pannello LCD.
+ * @param [in] h_res Risoluzione orizzontale del pannello.
+ * @param [in] v_res Risoluzione verticale del pannello.
+ * @return Nessun valore di ritorno.
+ */
 static void test_draw_color_bar(esp_lcd_panel_handle_t panel_handle, uint16_t h_res, uint16_t v_res)
 {
     uint8_t byte_per_pixel = (TEST_LCD_BIT_PER_PIXEL + 7) / 8;
@@ -238,12 +265,30 @@ TEST_CASE("test ili9881c to mirror with MIPI interface", "[ili9881c][mirror]")
 static size_t before_free_8bit;
 static size_t before_free_32bit;
 
+
+/**
+ * @brief Inizializza le variabili e le risorse necessarie prima di eseguire i test.
+ * 
+ * Questa funzione viene chiamata una volta all'inizio del test per preparare l'ambiente di esecuzione.
+ * 
+ * @return void Non restituisce alcun valore.
+ */
 void setUp(void)
 {
     before_free_8bit = heap_caps_get_free_size(MALLOC_CAP_8BIT);
     before_free_32bit = heap_caps_get_free_size(MALLOC_CAP_32BIT);
 }
 
+
+/**
+ * @brief Funzione di cleanup per la distruzione di risorse allocate.
+ *
+ * Questa funzione viene chiamata per deallocare tutte le risorse allocate
+ * durante l'esecuzione dei test. Viene utilizzata per assicurarsi che tutte
+ * le risorse siano correttamente rilasciate e che non ci siano leak di memoria.
+ *
+ * @return Niente.
+ */
 void tearDown(void)
 {
     size_t after_free_8bit = heap_caps_get_free_size(MALLOC_CAP_8BIT);
@@ -252,6 +297,15 @@ void tearDown(void)
     unity_utils_check_leak(before_free_32bit, after_free_32bit, "32BIT", TEST_MEMORY_LEAK_THRESHOLD);
 }
 
+
+/**
+ * @brief Funzione principale dell'applicazione.
+ *
+ * Questa funzione è l'entry point dell'applicazione e viene chiamata automaticamente
+ * dal sistema operativo al boot.
+ *
+ * @return void
+ */
 void app_main(void)
 {
     /**

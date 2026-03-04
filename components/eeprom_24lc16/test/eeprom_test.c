@@ -9,6 +9,13 @@
 
 static const char *TAG = "EEPROM_TEST";
 
+
+/**
+ * @brief Gestisce la richiesta HTTP per il test dell'EEPROM.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t eeprom_test_handler(httpd_req_t *req) {
     ESP_LOGI(TAG, "Ricevuta richiesta test EEPROM");
     char buf[512];

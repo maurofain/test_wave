@@ -691,40 +691,81 @@ bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_
 {
     /* #8 fix: receiver_id parametrico — qualunque agent può ricevere messaggi
      * dalla mailbox, non solo AGN_ID_FSM.
-     * #7 fix: attesa sul signal semaphore invece del polling ogni 1ms. */
-    if (!s_mb_mutex || !s_mb_signal || !event) {
+     *
+     * FIX consegna multi-destinatario:
+     * - prima scandiamo SEMPRE la mailbox sotto mutex per cercare messaggi
+     *   destinati al receiver.
+     * - solo se non troviamo nulla attendiamo sul semaforo di segnalazione.
+     *
+     * Questo evita che un task "sbagliato" consumi il token di segnale e lasci
+     * bloccato il destinatario reale (effetto osservato: eventi QR vecchi
+     * processati in ritardo quando arriva un nuovo evento touch/program).
+     */
+    if (!s_mb_mutex || !event) {
         return false;
     }
 
     uint32_t mybit = (1u << (uint32_t)receiver_id);
+    TickType_t start_tick = xTaskGetTickCount();
+    const TickType_t poll_delay = pdMS_TO_TICKS(2);
 
-    /* blocca efficientemente finché almeno un messaggio è disponibile;
-     * timeout_ticks == 0 → non-blocking, portMAX_DELAY → attesa infinita */
-    if (xSemaphoreTake(s_mb_signal, timeout_ticks) != pdTRUE) {
-        return false;
-    }
-
-    if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-        for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
-            if (s_mailbox[i].to_mask & mybit) {
-                *event = s_mailbox[i].ev;
+    while (true) {
+        if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
+                if (s_mailbox[i].to_mask & mybit) {
+                    bool slot_fully_consumed = false;
+                    *event = s_mailbox[i].ev;
 #ifdef LOG_QUEUE
-                ESP_LOGI(TAG, "DEQUEUE[%zu] type=%s action=%d from=%d receiver=%d",
-                         i, fsm_input_event_type_to_string(event->type),
-                         (int)event->action, (int)event->from, (int)receiver_id);
+                    ESP_LOGI(TAG, "DEQUEUE[%zu] type=%s action=%d from=%d receiver=%d",
+                             i, fsm_input_event_type_to_string(event->type),
+                             (int)event->action, (int)event->from, (int)receiver_id);
 #endif
-                s_mailbox[i].to_mask &= ~mybit;
-                /* BUG1 fix: avanzare head solo se lo slot è alla testa */
-                if (s_mailbox[i].to_mask == 0 && i == s_mb_head) {
-                    s_mb_head = (s_mb_head + 1) % FSM_MAILBOX_SIZE;
+                    s_mailbox[i].to_mask &= ~mybit;
+                    slot_fully_consumed = (s_mailbox[i].to_mask == 0);
+
+                    if (slot_fully_consumed) {
+                        while (s_mb_head != s_mb_tail && s_mailbox[s_mb_head].to_mask == 0) {
+                            s_mb_head = (s_mb_head + 1) % FSM_MAILBOX_SIZE;
+                        }
+                    }
+
+                    xSemaphoreGive(s_mb_mutex);
+
+                    if (slot_fully_consumed) {
+                        (void)xSemaphoreTake(s_mb_signal, 0);
+                    }
+                    return true;
                 }
-                xSemaphoreGive(s_mb_mutex);
-                return true;
             }
+            xSemaphoreGive(s_mb_mutex);
         }
-        xSemaphoreGive(s_mb_mutex);
+
+        if (timeout_ticks == 0) {
+            return false;
+        }
+
+        if (timeout_ticks == portMAX_DELAY) {
+            if (s_mb_signal) {
+                (void)xSemaphoreTake(s_mb_signal, poll_delay);
+            } else {
+                vTaskDelay(poll_delay);
+            }
+            continue;
+        }
+
+        TickType_t elapsed = xTaskGetTickCount() - start_tick;
+        if (elapsed >= timeout_ticks) {
+            return false;
+        }
+
+        TickType_t remaining = timeout_ticks - elapsed;
+        TickType_t wait_slice = (remaining > poll_delay) ? poll_delay : remaining;
+        if (wait_slice > 0) {
+            vTaskDelay(wait_slice);
+        } else {
+            taskYIELD();
+        }
     }
-    return false;
 }
 
 

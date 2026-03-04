@@ -71,7 +71,15 @@ typedef struct {
     uint16_t vid;           ///< Vendor ID
     uint16_t pid;           ///< Product ID
     uint16_t dual_pid;      ///< Dual/alternate PID
+    uint32_t cooldown_ms;   ///< Attesa post-lettura per evitare scansioni multiple
 } device_scanner_config_t;
+
+/**
+ * @brief Struttura timeout applicativi
+ */
+typedef struct {
+    uint32_t language_return_ms; ///< Timeout inattività per ritorno a pagina lingua
+} device_timeouts_config_t;
 
 /**
  * @brief Struttura di configurazione UART (RS232/RS485/MDB)
@@ -161,6 +169,7 @@ typedef struct {
     device_mdb_config_t mdb;
     device_display_config_t display;
     device_scanner_config_t scanner;    ///< Configurazione Scanner USB
+    device_timeouts_config_t timeouts;  ///< Timeout applicativi
     device_serial_config_t rs232;       ///< Configurazione RS232
     device_serial_config_t rs485;       ///< Configurazione RS485
     device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB

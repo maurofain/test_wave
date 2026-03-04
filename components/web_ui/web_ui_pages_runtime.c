@@ -67,7 +67,7 @@ esp_err_t root_get_handler(httpd_req_t *req)
     const char *emulator_link = show_emulator
         ? "<a href='/emulator' class='btn-link btn-emu'><span class='icon'>🕹️</span><span>Emulatore</span></a>"
         : "";
-    const char *mantainer_link = (show_emulator && !maintainer_active)
+    const char *mantainer_link = (!is_factory_view && show_emulator && !maintainer_active)
         ? "<a href='#' onclick=\"return window.goProtectedPath('/maintainer/enable');\" class='btn-link btn-maint'><span class='icon'>🛠️</span><span>Mantainer</span></a>"
         : "";
     const char *programs_link = show_programs

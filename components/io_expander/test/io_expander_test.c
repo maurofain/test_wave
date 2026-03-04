@@ -8,6 +8,15 @@ static const char *TAG = "IO_EXP_TEST";
 static TaskHandle_t s_test_handle = NULL;
 static bool s_run = false;
 
+
+/**
+ * @brief Funzione di test per l'espander I/O.
+ * 
+ * Questa funzione esegue i test per l'espander I/O.
+ * 
+ * @param arg Puntatore a dati di input per la funzione.
+ * @return Nessun valore di ritorno.
+ */
 static void io_expander_test_task(void *arg) {
     ESP_LOGI(TAG, "Avvio Test IO Expander (lampeggio 1Hz)");
     while(s_run) {
@@ -20,6 +29,14 @@ static void io_expander_test_task(void *arg) {
     vTaskDelete(NULL);
 }
 
+
+/**
+ * @brief Avvia il test dell'espansore I/O.
+ * 
+ * Questa funzione inizia il processo di test per l'espansore I/O.
+ * 
+ * @return esp_err_t - Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t io_expander_test_start(void) {
     if (s_test_handle) return ESP_ERR_INVALID_STATE;
     s_run = true;
@@ -29,6 +46,16 @@ esp_err_t io_expander_test_start(void) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Arresta il test dell'espansore I/O.
+ * 
+ * Questa funzione si occupa di interrompere e pulire tutte le operazioni in corso
+ * durante il test dell'espansore I/O, assicurandosi che tutte le risorse siano
+ * rilasciate correttamente.
+ * 
+ * @return esp_err_t - Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t io_expander_test_stop(void) {
     s_run = false;
     return ESP_OK;

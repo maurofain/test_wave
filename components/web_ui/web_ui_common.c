@@ -517,6 +517,16 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     return (i18n_record_t *)arr;
 }
 
+
+/**
+ * @brief Libera la memoria PSRAM utilizzata per un dizionario di record internazionalizzati.
+ *
+ * Questa funzione libera la memoria PSRAM allocata per un dizionario di record internazionalizzati.
+ * Ogni record inizia con un campo di lunghezza variabile che indica la lunghezza del record.
+ *
+ * @param [in/out] records Puntatore al primo record del dizionario da deallocare.
+ * @return Nessun valore di ritorno.
+ */
 void i18n_free_dictionary_psram(i18n_record_t *records)
 {
     if (!records)
@@ -542,6 +552,16 @@ static void add_table_mapping(cJSON *table, const char *key, const char *value)
     }
 }
 
+
+/**
+ * @brief Aggiunge una mappatura di tabella alla struttura cJSON.
+ * 
+ * @param table Puntatore alla struttura cJSON in cui aggiungere la mappatura.
+ * @param key Chiave della mappatura da aggiungere.
+ * @param value Valore della mappatura da aggiungere.
+ * @return true Se la mappatura è stata aggiunta con successo.
+ * @return false Se la mappatura non è stata aggiunta (table o key non validi).
+ */
 static bool append_table_mapping(cJSON *table, const char *key, const char *value)
 {
     if (!table || !key || key[0] == '\0')
@@ -1021,6 +1041,13 @@ static char *escape_script_end_tag(const char *src)
     return out;
 }
 
+
+/**
+ * @brief Invia uno script di runtime internazionale tramite HTTP.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
 {
     const char *lang = device_config_get_ui_backend_language();
@@ -1124,6 +1151,16 @@ static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
 
 // Nota: questa funzione è usata da diverse pagine; non è più `static` perché
 // sarà condivisa tra i file del componente web_ui dopo lo split.
+
+/**
+ * @brief Invia la testata HTTP per una richiesta.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @param title Titolo della pagina.
+ * @param extra_style Stili extra da applicare alla pagina.
+ * @param show_nav Indica se mostrare la navigazione.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style, bool show_nav)
 {
     const char *safe_title = title ? title : "";
@@ -1329,6 +1366,13 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
 
 // Sposto qui la response per /logo.jpg (era in web_ui.c). Rendendola visibile
 // tramite header interno possiamo registrarla dagli altri file.
+
+/**
+ * @brief Ottiene il gestore per la richiesta HTTP.
+ *
+ * @param [in] req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t logo_get_handler(httpd_req_t *req)
 {
     // Carica logo da filesystem (se presente) oppure restituisce 204
@@ -1378,6 +1422,13 @@ void ip_to_str(esp_netif_t *netif, char *out, size_t len)
     }
 }
 
+
+/**
+ * @brief Esegue l'operazione di aggiornamento del firmware tramite URL fornito.
+ *
+ * @param [in] url URL del firmware da aggiornare.
+ * @return esp_err_t Codice di errore che indica il risultato dell'operazione.
+ */
 esp_err_t perform_ota(const char *url)
 {
     if (!url || strlen(url) == 0)
@@ -1395,6 +1446,14 @@ esp_err_t perform_ota(const char *url)
     return ret;
 }
 
+
+/**
+ * @brief Controlla se il runtime della factory è attivo.
+ * 
+ * Questa funzione verifica se le funzionalità della factory sono state sovrascritte.
+ * 
+ * @return true se il runtime della factory è attivo, false altrimenti.
+ */
 static bool is_factory_runtime(void)
 {
     if (web_ui_factory_features_override_get())
@@ -1407,11 +1466,24 @@ static bool is_factory_runtime(void)
 
 static bool s_factory_features_override = false;
 
+
+/** @brief Imposta lo stato di override delle funzionalità dell'interfaccia web UI.
+ * 
+ * @param [in] enabled Se true, abilita l'override delle funzionalità dell'interfaccia web UI; altrimenti, lo disabilita.
+ * @return Niente.
+ */
 void web_ui_factory_features_override_set(bool enabled)
 {
     s_factory_features_override = enabled;
 }
 
+
+/**
+ * @brief Ottiene le funzionalità di override della factory per l'interfaccia web UI.
+ *
+ * @param [out] features Puntatore alla struttura che conterrà le funzionalità di override.
+ * @return true se le funzionalità di override sono state ottenute con successo, false altrimenti.
+ */
 bool web_ui_factory_features_override_get(void)
 {
     return s_factory_features_override;
@@ -1422,6 +1494,13 @@ const char *web_ui_profile_view_label(void)
     return is_factory_runtime() ? "Factory View" : "App View";
 }
 
+
+/**
+ * @brief Controlla se una funzionalità dell'interfaccia utente web è abilitata.
+ *
+ * @param feature La funzionalità dell'interfaccia utente web da controllare.
+ * @return true se la funzionalità è abilitata, false altrimenti.
+ */
 bool web_ui_feature_enabled(web_ui_feature_t feature)
 {
     bool is_factory = is_factory_runtime();

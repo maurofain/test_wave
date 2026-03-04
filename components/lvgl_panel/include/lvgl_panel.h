@@ -3,9 +3,10 @@
 #include <stdint.h>
 /**
  * @file lvgl_panel.h
- * @brief Pannello LVGL emulatore per display 7" 800×1280 verticale.
+ * @brief Pannello LVGL emulatore per display 7" 720×1280 verticale.
  *
  * Mostra:
+ *  - Splash iniziale con logo `MicroHard` centrato
  *  - Landing `select_language` con 5 pulsanti lingua (bandiera + nome)
  *  - Schermata principale a 4 colonne:
  *    | programmi 1-5 | counter | barra tempo | programmi 6-10 |
@@ -25,6 +26,21 @@
  * Acquisisce internamente il lock LVGL.
  */
 void lvgl_panel_show(void);
+
+/**
+ * @brief Mostra la splash iniziale con logo MicroHard al centro schermo.
+ *
+ * La schermata resta visibile finché non viene esplicitamente sostituita
+ * da `lvgl_panel_show_language_select()`.
+ */
+void lvgl_panel_show_boot_logo(void);
+
+/**
+ * @brief Mostra la schermata di selezione lingua.
+ *
+ * Tipicamente chiamata al termine della finestra di stabilità del boot.
+ */
+void lvgl_panel_show_language_select(void);
 
 /* Aggiorna i testi visibili in LVGL dopo un cambio lingua */
 void lvgl_panel_refresh_texts(void);

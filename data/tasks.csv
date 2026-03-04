@@ -9,6 +9,7 @@ rs485,idle,5,0,10,4096,spiram
 mdb,idle,5,0,10,4096,spiram
 pwm,idle,4,0,20,2048,spiram
 fsm,run,4,0,100,32768,spiram
+http_services,run,4,0,100,32768,spiram
 log_sender,run,5,0,1000,12288,internal
 touchscreen,idle,4,0,20,8192,spiram
 lvgl,idle,5,0,16,32768,spiram

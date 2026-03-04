@@ -50,6 +50,14 @@ static esp_err_t send_cdc_request(cdc_dev_t *cdc_dev, bool in_transfer, cdc_requ
     return cdc_acm_host_send_custom_request((cdc_acm_dev_hdl_t) cdc_dev, req_type, request, value, cdc_dev->notif.intf_desc->bInterfaceNumber, data_len, data);
 }
 
+
+/**
+ * @brief Ottiene la configurazione di codifica della linea ACM.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo ACM.
+ * @param [out] line_coding Puntatore alla struttura in cui verrà memorizzata la configurazione di codifica della linea.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t acm_compliant_line_coding_get(cdc_acm_dev_hdl_t cdc_hdl, cdc_acm_line_coding_t *line_coding)
 {
     CDC_ACM_CHECK(line_coding, ESP_ERR_INVALID_ARG);
@@ -62,6 +70,14 @@ esp_err_t acm_compliant_line_coding_get(cdc_acm_dev_hdl_t cdc_hdl, cdc_acm_line_
     return ESP_OK;
 }
 
+
+/**
+ * @brief Imposta la codifica della linea per un dispositivo CDC ACM.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC ACM.
+ * @param [in] line_coding Puntatore a una struttura che contiene la configurazione della codifica della linea.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t acm_compliant_line_coding_set(cdc_acm_dev_hdl_t cdc_hdl, const cdc_acm_line_coding_t *line_coding)
 {
     CDC_ACM_CHECK(line_coding, ESP_ERR_INVALID_ARG);
@@ -74,6 +90,18 @@ esp_err_t acm_compliant_line_coding_set(cdc_acm_dev_hdl_t cdc_hdl, const cdc_acm
     return ESP_OK;
 }
 
+
+/**
+ * @brief Imposta lo stato delle linee di controllo ACM.
+ *
+ * Questa funzione imposta lo stato delle linee di controllo ACM (Data Terminal Ready e Request to Send)
+ * per il dispositivo CDC ACM specificato.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC ACM.
+ * @param [in] dtr Stato della linea DTR (Data Terminal Ready).
+ * @param [in] rts Stato della linea RTS (Request to Send).
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t acm_compliant_set_control_line_state(cdc_acm_dev_hdl_t cdc_hdl, bool dtr, bool rts)
 {
     const uint16_t ctrl_bitmap = (uint16_t)dtr | ((uint16_t)rts << 1);
@@ -85,6 +113,14 @@ esp_err_t acm_compliant_set_control_line_state(cdc_acm_dev_hdl_t cdc_hdl, bool d
     return ESP_OK;
 }
 
+
+/**
+ * @brief Invia un segnale di interruzione (break) su un dispositivo CDC-ACM.
+ *
+ * @param [in] cdc_hdl Handle del dispositivo CDC-ACM su cui inviare il segnale di interruzione.
+ * @param [in] duration_ms Durata del segnale di interruzione in millisecondi.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t acm_compliant_send_break(cdc_acm_dev_hdl_t cdc_hdl, uint16_t duration_ms)
 {
     ESP_RETURN_ON_ERROR(

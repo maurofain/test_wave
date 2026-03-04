@@ -9,10 +9,12 @@
 #include "web_ui.h"
 #include "web_ui_programs.h"
 #include "fsm.h"
+#include "lvgl_panel.h"
 #include "usb_cdc_scanner.h" // Scanner QR
 #include "cctalk.h"          // cctalk_driver_init + cctalk_task_run
 #include "mdb.h"             // mdb_init + mdb_engine_run
 #include "sd_card.h"         // sd_card_init_monitor + sd_card_monitor_run
+#include "http_services.h"
 #include "freertos/idf_additions.h"
 #include <stdio.h>
 #include <string.h>
@@ -33,6 +35,59 @@
 static const char *TAG = "TASKS";
 static float s_temperature = 0.0f;
 static float s_humidity = 0.0f;
+
+#define SCANNER_QR_COOLDOWN_DEFAULT_MS 10000U
+#define SCANNER_QR_COOLDOWN_MIN_MS 500U
+#define SCANNER_QR_COOLDOWN_MAX_MS 60000U
+#define FSM_LANGUAGE_RETURN_DEFAULT_MS 10000U
+#define FSM_LANGUAGE_RETURN_MIN_MS 1000U
+#define FSM_LANGUAGE_RETURN_MAX_MS 600000U
+static volatile bool s_scanner_cooldown_active = false;
+static volatile bool s_scanner_reenable_pending = false;
+static volatile TickType_t s_scanner_cooldown_until = 0;
+static volatile uint32_t s_scanner_cooldown_active_ms = SCANNER_QR_COOLDOWN_DEFAULT_MS;
+static volatile uint32_t s_scanner_reenable_attempts = 0;
+static http_services_customer_t s_last_customer = {0};
+static bool s_last_customer_available = false;
+
+static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event);
+
+static uint32_t fsm_get_language_return_timeout_ms(void)
+{
+    uint32_t timeout_ms = FSM_LANGUAGE_RETURN_DEFAULT_MS;
+    device_config_t *cfg = device_config_get();
+    if (cfg && cfg->timeouts.language_return_ms > 0U) {
+        timeout_ms = cfg->timeouts.language_return_ms;
+    }
+
+    if (timeout_ms < FSM_LANGUAGE_RETURN_MIN_MS) {
+        timeout_ms = FSM_LANGUAGE_RETURN_MIN_MS;
+    }
+    if (timeout_ms > FSM_LANGUAGE_RETURN_MAX_MS) {
+        timeout_ms = FSM_LANGUAGE_RETURN_MAX_MS;
+    }
+
+    return timeout_ms;
+}
+
+static void fsm_apply_language_return_timeout(fsm_ctx_t *fsm)
+{
+    if (!fsm) {
+        return;
+    }
+
+    uint32_t timeout_ms = fsm_get_language_return_timeout_ms();
+    if (fsm->splash_screen_time_ms == timeout_ms) {
+        return;
+    }
+
+    fsm->splash_screen_time_ms = timeout_ms;
+    if (fsm->inactivity_ms > (timeout_ms + 5000U)) {
+        fsm->inactivity_ms = timeout_ms + 5000U;
+    }
+
+    ESP_LOGI(TAG, "[M] Timeout inattività ritorno lingua impostato a %lu ms", (unsigned long)timeout_ms);
+}
 
 
 /**
@@ -285,6 +340,7 @@ static void fsm_task(void *arg)
     task_param_t *param = (task_param_t *)arg;
     fsm_ctx_t fsm;
     fsm_init(&fsm);
+    fsm_apply_language_return_timeout(&fsm);
     TickType_t prev_tick = xTaskGetTickCount();
 
     if (!fsm_event_queue_init(0)) {
@@ -302,14 +358,18 @@ static void fsm_task(void *arg)
 
     while (true) {
         fsm_input_event_t event;
+        bool event_received = false;
         bool changed = false;
         fsm_state_t state_before = fsm.state;
+
+        fsm_apply_language_return_timeout(&fsm);
 
         /* #6 fix: receive first (blocca fino a period_ticks = 100ms), poi
          * misura l'elapsed così l'attesa è inclusa nel delta. In questo modo
          * fsm_tick() riceve il tempo realmente trascorso, non quello
          * dell'iterazione *precedente*. */
         if (fsm_event_receive(&event, AGN_ID_FSM, param->period_ticks)) {
+            event_received = true;
             changed = fsm_handle_input_event(&fsm, &event);
         }
 
@@ -334,6 +394,23 @@ static void fsm_task(void *arg)
                 (void)web_ui_virtual_relay_control(relay, false, 0);
             }
             fsm_append_message("Programma terminato: reset relay/schermata");
+        }
+
+        if (state_before == FSM_STATE_CREDIT && fsm.state == FSM_STATE_IDLE) {
+            device_config_t *cfg = device_config_get();
+            if (cfg && cfg->display.enabled) {
+                lvgl_panel_show_language_select();
+                ESP_LOGI(TAG, "[M] Timeout inattività: ritorno alla scelta lingua");
+            } else {
+                ESP_LOGI(TAG, "[M] Timeout inattività: display disabilitato, pagina lingua non mostrata");
+            }
+        }
+
+        if (event_received &&
+            event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED &&
+            state_before == FSM_STATE_CREDIT &&
+            fsm.state == FSM_STATE_RUNNING) {
+            publish_program_payment_event(&fsm, &event);
         }
 
         if (changed) {
@@ -483,6 +560,109 @@ static void ntp_task(void *arg)
 // wrapper per lo scanner USB: inizializza il driver e poi entra nella sua routine
 
 /**
+ * @brief Recupera il tempo di attesa scanner da configurazione.
+ */
+static uint32_t scanner_get_cooldown_ms(void)
+{
+    uint32_t cooldown_ms = SCANNER_QR_COOLDOWN_DEFAULT_MS;
+    device_config_t *cfg = device_config_get();
+    if (cfg && cfg->scanner.cooldown_ms > 0) {
+        cooldown_ms = cfg->scanner.cooldown_ms;
+    }
+
+    if (cooldown_ms < SCANNER_QR_COOLDOWN_MIN_MS) {
+        cooldown_ms = SCANNER_QR_COOLDOWN_MIN_MS;
+    }
+    if (cooldown_ms > SCANNER_QR_COOLDOWN_MAX_MS) {
+        cooldown_ms = SCANNER_QR_COOLDOWN_MAX_MS;
+    }
+    return cooldown_ms;
+}
+
+/**
+ * @brief Verifica se il cooldown scanner è ancora attivo.
+ */
+static bool scanner_cooldown_is_active(TickType_t now)
+{
+    if (!s_scanner_cooldown_active) {
+        return false;
+    }
+    return ((int32_t)(now - s_scanner_cooldown_until) < 0);
+}
+
+
+/**
+ * @brief Riattiva lo scanner al termine del cooldown.
+ */
+static void scanner_cooldown_tick(void)
+{
+    if (!s_scanner_reenable_pending) {
+        return;
+    }
+
+    TickType_t now = xTaskGetTickCount();
+    if ((int32_t)(now - s_scanner_cooldown_until) < 0) {
+        return;
+    }
+
+    esp_err_t on_err = usb_cdc_scanner_send_on_command();
+    if (on_err == ESP_OK) {
+        s_scanner_reenable_pending = false;
+        s_scanner_cooldown_active = false;
+        s_scanner_reenable_attempts = 0;
+        ESP_LOGI("SCANNER", "[M] Scanner riattivato dopo cooldown di %lu ms",
+                 (unsigned long)s_scanner_cooldown_active_ms);
+    } else {
+        s_scanner_reenable_attempts++;
+
+        if ((s_scanner_reenable_attempts % 10U) == 1U) {
+            ESP_LOGW("SCANNER", "[M] Riattivazione scanner fallita (tentativo=%lu): %s",
+                     (unsigned long)s_scanner_reenable_attempts,
+                     esp_err_to_name(on_err));
+        }
+
+        if (s_scanner_reenable_attempts >= 5U) {
+            esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
+            if (setup_err == ESP_OK) {
+                on_err = usb_cdc_scanner_send_on_command();
+                if (on_err == ESP_OK) {
+                    s_scanner_reenable_pending = false;
+                    s_scanner_cooldown_active = false;
+                    s_scanner_reenable_attempts = 0;
+                    ESP_LOGI("SCANNER", "[M] Scanner riattivato con fallback setup+on");
+                    return;
+                }
+            }
+
+            if ((s_scanner_reenable_attempts % 10U) == 1U) {
+                ESP_LOGW("SCANNER", "[M] Fallback setup+on fallito (setup=%s on=%s)",
+                         esp_err_to_name(setup_err),
+                         esp_err_to_name(on_err));
+            }
+        }
+
+        s_scanner_cooldown_until = now + pdMS_TO_TICKS(500);
+    }
+}
+
+/**
+ * @brief Task dedicato alla riattivazione scanner dopo cooldown.
+ */
+static void scanner_cooldown_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t period = (param && param->period_ticks > 0) ? param->period_ticks : pdMS_TO_TICKS(100);
+
+    ESP_LOGI("SCANNER", "[M] scanner_cooldown_task avviato (period=%lu ms)",
+             (unsigned long)pdTICKS_TO_MS(period));
+
+    while (true) {
+        scanner_cooldown_tick();
+        vTaskDelay(period);
+    }
+}
+
+/**
  * @brief Callback chiamata quando viene rilevato un barcode.
  *
  * Questa funzione viene invocata dal sistema quando viene rilevato un barcode.
@@ -490,16 +670,140 @@ static void ntp_task(void *arg)
  * @param barcode [in] Il codice barcode rilevato.
  * @return void Non restituisce alcun valore.
  */
+static bool scanner_extract_clean_barcode(const char *raw_barcode, char *clean_barcode, size_t clean_len)
+{
+    if (!raw_barcode || !clean_barcode || clean_len == 0) {
+        return false;
+    }
+
+    clean_barcode[0] = '\0';
+
+    char printable[FSM_EVENT_TEXT_MAX_LEN] = {0};
+    size_t printable_idx = 0;
+    for (const unsigned char *p = (const unsigned char *)raw_barcode;
+         *p != '\0' && printable_idx < sizeof(printable) - 1;
+         ++p) {
+        if (*p >= 32 && *p <= 126) {
+            printable[printable_idx++] = (char)*p;
+        }
+    }
+    printable[printable_idx] = '\0';
+
+    const char *start = printable;
+    while (*start && isspace((unsigned char)*start)) {
+        start++;
+    }
+
+    size_t len = strlen(start);
+    while (len > 0 && isspace((unsigned char)start[len - 1])) {
+        len--;
+    }
+    if (len == 0) {
+        return false;
+    }
+
+    char trimmed[FSM_EVENT_TEXT_MAX_LEN] = {0};
+    if (len >= sizeof(trimmed)) {
+        len = sizeof(trimmed) - 1;
+    }
+    memcpy(trimmed, start, len);
+    trimmed[len] = '\0';
+
+    bool looks_like_scanner_frame = (strstr(trimmed, "SCNENA") != NULL) ||
+                                    (strstr(trimmed, "SCNMOD") != NULL) ||
+                                    (strstr(trimmed, "RRDENA") != NULL) ||
+                                    (strstr(trimmed, "CIDENA") != NULL) ||
+                                    (strstr(trimmed, "RRDDUR") != NULL) ||
+                                    (strchr(trimmed, '#') != NULL && strchr(trimmed, ';') != NULL);
+
+    if (!looks_like_scanner_frame) {
+        if (len >= clean_len) {
+            len = clean_len - 1;
+        }
+        memcpy(clean_barcode, trimmed, len);
+        clean_barcode[len] = '\0';
+        return true;
+    }
+
+    size_t best_start = 0;
+    size_t best_len = 0;
+    size_t run_start = 0;
+    size_t run_len = 0;
+    for (size_t i = 0;; ++i) {
+        char c = trimmed[i];
+        if (isdigit((unsigned char)c)) {
+            if (run_len == 0) {
+                run_start = i;
+            }
+            run_len++;
+        } else {
+            if (run_len > 0) {
+                if (run_len > best_len || (run_len == best_len && run_start >= best_start)) {
+                    best_start = run_start;
+                    best_len = run_len;
+                }
+                run_len = 0;
+            }
+            if (c == '\0') {
+                break;
+            }
+        }
+    }
+
+    if (best_len < 6) {
+        return false;
+    }
+
+    if (best_len >= clean_len) {
+        best_len = clean_len - 1;
+    }
+    memcpy(clean_barcode, &trimmed[best_start], best_len);
+    clean_barcode[best_len] = '\0';
+    return true;
+}
+
 static void scanner_on_barcode_cb(const char *barcode)
 {
-    ESP_LOGI("SCANNER", "Barcode: %s", barcode);
+    if (!barcode || barcode[0] == '\0') {
+        return;
+    }
+
+    char clean_barcode[FSM_EVENT_TEXT_MAX_LEN] = {0};
+    if (!scanner_extract_clean_barcode(barcode, clean_barcode, sizeof(clean_barcode))) {
+        ESP_LOGW("SCANNER", "[M] Barcode scanner non valido/scartato");
+        return;
+    }
+
+    TickType_t now = xTaskGetTickCount();
+    if (scanner_cooldown_is_active(now)) {
+        ESP_LOGI("SCANNER", "[M] Barcode ignorato: scanner in cooldown");
+        return;
+    }
+
+    uint32_t cooldown_ms = scanner_get_cooldown_ms();
+    s_scanner_cooldown_active = true;
+    s_scanner_reenable_pending = true;
+    s_scanner_reenable_attempts = 0;
+    s_scanner_cooldown_active_ms = cooldown_ms;
+    s_scanner_cooldown_until = now + pdMS_TO_TICKS(cooldown_ms);
+
+    esp_err_t off_err = usb_cdc_scanner_send_off_command();
+    if (off_err == ESP_OK) {
+        ESP_LOGI("SCANNER", "[M] Scanner spento per %lu ms dopo lettura QR",
+                 (unsigned long)cooldown_ms);
+    } else {
+        ESP_LOGW("SCANNER", "[M] Spegnimento scanner fallito: %s",
+                 esp_err_to_name(off_err));
+    }
+
+    ESP_LOGI("SCANNER", "[M] Barcode clean: %s", clean_barcode);
     /* Barcode readings: use distinct tag so UI can display readings separately */
-    web_ui_add_log("INFO", "SCANNER_DATA", barcode);
+    web_ui_add_log("INFO", "SCANNER_DATA", clean_barcode);
     {
         fsm_input_event_t ev = {
             .from = AGN_ID_USB_CDC_SCANNER,
-            .to = {AGN_ID_FSM},
-            .action = ACTION_ID_NONE,
+            .to = {AGN_ID_HTTP_SERVICES},
+            .action = ACTION_ID_USB_CDC_SCANNER_READ,
             .type = FSM_INPUT_EVENT_QR_SCANNED,
             .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
             .value_i32 = 0,
@@ -507,8 +811,235 @@ static void scanner_on_barcode_cb(const char *barcode)
             .aux_u32 = 0,
             .text = {0},
         };
-        strncpy(ev.text, barcode, sizeof(ev.text)-1);
+        strncpy(ev.text, clean_barcode, sizeof(ev.text)-1);
         (void)fsm_event_publish(&ev, 0);
+    }
+}
+
+
+/**
+ * @brief Normalizza il testo barcode rimuovendo spazi iniziali/finali.
+ */
+static void normalize_barcode_text(const char *input, char *output, size_t output_len)
+{
+    if (!output || output_len == 0) {
+        return;
+    }
+    output[0] = '\0';
+    if (!input) {
+        return;
+    }
+
+    while (*input && isspace((unsigned char)*input)) {
+        input++;
+    }
+
+    size_t len = strlen(input);
+    while (len > 0 && isspace((unsigned char)input[len - 1])) {
+        len--;
+    }
+
+    if (len >= output_len) {
+        len = output_len - 1;
+    }
+
+    memcpy(output, input, len);
+    output[len] = '\0';
+}
+
+
+/**
+ * @brief Pubblica verso FSM il credito ECD ricavato da QR.
+ */
+static void publish_qr_credit_event(const char *barcode, int32_t ecd_amount)
+{
+    if (ecd_amount <= 0) {
+        return;
+    }
+
+    fsm_input_event_t credit_ev = {
+        .from = AGN_ID_HTTP_SERVICES,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_PAYMENT_ACCEPTED,
+        .type = FSM_INPUT_EVENT_QR_CREDIT,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = ecd_amount,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .text = {0},
+    };
+    if (barcode && barcode[0] != '\0') {
+        strncpy(credit_ev.text, barcode, sizeof(credit_ev.text) - 1);
+    }
+
+    if (!fsm_event_publish(&credit_ev, pdMS_TO_TICKS(50))) {
+        ESP_LOGE(TAG, "[M] Publish QR_CREDIT fallito (barcode=%s ecd=%ld)",
+                 barcode ? barcode : "",
+                 (long)ecd_amount);
+        return;
+    }
+
+    ESP_LOGI(TAG, "[M] QR_CREDIT pubblicato (barcode=%s ecd=%ld)",
+             barcode ? barcode : "",
+             (long)ecd_amount);
+}
+
+
+/**
+ * @brief Pubblica verso HTTP_SERVICES l'evento di pagamento all'attivazione programma.
+ */
+static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event)
+{
+    if (!ctx) {
+        return;
+    }
+
+    int32_t payment_amount = (ctx->running_price_units > 0) ? ctx->running_price_units : 0;
+    const char *service_code = (ctx->running_program_name[0] != '\0')
+                                   ? ctx->running_program_name
+                                   : ((source_event && source_event->text[0] != '\0') ? source_event->text : "SER1");
+
+    fsm_input_event_t pay_ev = {
+        .from = AGN_ID_FSM,
+        .to = {AGN_ID_HTTP_SERVICES},
+        .action = ACTION_ID_PROGRAM_SELECTED,
+        .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = payment_amount,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .text = {0},
+    };
+    strncpy(pay_ev.text, service_code, sizeof(pay_ev.text) - 1);
+
+    if (!fsm_event_publish(&pay_ev, pdMS_TO_TICKS(50))) {
+        ESP_LOGE(TAG, "[M] Publish PAYMENT_EVENT fallito (service=%s amount=%ld)",
+                 service_code,
+                 (long)payment_amount);
+        return;
+    }
+
+    ESP_LOGI(TAG, "[M] PAYMENT_EVENT pubblicato (service=%s amount=%ld)",
+             service_code,
+             (long)payment_amount);
+}
+
+
+/**
+ * @brief Task consumer eventi per AGN_ID_HTTP_SERVICES.
+ *
+ * Riceve barcode scanner da mailbox FSM, interroga il backend (`getcustomers`) e
+ * traduce `amount` in credito ECD verso FSM.
+ */
+static void http_services_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGE(TAG, "[M] HTTP_SERVICES task: mailbox init fallita");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    while (true) {
+        fsm_input_event_t event;
+        if (!fsm_event_receive(&event, AGN_ID_HTTP_SERVICES, param->period_ticks)) {
+            continue;
+        }
+
+        if (event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED && event.action == ACTION_ID_PROGRAM_SELECTED) {
+            const char *service_code = (event.text[0] != '\0') ? event.text : "SER1";
+            int32_t amount = (event.value_i32 > 0) ? event.value_i32 : 0;
+            const http_services_customer_t *customer = s_last_customer_available ? &s_last_customer : NULL;
+
+            if (!s_last_customer_available) {
+                ESP_LOGW(TAG, "[M] payment: customer non disponibile, invio campi customer vuoti");
+            }
+
+            http_services_payment_response_t pay_resp;
+            esp_err_t pay_err = http_services_payment(customer, amount, service_code, &pay_resp);
+            if (pay_err != ESP_OK || pay_resp.common.iserror) {
+                ESP_LOGE(TAG,
+                         "[M] payment fallita service=%s amount=%ld err=%s code=%ld des=%s",
+                         service_code,
+                         (long)amount,
+                         esp_err_to_name(pay_err),
+                         (long)pay_resp.common.codeerror,
+                         pay_resp.common.deserror);
+            } else {
+                ESP_LOGI(TAG,
+                         "[M] payment OK service=%s amount=%ld paymentid=%ld",
+                         service_code,
+                         (long)amount,
+                         (long)pay_resp.paymentid);
+            }
+            continue;
+        }
+
+        if (event.type != FSM_INPUT_EVENT_QR_SCANNED || event.action != ACTION_ID_USB_CDC_SCANNER_READ) {
+            continue;
+        }
+
+        char barcode[FSM_EVENT_TEXT_MAX_LEN] = {0};
+        normalize_barcode_text(event.text, barcode, sizeof(barcode));
+        if (barcode[0] == '\0') {
+            ESP_LOGW(TAG, "[M] QR scanner: barcode vuoto, evento ignorato");
+            continue;
+        }
+
+        ESP_LOGI(TAG, "[M] QR scanner: lookup customer code=%s", barcode);
+
+        http_services_getcustomers_response_t gc_resp;
+        esp_err_t gc_err = http_services_getcustomers(barcode, "", &gc_resp);
+        if (gc_err != ESP_OK) {
+            ESP_LOGE(TAG, "[M] getcustomers fallita per barcode=%s (%s)",
+                     barcode,
+                     esp_err_to_name(gc_err));
+            continue;
+        }
+        if (gc_resp.common.iserror) {
+            ESP_LOGW(TAG, "[M] getcustomers errore server barcode=%s code=%ld des=%s",
+                     barcode,
+                     (long)gc_resp.common.codeerror,
+                     gc_resp.common.deserror);
+            continue;
+        }
+
+        const http_services_customer_t *selected = NULL;
+        for (size_t i = 0; i < gc_resp.customer_count; ++i) {
+            const http_services_customer_t *candidate = &gc_resp.customers[i];
+            if (!candidate->valid) {
+                continue;
+            }
+            if (candidate->code[0] != '\0' && strcmp(candidate->code, barcode) == 0) {
+                selected = candidate;
+                break;
+            }
+            if (!selected) {
+                selected = candidate;
+            }
+        }
+
+        if (!selected) {
+            ESP_LOGW(TAG, "[M] QR scanner: nessun customer valido per barcode=%s", barcode);
+            continue;
+        }
+
+        memset(&s_last_customer, 0, sizeof(s_last_customer));
+        memcpy(&s_last_customer, selected, sizeof(*selected));
+        if (s_last_customer.code[0] == '\0') {
+            strncpy(s_last_customer.code, barcode, sizeof(s_last_customer.code) - 1);
+        }
+        s_last_customer_available = true;
+
+        if (selected->amount <= 0) {
+            ESP_LOGI(TAG, "[M] QR scanner: credito non disponibile per code=%s (amount=%ld)",
+                     selected->code,
+                     (long)selected->amount);
+            continue;
+        }
+
+        publish_qr_credit_event(barcode, selected->amount);
     }
 }
 
@@ -687,6 +1218,30 @@ static task_param_t s_tasks[] = {
         .period_ticks = pdMS_TO_TICKS(100),
         .task_fn = fsm_task,
         .stack_words = 32768,                 /* RISC-V: 32KB; logica FSM + ESP_LOG + cJSON */
+        .stack_caps = MALLOC_CAP_SPIRAM,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "http_services",
+        .state = TASK_STATE_RUN,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(100),
+        .task_fn = http_services_task,
+        .stack_words = 32768,                 /* RISC-V: 32KB; esp_http_client + JSON parsing */
+        .stack_caps = MALLOC_CAP_SPIRAM,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "scanner_cooldown",
+        .state = TASK_STATE_RUN,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(100),
+        .task_fn = scanner_cooldown_task,
+        .stack_words = 4096,                  /* RISC-V: 4KB; polling cooldown + comando ON scanner */
         .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,

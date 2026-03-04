@@ -9,6 +9,15 @@ static TaskHandle_t s_led_test_handle = NULL;
 static bool s_run = false;
 static uint8_t s_test_brightness = 100;
 
+
+/** 
+ * @brief Task di test per il controllo dei LED.
+ * 
+ * Questa funzione esegue un test sui LED, accendendo e spentendo uno alla volta.
+ * 
+ * @param arg Puntatore agli argomenti del task (non utilizzato in questo contesto).
+ * @return Nessun valore di ritorno.
+ */
 static void led_test_task(void *arg) {
     ESP_LOGI(TAG, "Avvio Test Striscia LED WS2812 (Rainbow)");
     int hue = 0;
@@ -29,6 +38,14 @@ static void led_test_task(void *arg) {
     vTaskDelete(NULL);
 }
 
+
+/**
+ * @brief Avvia il test del LED.
+ * 
+ * Questa funzione inizia il test del LED, eseguendo una serie di operazioni per verificare il funzionamento del LED.
+ * 
+ * @return esp_err_t - Codice di errore che indica il successo o la fallita dell'operazione.
+ */
 esp_err_t led_test_start(void) {
     if (s_led_test_handle) return ESP_ERR_INVALID_STATE;
     s_run = true;
@@ -36,16 +53,43 @@ esp_err_t led_test_start(void) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Arresta il test del LED.
+ * 
+ * Questa funzione interrompe il processo di test del LED in corso.
+ * 
+ * @return esp_err_t
+ * - ESP_OK: Operazione riuscita.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t led_test_stop(void) {
     s_run = false;
     return ESP_OK;
 }
 
+
+/**
+ * @brief Imposta la luminosità del LED.
+ * 
+ * @param [in] brightness Valore di luminosità da impostare, compreso tra 0 e 255.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t led_test_set_brightness(uint8_t brightness) {
     s_test_brightness = (brightness > 100) ? 100 : brightness;
     return ESP_OK;
 }
 
+
+/**
+ * @brief Imposta il colore del LED.
+ * 
+ * @param [in] r Valore del canale rosso (0-255).
+ * @param [in] g Valore del canale verde (0-255).
+ * @param [in] b Valore del canale blu (0-255).
+ * @param [in] brightness Valore della luminosità (0-255).
+ * @return esp_err_t Errore generato dalla funzione.
+ */
 esp_err_t led_test_set_color(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness) {
     if (s_run) {
         s_run = false;
