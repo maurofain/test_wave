@@ -13,5 +13,6 @@ void serial_test_clear_monitor(int port);
 
 /* CCtalk monitoring helper */
 void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size_t len);
+void serial_test_push_monitor_action(const char *label, const char *action);
 const char* serial_test_get_cctalk_monitor(void);
 void serial_test_clear_cctalk_monitor(void);

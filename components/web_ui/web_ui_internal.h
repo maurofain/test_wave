@@ -42,6 +42,8 @@ esp_err_t api_logs_receive(httpd_req_t *req);
 esp_err_t api_logs_options(httpd_req_t *req);
 esp_err_t api_logs_levels_get(httpd_req_t *req);  // GET /api/logs/levels
 esp_err_t api_logs_set_level(httpd_req_t *req);    // POST /api/logs/level
+esp_err_t api_logs_network_get(httpd_req_t *req);  // GET /api/logs/network
+esp_err_t api_logs_network_set(httpd_req_t *req);  // POST /api/logs/network
 esp_err_t logs_page_handler(httpd_req_t *req);
 
 // Helper di registrazione (usato da web_ui_server.c)

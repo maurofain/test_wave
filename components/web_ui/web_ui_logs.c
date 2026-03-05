@@ -1,5 +1,6 @@
 #include "web_ui_internal.h"
 #include "web_ui.h"
+#include "device_config.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 
@@ -418,6 +419,135 @@ esp_err_t api_logs_set_level(httpd_req_t *req)
 }
 
 /**
+ * @brief Restituisce lo stato di invio log in rete (broadcast UDP).
+ *
+ * Endpoint: `GET /api/logs/network`.
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK dopo invio risposta JSON.
+ */
+esp_err_t api_logs_network_get(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+
+    device_config_t *cfg = device_config_get();
+    if (!cfg) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_send(req, "{\"error\":\"config unavailable\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    cJSON_AddBoolToObject(root, "enabled", cfg->remote_log.use_broadcast);
+    cJSON_AddNumberToObject(root, "server_port", cfg->remote_log.server_port);
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
+/**
+ * @brief Imposta lo stato di invio log in rete (broadcast UDP) e salva config.
+ *
+ * Endpoint: `POST /api/logs/network` con body JSON `{enabled: true|false}`.
+ *
+ * @param req Richiesta HTTP POST.
+ * @return ESP_OK dopo invio risposta JSON.
+ */
+esp_err_t api_logs_network_set(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+
+    device_config_t *cfg = device_config_get();
+    if (!cfg) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_send(req, "{\"error\":\"config unavailable\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    char body[128] = {0};
+    int received = httpd_req_recv(req, body, sizeof(body) - 1);
+    if (received <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"empty body\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    body[received] = '\0';
+
+    cJSON *root = cJSON_Parse(body);
+    if (!root) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"invalid json\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    cJSON *enabled = cJSON_GetObjectItem(root, "enabled");
+    if (!enabled) {
+        enabled = cJSON_GetObjectItem(root, "use_broadcast");
+    }
+
+    bool use_broadcast = false;
+    if (cJSON_IsBool(enabled)) {
+        use_broadcast = cJSON_IsTrue(enabled);
+    } else if (cJSON_IsNumber(enabled)) {
+        use_broadcast = (enabled->valueint != 0);
+    } else {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"missing/invalid enabled\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    cfg->remote_log.use_broadcast = use_broadcast;
+    cfg->updated = true;
+
+    if (device_config_save(cfg) != ESP_OK) {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_send(req, "{\"error\":\"config save failed\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    ESP_LOGI(TAG, "[C] Invio log rete %s (porta=%u)",
+             use_broadcast ? "abilitato" : "disabilitato",
+             (unsigned)cfg->remote_log.server_port);
+
+    cJSON_Delete(root);
+
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    cJSON_AddStringToObject(resp, "status", "ok");
+    cJSON_AddBoolToObject(resp, "enabled", cfg->remote_log.use_broadcast);
+    cJSON_AddNumberToObject(resp, "server_port", cfg->remote_log.server_port);
+
+    char *json = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
+/**
  * @brief Gestisce il preflight CORS per endpoint logs.
  *
  * Endpoint: `OPTIONS /api/logs`.
@@ -463,6 +593,12 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "<div class='container'>"
         "<div class='section'><h2>📋 Log Remoto Ricevuti</h2>"
         "<p>I log vengono ricevuti via UDP dal server configurato. Aggiorna la pagina per vedere i nuovi log.</p>"
+        "<div style='margin:10px 0 14px 0;padding:10px;border:1px solid #cfe2ff;border-radius:6px;background:#eef6ff;'>"
+        "  <label style='display:inline-flex;align-items:center;gap:8px;font-weight:bold;color:#2c3e50;'>"
+        "    <input type='checkbox' id='netLogToggle'>Invio log in rete (UDP)"
+        "  </label>"
+        "  <span id='netLogStatus' style='margin-left:10px;font-size:12px;color:#34495e;'></span>"
+        "</div>"
         "<div id='levelsContainer' style='margin-bottom:12px;'></div>"
         "<div style='margin-bottom:10px;'>"
         "  <button id='applyLevelsBtn' style='margin-right:8px;padding:6px 10px;background:#3498db;color:white;border-radius:4px;border:none;'>Applica livelli</button>"
@@ -480,6 +616,8 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "const LEVELS = [{v:0,t:'NONE'},{v:1,t:'ERROR'},{v:2,t:'WARN'},{v:3,t:'INFO'},{v:4,t:'DEBUG'},{v:5,t:'VERBOSE'}];"
         "let AUTO_SCROLL = false;"
         "function levelToText(v){const l=LEVELS.find(x=>x.v===v);return l?l.t:v;}"
+        "async function loadNetworkLogState(){try{const r=await fetch('/api/logs/network');if(!r.ok)throw new Error('Network state error');const js=await r.json();const sw=document.getElementById('netLogToggle');const st=document.getElementById('netLogStatus');if(sw)sw.checked=!!js.enabled;if(st)st.textContent='Stato: '+(js.enabled?'ATTIVO':'FERMO')+' · porta '+(js.server_port||'-');}catch(e){console.error(e);const st=document.getElementById('netLogStatus');if(st)st.textContent='Errore lettura stato invio rete';}}"
+        "async function saveNetworkLogState(enabled){try{const r=await fetch('/api/logs/network',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!enabled})});if(!r.ok)throw new Error('Network save error');const js=await r.json();const st=document.getElementById('netLogStatus');if(st)st.textContent='Stato: '+(js.enabled?'ATTIVO':'FERMO')+' · salvato in config';return true;}catch(e){console.error(e);const st=document.getElementById('netLogStatus');if(st)st.textContent='Errore salvataggio stato invio rete';return false;}}"
         "async function setLogLevel(tag, level){try{return fetch('/api/logs/level',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag:tag,level:level})}).then(r=>{if(!r.ok)throw r;return r.json();}).then(js=>{loadLevels();if(js.clamped)console.warn('Livello richiesto clamped to',js.applied);return true;}).catch(e=>{console.error(e);return false;});}catch(e){console.error(e);return false;}}"
         "async function loadLevels(){"
         "  try {"
@@ -529,14 +667,15 @@ esp_err_t logs_page_handler(httpd_req_t *req)
         "document.addEventListener('DOMContentLoaded', function(){\n"
         "  var applyBtn = document.getElementById('applyLevelsBtn');\n"
         "  if(applyBtn){ applyBtn.addEventListener('click', async function(){ var container = document.getElementById('levelsContainer'); if(!container) return; var selects = container.querySelectorAll('select[data-tag]'); applyBtn.disabled=true; applyBtn.innerText='Applicazione...'; for(const s of selects){ var tag = s.getAttribute('data-tag'); var lvl = parseInt(s.value); try{ await setLogLevel(tag,lvl); }catch(e){console.error(e);} } applyBtn.disabled=false; applyBtn.innerText='Applica livelli'; }); }\n"
+        "  var nsw=document.getElementById('netLogToggle'); if(nsw){ nsw.addEventListener('change', async function(){ nsw.disabled=true; var ok=await saveNetworkLogState(!!nsw.checked); if(!ok){ await loadNetworkLogState(); } nsw.disabled=false; }); }\n"
         "  var fbtn = document.getElementById('applyLogFilterBtn'); var cbtn = document.getElementById('clearLogFilterBtn'); var finp = document.getElementById('logFilterInput');\n"
         "  var as=document.getElementById('autoScrollToggle'); if(as){ as.checked=false; as.addEventListener('change', function(){ AUTO_SCROLL = !!as.checked; }); }\n"
         "  if(fbtn && finp){ fbtn.addEventListener('click', function(){ var v=(finp.value||'').trim(); LOG_FILTER_RE = v ? wildcardToRegExp(v) : null; loadLogs(); }); }\n"
         "  if(cbtn && finp){ cbtn.addEventListener('click', function(){ finp.value=''; LOG_FILTER_RE = null; loadLogs(); }); }\n"
         "});\n"
         "(function(){ const _orig = loadLogs; loadLogs = async function(){ try{ const r = await fetch('/api/logs'); if(!r.ok) throw new Error('Logs Error'); const logs = await r.json(); const container = document.getElementById('logContainer'); if(!container) return; const filtered = LOG_FILTER_RE ? logs.filter(l => LOG_FILTER_RE.test(l.message) || LOG_FILTER_RE.test(l.tag) || LOG_FILTER_RE.test(l.level)) : logs; if(filtered.length===0){ container.innerHTML = LOG_FILTER_RE ? 'Nessun log ricevuto che soddisfi il filtro.' : 'Nessun log ricevuto ancora.'; return; } container.innerHTML = ''; filtered.forEach(log=>{ const entry=document.createElement('div'); entry.className='log-entry log-'+log.level.toLowerCase(); entry.innerHTML = `<span class=\'log-timestamp\'>${log.timestamp}</span><span class=\'log-level\'>[${log.level}]</span><span class=\'log-tag\'>${log.tag}:</span><span class=\'log-message\'>${log.message}</span>`; container.appendChild(entry); }); if(AUTO_SCROLL) container.scrollTop = container.scrollHeight; }catch(e){ console.error(e); document.getElementById('logContainer').innerHTML = 'Errore caricamento log: '+e; } }; })();\n"
-        "window.addEventListener('load',()=>{loadLevels(); loadLogs();});\n"
-        "setInterval(()=>{loadLogs(); loadLevels();},5000);"
+        "window.addEventListener('load',()=>{loadNetworkLogState(); loadLevels(); loadLogs();});\n"
+        "setInterval(()=>{loadLogs(); loadLevels(); loadNetworkLogState();},5000);"
         "</script></body></html>";
 
     httpd_resp_sendstr_chunk(req, body);

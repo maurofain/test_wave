@@ -71,6 +71,7 @@ static lv_obj_t *s_counter_fill = NULL;
 static lv_obj_t *s_prog_btns[PROG_COUNT];
 static lv_obj_t *s_prog_lbls[PROG_COUNT];
 static lv_timer_t *s_panel_timer = NULL;
+static lv_timer_t *s_clock_timer = NULL;
 static uint8_t s_active_prog = 0;
 
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
@@ -80,6 +81,30 @@ static char s_last_credit_text[16] = "";
 static char s_last_elapsed_text[32] = "";
 static char s_last_pause_text[32] = "";
 static int32_t s_last_gauge_pct = -1;
+static time_t s_last_minute_epoch = (time_t)-1;
+static bool s_btn_last_clickable[PROG_COUNT] = {0};
+static bool s_btn_last_active[PROG_COUNT] = {0};
+static bool s_btn_state_valid[PROG_COUNT] = {0};
+
+static char s_tr_credit[32] = "Credito";
+static char s_tr_elapsed_fmt[32] = "Secondi   %s";
+static char s_tr_pause_fmt[32] = "Pausa: %s";
+
+static void panel_load_translations(void)
+{
+    if (device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", s_tr_credit, sizeof(s_tr_credit)) != ESP_OK) {
+        strncpy(s_tr_credit, "Credito", sizeof(s_tr_credit) - 1);
+        s_tr_credit[sizeof(s_tr_credit) - 1] = '\0';
+    }
+    if (device_config_get_ui_text_scoped("lvgl", "elapsed_fmt", "Secondi   %s", s_tr_elapsed_fmt, sizeof(s_tr_elapsed_fmt)) != ESP_OK) {
+        strncpy(s_tr_elapsed_fmt, "Secondi   %s", sizeof(s_tr_elapsed_fmt) - 1);
+        s_tr_elapsed_fmt[sizeof(s_tr_elapsed_fmt) - 1] = '\0';
+    }
+    if (device_config_get_ui_text_scoped("lvgl", "pause_fmt", "Pausa: %s", s_tr_pause_fmt, sizeof(s_tr_pause_fmt)) != ESP_OK) {
+        strncpy(s_tr_pause_fmt, "Pausa: %s", sizeof(s_tr_pause_fmt) - 1);
+        s_tr_pause_fmt[sizeof(s_tr_pause_fmt) - 1] = '\0';
+    }
+}
 
 static void btn_style(lv_obj_t *btn, lv_color_t bg)
 {
@@ -130,17 +155,25 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
                          (snap->credit_cents > 0) &&
                          (snap->credit_cents >= (int32_t)entry->price_units);
         bool is_active = running_or_paused && (s_active_prog == pid) && has_snap && (snap->credit_cents > 0);
-
-        btn_style(btn, is_active ? COL_PROG_ACT : COL_PROG);
-
         bool can_click = program_enabled && credit_ok;
-        if (can_click) {
-            lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
-        } else {
-            lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_set_style_opa(btn, LV_OPA_50, LV_PART_MAIN);
+
+        if (!s_btn_state_valid[i] || s_btn_last_active[i] != is_active) {
+            btn_style(btn, is_active ? COL_PROG_ACT : COL_PROG);
+            s_btn_last_active[i] = is_active;
         }
+
+        if (!s_btn_state_valid[i] || s_btn_last_clickable[i] != can_click) {
+            if (can_click) {
+                lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+                lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+            } else {
+                lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+                lv_obj_set_style_opa(btn, LV_OPA_50, LV_PART_MAIN);
+            }
+            s_btn_last_clickable[i] = can_click;
+        }
+
+        s_btn_state_valid[i] = true;
     }
 }
 
@@ -150,7 +183,7 @@ static void fmt_mm_ss(char *buf, size_t len, uint32_t ms)
     snprintf(buf, len, "%02lu:%02lu", (unsigned long)(s / 60), (unsigned long)(s % 60));
 }
 
-static void update_time(void)
+static void update_time(bool publish_minute_message)
 {
     if (!s_time_lbl) {
         return;
@@ -158,7 +191,7 @@ static void update_time(void)
 
     time_t now = time(NULL);
     if (now == (time_t)-1) {
-        const char *fallback = "--/--/---- --:--:--";
+        const char *fallback = "--/--/---- --:--";
         if (strcmp(s_last_time_text, fallback) != 0) {
             lv_label_set_text(s_time_lbl, fallback);
             strncpy(s_last_time_text, fallback, sizeof(s_last_time_text) - 1);
@@ -171,13 +204,31 @@ static void update_time(void)
     localtime_r(&now, &ti);
 
     char buf[40] = {0};
-    strftime(buf, sizeof(buf), "%d/%m/%Y %H:%M:%S", &ti);
+    strftime(buf, sizeof(buf), "%d/%m/%Y %H:%M", &ti);
 
     if (strcmp(s_last_time_text, buf) != 0) {
         lv_label_set_text(s_time_lbl, buf);
         strncpy(s_last_time_text, buf, sizeof(s_last_time_text) - 1);
         s_last_time_text[sizeof(s_last_time_text) - 1] = '\0';
     }
+
+    if (publish_minute_message) {
+        time_t minute_epoch = now / 60;
+        if (s_last_minute_epoch == (time_t)-1) {
+            s_last_minute_epoch = minute_epoch;
+        } else if (minute_epoch != s_last_minute_epoch) {
+            char msg[FSM_EVENT_TEXT_MAX_LEN] = {0};
+            s_last_minute_epoch = minute_epoch;
+            strftime(msg, sizeof(msg), "Ora %H:%M", &ti);
+            fsm_append_message(msg);
+        }
+    }
+}
+
+static void clock_timer_cb(lv_timer_t *t)
+{
+    (void)t;
+    update_time(true);
 }
 
 static void update_state(const fsm_ctx_t *snap)
@@ -188,20 +239,6 @@ static void update_state(const fsm_ctx_t *snap)
 
     bool running = (snap->state == FSM_STATE_RUNNING);
     bool paused = (snap->state == FSM_STATE_PAUSED);
-
-    char tr_credit[32] = {0};
-    char tr_elapsed_fmt[32] = {0};
-    char tr_pause_fmt[32] = {0};
-
-    if (device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", tr_credit, sizeof(tr_credit)) != ESP_OK) {
-        strncpy(tr_credit, "Credito", sizeof(tr_credit) - 1);
-    }
-    if (device_config_get_ui_text_scoped("lvgl", "elapsed_fmt", "Secondi   %s", tr_elapsed_fmt, sizeof(tr_elapsed_fmt)) != ESP_OK) {
-        strncpy(tr_elapsed_fmt, "Secondi   %s", sizeof(tr_elapsed_fmt) - 1);
-    }
-    if (device_config_get_ui_text_scoped("lvgl", "pause_fmt", "Pausa: %s", tr_pause_fmt, sizeof(tr_pause_fmt)) != ESP_OK) {
-        strncpy(tr_pause_fmt, "Pausa: %s", sizeof(tr_pause_fmt) - 1);
-    }
 
     if (s_status_box) {
         lv_obj_set_style_bg_color(s_status_box, COL_STATE_IDL, LV_PART_MAIN);
@@ -232,9 +269,9 @@ static void update_state(const fsm_ctx_t *snap)
         if (running || paused) {
             char mm[10] = {0};
             fmt_mm_ss(mm, sizeof(mm), snap->running_elapsed_ms);
-            snprintf(buf, sizeof(buf), tr_elapsed_fmt, mm);
+            snprintf(buf, sizeof(buf), s_tr_elapsed_fmt, mm);
         } else {
-            snprintf(buf, sizeof(buf), "%s", tr_credit);
+            snprintf(buf, sizeof(buf), "%s", s_tr_credit);
         }
 
         if (strcmp(s_last_elapsed_text, buf) != 0) {
@@ -250,7 +287,7 @@ static void update_state(const fsm_ctx_t *snap)
         if (paused && snap->pause_elapsed_ms > 0) {
             char mm[10] = {0};
             fmt_mm_ss(mm, sizeof(mm), snap->pause_elapsed_ms);
-            snprintf(buf, sizeof(buf), tr_pause_fmt, mm);
+            snprintf(buf, sizeof(buf), s_tr_pause_fmt, mm);
         }
 
         if (strcmp(s_last_pause_text, buf) != 0) {
@@ -533,6 +570,9 @@ static void clear_panel_handles(void)
     for (int i = 0; i < PROG_COUNT; i++) {
         s_prog_btns[i] = NULL;
         s_prog_lbls[i] = NULL;
+        s_btn_last_clickable[i] = false;
+        s_btn_last_active[i] = false;
+        s_btn_state_valid[i] = false;
     }
 
     s_last_time_text[0] = '\0';
@@ -540,13 +580,12 @@ static void clear_panel_handles(void)
     s_last_elapsed_text[0] = '\0';
     s_last_pause_text[0] = '\0';
     s_last_gauge_pct = -1;
+    s_last_minute_epoch = (time_t)-1;
 }
 
 static void panel_timer_cb(lv_timer_t *t)
 {
     (void)t;
-
-    update_time();
 
     fsm_ctx_t snap = {0};
     if (fsm_runtime_snapshot(&snap)) {
@@ -560,6 +599,11 @@ void lvgl_page_main_deactivate(void)
     if (s_panel_timer) {
         lv_timer_del(s_panel_timer);
         s_panel_timer = NULL;
+    }
+
+    if (s_clock_timer) {
+        lv_timer_del(s_clock_timer);
+        s_clock_timer = NULL;
     }
 
     clear_panel_handles();
@@ -580,11 +624,13 @@ void lvgl_page_main_show(void)
 
     s_active_prog = 0;
 
+    panel_load_translations();
+
     build_status(scr);
     build_header(scr);
     build_prog_buttons();
 
-    update_time();
+    update_time(true);
 
     fsm_ctx_t snap = {0};
     if (fsm_runtime_snapshot(&snap)) {
@@ -593,12 +639,17 @@ void lvgl_page_main_show(void)
     }
 
     s_panel_timer = lv_timer_create(panel_timer_cb, PANEL_REFRESH_MS, NULL);
+    s_clock_timer = lv_timer_create(clock_timer_cb, 1000, NULL);
 
     ESP_LOGI(TAG, "[C] Pagina principale LVGL visualizzata");
 }
 
 void lvgl_page_main_refresh_texts(void)
 {
+    panel_load_translations();
+    s_last_elapsed_text[0] = '\0';
+    s_last_pause_text[0] = '\0';
+
     for (int i = 0; i < PROG_COUNT; ++i) {
         if (!s_prog_lbls[i]) {
             continue;

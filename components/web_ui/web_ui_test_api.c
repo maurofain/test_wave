@@ -381,47 +381,89 @@ esp_err_t api_test_handler(httpd_req_t *req)
     }
 
     else if (strcmp(test_name, "cctalk_start") == 0) {
+        serial_test_clear_cctalk_monitor();
+        serial_test_push_monitor_action("CCTALK", "START richiesta");
         esp_err_t rs232_err = rs232_init();
         if (rs232_err != ESP_OK) {
+            serial_test_push_monitor_action("CCTALK", "START errore RS232");
             snprintf(response, sizeof(response), "{\"error\":\"Init RS232 fallita: %s\"}", esp_err_to_name(rs232_err));
         } else {
             esp_err_t cctalk_err = cctalk_driver_init();
             if (cctalk_err != ESP_OK) {
+                serial_test_push_monitor_action("CCTALK", "START errore init CCtalk");
                 snprintf(response, sizeof(response), "{\"error\":\"Init CCtalk fallita: %s\"}", esp_err_to_name(cctalk_err));
-            } else if (s_cctalk_test_handle) {
-                snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
             } else {
-                TaskHandle_t existing = xTaskGetHandle("cctalk_task");
-                if (existing) {
-                    s_cctalk_test_handle = existing;
-                    s_cctalk_test_owned = false;
-                    snprintf(response, sizeof(response), "{\"message\":\"Monitor CCtalk agganciato a task esistente\"}");
+                bool monitor_ready = false;
+                bool own_task = false;
+
+                if (s_cctalk_test_handle) {
+                    monitor_ready = true;
+                    own_task = s_cctalk_test_owned;
                 } else {
-                    BaseType_t ok = xTaskCreate(cctalk_task_run, "cctalk_test", 4096, NULL, 5, &s_cctalk_test_handle);
-                    if (ok == pdPASS) {
-                        s_cctalk_test_owned = true;
-                        serial_test_clear_cctalk_monitor();
-                        snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk avviato\"}");
-                    } else {
-                        s_cctalk_test_handle = NULL;
+                    TaskHandle_t existing = xTaskGetHandle("cctalk_task");
+                    if (existing) {
+                        s_cctalk_test_handle = existing;
                         s_cctalk_test_owned = false;
-                        snprintf(response, sizeof(response), "{\"error\":\"Impossibile avviare task CCtalk\"}");
+                        monitor_ready = true;
+                        own_task = false;
+                        serial_test_push_monitor_action("CCTALK", "START monitor agganciato");
+                    } else {
+                        BaseType_t ok = xTaskCreate(cctalk_task_run, "cctalk_test", 4096, NULL, 5, &s_cctalk_test_handle);
+                        if (ok == pdPASS) {
+                            s_cctalk_test_owned = true;
+                            monitor_ready = true;
+                            own_task = true;
+                            serial_test_push_monitor_action("CCTALK", "START task locale creato");
+                        } else {
+                            s_cctalk_test_handle = NULL;
+                            s_cctalk_test_owned = false;
+                            serial_test_push_monitor_action("CCTALK", "START errore task");
+                            snprintf(response, sizeof(response), "{\"error\":\"Impossibile avviare task CCtalk\"}");
+                        }
+                    }
+                }
+
+                if (monitor_ready) {
+                    esp_err_t start_err = cctalk_driver_start_acceptor();
+                    if (start_err != ESP_OK) {
+                        serial_test_push_monitor_action("CCTALK", "START errore sequenza gettoniera");
+                        snprintf(response, sizeof(response), "{\"error\":\"Avvio gettoniera fallito: %s\"}", esp_err_to_name(start_err));
+                    } else {
+                        serial_test_push_monitor_action("CCTALK", "START ok");
+                        if (own_task) {
+                            snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk avviato (task locale)\"}");
+                        } else {
+                            snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk avviato (task scheduler)\"}");
+                        }
                     }
                 }
             }
         }
     } else if (strcmp(test_name, "cctalk_stop") == 0) {
+        serial_test_push_monitor_action("CCTALK", "STOP richiesta");
+
+        esp_err_t stop_err = cctalk_driver_stop_acceptor();
+
         if (s_cctalk_test_handle && s_cctalk_test_owned) {
             vTaskDelete(s_cctalk_test_handle);
             s_cctalk_test_handle = NULL;
             s_cctalk_test_owned = false;
-            snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk fermato\"}");
+            serial_test_push_monitor_action("CCTALK", "STOP task locale fermato");
         } else if (s_cctalk_test_handle && !s_cctalk_test_owned) {
             s_cctalk_test_handle = NULL;
             s_cctalk_test_owned = false;
-            snprintf(response, sizeof(response), "{\"message\":\"Monitor CCtalk sganciato (task gestito da scheduler)\"}");
-        } else {
+            serial_test_push_monitor_action("CCTALK", "STOP monitor sganciato");
+        }
+
+        if (stop_err == ESP_OK) {
+            serial_test_push_monitor_action("CCTALK", "STOP ok");
+            snprintf(response, sizeof(response), "{\"message\":\"Gettoniera CCtalk disabilitata\"}");
+        } else if (stop_err == ESP_ERR_INVALID_STATE) {
+            serial_test_push_monitor_action("CCTALK", "STOP non attivo");
             snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk non attivo\"}");
+        } else {
+            serial_test_push_monitor_action("CCTALK", "STOP errore sequenza gettoniera");
+            snprintf(response, sizeof(response), "{\"error\":\"Stop gettoniera fallito: %s\"}", esp_err_to_name(stop_err));
         }
     }
 
@@ -528,7 +570,7 @@ esp_err_t api_test_handler(httpd_req_t *req)
                             uint8_t tx_buf[64] = {0};
                             size_t tx_len = 0;
                             if (parse_hex_payload(data_str, tx_buf, sizeof(tx_buf), &tx_len) == ESP_OK) {
-                                serial_test_push_monitor_entry("CCTALK", tx_buf, tx_len);
+                                serial_test_push_monitor_entry("CCTALK_TX", tx_buf, tx_len);
                             }
                             snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Pacchetto CCtalk inviato\"}");
                         } else {

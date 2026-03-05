@@ -112,6 +112,19 @@ Il task chiama `POST /ota?url=<firmware_url>` e il device scarica il firmware in
 - **Gestione del file `.bin` (stato attuale):** il firmware non salva l'immagine completa né in RAM né su SD; usa streaming a chunk con buffer ridotto in RAM e scrittura diretta sulla partizione OTA inattiva.
 - **Impatto operativo:** medio; soluzione consigliata se accompagnata da controlli di sicurezza e recovery.
 
+## Nota di fattibilità: unificazione code FSM
+
+Stato attuale:
+- La **mailbox eventi FSM** trasporta gli eventi strutturati (`fsm_input_event_t`) per la logica runtime.
+- La coda **pending messages** (testuale) è usata per diagnostica/UI (`fsm_append_message`, endpoint `/api/emulator/fsm/messages`).
+
+Fattibilità modifica (tenere solo la mailbox eventi):
+- **Fattibile**, senza impatto sul core stati/transizioni della FSM.
+- Richiede però di sostituire il canale testuale dell’emulatore con una vista derivata dagli eventi/snapshot, oppure di rinunciare allo storico messaggi “umano”.
+
+Decisione corrente:
+- Per ora si mantiene l’architettura attuale (mailbox + pending messages) perché utile per debug rapido e feedback UI lato emulatore.
+
 ## Notes
 - WS2812 uses the RMT-based led_strip helper and blinks the first LED to indicate the app is alive.
 - RS485 and MDB UARTs are only initialized if the target exposes enough UART controllers; warnings are logged otherwise.

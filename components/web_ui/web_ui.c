@@ -704,8 +704,8 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "nameSection.insertAdjacentElement('afterend',pwd);"
         "}"
         "function ensureCctalkConfigSections(){"
-        "const sections=Array.from(document.querySelectorAll('.section'));"
-        "const hwSection=sections.find(function(s){const h=s.querySelector('h2');return h&&h.textContent&&h.textContent.indexOf('Periferiche Hardware')!==-1;});"
+        "const rs232Switch=document.getElementById('rs232');"
+        "const hwSection=rs232Switch?rs232Switch.closest('.section'):null;"
         "if(hwSection && !document.getElementById('cctalk')){"
         "const row=document.createElement('div');"
         "row.className='sw-row';"
@@ -714,7 +714,8 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "const mdbRow=mdbEl?mdbEl.closest('.sw-row'):null;"
         "if(mdbRow && mdbRow.parentNode){mdbRow.parentNode.insertBefore(row,mdbRow.nextSibling);}else{hwSection.appendChild(row);}"
         "}"
-        "const serialSection=sections.find(function(s){const h=s.querySelector('h2');return h&&h.textContent&&h.textContent.indexOf('(TAG) Porte Seriali')!==-1;});"
+        "const rs232Baud=document.getElementById('rs232_baud');"
+        "const serialSection=rs232Baud?rs232Baud.closest('.section'):null;"
         "if(serialSection && !document.getElementById('cctalk_baud')){"
         "const details=document.createElement('details');"
         "details.style.marginTop='10px';"
@@ -816,7 +817,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "document.getElementById('rs232').checked=c.sensors.rs232_enabled;"
         "document.getElementById('rs485').checked=c.sensors.rs485_enabled;"
         "document.getElementById('mdb').checked=c.sensors.mdb_enabled;"
-        "document.getElementById('cctalk').checked=(typeof c.sensors.cctalk_enabled==='undefined')?true:!!c.sensors.cctalk_enabled;"
+        "const cctalkSensorEl=document.getElementById('cctalk');if(cctalkSensorEl){cctalkSensorEl.checked=(typeof c.sensors.cctalk_enabled==='undefined')?true:!!c.sensors.cctalk_enabled;}"
         "document.getElementById('eeprom').checked=(typeof c.sensors.eeprom_enabled==='undefined')?true:!!c.sensors.eeprom_enabled;"
         "document.getElementById('sd_card').checked=c.sensors.sd_card_enabled;"
         "document.getElementById('pwm1').checked=c.sensors.pwm1_enabled;"
@@ -839,27 +840,31 @@ esp_err_t config_page_handler(httpd_req_t *req)
         "onDisplayBrightInput(c.display.lcd_brightness);"
         "document.getElementById('lcd_bright').disabled = !document.getElementById('display_en').checked;"
         "document.getElementById('display_en').addEventListener('change', function(){ document.getElementById('lcd_bright').disabled = !this.checked; });"
-        "document.getElementById('rs232_baud').value=c.rs232.baud;"        "document.getElementById('rs232_bits').value=c.rs232.data_bits;"
-        "document.getElementById('rs232_par').value=c.rs232.parity;"
-        "document.getElementById('rs232_stop').value=c.rs232.stop_bits;"
-        "document.getElementById('rs232_rx').value=c.rs232.rx_buf;"
-        "document.getElementById('rs232_tx').value=c.rs232.tx_buf;"
-        "document.getElementById('rs485_baud').value=c.rs485.baud;"
-        "document.getElementById('rs485_bits').value=c.rs485.data_bits;"
-        "document.getElementById('rs485_par').value=c.rs485.parity;"
-        "document.getElementById('rs485_stop').value=c.rs485.stop_bits;"
-        "document.getElementById('rs485_rx').value=c.rs485.rx_buf;"
-        "document.getElementById('rs485_tx').value=c.rs485.tx_buf;"
-        "document.getElementById('mdb_baud').value=c.mdb_serial.baud;"
-        "document.getElementById('mdb_rx').value=c.mdb_serial.rx_buf;"
-        "document.getElementById('mdb_tx').value=c.mdb_serial.tx_buf;"
+        "const rs232Cfg=(c.rs232&&typeof c.rs232==='object')?c.rs232:{};"
+        "document.getElementById('rs232_baud').value=(typeof rs232Cfg.baud==='undefined')?'':rs232Cfg.baud;"
+        "document.getElementById('rs232_bits').value=(typeof rs232Cfg.data_bits==='undefined')?'':rs232Cfg.data_bits;"
+        "document.getElementById('rs232_par').value=(typeof rs232Cfg.parity==='undefined')?'':rs232Cfg.parity;"
+        "document.getElementById('rs232_stop').value=(typeof rs232Cfg.stop_bits==='undefined')?'':rs232Cfg.stop_bits;"
+        "document.getElementById('rs232_rx').value=(typeof rs232Cfg.rx_buf==='undefined')?'':rs232Cfg.rx_buf;"
+        "document.getElementById('rs232_tx').value=(typeof rs232Cfg.tx_buf==='undefined')?'':rs232Cfg.tx_buf;"
+        "const rs485Cfg=(c.rs485&&typeof c.rs485==='object')?c.rs485:{};"
+        "document.getElementById('rs485_baud').value=(typeof rs485Cfg.baud==='undefined')?'':rs485Cfg.baud;"
+        "document.getElementById('rs485_bits').value=(typeof rs485Cfg.data_bits==='undefined')?'':rs485Cfg.data_bits;"
+        "document.getElementById('rs485_par').value=(typeof rs485Cfg.parity==='undefined')?'':rs485Cfg.parity;"
+        "document.getElementById('rs485_stop').value=(typeof rs485Cfg.stop_bits==='undefined')?'':rs485Cfg.stop_bits;"
+        "document.getElementById('rs485_rx').value=(typeof rs485Cfg.rx_buf==='undefined')?'':rs485Cfg.rx_buf;"
+        "document.getElementById('rs485_tx').value=(typeof rs485Cfg.tx_buf==='undefined')?'':rs485Cfg.tx_buf;"
+        "const mdbCfg=(c.mdb_serial&&typeof c.mdb_serial==='object')?c.mdb_serial:{};"
+        "document.getElementById('mdb_baud').value=(typeof mdbCfg.baud==='undefined')?'':mdbCfg.baud;"
+        "document.getElementById('mdb_rx').value=(typeof mdbCfg.rx_buf==='undefined')?'':mdbCfg.rx_buf;"
+        "document.getElementById('mdb_tx').value=(typeof mdbCfg.tx_buf==='undefined')?'':mdbCfg.tx_buf;"
         "const cct=(c.cctalk_serial&&typeof c.cctalk_serial==='object')?c.cctalk_serial:{baud:9600,data_bits:8,parity:0,stop_bits:1,rx_buf:256,tx_buf:256};"
-        "document.getElementById('cctalk_baud').value=(typeof cct.baud==='undefined')?9600:cct.baud;"
-        "document.getElementById('cctalk_bits').value=(typeof cct.data_bits==='undefined')?8:cct.data_bits;"
-        "document.getElementById('cctalk_par').value=(typeof cct.parity==='undefined')?0:cct.parity;"
-        "document.getElementById('cctalk_stop').value=(typeof cct.stop_bits==='undefined')?1:cct.stop_bits;"
-        "document.getElementById('cctalk_rx').value=(typeof cct.rx_buf==='undefined')?256:cct.rx_buf;"
-        "document.getElementById('cctalk_tx').value=(typeof cct.tx_buf==='undefined')?256:cct.tx_buf;"
+        "if(document.getElementById('cctalk_baud')) document.getElementById('cctalk_baud').value=(typeof cct.baud==='undefined')?9600:cct.baud;"
+        "if(document.getElementById('cctalk_bits')) document.getElementById('cctalk_bits').value=(typeof cct.data_bits==='undefined')?8:cct.data_bits;"
+        "if(document.getElementById('cctalk_par')) document.getElementById('cctalk_par').value=(typeof cct.parity==='undefined')?0:cct.parity;"
+        "if(document.getElementById('cctalk_stop')) document.getElementById('cctalk_stop').value=(typeof cct.stop_bits==='undefined')?1:cct.stop_bits;"
+        "if(document.getElementById('cctalk_rx')) document.getElementById('cctalk_rx').value=(typeof cct.rx_buf==='undefined')?256:cct.rx_buf;"
+        "if(document.getElementById('cctalk_tx')) document.getElementById('cctalk_tx').value=(typeof cct.tx_buf==='undefined')?256:cct.tx_buf;"
         "document.getElementById('g33_mode').value=c.gpios.gpio33.mode;"
         "document.getElementById('g33_state').checked=c.gpios.gpio33.state;"
         "if(c.remote_log.use_broadcast){const ipEl=document.getElementById('remote_log_ip'); if(ipEl){ipEl.disabled=true; ipEl.value='255.255.255.255';}}"
@@ -2691,6 +2696,14 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_api_logs_set_level = {.uri = "/api/logs/level", .method = HTTP_POST, .handler = api_logs_set_level};
     httpd_register_uri_handler(server, &uri_api_logs_set_level);
     ESP_LOGI(TAG, "Registered POST /api/logs/level handler");
+
+    httpd_uri_t uri_api_logs_network_get = {.uri = "/api/logs/network", .method = HTTP_GET, .handler = api_logs_network_get};
+    httpd_register_uri_handler(server, &uri_api_logs_network_get);
+    ESP_LOGI(TAG, "Registered GET /api/logs/network handler");
+
+    httpd_uri_t uri_api_logs_network_set = {.uri = "/api/logs/network", .method = HTTP_POST, .handler = api_logs_network_set};
+    httpd_register_uri_handler(server, &uri_api_logs_network_set);
+    ESP_LOGI(TAG, "Registered POST /api/logs/network handler");
 
     httpd_uri_t uri_api_logs_options = {.uri = "/api/logs/*", .method = HTTP_OPTIONS, .handler = api_logs_options};
     httpd_register_uri_handler(server, &uri_api_logs_options);

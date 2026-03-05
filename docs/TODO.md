@@ -191,6 +191,9 @@
         - Azione: ✅ risolto con base codice unica e selezione modalità via `COMPILE_APP`.
       8. Strategia migrazione API: servono API di claim/ack per agente mantenendo compatibilità con publish/receive attuali.
         - Azione: introdurre nuove API (`publish_ex`, `claim_for_agent`, `ack_for_agent`) mantenendo le API correnti come wrapper.
+      9. Valutazione unificazione code FSM: possibile rimuovere la coda testuale `pending messages` e usare solo la mailbox eventi.
+        - Fattibilità: alta sul core FSM; impatto medio su UI/emulatore perché oggi `/api/emulator/fsm/messages` usa lo storico testuale.
+        - Azione: mantenere per ora doppio canale (eventi + pending), pianificare eventuale migrazione con endpoint/UI derivati da eventi+snapshot.
 
  6. Piano test endpoint e funzioni (da riprendere)
 
@@ -533,3 +536,33 @@ load:0x4ff29ed0,len:0xb5c
 load:0x4ff2cbd0,len:0x32b8
 entry 0x4ff29ed0
 --- Error: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
+
+
+Spazio Risparmiato Spostando Web UI su SD
+📦 Analisi di Dimensione del Firmware (Firmware Flash)
+Attuale: HTML/JS/CSS inclusi nel codice C (web_ui.c o simili) → occupano spazio in SPI Flash esterna o nella partizione app della SD.
+Obiettivo: Spostare il contenuto web statico su file separati nella directory filesystem della SD card (montata via FATFS).
+Stima sparisca: Dipende dalla dimensione attuale dei file, ma per progetti tipici ESP32:
+HTML + CSS + JS base: ~50KB – ~500KB
+Risparmio nel firmware: riduzione diretta del binary finale (firmware.bin).
+🧠 Gestione Memorie su ESP32
+RAM Interna: Limitata (~512KB). Evitare di caricare tutto in RAM interna.
+PSRAM: Usabile per buffer, ma ha latenza superiore.
+Approccio consigliato: Servire direttamente i file dalla SD (filesystem) senza caricarli completamente in RAM:
+Usa esp_vfs_fat_sdcard_create() per montare la SD.
+Configura l'httpd per servire risorse da directory esposta.
+Cache opzionale nella PSRAM se traffico elevato, ma non obbligatoria per file statici.
+✅ Vantaggi dell'approccio File-SD:
+Riduzione firmware: Meno dati nel binary (risparmio Flash).
+Aggiornamenti facili: Modifica HTML/JS senza recompilare.
+Ottimizzazione RAM: Evita caricamento di file pesanti in memoria volatile.
+Scalabilità: Più facile da gestire se si aggiungono asset (immagini, font).
+⚠️ Considerazioni Implementative
+Leggere la SD ha latenza più alta: usare buffering adeguato prima di servire i dati al client.
+Gestire fallback in caso di assenza/danno SD (es. fornire pagina statica minimale hardcoded).
+Monitorare uso PSRAM per evitare saturazione con molti asset.
+🛠️ Prossimi Passi
+[ ] Identificare file HTML/JS da migrare su SD.
+[ ] Calcolare dimensione attuale del contenuto embeddato nel firmware (se possibile via objcopy o elf2hex).
+[ ] Implementare filesystem FS su SD e config HTTPD per servire asset statici.
+[ ] Aggiornare configurazione build ESP-IDF per gestire risorse esterne vs inline.
