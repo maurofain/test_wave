@@ -59,6 +59,23 @@ if (sd_card_is_mounted() && file_exists("/sdcard/www" + req_path)) {
 - Alta priorità su SD: `index.html`, `config` page HTML/JS/CSS, file JS/CSS minificati, asset multimediali grandi.
 - Tenere in firmware: API JSON (status, config save), pagine di fallback, endpoint di amministrazione critici.
 
+## Export pagine embedded in HTML
+Per rigenerare i file `.html` esterni a partire dalle costanti embedded (`WEBPAGE_*`) usare lo script:
+
+```bash
+python3 scripts/export_embedded_pages.py --output data/www
+```
+
+Output generato (default):
+- `index.html`, `config.html`, `ota.html`
+- `stats.html`, `tasks.html`, `httpservices.html`, `api.html`
+- `files.html`, `logs.html`, `test.html`, `programs.html`, `emulator.html`
+
+Opzioni utili:
+- `--pages index.html,config.html` esporta solo alcune pagine
+- `--config-read-only` aggiunge lo script read-only nella pagina config
+- `--show-factory-password-section` / `--no-show-factory-password-section` imposta la variabile JS di sezione password factory
+
 ## Miglioramenti opzionali
 - Endpoint admin per sincronizzare/validare la versione web sulla SD (`/api/admin/websync`).
 - Script di deploy (pc → copia su SD) e validazione (checksum/manifest).

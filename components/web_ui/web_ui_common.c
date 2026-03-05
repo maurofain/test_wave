@@ -1,4 +1,5 @@
 #include "web_ui_internal.h"
+#include "webpages_embedded.h"
 #include "device_config.h"
 #include "app_version.h"
 #include "esp_log.h"
@@ -22,11 +23,6 @@
  * componente web_ui. Molte di queste funzioni gestiscono la cache delle
  * traduzioni, conversioni di indirizzi IP, e assistenza per l'OTA.
  */
-
-static const char *HTML_STYLE_NAV =
-    "nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}"
-    "nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}"
-    "nav a:hover{background:#3498db}";
 
 static const char *TAG = "WEB_UI_COMMON";
 
@@ -1101,31 +1097,7 @@ static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
         return ESP_ERR_NO_MEM;
     }
 
-    const char *script_fmt =
-        "<script>(function(){"
-        "if(window.__ui_i18n_ready)return;"
-        "window.__ui_i18n_ready=true;"
-        "const lang='%s';"
-        "const table=%s||{};"
-        "const SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1};"
-        "function mapText(t){if(!t)return t;return (table[t]!==undefined&&table[t]!==null)?String(table[t]):t;}"
-        "function applyNode(node){if(!node)return;"
-        "if(node.nodeType===Node.TEXT_NODE){const p=node.parentElement;if(p&&SKIP[p.tagName])return;const v=node.nodeValue;if(!v)return;const tt=v.trim();if(!tt)return;"
-        "const tr=mapText(tt);if(tr!==tt){node.nodeValue=v.replace(tt,tr);}return;}"
-        "if(node.nodeType!==Node.ELEMENT_NODE)return;"
-        "if(SKIP[node.tagName])return;"
-        "if(node.hasAttribute&&node.hasAttribute('data-i18n')){const k=node.getAttribute('data-i18n');if(k){const tr=mapText(k);if(tr&&tr!==k)node.textContent=tr;}}"
-        "const attrs=['placeholder','title','aria-label','value'];"
-        "for(const a of attrs){if(node.hasAttribute&&node.hasAttribute(a)){const ov=node.getAttribute(a);const nv=mapText(ov);if(nv!==ov)node.setAttribute(a,nv);}}"
-        "for(const c of node.childNodes){applyNode(c);}"
-        "}"
-        "function apply(root){if(!root)return;applyNode(root);}"
-        "window.uiI18n={language:lang,table:table,apply:apply,translate:mapText};"
-        "document.addEventListener('DOMContentLoaded',function(){apply(document.body);"
-        "const obs=new MutationObserver(function(ms){for(const m of ms){for(const n of m.addedNodes){applyNode(n);}}});"
-        "obs.observe(document.body,{subtree:true,childList:true});"
-        "});"
-        "})();</script>";
+    const char *script_fmt = WEBPAGE_COMMON_I18N_SCRIPT_FMT;
 
     int needed = snprintf(NULL, 0, script_fmt, lang, safe_texts_json);
     if (needed < 0)
@@ -1188,10 +1160,8 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
     device_config_get_ui_text_scoped("nav", "home", "Home", txt_home, sizeof(txt_home));
     device_config_get_ui_text_scoped("nav", "emulator", "Emulatore", txt_emulator, sizeof(txt_emulator));
 
-    const char *emu_button_fmt_home =
-        "<a href='/' style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>%s</a>";
-    const char *emu_button_fmt_emu =
-        "<a href='#' onclick=\"return window.goProtectedPath('/emulator');\" style='margin-left:12px;padding:6px 10px;background:#8e44ad;color:white;text-decoration:none;border-radius:6px;font-size:14px;font-weight:bold;'>%s</a>";
+    const char *emu_button_fmt_home = WEBPAGE_COMMON_EMU_BUTTON_FMT_HOME;
+    const char *emu_button_fmt_emu = WEBPAGE_COMMON_EMU_BUTTON_FMT_EMU;
     const char *emu_fmt = is_emulator_page ? emu_button_fmt_home : emu_button_fmt_emu;
     int emu_needed = snprintf(NULL, 0, emu_fmt, is_emulator_page ? txt_home : txt_emulator);
     if (emu_needed < 0)
@@ -1305,7 +1275,7 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
         "window.goProtectedPath=function(path){window.location.href=path;return false;};"
         "(function(){function tc(){var e=document.getElementById('hdr_clock');if(e)e.textContent=new Date().toTimeString().slice(0,8);}tc();setInterval(tc,1000);})();"
         "})();</script>",
-        safe_title, show_nav ? HTML_STYLE_NAV : "", safe_extra_style, safe_title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav ? nav_html : "");
+        safe_title, show_nav ? WEBPAGE_COMMON_STYLE_NAV : "", safe_extra_style, safe_title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav ? nav_html : "");
     if (needed < 0)
     {
         free(nav_html);
@@ -1341,7 +1311,7 @@ esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style
              "window.goProtectedPath=function(path){window.location.href=path;return false;};"
              "(function(){function tc(){var e=document.getElementById('hdr_clock');if(e)e.textContent=new Date().toTimeString().slice(0,8);}tc();setInterval(tc,1000);})();"
              "})();</script>",
-             safe_title, show_nav ? HTML_STYLE_NAV : "", safe_extra_style, safe_title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav ? nav_html : "");
+             safe_title, show_nav ? WEBPAGE_COMMON_STYLE_NAV : "", safe_extra_style, safe_title, device_config_get_running_app_name(), time_str, emu_button, APP_VERSION, APP_DATE, show_nav ? nav_html : "");
     esp_err_t send_ret = httpd_resp_sendstr_chunk(req, buf);
     free(buf);
     free(nav_html);

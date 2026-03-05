@@ -156,6 +156,12 @@ static void cctalk_log_powerup_info(void)
     }
 }
 
+/*
+* NOTA DA CONSIDERARE PER IMPLEMENTAZIONI FUTURE:
+* La gettoniera accetta anche centesimi: quando raggiunge la quota di un euro la trasferisce a ecd
+* e mantiene in memoria eventiali centesimi rimasti. Al momento dell'utilizzo dell'ultimo ecd
+* azzera il credito rimasto (< 1.00 euro)
+*/
 static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
 {
     if (!buffer) {

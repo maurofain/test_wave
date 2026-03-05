@@ -12,6 +12,7 @@ static const char *TAG = "SERIAL_TEST";
 
 // Buffer per il monitoraggio delle risposte (separati per porta)
 #define MONITOR_BUF_SIZE 512
+#define CCTALK_MONITOR_BUF_SIZE 4096
 static char s_monitor_232[MONITOR_BUF_SIZE];
 static int  s_ptr_232 = 0;
 static char s_monitor_485[MONITOR_BUF_SIZE];
@@ -20,7 +21,7 @@ static char s_monitor_mdb[MONITOR_BUF_SIZE];
 static int  s_ptr_mdb = 0;
 
 // CCtalk monitor buffer (separato per chiarezza)
-static char s_monitor_cctalk[MONITOR_BUF_SIZE];
+static char s_monitor_cctalk[CCTALK_MONITOR_BUF_SIZE];
 static int  s_ptr_cctalk = 0;
 
 static SemaphoreHandle_t s_monitor_mux = NULL;
@@ -106,8 +107,8 @@ void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size
 
         for (size_t i = 0; i < len; ++i) {
             char c = (isprint(data[i]) ? data[i] : '.');
-            *ptr += snprintf(buf + *ptr, MONITOR_BUF_SIZE - *ptr, "%s|%02X|%c|", entry_prefix, data[i], c);
-            if (*ptr > MONITOR_BUF_SIZE - 40) *ptr = 0;
+            *ptr += snprintf(buf + *ptr, CCTALK_MONITOR_BUF_SIZE - *ptr, "%s|%02X|%c|", entry_prefix, data[i], c);
+            if (*ptr > CCTALK_MONITOR_BUF_SIZE - 40) *ptr = 0;
         }
         xSemaphoreGive(s_monitor_mux);
     }
@@ -144,8 +145,8 @@ void serial_test_push_monitor_action(const char *label, const char *action) {
             strlcpy(sanitized, "ACTION", sizeof(sanitized));
         }
 
-        *ptr += snprintf(buf + *ptr, MONITOR_BUF_SIZE - *ptr, "ACT|--|%s|", sanitized);
-        if (*ptr > MONITOR_BUF_SIZE - 80) *ptr = 0;
+        *ptr += snprintf(buf + *ptr, CCTALK_MONITOR_BUF_SIZE - *ptr, "ACT|--|%s|", sanitized);
+        if (*ptr > CCTALK_MONITOR_BUF_SIZE - 80) *ptr = 0;
         xSemaphoreGive(s_monitor_mux);
     }
 }
@@ -167,7 +168,7 @@ void serial_test_clear_cctalk_monitor(void) {
     if (!s_monitor_mux) serial_test_init();
     if (!s_monitor_mux) return;
     if (xSemaphoreTake(s_monitor_mux, pdMS_TO_TICKS(100))) {
-        memset(s_monitor_cctalk, 0, MONITOR_BUF_SIZE);
+        memset(s_monitor_cctalk, 0, CCTALK_MONITOR_BUF_SIZE);
         s_ptr_cctalk = 0;
         xSemaphoreGive(s_monitor_mux);
     }

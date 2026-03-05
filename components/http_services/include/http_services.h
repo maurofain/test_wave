@@ -91,6 +91,29 @@ typedef struct {
 esp_err_t http_services_register_handlers(httpd_handle_t server);
 
 /**
+ * @brief Indica se il server remoto è abilitato da configurazione runtime.
+ */
+bool http_services_is_remote_enabled(void);
+
+/**
+ * @brief Indica se il server remoto risulta ONLINE (ultimo login/chiamata OK).
+ */
+bool http_services_is_remote_online(void);
+
+/**
+ * @brief Indica se è presente un token JWT remoto in memoria.
+ */
+bool http_services_has_auth_token(void);
+
+/**
+ * @brief Sincronizza lo stato runtime HTTP services con la config corrente.
+ *
+ * Quando force_login è true, invalida il token corrente e forza un login remoto
+ * se il server è abilitato.
+ */
+esp_err_t http_services_sync_runtime_state(bool force_login);
+
+/**
  * Call remote /api/getcustomers and parse the response.
  *
  * @param code       Customer code to look up, or "*" for all. Must not be NULL.

@@ -3,6 +3,26 @@
 #include "esp_err.h"
 #include "esp_netif.h"
 #include "led_strip.h"
+#include <stddef.h>
+#include <stdint.h>
+
+typedef enum {
+	INIT_AGENT_ERR_NONE = 0,
+	INIT_AGENT_ERR_NOT_EVALUATED = 1,
+	INIT_AGENT_ERR_DISABLED_BY_CONFIG = 2,
+	INIT_AGENT_ERR_INIT_FAILED = 3,
+	INIT_AGENT_ERR_DEPENDENCY_FAILED = 4,
+	INIT_AGENT_ERR_NETWORK_NO_IP = 5,
+	INIT_AGENT_ERR_REMOTE_LOGIN_FAILED = 6,
+	INIT_AGENT_ERR_RUNTIME_FAILED = 7,
+	INIT_AGENT_ERR_NOT_AVAILABLE = 8,
+} init_agent_error_code_t;
+
+typedef struct {
+	int32_t agn_value;
+	int32_t state;
+	int32_t error_code;
+} init_agent_status_t;
 
 esp_err_t init_run_factory(void);
 
@@ -57,3 +77,28 @@ esp_err_t init_mark_forced_crash_request(void);
  * @return ESP_OK se il display è stato avviato, altrimenti il codice di errore.
  */
 esp_err_t init_run_display_only(void);
+
+/**
+ * @brief Reinizializza la tabella globale stati agenti ai valori di default.
+ */
+void init_agent_status_reset_defaults(void);
+
+/**
+ * @brief Aggiorna stato e codice errore di un agente AGN.
+ *
+ * Convenzione stato: 0=fail, valori diversi da 0=non-fail.
+ */
+void init_agent_status_set(int32_t agn_value, int32_t state, init_agent_error_code_t error_code);
+
+/**
+ * @brief Restituisce la tabella globale stati agenti.
+ *
+ * Il primo elemento (AGN_ID_NONE) contiene nel campo `state` il numero totale
+ * di device in errore (stato==0).
+ */
+const init_agent_status_t *init_agent_status_get_table(size_t *out_count);
+
+/**
+ * @brief Restituisce la descrizione testuale del codice errore agente.
+ */
+const char *init_agent_error_code_text(init_agent_error_code_t code);

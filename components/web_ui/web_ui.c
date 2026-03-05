@@ -368,35 +368,25 @@ esp_err_t maintainer_enable_handler(httpd_req_t *req)
  */
 esp_err_t ota_get_handler(httpd_req_t *req)
 {
-    const char *extra_style = 
-        ".card{background:white;padding:25px;margin:20px auto;max-width:600px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}"
-        "input,button{width:100%;padding:10px;margin:10px 0;border-radius:4px;border:1px solid #ddd;box-sizing:border-box}"
-        "button{background:#e67e22;color:white;font-weight:bold;cursor:pointer}button:hover{background:#d35400}";
+#if WEB_UI_USE_EMBEDDED_PAGES == 0
+    return webpages_send_external_or_error(req, "ota.html", "text/html; charset=utf-8");
+#else
+    esp_err_t ext_page_ret = webpages_try_send_external(req, "ota.html", "text/html; charset=utf-8");
+    if (ext_page_ret == ESP_OK) {
+        return ESP_OK;
+    }
+
+    const char *extra_style = WEBPAGE_OTA_EXTRA_STYLE;
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     send_head(req, "Aggiornamento OTA", extra_style, true);
 
-    const char *body = 
-        "<div class='container'><div class='card'>"
-        "<form id='f'><input type='file' id='i' accept='.bin' required><button type='submit'>⬆️ Carica Firmware</button></form>"
-        "<div style='margin-top:10px'><progress id='p' value='0' max='100' style='width:100%;height:20px;'></progress><div id='pct' style='margin-top:6px;font-weight:bold;'>0%</div></div>"
-        "<div id='s' style='margin-top:10px'></div></div></div><script>"
-        "document.getElementById('f').onsubmit=function(e){e.preventDefault();"
-        "const file=document.getElementById('i').files[0];if(!file){return;}"
-        "const p=document.getElementById('p');const pct=document.getElementById('pct');const s=document.getElementById('s');"
-        "p.value=0;pct.innerText='0%';s.innerText='Upload in corso...';"
-        "const x=new XMLHttpRequest();x.open('POST','/ota/upload',true);"
-        "x.setRequestHeader('Content-Type','application/octet-stream');"
-        "x.upload.onprogress=function(ev){if(ev.lengthComputable){const v=Math.min(100,Math.round((ev.loaded*100)/ev.total));p.value=v;pct.innerText=v+'%';}};"
-        "x.onload=function(){if(x.status>=200&&x.status<300){p.value=100;pct.innerText='100%';s.innerText='✅ Successo! Riavvio...';}else{s.innerText='❌ Errore ('+x.status+')';}};"
-        "x.onerror=function(){s.innerText='❌ Errore di rete';};"
-        "x.send(file);"
-        "};"
-        "</script></body></html>";
+    const char *body = WEBPAGE_OTA_BODY;
 
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
+#endif
 }
 
 // Handler per l'upload OTA (POST)
@@ -513,27 +503,18 @@ esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
  */
 esp_err_t config_page_handler(httpd_req_t *req)
 {
+#if WEB_UI_USE_EMBEDDED_PAGES == 0
+    return webpages_send_external_or_error(req, "config.html", "text/html; charset=utf-8");
+#else
+    esp_err_t ext_page_ret = webpages_try_send_external(req, "config.html", "text/html; charset=utf-8");
+    if (ext_page_ret == ESP_OK) {
+        return ESP_OK;
+    }
+
     ESP_LOGI(TAG, "[C] GET /config");
     const bool config_read_only = !web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS);
     
-    const char *extra_style = 
-        ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
-        "h2{color:#2c3e50;border-bottom:2px solid #3498db;padding-bottom:10px}.form-group{margin:15px 0}"
-        "label{display:block;margin:5px 0;font-weight:bold;color:#34495e}input[type=text],input[type=password]{padding:8px;border:1px solid #ddd;border-radius:4px;width:100%;margin:5px 0;box-sizing:border-box;color:#333}"
-        "button{padding:10px 20px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;margin:5px}"
-        "button:hover{background:#229954}.indent{margin-left:30px;padding-left:15px;border-left:2px solid #ecf0f1}"
-        ".sw-row{display:flex;align-items:center;gap:15px;padding:12px 0;border-bottom:1px solid #f9f9f9}"
-        ".sw-row:last-child{border-bottom:none}"
-        ".switch{position:relative;display:inline-block;width:46px;height:24px}"
-        ".switch input{opacity:0;width:0;height:0}"
-        ".slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:.3s;border-radius:24px}"
-        ".slider:before{position:absolute;content:\"\";height:18px;width:18px;left:3px;bottom:3px;background-color:white;transition:.3s;border-radius:50%}"
-        "input:checked + .slider{background-color:#27ae60}"
-        "input:checked + .slider:before{transform:translateX(22px)}"
-        "/* Collapsible sections (config page) */"
-        ".section.collapsed > :not(h2){display:none !important;}"
-        ".section h2{cursor:pointer; position:relative;}"
-        ".section h2 .section-toggle-icon{position:absolute; right:12px; top:6px; font-size:18px; color:#95a5a6;}";
+    const char *extra_style = WEBPAGE_CONFIG_EXTRA_STYLE;
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     send_head(req, "Configurazione Device", extra_style, true);
@@ -544,418 +525,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
         httpd_resp_sendstr_chunk(req, "<script>window.__showFactoryPasswordSection=false;</script>");
     }
 
-    /* DO_NOT_MODIFY_START: /config page - autogenerated UI markup */
-    const char *body = 
-        "<div class='container'>"
-        "<div id='alert'></div>"
-        "<form id='configForm'>"
-        
-        "<div class='section collapsed' style='background:#f1f4f6; border-left:5px solid #3498db;'>"
-        "<h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🆔 Identità Dispositivo<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='form-group'><label>Nome Dispositivo</label>"
-        "<input type='text' id='dev_name' name='dev_name' placeholder='es: TestWave-01' style='font-size:1.1em; font-weight:bold;'></div>"
-        "<div class='form-group'><label>Lingua Pannello Utente (LCD)</label>"
-        "<select id='ui_user_language' name='ui_user_language' style='width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;'><option value='it'>Italiano (IT)</option></select></div>"
-        "<div class='form-group'><label>Lingua Backend (Web UI/Server)</label>"
-        "<select id='ui_backend_language' name='ui_backend_language' style='width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;'><option value='it'>Italiano (IT)</option></select></div>"
-        "</div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🌐 Ethernet<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='eth_en' name='eth_en'><span class='slider'></span></label><span>Abilitato</span></div>"
-        "<div class='indent'>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='eth_dhcp' name='eth_dhcp'><span class='slider'></span></label><span>DHCP</span></div>"
-        "<div class='form-group'><label>Indirizzo IP</label><input type='text' id='eth_ip' name='eth_ip' placeholder='192.168.1.100'></div>"
-        "<div class='form-group'><label>Subnet Mask</label><input type='text' id='eth_subnet' name='eth_subnet' placeholder='255.255.255.0'></div>"
-        "<div class='form-group'><label>Gateway</label><input type='text' id='eth_gateway' name='eth_gateway' placeholder='192.168.1.1'></div>"
-        "</div></div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>📡 WiFi STA<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='wifi_en' name='wifi_en'><span class='slider'></span></label><span>WiFi Abilitato</span></div>"
-        "<div class='indent'>"
-        "<div class='form-group'><label>SSID</label><input type='text' id='wifi_ssid' name='wifi_ssid'></div>"
-        "<div class='form-group'><label>Password</label><input type='password' id='wifi_pwd' name='wifi_pwd'></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='wifi_dhcp' name='wifi_dhcp'><span class='slider'></span></label><span>DHCP</span></div>"
-        "</div></div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'> NTP<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='ntp_en' name='ntp_en'><span class='slider'></span></label><span>NTP Abilitato</span><button type='button' onclick='syncNTP()' style='margin-left:10px; background:#f39c12; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;'>Aggiorna</button><span id='current_time' style='margin-left:15px; font-weight:bold; color:#27ae60;'></span></div>"
-        "<div class='indent'>"
-        "<div class='form-group'><label>Server NTP 1</label><input type='text' id='ntp_server1' name='ntp_server1' placeholder='time.google.com'></div>"
-        "<div class='form-group'><label>Server NTP 2</label><input type='text' id='ntp_server2' name='ntp_server2' placeholder='pool.ntp.org'></div>"
-        "<div class='form-group'><label>Offset Fuso Orario (ore)</label><input type='number' id='ntp_timezone_offset' name='ntp_timezone_offset' min='-12' max='12' placeholder='1'></div>"
-        "</div></div>"
-
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🔁 Server Remoto<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='server_en' name='server_en'><span class='slider'></span></label><span>Server abilitato</span></div>"
-        "<div class='form-group indent'><label>Base server URL</label><input type='text' id='server_url' name='server_url' placeholder='http://195.231.69.227:5556/'></div>"
-        "<div class='form-group indent'><label>Server serial</label><input type='text' id='server_serial' name='server_serial' placeholder='AD-34-DFG-333'></div>"
-        "<div class='form-group indent'><label>Server password (MD5)</label><input type='text' id='server_password' name='server_password' placeholder='c1ef6429c5e0f753ff24a114de6ee7d4'></div>"
-        "</div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>📊 Logging Remoto<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_broadcast' name='remote_log_broadcast'><span class='slider'></span></label><span>Usa broadcast UDP</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='remote_log_sd' name='remote_log_sd'><span class='slider'></span></label><span>Salva log su SD</span></div>"
-        "<div class='form-group indent'><label>Porta UDP</label><input type='number' id='remote_log_port' name='remote_log_port' min='1024' max='65535' placeholder='9514' style='width:120px; padding:6px; border:1px solid #ddd; border-radius:4px;'></div>"
-        "</div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🔌 Periferiche Hardware<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='io_exp' name='io_exp'><span class='slider'></span></label><span>I/O Expander</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='temp' name='temp'><span class='slider'></span></label><span>Sensore Temperatura</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='led' name='led'><span class='slider'></span></label><span>LED Strip (WS2812)</span></div>"
-        "<div class='form-group indent'><label>Numero di LED</label><input type='number' id='led_count' name='led_count' min='1' max='512' style='width:120px; padding:6px; border:1px solid #ddd; border-radius:4px;'></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs232' name='rs232'><span class='slider'></span></label><span>UART RS232</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='rs485' name='rs485'><span class='slider'></span></label><span>UART RS485</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='mdb' name='mdb'><span class='slider'></span></label><span>MDB Engine</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='eeprom' name='eeprom'><span class='slider'></span></label><span>EEPROM 24LC16</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='sd_card' name='sd_card'><span class='slider'></span></label><span>Scheda SD</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm1' name='pwm1'><span class='slider'></span></label><span>PWM Canale 1</span></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='pwm2' name='pwm2'><span class='slider'></span></label><span>PWM Canale 2</span></div>"
-        "</div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🔍 Scanner USB (CDC)<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='scanner_en' name='scanner_en'><span class='slider'></span></label><span>Scanner USB (CDC)</span></div>"
-        "<div class='form-group indent'><label>VID</label><input type='text' id='scanner_vid' name='scanner_vid' placeholder='0x1EAB' style='width:120px'></div>"
-        "<div class='form-group indent'><label>PID</label><input type='text' id='scanner_pid' name='scanner_pid' placeholder='0x0006' style='width:120px'></div>"
-        "<div class='form-group indent'><label>Dual PID (opzionale)</label><input type='text' id='scanner_dual_pid' name='scanner_dual_pid' placeholder='0x0000' style='width:120px'></div>"
-        "<div class='form-group indent'><label>Attesa post-lettura (ms)</label><input type='number' id='scanner_cooldown_ms' name='scanner_cooldown_ms' min='500' max='60000' step='100' value='10000' style='width:140px'></div>"
-        "</div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>⏱️ Timeouts<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='form-group'><label>Ritorno a scelta lingua dopo inattività (s)</label><input type='number' id='timeout_language_return_s' name='timeout_language_return_s' min='1' max='600' step='1' value='10' style='width:140px'></div>"
-        "</div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>📺 Display<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='display_en' name='display_en'><span class='slider'></span></label><span>Display abilitato</span></div>"
-        "<div class='form-group'><label>Luminosità LCD (<span id='bright_val'>--</span>%)</label>"
-        "<input type='range' id='lcd_bright' name='lcd_bright' min='0' max='100' style='width:100%' oninput='onDisplayBrightInput(this.value)'></div>"
-        "</div>"
-
-        "<div class='section collapsed'><h2 onclick='var s=this.parentElement;s.classList.toggle(\"collapsed\");var i=this.querySelector(\".section-toggle-icon\");if(i){i.innerText=s.classList.contains(\"collapsed\")?\"▸\":\"▾\";}' tabindex='0'>🔘 GPIO Ausiliario (GPIO33)<span class='section-toggle-icon'>▸</span></h2>"
-        "<div class='indent'>"
-        "<b>GPIO 33</b>"
-        "<div class='form-group'><label>Modalità</label>"
-        "<select id='g33_mode' style='width:100%; padding:8px;'><option value='0'>Input (Float)</option><option value='1'>Input (Pull-up)</option><option value='2'>Input (Pull-down)</option><option value='3'>Output</option></select></div>"
-        "<div class='sw-row'><label class='switch'><input type='checkbox' id='g33_state'><span class='slider'></span></label><span>Stato Iniziale (Solo Out)</span></div>"
-        "</div></div>"
-
-        "<div class='section'><h2>(TAG) Porte Seriali</h2>"
-        "<details><summary><b>RS232 Configuration</b></summary>"
-        "<div class='form-group'><label>Baudrate</label><input type='text' id='rs232_baud'></div>"
-        "<div class='form-group'><label>Data Bits</label><input type='text' id='rs232_bits'></div>"
-        "<div class='form-group'><label>Parità (0:None, 1:Odd, 2:Even)</label><input type='text' id='rs232_par'></div>"
-        "<div class='form-group'><label>Stop Bits (1, 2)</label><input type='text' id='rs232_stop'></div>"
-        "<div class='form-group'><label>Buffer RX</label><input type='text' id='rs232_rx'></div>"
-        "<div class='form-group'><label>Buffer TX</label><input type='text' id='rs232_tx'></div>"
-        "</details>"
-        "<details style='margin-top:10px'><summary><b>RS485 Configuration</b></summary>"
-        "<div class='form-group'><label>Baudrate</label><input type='text' id='rs485_baud'></div>"
-        "<div class='form-group'><label>Data Bits</label><input type='text' id='rs485_bits'></div>"
-        "<div class='form-group'><label>Parità (0:None, 1:Odd, 2:Even)</label><input type='text' id='rs485_par'></div>"
-        "<div class='form-group'><label>Stop Bits (1, 2)</label><input type='text' id='rs485_stop'></div>"
-        "<div class='form-group'><label>Buffer RX</label><input type='text' id='rs485_rx'></div>"
-        "<div class='form-group'><label>Buffer TX</label><input type='text' id='rs485_tx'></div>"
-        "</details>"
-        "<details style='margin-top:10px'><summary><b>MDB Configuration</b></summary>"
-        "<div class='form-group'><label>Baudrate</label><input type='text' id='mdb_baud'></div>"
-        "<div class='form-group'><label>Buffer RX</label><input type='text' id='mdb_rx'></div>"
-        "<div class='form-group'><label>Buffer TX</label><input type='text' id='mdb_tx'></div>"
-        "</details>"
-        "</div>"
-
-        "<div class='section' style='display:flex; justify-content:center; gap:20px;'>"
-        "<button type='submit' style='flex:1; max-width:200px;'>💾 Salva Configurazione</button>"
-        "<button type='button' onclick='backupConfig()' style='background:#9b59b6; flex:1; max-width:200px;'>📥 Backup Config</button>"
-        "<button type='button' onclick='loadConfig()' style='background:#3498db; flex:1; max-width:200px;'>🔄 Aggiorna Dati</button>"
-        "<button type='button' onclick='resetConfig()' style='background:#7f8c8d; flex:1; max-width:200px;'>⚠️ Reset Fabbrica</button>"
-        "</div>"
-        "</form></div>"
-        "<script>"
-        "/* DO_NOT_MODIFY_END: /config page - autogenerated UI markup */"
-        "async function backupConfig(){"
-        "try{const r=await fetch('/api/config/backup',{method:'POST'});"
-        "const res=await r.json();"
-        "if(r.ok) alert('✅ '+res.message); else alert('❌ '+res.error);"
-        "}catch(e){alert('❌ Errore: '+e);}}"
-        "async function resetConfig(){if(confirm(\"Resettare ai valori di fabbrica?\")){await fetch(\"/api/config/reset\",{method:\"POST\"});location.reload();}}"
-        "async function syncNTP(){"
-        "try{const r=await fetch('/api/ntp/sync',{method:'POST'});"
-        "const res=await r.json();"
-        "if(r.ok) alert('✅ '+res.message); else alert('❌ '+res.message);"
-        "}catch(e){alert('❌ Errore: '+e);}}"
-        "function updateCurrentTime(){const now=new Date();document.getElementById('current_time').innerText=now.toLocaleString('it-IT');}"
-        "document.getElementById('ntp_en').addEventListener('change',function(){if(this.checked){syncNTP();}});"
-        "document.getElementById('remote_log_broadcast').addEventListener('change',function(){"
-        "const ipField=document.getElementById('remote_log_ip');"
-        "if(!ipField) return;"
-        "ipField.disabled=this.checked;"
-        "if(this.checked){ipField.value='255.255.255.255';}else{ipField.value='';}"
-        "});"
-        "setInterval(updateCurrentTime,1000);"
-        "function ensureFactorySections(){"
-        "if(!window.__showFactoryPasswordSection) return;"
-        "if(document.getElementById('boot_pwd_current')) return;"
-        "const form=document.getElementById('configForm');"
-        "const nameSection=form?form.querySelector('.section'):null;"
-        "if(!nameSection) return;"
-        "const pwd=document.createElement('div');"
-        "pwd.className='section';"
-        "pwd.innerHTML=\"<h2>🔐 Password boot/emulatore</h2><p style='margin:8px 0 12px 0;color:#566573;'>Modifica password richiesta per /emulator e reboot FACTORY.</p><div class='form-group'><label>Password attuale</label><input type='password' id='boot_pwd_current' placeholder='password attuale'></div><div class='form-group'><label>Nuova password</label><input type='password' id='boot_pwd_new' placeholder='min 4 caratteri'></div><div class='form-group'><label>Conferma nuova password</label><input type='password' id='boot_pwd_confirm' placeholder='ripeti password'></div><button type='button' onclick='saveBootPassword()' style='background:#8e44ad;'>💾 Salva password boot</button>\";"
-        "nameSection.insertAdjacentElement('afterend',pwd);"
-        "}"
-        "function ensureCctalkConfigSections(){"
-        "const rs232Switch=document.getElementById('rs232');"
-        "const hwSection=rs232Switch?rs232Switch.closest('.section'):null;"
-        "if(hwSection && !document.getElementById('cctalk')){"
-        "const row=document.createElement('div');"
-        "row.className='sw-row';"
-        "row.innerHTML=\"<label class='switch'><input type='checkbox' id='cctalk' name='cctalk'><span class='slider'></span></label><span>CCtalk</span>\";"
-        "const mdbEl=document.getElementById('mdb');"
-        "const mdbRow=mdbEl?mdbEl.closest('.sw-row'):null;"
-        "if(mdbRow && mdbRow.parentNode){mdbRow.parentNode.insertBefore(row,mdbRow.nextSibling);}else{hwSection.appendChild(row);}"
-        "}"
-        "const rs232Baud=document.getElementById('rs232_baud');"
-        "const serialSection=rs232Baud?rs232Baud.closest('.section'):null;"
-        "if(serialSection && !document.getElementById('cctalk_baud')){"
-        "const details=document.createElement('details');"
-        "details.style.marginTop='10px';"
-        "details.innerHTML=\"<summary><b>CCTalk Configuration</b></summary><div class='form-group'><label>Baudrate</label><input type='text' id='cctalk_baud' readonly></div><div class='form-group'><label>Data Bits</label><input type='text' id='cctalk_bits' readonly></div><div class='form-group'><label>Parità (0:None, 1:Odd, 2:Even)</label><input type='text' id='cctalk_par' readonly></div><div class='form-group'><label>Stop Bits (1, 2)</label><input type='text' id='cctalk_stop' readonly></div><div class='form-group'><label>Buffer RX</label><input type='text' id='cctalk_rx' readonly></div><div class='form-group'><label>Buffer TX</label><input type='text' id='cctalk_tx' readonly></div><div style='font-size:12px;color:#7f8c8d;margin-top:6px;'>Configurazione fissa driver CCTalk (GPIO20/GPIO21, 9600 8N1).</div>\";"
-        "serialSection.appendChild(details);"
-        "}"
-        "}"
-        "ensureFactorySections();"
-        "ensureCctalkConfigSections();"
-        "window.__configOriginalLang='it';"
-        "window.addEventListener('load',loadConfig);"
-        "function indexI18nRecords(records){"
-        "const byScoped={};const byKey={};"
-        "if(!Array.isArray(records)) return {byScoped,byKey};"
-        "for(const item of records){"
-        "if(!item||typeof item!=='object') continue;"
-        "const scope=(item.scope!=null)?String(item.scope):'';"
-        "const key=(item.key!=null)?String(item.key):'';"
-        "const text=(item.text!=null)?String(item.text):'';"
-        "if(!scope||!key) continue;"
-        "const sk=scope+'.'+key;"
-        "byScoped[sk]=text;"
-        "if(byKey[key]===undefined) byKey[key]=text;"
-        "}"
-        "return {byScoped,byKey};"
-        "}"
-        "function buildI18nTableFromRecords(targetRecords, baseRecords){"
-        "const table={};"
-        "const t=indexI18nRecords(targetRecords);"
-        "const b=indexI18nRecords(baseRecords);"
-        "for(const sk in t.byScoped){"
-        "const targetText=t.byScoped[sk];"
-        "table[sk]=targetText;"
-        "const key=sk.includes('.')?sk.substring(sk.indexOf('.')+1):sk;"
-        "if(table[key]===undefined){const tk=t.byKey[key];table[key]=(tk!==undefined?tk:targetText);}"
-        "const baseText=b.byScoped[sk];"
-        "if(baseText&&baseText!==targetText){table[baseText]=targetText;const bt=baseText.trim();if(bt&&bt!==baseText)table[bt]=targetText;}"
-        "}"
-        "return table;"
-        "}"
-        "async function reloadLanguageTables(lang){"
-        "const target=(lang?String(lang):'it').toLowerCase();"
-        "const r=await fetch('/api/ui/texts?lang='+encodeURIComponent(target));"
-        "if(!r.ok) throw new Error('HTTP '+r.status);"
-        "const data=await r.json();"
-        "let baseRecords=[];"
-        "try{const rb=await fetch('/api/ui/texts?lang=it');if(rb.ok){const db=await rb.json();if(Array.isArray(db.records)) baseRecords=db.records;}}catch(_e){}"
-        "const table=buildI18nTableFromRecords(data.records,baseRecords);"
-        "if(window.uiI18n){window.uiI18n.language=target;window.uiI18n.table=table;if(typeof window.uiI18n.apply==='function'){window.uiI18n.apply(document.body);}}"
-        "}"
-        "async function loadUiLanguages(selectedLang, elId){"
-            "const uiLangEl=document.getElementById(elId||'ui_language');"
-            "if(!uiLangEl) return;"
-            "const target=(selectedLang?String(selectedLang):'it').toLowerCase();"
-            "let list=[];"
-            "try{const r=await fetch('/api/ui/languages');if(r.ok){const data=await r.json();if(Array.isArray(data.languages))list=data.languages;}}catch(e){console.warn('ui languages fetch failed',e);}" 
-            "if(!Array.isArray(list)||!list.length){list=[{code:'it',label:'Italiano (IT)'}];}"
-            "uiLangEl.innerHTML='';"
-            "const seen={};"
-            "for(const item of list){if(!item||!item.code)continue;const code=String(item.code).toLowerCase();if(seen[code])continue;seen[code]=true;const opt=document.createElement('option');opt.value=code;opt.textContent=item.label?String(item.label):code.toUpperCase();uiLangEl.appendChild(opt);}" 
-            "if(!seen.it){const opt=document.createElement('option');opt.value='it';opt.textContent='Italiano (IT)';uiLangEl.appendChild(opt);}" 
-            "uiLangEl.value=target;"
-            "if(!uiLangEl.value)uiLangEl.value='it';"
-            "}"
-        "async function loadConfig(){"
-        "ensureFactorySections();"
-        "ensureCctalkConfigSections();"
-        "try{const r=await fetch('/api/config');if(!r.ok)throw new Error('HTTP '+r.status);"
-        "const c=await r.json();"
-        "document.getElementById('dev_name').value=c.device_name || '';"
-        "const userLang=(c.ui&&c.ui.user_language)?String(c.ui.user_language).toLowerCase():'it';"
-        "const backendLang=(c.ui&&c.ui.backend_language)?String(c.ui.backend_language).toLowerCase():'it';"
-        "await loadUiLanguages(userLang,'ui_user_language');window.__configOriginalUserLang=userLang;"
-        "await loadUiLanguages(backendLang,'ui_backend_language');window.__configOriginalBackendLang=backendLang;"
-        "document.getElementById('eth_en').checked=c.eth.enabled;"
-        "document.getElementById('eth_dhcp').checked=c.eth.dhcp_enabled;"
-        "document.getElementById('eth_ip').value=c.eth.ip;"
-        "document.getElementById('eth_subnet').value=c.eth.subnet;"
-        "document.getElementById('eth_gateway').value=c.eth.gateway;"
-        "document.getElementById('wifi_en').checked=c.wifi.sta_enabled;"
-        "document.getElementById('wifi_dhcp').checked=c.wifi.dhcp_enabled;"
-        "document.getElementById('wifi_ssid').value=c.wifi.ssid;"
-        "document.getElementById('wifi_pwd').value=c.wifi.password;"
-        "document.getElementById('ntp_en').checked=c.ntp_enabled;"
-        "document.getElementById('ntp_server1').value=c.ntp.server1;"
-        "document.getElementById('ntp_server2').value=c.ntp.server2;"
-        "document.getElementById('ntp_timezone_offset').value=c.ntp.timezone_offset;"
-        "document.getElementById('server_en').checked = (c.server && c.server.enabled) ? true : false;"
-        "document.getElementById('server_url').value = (c.server && c.server.url) ? c.server.url : 'http://195.231.69.227:5556/';"
-        "document.getElementById('server_serial').value = (c.server && c.server.serial) ? c.server.serial : 'AD-34-DFG-333';"
-        "document.getElementById('server_password').value = (c.server && c.server.password) ? c.server.password : 'c1ef6429c5e0f753ff24a114de6ee7d4';"
-        "document.getElementById('remote_log_port').value=c.remote_log.server_port;"
-        "document.getElementById('remote_log_broadcast').checked=c.remote_log.use_broadcast;"
-        "document.getElementById('remote_log_sd').checked=!!(c.remote_log && c.remote_log.write_to_sd);"
-        "document.getElementById('io_exp').checked=c.sensors.io_expander_enabled;"
-        "document.getElementById('temp').checked=c.sensors.temperature_enabled;"
-        "document.getElementById('led').checked=c.sensors.led_enabled;"
-        "document.getElementById('led_count').value=c.sensors.led_count || 16;"
-        "document.getElementById('rs232').checked=c.sensors.rs232_enabled;"
-        "document.getElementById('rs485').checked=c.sensors.rs485_enabled;"
-        "document.getElementById('mdb').checked=c.sensors.mdb_enabled;"
-        "const cctalkSensorEl=document.getElementById('cctalk');if(cctalkSensorEl){cctalkSensorEl.checked=(typeof c.sensors.cctalk_enabled==='undefined')?true:!!c.sensors.cctalk_enabled;}"
-        "document.getElementById('eeprom').checked=(typeof c.sensors.eeprom_enabled==='undefined')?true:!!c.sensors.eeprom_enabled;"
-        "document.getElementById('sd_card').checked=c.sensors.sd_card_enabled;"
-        "document.getElementById('pwm1').checked=c.sensors.pwm1_enabled;"
-        "document.getElementById('pwm2').checked=c.sensors.pwm2_enabled;"
-        "if (c.scanner) {"
-        "    document.getElementById('scanner_en').checked = c.scanner.enabled;"
-        "    document.getElementById('scanner_vid').value = c.scanner.vid ? ('0x' + c.scanner.vid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
-        "    document.getElementById('scanner_pid').value = c.scanner.pid ? ('0x' + c.scanner.pid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
-        "    document.getElementById('scanner_dual_pid').value = c.scanner.dual_pid ? ('0x' + c.scanner.dual_pid.toString(16).padStart(4, '0').toUpperCase()) : '0x0000';"
-        "    document.getElementById('scanner_cooldown_ms').value = c.scanner.cooldown_ms ? c.scanner.cooldown_ms : 10000;"
-        "} else {"
-        "    document.getElementById('scanner_cooldown_ms').value = 10000;"
-        "}"
-        "const languageTimeoutMs=(c.timeouts&&c.timeouts.language_return_ms)?parseInt(c.timeouts.language_return_ms,10):10000;"
-        "document.getElementById('timeout_language_return_s').value=Math.max(1,Math.min(600,Math.round(languageTimeoutMs/1000)));"
-        "if (typeof c.display.enabled === 'undefined') { try { const s = await (await fetch('/status')).json(); document.getElementById('display_en').checked = s.config && s.config.display ? !!s.config.display.enabled : true; } catch(e) { document.getElementById('display_en').checked = true; } } else { document.getElementById('display_en').checked = c.display.enabled; }" 
-        "document.getElementById('lcd_bright').value=c.display.lcd_brightness;"
-        "document.getElementById('bright_val').innerText=c.display.lcd_brightness;"
-        "// ensure slider visual triggers the live update icon/text\n"
-        "onDisplayBrightInput(c.display.lcd_brightness);"
-        "document.getElementById('lcd_bright').disabled = !document.getElementById('display_en').checked;"
-        "document.getElementById('display_en').addEventListener('change', function(){ document.getElementById('lcd_bright').disabled = !this.checked; });"
-        "const rs232Cfg=(c.rs232&&typeof c.rs232==='object')?c.rs232:{};"
-        "document.getElementById('rs232_baud').value=(typeof rs232Cfg.baud==='undefined')?'':rs232Cfg.baud;"
-        "document.getElementById('rs232_bits').value=(typeof rs232Cfg.data_bits==='undefined')?'':rs232Cfg.data_bits;"
-        "document.getElementById('rs232_par').value=(typeof rs232Cfg.parity==='undefined')?'':rs232Cfg.parity;"
-        "document.getElementById('rs232_stop').value=(typeof rs232Cfg.stop_bits==='undefined')?'':rs232Cfg.stop_bits;"
-        "document.getElementById('rs232_rx').value=(typeof rs232Cfg.rx_buf==='undefined')?'':rs232Cfg.rx_buf;"
-        "document.getElementById('rs232_tx').value=(typeof rs232Cfg.tx_buf==='undefined')?'':rs232Cfg.tx_buf;"
-        "const rs485Cfg=(c.rs485&&typeof c.rs485==='object')?c.rs485:{};"
-        "document.getElementById('rs485_baud').value=(typeof rs485Cfg.baud==='undefined')?'':rs485Cfg.baud;"
-        "document.getElementById('rs485_bits').value=(typeof rs485Cfg.data_bits==='undefined')?'':rs485Cfg.data_bits;"
-        "document.getElementById('rs485_par').value=(typeof rs485Cfg.parity==='undefined')?'':rs485Cfg.parity;"
-        "document.getElementById('rs485_stop').value=(typeof rs485Cfg.stop_bits==='undefined')?'':rs485Cfg.stop_bits;"
-        "document.getElementById('rs485_rx').value=(typeof rs485Cfg.rx_buf==='undefined')?'':rs485Cfg.rx_buf;"
-        "document.getElementById('rs485_tx').value=(typeof rs485Cfg.tx_buf==='undefined')?'':rs485Cfg.tx_buf;"
-        "const mdbCfg=(c.mdb_serial&&typeof c.mdb_serial==='object')?c.mdb_serial:{};"
-        "document.getElementById('mdb_baud').value=(typeof mdbCfg.baud==='undefined')?'':mdbCfg.baud;"
-        "document.getElementById('mdb_rx').value=(typeof mdbCfg.rx_buf==='undefined')?'':mdbCfg.rx_buf;"
-        "document.getElementById('mdb_tx').value=(typeof mdbCfg.tx_buf==='undefined')?'':mdbCfg.tx_buf;"
-        "const cct=(c.cctalk_serial&&typeof c.cctalk_serial==='object')?c.cctalk_serial:{baud:9600,data_bits:8,parity:0,stop_bits:1,rx_buf:256,tx_buf:256};"
-        "if(document.getElementById('cctalk_baud')) document.getElementById('cctalk_baud').value=(typeof cct.baud==='undefined')?9600:cct.baud;"
-        "if(document.getElementById('cctalk_bits')) document.getElementById('cctalk_bits').value=(typeof cct.data_bits==='undefined')?8:cct.data_bits;"
-        "if(document.getElementById('cctalk_par')) document.getElementById('cctalk_par').value=(typeof cct.parity==='undefined')?0:cct.parity;"
-        "if(document.getElementById('cctalk_stop')) document.getElementById('cctalk_stop').value=(typeof cct.stop_bits==='undefined')?1:cct.stop_bits;"
-        "if(document.getElementById('cctalk_rx')) document.getElementById('cctalk_rx').value=(typeof cct.rx_buf==='undefined')?256:cct.rx_buf;"
-        "if(document.getElementById('cctalk_tx')) document.getElementById('cctalk_tx').value=(typeof cct.tx_buf==='undefined')?256:cct.tx_buf;"
-        "document.getElementById('g33_mode').value=c.gpios.gpio33.mode;"
-        "document.getElementById('g33_state').checked=c.gpios.gpio33.state;"
-        "if(c.remote_log.use_broadcast){const ipEl=document.getElementById('remote_log_ip'); if(ipEl){ipEl.disabled=true; ipEl.value='255.255.255.255';}}"
-        "updateCurrentTime();"
-        "}catch(e){console.error(e);ensureFactorySections();}"
-        "}"
-        "async function saveBootPassword(){"
-        "const current=document.getElementById('boot_pwd_current');"
-        "const next=document.getElementById('boot_pwd_new');"
-        "const confirm=document.getElementById('boot_pwd_confirm');"
-        "if(!current||!next||!confirm)return;"
-        "if(next.value.length<4){alert('Password troppo corta (min 4)');return;}"
-        "if(next.value!==confirm.value){alert('Conferma password non valida');return;}"
-        "try{const r=await fetch('/api/security/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:current.value,new_password:next.value})});const t=await r.text();if(r.ok){alert('✅ Password aggiornata');current.value='';next.value='';confirm.value='';}else{alert('❌ '+(t||('HTTP '+r.status)));}}catch(e){alert('❌ Errore: '+e);}"
-        "}"
-        "document.getElementById('configForm').onsubmit=async function(e){e.preventDefault();"
-        "const prevUser=(window.__configOriginalUserLang?String(window.__configOriginalUserLang):'it').toLowerCase();"
-        "const prevBackend=(window.__configOriginalBackendLang?String(window.__configOriginalBackendLang):'it').toLowerCase();"
-        "const newUser=(document.getElementById('ui_user_language').value?String(document.getElementById('ui_user_language').value):'it').toLowerCase();"
-        "const newBackend=(document.getElementById('ui_backend_language').value?String(document.getElementById('ui_backend_language').value):'it').toLowerCase();"
-        "const userChanged=(prevUser!==newUser);"
-        "const backendChanged=(prevBackend!==newBackend);"
-        "if((userChanged||backendChanged)&&!confirm('Confermi il cambio lingua? Verranno ricaricate le tabelle di traduzione per le interfacce modificate.')) return;"
-        "const cfg={"
-        "device_name:document.getElementById('dev_name').value,"
-        "ui:{user_language:document.getElementById('ui_user_language').value,backend_language:document.getElementById('ui_backend_language').value},"
-        "eth:{enabled:document.getElementById('eth_en').checked,dhcp_enabled:document.getElementById('eth_dhcp').checked,ip:document.getElementById('eth_ip').value,subnet:document.getElementById('eth_subnet').value,gateway:document.getElementById('eth_gateway').value},"
-        "wifi:{sta_enabled:document.getElementById('wifi_en').checked,dhcp_enabled:document.getElementById('wifi_dhcp').checked,ssid:document.getElementById('wifi_ssid').value,password:document.getElementById('wifi_pwd').value,ip:'',subnet:'',gateway:''},"
-        "ntp_enabled:document.getElementById('ntp_en').checked,"
-        "ntp:{server1:document.getElementById('ntp_server1').value,server2:document.getElementById('ntp_server2').value,timezone_offset:parseInt(document.getElementById('ntp_timezone_offset').value)},"
-        "server:{enabled:document.getElementById('server_en').checked,url:document.getElementById('server_url').value,serial:document.getElementById('server_serial').value,password:document.getElementById('server_password').value},"
-        "remote_log:{server_port:parseInt(document.getElementById('remote_log_port').value),use_broadcast:document.getElementById('remote_log_broadcast').checked,write_to_sd:document.getElementById('remote_log_sd').checked},"
-        "sensors:{io_expander_enabled:document.getElementById('io_exp').checked,temperature_enabled:document.getElementById('temp').checked,led_enabled:document.getElementById('led').checked,led_count:parseInt(document.getElementById('led_count').value),rs232_enabled:document.getElementById('rs232').checked,rs485_enabled:document.getElementById('rs485').checked,mdb_enabled:document.getElementById('mdb').checked,cctalk_enabled:document.getElementById('cctalk').checked,eeprom_enabled:document.getElementById('eeprom').checked,sd_card_enabled:document.getElementById('sd_card').checked,pwm1_enabled:document.getElementById('pwm1').checked,pwm2_enabled:document.getElementById('pwm2').checked},"
-"scanner:{enabled:document.getElementById('scanner_en').checked,vid:document.getElementById('scanner_vid').value,pid:document.getElementById('scanner_pid').value,dual_pid:document.getElementById('scanner_dual_pid').value,cooldown_ms:parseInt(document.getElementById('scanner_cooldown_ms').value)||10000},"
-        "timeouts:{language_return_ms:(Math.max(1,Math.min(600,parseInt(document.getElementById('timeout_language_return_s').value)||10))*1000)},"
-        "display:{enabled:document.getElementById('display_en').checked,lcd_brightness:parseInt(document.getElementById('lcd_bright').value)},"
-        "rs232:{baud:parseInt(document.getElementById('rs232_baud').value),data_bits:parseInt(document.getElementById('rs232_bits').value),parity:parseInt(document.getElementById('rs232_par').value),stop_bits:parseInt(document.getElementById('rs232_stop').value),rx_buf:parseInt(document.getElementById('rs232_rx').value),tx_buf:parseInt(document.getElementById('rs232_tx').value)},"
-        "rs485:{baud:parseInt(document.getElementById('rs485_baud').value),data_bits:parseInt(document.getElementById('rs485_bits').value),parity:parseInt(document.getElementById('rs485_par').value),stop_bits:parseInt(document.getElementById('rs485_stop').value),rx_buf:parseInt(document.getElementById('rs485_rx').value),tx_buf:parseInt(document.getElementById('rs485_tx').value)},"
-        "mdb_serial:{baud:parseInt(document.getElementById('mdb_baud').value),data_bits:8,parity:0,stop_bits:1,rx_buf:parseInt(document.getElementById('mdb_rx').value),tx_buf:parseInt(document.getElementById('mdb_tx').value)},"
-        "gpios:{"
-        "gpio33:{mode:parseInt(document.getElementById('g33_mode').value),state:document.getElementById('g33_state').checked}}"
-        "};"
-        "const r=await fetch('/api/config/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});"
-        "if(r.ok){"
-        "try{if(userChanged){await reloadLanguageTables(newUser);window.__configOriginalUserLang=newUser;}}catch(err){console.warn('reloadLanguageTables failed',err);}"
-        "if(userChanged||backendChanged){alert('✅ Configurazione salvata. Lingue aggiornate!');const u=new URL(window.location.href);u.pathname='/config';u.searchParams.set('lang',newBackend);u.searchParams.set('_ts',String(Date.now()));window.location.replace(u.toString());return;}"
-        "alert('✅ Configurazione salvata!');"
-        "} else alert('❌ Errore durante il salvataggio!');"
-        "}"
-
-        "// Rendiamo collassabili tutte le sezioni: init robusta (immediata + fallback su load)\n"
-        "function initCollapsibleSections(){\n"
-        "  const sections = Array.from(document.querySelectorAll('.section')).filter(s => s.querySelector('h2'));\n"
-        "  sections.forEach((s, idx) => {\n"
-        "    if (idx === 0) s.classList.remove('collapsed'); else s.classList.add('collapsed');\n"
-        "    const h = s.querySelector('h2'); if(!h) return;\n"
-        "    if (h.dataset.collapsibleReady === '1') return;\n"
-        "    h.dataset.collapsibleReady = '1';\n"
-        "    h.setAttribute('role', 'button');\n"
-        "    h.setAttribute('tabindex', '0');\n"
-        "    if (h.hasAttribute('onclick')) { h.removeAttribute('onclick'); }\n"
-        "    if (!h.querySelector('.section-toggle-icon')) {\n"
-        "      const ic = document.createElement('span'); ic.className = 'section-toggle-icon'; ic.innerText = s.classList.contains('collapsed') ? '▸' : '▾'; h.appendChild(ic);\n"
-        "    } else {\n"
-        "      const ic = h.querySelector('.section-toggle-icon'); ic.innerText = s.classList.contains('collapsed') ? '▸' : '▾';\n"
-        "    }\n"
-        "    const toggle = () => {\n"
-        "      s.classList.toggle('collapsed');\n"
-        "      const ic2 = h.querySelector('.section-toggle-icon');\n"
-        "      if (ic2) ic2.innerText = s.classList.contains('collapsed') ? '▸' : '▾';\n"
-        "    };\n"
-        "    h.addEventListener('click', function(ev){ ev.preventDefault(); toggle(); });\n"
-        "    h.addEventListener('keydown', function(ev){ if(ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });\n"
-        "  });\n"
-        "}\n"
-        "initCollapsibleSections();\n"
-        "window.addEventListener('load', initCollapsibleSections);\n"
-        "// Sperimentali: append USB Debug buttons near scanner fields (se presenti)\n"
-        "try{(function(){const pidEl=document.getElementById('scanner_pid');"
-        " if(pidEl){const btnEnum=document.createElement('button');"
-        " btnEnum.textContent='USB:Enumerate (Sperimentali)';"
-        " btnEnum.type='button';"
-        " btnEnum.onclick=async function(){const r=await fetch('/api/debug/usb/enumerate'); const j=await r.json(); alert(JSON.stringify(j,null,2));};"
-        " pidEl.parentNode.insertBefore(btnEnum,pidEl.nextSibling);"
-        " const btnRestart=document.createElement('button');"
-        " btnRestart.textContent='USB:Restart Host (Sperimentali)';"
-        " btnRestart.type='button';"
-        " btnRestart.onclick=async function(){const r=await fetch('/api/debug/usb/restart',{method:'POST'}); const txt=await r.text(); alert('Restart: '+txt);};"
-        " pidEl.parentNode.insertBefore(btnRestart,btnEnum.nextSibling); }"
-        " })();}catch(e){}"
-        "</script></body></html>";
+    const char *body = WEBPAGE_CONFIG_BODY;
     
     httpd_resp_sendstr_chunk(req, body);
     if (config_read_only) {
@@ -972,6 +542,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
     }
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
+#endif
 }
 
 // Handler API GET /api/debug/usb/enumerate
@@ -1536,6 +1107,13 @@ esp_err_t api_config_save(httpd_req_t *req)
     }
     
     device_config_t *cfg = device_config_get();
+    bool prev_server_enabled = cfg->server.enabled;
+    char prev_server_url[sizeof(cfg->server.url)] = {0};
+    char prev_server_serial[sizeof(cfg->server.serial)] = {0};
+    char prev_server_password[sizeof(cfg->server.password)] = {0};
+    strncpy(prev_server_url, cfg->server.url, sizeof(prev_server_url) - 1);
+    strncpy(prev_server_serial, cfg->server.serial, sizeof(prev_server_serial) - 1);
+    strncpy(prev_server_password, cfg->server.password, sizeof(prev_server_password) - 1);
 
     cJSON *name_obj = cJSON_GetObjectItem(root, "device_name");
     if (name_obj && name_obj->valuestring) strncpy(cfg->device_name, name_obj->valuestring, sizeof(cfg->device_name)-1);
@@ -1779,9 +1357,23 @@ esp_err_t api_config_save(httpd_req_t *req)
     if (ui_lang_flat && cJSON_IsString(ui_lang_flat) && ui_lang_flat->valuestring) {
         strncpy(cfg->ui.user_language, ui_lang_flat->valuestring, sizeof(cfg->ui.user_language) - 1);
     }
+
+    bool server_cfg_changed =
+        (prev_server_enabled != cfg->server.enabled) ||
+        (strncmp(prev_server_url, cfg->server.url, sizeof(prev_server_url)) != 0) ||
+        (strncmp(prev_server_serial, cfg->server.serial, sizeof(prev_server_serial)) != 0) ||
+        (strncmp(prev_server_password, cfg->server.password, sizeof(prev_server_password)) != 0);
     
     cfg->updated = true;
     device_config_save(cfg);
+    if (server_cfg_changed) {
+        esp_err_t hs_sync_err = http_services_sync_runtime_state(true);
+        if (hs_sync_err != ESP_OK && cfg->server.enabled) {
+            ESP_LOGW(TAG,
+                     "[C] Sync runtime server remoto dopo save fallita: %s",
+                     esp_err_to_name(hs_sync_err));
+        }
+    }
     // Applica stati task che dipendono dalla configurazione (es. display on/off)
     tasks_apply_n_run();
     /* Se la lingua è cambiata: carica la nuova tabella in PSRAM, invalida cache e

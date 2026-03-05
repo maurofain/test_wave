@@ -15,6 +15,7 @@ extern const lv_font_t arial96;
 static const char *TAG = "lvgl_panel";
 
 #define COL_BG    lv_color_make(0x1a, 0x1a, 0x2e)
+#define COL_BOOT_BG lv_color_make(0x00, 0x00, 0x00)
 #define COL_WHITE lv_color_make(0xEE, 0xEE, 0xEE)
 #define BOOT_LOGO_SPIFFS_PATH "/spiffs/logo.jpg"
 #define BOOT_LOGO_LVGL_PATH   "S:/spiffs/logo.jpg"
@@ -36,7 +37,7 @@ static void panel_show_boot_logo_screen(void)
     lvgl_page_main_deactivate();
     lv_obj_clean(scr);
 
-    lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(scr, COL_BOOT_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);

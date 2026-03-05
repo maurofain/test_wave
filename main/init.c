@@ -60,6 +60,7 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #include "remote_logging.h"
 #include "sd_card.h"
 #include "sht40.h"
+#include "http_services.h"
 #include "device_activity.h"
 #include "error_log.h"
 #include "fsm.h"  // needed for fsm_event_queue_init()
@@ -91,6 +92,97 @@ static esp_eth_handle_t s_eth_handle;
 static esp_lcd_touch_handle_t s_touch_handle;
 static bool s_error_lock_active = false;
 static uint32_t s_consecutive_reboots = 0;
+static bool s_http_services_initial_token_done = false;
+
+static init_agent_status_t s_agent_status_table[] = {
+    {AGN_ID_NONE, 0, INIT_AGENT_ERR_NONE},
+    {AGN_ID_FSM, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_WEB_UI, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_TOUCH, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_TOKEN, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_AUX_GPIO, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_IO_EXPANDER, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_PWM1, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_PWM2, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_LED, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_SHT40, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_CCTALK, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_RS232, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_RS485, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_MDB, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_USB_CDC_SCANNER, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_USB_HOST, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_SD_CARD, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_REMOTE_LOGGING, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_DEVICE_CONFIG, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_DEVICE_ACTIVITY, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_ERROR_LOG, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_LVGL, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+    {AGN_ID_WAVESHARE_LCD, 1, INIT_AGENT_ERR_NOT_EVALUATED},
+};
+
+static void init_agent_status_update_error_counter(void)
+{
+    int32_t error_count = 0;
+    const size_t count = sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
+    for (size_t i = 1; i < count; ++i) {
+        if (s_agent_status_table[i].state == 0) {
+            error_count++;
+        }
+    }
+    s_agent_status_table[0].state = error_count;
+    s_agent_status_table[0].error_code = INIT_AGENT_ERR_NONE;
+}
+
+void init_agent_status_reset_defaults(void)
+{
+    const size_t count = sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
+    for (size_t i = 1; i < count; ++i) {
+        s_agent_status_table[i].state = 1;
+        s_agent_status_table[i].error_code = INIT_AGENT_ERR_NOT_EVALUATED;
+    }
+    s_agent_status_table[0].state = 0;
+    s_agent_status_table[0].error_code = INIT_AGENT_ERR_NONE;
+}
+
+void init_agent_status_set(int32_t agn_value, int32_t state, init_agent_error_code_t error_code)
+{
+    const size_t count = sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
+    for (size_t i = 1; i < count; ++i) {
+        if (s_agent_status_table[i].agn_value == agn_value) {
+            s_agent_status_table[i].state = state;
+            s_agent_status_table[i].error_code = (int32_t)error_code;
+            init_agent_status_update_error_counter();
+            return;
+        }
+    }
+}
+
+const init_agent_status_t *init_agent_status_get_table(size_t *out_count)
+{
+    if (out_count) {
+        *out_count = sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
+    }
+    return s_agent_status_table;
+}
+
+const char *init_agent_error_code_text(init_agent_error_code_t code)
+{
+    switch (code) {
+        case INIT_AGENT_ERR_NONE: return "none";
+        case INIT_AGENT_ERR_NOT_EVALUATED: return "not_evaluated";
+        case INIT_AGENT_ERR_DISABLED_BY_CONFIG: return "disabled_by_config";
+        case INIT_AGENT_ERR_INIT_FAILED: return "init_failed";
+        case INIT_AGENT_ERR_DEPENDENCY_FAILED: return "dependency_failed";
+        case INIT_AGENT_ERR_NETWORK_NO_IP: return "network_no_ip";
+        case INIT_AGENT_ERR_REMOTE_LOGIN_FAILED: return "remote_login_failed";
+        case INIT_AGENT_ERR_RUNTIME_FAILED: return "runtime_failed";
+        case INIT_AGENT_ERR_NOT_AVAILABLE: return "not_available";
+        default: return "unknown";
+    }
+}
 
 #define BOOT_GUARD_NAMESPACE "boot_guard"
 #define BOOT_GUARD_KEY_CONSEC "consecutive"
@@ -958,6 +1050,28 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
                 ESP_LOGI(TAG, "[M] [NTP] NTP disabilitato da config");
             }
         }
+
+        if (!s_http_services_initial_token_done) {
+            s_http_services_initial_token_done = true;
+
+            if (!http_services_is_remote_enabled()) {
+                init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+                ESP_LOGI(TAG, "[M] [HTTP_SVC] Login iniziale token saltato: server remoto disabilitato");
+                return;
+            }
+
+            ESP_LOGI(TAG, "[M] [HTTP_SVC] Avvio login iniziale token (IP disponibile)");
+            esp_err_t hs_sync_err = http_services_sync_runtime_state(true);
+            if (hs_sync_err == ESP_OK && http_services_is_remote_online()) {
+                init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_NONE);
+                ESP_LOGI(TAG, "[M] [HTTP_SVC] Login iniziale token completato");
+            } else {
+                init_agent_status_set(AGN_ID_HTTP_SERVICES, 0, INIT_AGENT_ERR_REMOTE_LOGIN_FAILED);
+                ESP_LOGW(TAG,
+                         "[M] [HTTP_SVC] Login iniziale token fallito: %s",
+                         esp_err_to_name(hs_sync_err));
+            }
+        }
     }
 }
 
@@ -1327,6 +1441,9 @@ esp_err_t init_run_display_only(void)
  */
 esp_err_t init_run_factory(void)
 {
+    init_agent_status_reset_defaults();
+    s_http_services_initial_token_done = false;
+
     ESP_ERROR_CHECK(init_nvs());
     ESP_ERROR_CHECK(update_boot_reboot_guard());
     ESP_ERROR_CHECK(update_crash_pending_record());
@@ -1348,9 +1465,11 @@ esp_err_t init_run_factory(void)
     ESP_ERROR_CHECK(init_i2c_bus());
     ESP_ERROR_CHECK(eeprom_24lc16_init());
 #endif
+    init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NONE);
 
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
+    init_agent_status_set(AGN_ID_DEVICE_CONFIG, 1, INIT_AGENT_ERR_NONE);
 
     // Inizializza Remote Logging il prima possibile per catturare i log pre-rete
 #if !defined(DNA_REMOTE_LOGGING) || (DNA_REMOTE_LOGGING == 0)
@@ -1359,12 +1478,15 @@ esp_err_t init_run_factory(void)
         if (rl_ret != ESP_OK) {
             ESP_LOGW(TAG, "[M] remote_logging_init early failed (%s), continuo senza remote logs",
                      esp_err_to_name(rl_ret));
+            init_agent_status_set(AGN_ID_REMOTE_LOGGING, 0, INIT_AGENT_ERR_INIT_FAILED);
         } else {
             ESP_LOGI(TAG, "[M] remote_logging early init attivo (log pre-rete catturati)");
+            init_agent_status_set(AGN_ID_REMOTE_LOGGING, 1, INIT_AGENT_ERR_NONE);
         }
     }
 #else
     ESP_LOGI(TAG, "[M] remote_logging: disabilitato (DNA_REMOTE_LOGGING=1)");
+    init_agent_status_set(AGN_ID_REMOTE_LOGGING, 1, INIT_AGENT_ERR_NOT_AVAILABLE);
 #endif
 
     /* prepare the FSM mailbox early so that any code executing during
@@ -1375,7 +1497,11 @@ esp_err_t init_run_factory(void)
      * send an event before the daemon task had started and our old init
      * reentrant logic would reset the mailbox repeatedly.
      */
-    (void)fsm_event_queue_init(0);
+    if (!fsm_event_queue_init(0)) {
+        init_agent_status_set(AGN_ID_FSM, 0, INIT_AGENT_ERR_INIT_FAILED);
+        return ESP_FAIL;
+    }
+    init_agent_status_set(AGN_ID_FSM, 1, INIT_AGENT_ERR_NONE);
 
     // Tentativo rapido pre-boot di invio crash (best-effort, timeout corto)
     ESP_ERROR_CHECK(try_send_pending_crash_record());
@@ -1389,6 +1515,7 @@ esp_err_t init_run_factory(void)
 
     // Inizializza GPIO ausiliari
     aux_gpio_init();
+    init_agent_status_set(AGN_ID_AUX_GPIO, 1, INIT_AGENT_ERR_NONE);
 
     // Display + LVGL (minimal screen) - skip se headless
     device_config_t *cfg = device_config_get();
@@ -1418,9 +1545,31 @@ esp_err_t init_run_factory(void)
         if (disp_ret != ESP_OK)
         {
             ESP_LOGW(TAG, "[M] Display/LVGL init failed: %s", esp_err_to_name(disp_ret));
+            init_agent_status_set(AGN_ID_LVGL, 0, INIT_AGENT_ERR_INIT_FAILED);
+            init_agent_status_set(AGN_ID_WAVESHARE_LCD, 0, INIT_AGENT_ERR_INIT_FAILED);
+            init_agent_status_set(AGN_ID_TOUCH, 0, INIT_AGENT_ERR_INIT_FAILED);
+        }
+        else
+        {
+            init_agent_status_set(AGN_ID_LVGL, 1, INIT_AGENT_ERR_NONE);
+            init_agent_status_set(AGN_ID_WAVESHARE_LCD, 1, INIT_AGENT_ERR_NONE);
+            if (s_touch_handle) {
+                init_agent_status_set(AGN_ID_TOUCH, 1, INIT_AGENT_ERR_NONE);
+            } else {
+                init_agent_status_set(AGN_ID_TOUCH, 0, INIT_AGENT_ERR_INIT_FAILED);
+            }
         }
     } else {
         ESP_LOGI(TAG, "[M] Display disabilitato da config: salto init LVGL/display (modalità headless)");
+        init_agent_status_set(AGN_ID_LVGL, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+        init_agent_status_set(AGN_ID_WAVESHARE_LCD, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+        init_agent_status_set(AGN_ID_TOUCH, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+    }
+
+    if (http_services_is_remote_enabled()) {
+        init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_NETWORK_NO_IP);
+    } else {
+        init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     // Ethernet - continua anche se fallisce
@@ -1445,13 +1594,20 @@ esp_err_t init_run_factory(void)
     if (web_ret != ESP_OK)
     {
         ESP_LOGE(TAG, "[M] web_ui_init fallita: %s", esp_err_to_name(web_ret));
+        init_agent_status_set(AGN_ID_WEB_UI, 0, INIT_AGENT_ERR_INIT_FAILED);
         return web_ret;
     }
+    init_agent_status_set(AGN_ID_WEB_UI, 1, INIT_AGENT_ERR_NONE);
     ESP_LOGI(TAG, "[M] Web UI avviata correttamente");
 
 #if COMPILE_APP
     // Carica la tabella activity da SPIFFS (solo build APP)
-    ESP_ERROR_CHECK(device_activity_init());
+    esp_err_t activity_ret = device_activity_init();
+    if (activity_ret != ESP_OK) {
+        init_agent_status_set(AGN_ID_DEVICE_ACTIVITY, 0, INIT_AGENT_ERR_INIT_FAILED);
+        return activity_ret;
+    }
+    init_agent_status_set(AGN_ID_DEVICE_ACTIVITY, 1, INIT_AGENT_ERR_NONE);
 #endif
 
     // Inizializzazioni condizionali basate su NVS
@@ -1462,8 +1618,10 @@ esp_err_t init_run_factory(void)
         if (exp_ret != ESP_OK) {
             ESP_LOGW(TAG, "[M] I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));
             cfg->sensors.io_expander_enabled = false;
+            init_agent_status_set(AGN_ID_IO_EXPANDER, 0, INIT_AGENT_ERR_INIT_FAILED);
         }
         if (exp_ret == ESP_OK) {
+            init_agent_status_set(AGN_ID_IO_EXPANDER, 1, INIT_AGENT_ERR_NONE);
             // Controllo GPIO3 solo se expander disponibile
             while (true) {
                 int gpio3_value = io_get_pin(3) ? 1 : 0;
@@ -1478,6 +1636,7 @@ esp_err_t init_run_factory(void)
     else
     {
         ESP_LOGI(TAG, "I/O Expander disabilitato da config");
+        init_agent_status_set(AGN_ID_IO_EXPANDER, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     if (cfg->sensors.led_enabled)
@@ -1487,11 +1646,17 @@ esp_err_t init_run_factory(void)
         {
             ESP_LOGE(TAG, "[M] Inizializzazione LED fallita (%s): periferica disabilitata a runtime", esp_err_to_name(led_ret));
             cfg->sensors.led_enabled = false;
+            init_agent_status_set(AGN_ID_LED, 0, INIT_AGENT_ERR_INIT_FAILED);
+        }
+        else
+        {
+            init_agent_status_set(AGN_ID_LED, 1, INIT_AGENT_ERR_NONE);
         }
     }
     else
     {
         ESP_LOGI(TAG, "LED Strip disabilitato da config");
+        init_agent_status_set(AGN_ID_LED, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     if (cfg->sensors.rs232_enabled)
@@ -1501,17 +1666,25 @@ esp_err_t init_run_factory(void)
         {
             ESP_LOGE(TAG, "[M] Inizializzazione RS232 fallita (%s): periferica disabilitata a runtime", esp_err_to_name(rs232_ret));
             cfg->sensors.rs232_enabled = false;
+            init_agent_status_set(AGN_ID_RS232, 0, INIT_AGENT_ERR_INIT_FAILED);
+            init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_DEPENDENCY_FAILED);
         } else {
+            init_agent_status_set(AGN_ID_RS232, 1, INIT_AGENT_ERR_NONE);
             /* Avvia anche il driver CCtalk (se presente) che usa la stessa UART fisica */
             esp_err_t cctalk_ret = cctalk_driver_init();
             if (cctalk_ret != ESP_OK) {
                 ESP_LOGW(TAG, "CCTALK driver non avviato: %s", esp_err_to_name(cctalk_ret));
+                init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_INIT_FAILED);
+            } else {
+                init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_NONE);
             }
         }
     }
     else
     {
         ESP_LOGI(TAG, "UART RS232 disabilitato da config");
+        init_agent_status_set(AGN_ID_RS232, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+        init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     if (cfg->sensors.rs485_enabled)
@@ -1521,11 +1694,17 @@ esp_err_t init_run_factory(void)
         {
             ESP_LOGE(TAG, "[M] Inizializzazione RS485 fallita (%s): periferica disabilitata a runtime", esp_err_to_name(rs485_ret));
             cfg->sensors.rs485_enabled = false;
+            init_agent_status_set(AGN_ID_RS485, 0, INIT_AGENT_ERR_INIT_FAILED);
+        }
+        else
+        {
+            init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_NONE);
         }
     }
     else
     {
         ESP_LOGI(TAG, "UART RS485 disabilitato da config");
+        init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     if (cfg->sensors.mdb_enabled)
@@ -1538,11 +1717,17 @@ esp_err_t init_run_factory(void)
         {
             ESP_LOGE(TAG, "[M] Inizializzazione MDB fallita (%s): periferica disabilitata a runtime", esp_err_to_name(mdb_ret));
             cfg->sensors.mdb_enabled = false;
+            init_agent_status_set(AGN_ID_MDB, 0, INIT_AGENT_ERR_INIT_FAILED);
+        }
+        else
+        {
+            init_agent_status_set(AGN_ID_MDB, 1, INIT_AGENT_ERR_NONE);
         }
     }
     else
     {
         ESP_LOGI(TAG, "MDB Engine disabilitato da config");
+        init_agent_status_set(AGN_ID_MDB, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled)
@@ -1553,11 +1738,24 @@ esp_err_t init_run_factory(void)
             ESP_LOGE(TAG, "[M] Inizializzazione PWM fallita (%s): PWM1/PWM2 disabilitati a runtime", esp_err_to_name(pwm_ret));
             cfg->sensors.pwm1_enabled = false;
             cfg->sensors.pwm2_enabled = false;
+            init_agent_status_set(AGN_ID_PWM1, 0, INIT_AGENT_ERR_INIT_FAILED);
+            init_agent_status_set(AGN_ID_PWM2, 0, INIT_AGENT_ERR_INIT_FAILED);
+        }
+        else
+        {
+            init_agent_status_set(AGN_ID_PWM1,
+                                  1,
+                                  cfg->sensors.pwm1_enabled ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+            init_agent_status_set(AGN_ID_PWM2,
+                                  1,
+                                  cfg->sensors.pwm2_enabled ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_DISABLED_BY_CONFIG);
         }
     }
     else
     {
         ESP_LOGI(TAG, "PWM Hardware disabilitato da config");
+        init_agent_status_set(AGN_ID_PWM1, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+        init_agent_status_set(AGN_ID_PWM2, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     if (cfg->sensors.temperature_enabled)
@@ -1567,7 +1765,16 @@ esp_err_t init_run_factory(void)
         {
             ESP_LOGE(TAG, "[M] Inizializzazione SHT40 fallita! Sensore temperatura disabilitato a runtime");
             cfg->sensors.temperature_enabled = false;
+            init_agent_status_set(AGN_ID_SHT40, 0, INIT_AGENT_ERR_INIT_FAILED);
         }
+        else
+        {
+            init_agent_status_set(AGN_ID_SHT40, 1, INIT_AGENT_ERR_NONE);
+        }
+    }
+    else
+    {
+        init_agent_status_set(AGN_ID_SHT40, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     /* Il task sd_monitor è avviato da tasks_start_all() via s_tasks[] (sd_monitor_wrapper).
@@ -1580,15 +1787,18 @@ esp_err_t init_run_factory(void)
         {
             ESP_LOGE(TAG, "[M] Inizializzazione SD Card fallita (%s): periferica disabilitata a runtime", esp_err_to_name(sd_ret));
             cfg->sensors.sd_card_enabled = false;
+            init_agent_status_set(AGN_ID_SD_CARD, 0, INIT_AGENT_ERR_INIT_FAILED);
         }
         else
         {
             (void)transfer_coredump_flash_to_sd();
+            init_agent_status_set(AGN_ID_SD_CARD, 1, INIT_AGENT_ERR_NONE);
         }
     }
     else
     {
         ESP_LOGI(TAG, "[M] SD Card disabilitata da config");
+        init_agent_status_set(AGN_ID_SD_CARD, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
 
     return ESP_OK;

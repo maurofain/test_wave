@@ -1,4 +1,5 @@
 #include "web_ui.h"
+#include "web_ui_internal.h"
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "esp_err.h"
@@ -103,6 +104,11 @@ esp_err_t web_ui_init(void)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "[C] httpd_start fallita: %s", esp_err_to_name(ret));
         return ret;
+    }
+
+    esp_err_t wp_ret = webpages_bootstrap();
+    if (wp_ret != ESP_OK && wp_ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "[C] Bootstrap pagine esterne fallito: %s", esp_err_to_name(wp_ret));
     }
 
     // Delego la registrazione degli handler al modulo "web_ui"

@@ -30,6 +30,27 @@ componenti.
 - **Valori:** `1` disabilita forzatamente la parte video, `0` comportamento da configurazione runtime.
 - **Impatto:** inibisce codice e/o comportamenti relativi a display/LVGL/touch e gestione web della parte video.
 
+### `WEB_UI_PAGE_SOURCE`
+- **File:** `CMakeLists.txt`, `components/web_ui/webpages.c`
+- **Valori:**
+  - `0` = pagine embedded nel firmware (comportamento storico)
+  - `1` = pagine da SPIFFS (`/spiffs/www`)
+  - `2` = pagine da SD (`/sdcard/www`)
+- **Impatto:** seleziona la sorgente delle pagine Web UI. Con `0` usa markup embedded compilato nel firmware. Con `1`/`2` abilita source esterna (`/spiffs/www` o `/sdcard/www`) e gli handler pagina lavorano in modalità external-only (niente fallback al markup embedded).
+
+### `WEB_UI_USE_EMBEDDED_PAGES`
+- **File:** `CMakeLists.txt`, `components/web_ui/*`
+- **Valori:** `1` = include pagine HTML/JS embedded C, `0` = non includere percorso embedded
+- **Impatto:** flag derivato automaticamente da `WEB_UI_PAGE_SOURCE`:
+  - `WEB_UI_PAGE_SOURCE=0` ⇒ `WEB_UI_USE_EMBEDDED_PAGES=1`
+  - `WEB_UI_PAGE_SOURCE=1/2` ⇒ `WEB_UI_USE_EMBEDDED_PAGES=0`
+  In modalità `0`, gli handler HTML rispondono solo da filesystem esterno (SPIFFS/SD) tramite `webpages_send_external_or_error(...)`.
+
+### `WEB_UI_EXPORT_ON_BOOT`
+- **File:** `CMakeLists.txt`, `components/web_ui/webpages.c`
+- **Valori:** `0` = export seed disabilitato, `1` = export seed abilitato
+- **Impatto:** quando `WEB_UI_PAGE_SOURCE` è esterno (`1` o `2`), all'avvio Web UI crea (se mancanti) pagine seed `.html` nella cartella source (`/spiffs/www` oppure `/sdcard/www`). Non sovrascrive file esistenti.
+
 ### `MINIMAL_I2C_EEPROM_BOOT`
 - **File:** `main/app_version.h`, `main/main.c`
 - **Valori:** `1` attiva boot minimale diagnostico, `0` boot normale.

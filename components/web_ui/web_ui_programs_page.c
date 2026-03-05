@@ -21,65 +21,28 @@ esp_err_t programs_page_handler(httpd_req_t *req)
         return httpd_resp_send(req, "404 Non Trovato", -1);
     }
 
+#if WEB_UI_USE_EMBEDDED_PAGES == 0
+    return webpages_send_external_or_error(req, "programs.html", "text/html; charset=utf-8");
+#else
+
+    esp_err_t ext_page_ret = webpages_try_send_external(req, "programs.html", "text/html; charset=utf-8");
+    if (ext_page_ret == ESP_OK) {
+        return ESP_OK;
+    }
+
     ESP_LOGI(TAG, "[C] GET /config/programs");
 
-    const char *extra_style =
-        ".section{background:white;padding:20px;margin:20px 0;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}"
-        "table{width:100%;border-collapse:collapse;margin-top:15px}"
-        "th,td{padding:8px;border:1px solid #ddd;text-align:left;color:#333}"
-        "th{background:#34495e;color:white}"
-        "input[type=text],input[type=number]{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}"
-        "input[type=checkbox]{transform:scale(1.2)}"
-        "button{padding:10px 16px;background:#27ae60;color:white;border:none;border-radius:5px;cursor:pointer;font-weight:bold}"
-        "button:hover{background:#229954}"
-        ".btn-secondary{background:#3498db}.btn-secondary:hover{background:#2c80b7}"
-        ".status{margin:12px 0;padding:10px;border-radius:5px;display:none}"
-        ".status.ok{display:block;background:#d4edda;color:#155724;border:1px solid #c3e6cb}"
-        ".status.err{display:block;background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}";
+    const char *extra_style = WEBPAGE_PROGRAMS_EXTRA_STYLE;
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     send_head(req, "Tabella Programmi", extra_style, true);
 
-    const char *body =
-        "<div class='container'><div class='section'>"
-        "<h2>📊 Editor Tabella Programmi (FACTORY)</h2>"
-        "<p>Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.</p>"
-        "<div id='status' class='status'></div>"
-        "<table><thead><tr><th>ID</th><th>Nome</th><th>Abilitato</th><th>Prezzo</th><th>Durata (s)</th><th>Pausa Max (s)</th><th>Relay mask</th></tr></thead><tbody id='programRows'></tbody></table>"
-        "<div style='display:flex;align-items:center;gap:10px;margin-top:14px;'>"
-        "<button onclick='savePrograms()'>💾 Salva tabella</button>"
-        "<button class='btn-secondary' onclick='loadPrograms()'>🔄 Ricarica</button>"
-        "<span>Secondi pausa:</span>"
-        "<input type='number' id='pauseAll' min='0' max='65535' value='0' style='width:80px;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box'>"
-        "<button onclick='setAllPauses()'>Set</button>"
-        "</div>"
-        "</div></div>"
-        "<script>"
-        "let programs=[];"
-        "function maskToHex(v){const n=(Number(v)||0)>>>0;return '0x'+n.toString(16).toUpperCase();}"
-        "function parseRelayMaskHex(raw){let s=String(raw||'').trim();if(!s)return 0;if(s.startsWith('0x')||s.startsWith('0X'))s=s.slice(2);const n=parseInt(s,16);if(Number.isNaN(n)||n<0)return 0;return n;}"
-        "function showStatus(msg,ok){const s=document.getElementById('status');s.textContent=msg;s.className='status '+(ok?'ok':'err');}"
-        "function rowHtml(p,idx){"
-        "return `<tr>`+"
-        "`<td><input type='number' min='1' max='255' value='${p.program_id||idx+1}' onchange='programs[${idx}].program_id=parseInt(this.value||0,10)'></td>`+"
-        "`<td><input type='text' value='${(p.name||'').replace(/\"/g,'&quot;')}' onchange='programs[${idx}].name=this.value'></td>`+"
-        "`<td style='text-align:center'><input type='checkbox' ${p.enabled?'checked':''} onchange='programs[${idx}].enabled=this.checked'></td>`+"
-        "`<td><input type='number' min='0' max='65535' value='${p.price_units||0}' onchange='programs[${idx}].price_units=parseInt(this.value||0,10)'></td>`+"
-        "`<td><input type='number' min='0' max='65535' value='${p.duration_sec||0}' onchange='programs[${idx}].duration_sec=parseInt(this.value||0,10)'></td>`+"
-        "`<td><input type='number' min='0' max='65535' value='${p.pause_max_suspend_sec||0}' onchange='programs[${idx}].pause_max_suspend_sec=parseInt(this.value||0,10)'></td>`+"
-        "`<td><input type='text' value='${maskToHex(p.relay_mask||0)}' onchange='const v=parseRelayMaskHex(this.value);programs[${idx}].relay_mask=v;this.value=maskToHex(v);'></td>`+"
-        "`</tr>`;"
-        "}"
-        "function render(){const b=document.getElementById('programRows');b.innerHTML='';programs.forEach((p,i)=>{b.insertAdjacentHTML('beforeend',rowHtml(p,i));});}"
-        // set pause value for all programs
-        "function setAllPauses(){const v=parseInt(document.getElementById('pauseAll').value||0,10);programs.forEach(p=>{p.pause_max_suspend_sec=v;});render();showStatus('Pausa impostata a '+v+'s per tutti i programmi',true);}"        "async function loadPrograms(){try{const r=await fetch('/api/programs');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();programs=data.programs||[];render();showStatus('Tabella programmi caricata',true);}catch(e){showStatus('Errore caricamento: '+e.message,false);}}"
-        "async function savePrograms(){try{programs=programs.map(p=>({...p,relay_mask:parseRelayMaskHex(p.relay_mask)}));const r=await fetch('/api/programs/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({programs})});if(!r.ok){const t=await r.text();throw new Error(t||('HTTP '+r.status));}showStatus('Tabella programmi salvata',true);render();}catch(e){showStatus('Errore salvataggio: '+e.message,false);}}"
-        "window.addEventListener('load',loadPrograms);"
-        "</script></body></html>";
+    const char *body = WEBPAGE_PROGRAMS_BODY;
 
     httpd_resp_sendstr_chunk(req, body);
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
+#endif
 }
 
 /**

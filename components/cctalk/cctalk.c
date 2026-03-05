@@ -292,7 +292,8 @@ bool cctalk_command(uint8_t dest_addr,
 
     (void)uart_flush_input(s_cctalk_uart_num);
 
-    bool tx_ok = cctalk_send_frame_unlocked(dest_addr, src_addr, header, data, len, true);
+    bool monitor_traffic = (header != 229U);
+    bool tx_ok = cctalk_send_frame_unlocked(dest_addr, src_addr, header, data, len, monitor_traffic);
     if (!tx_ok) {
         cctalk_lock_give();
         return false;
@@ -321,7 +322,9 @@ bool cctalk_command(uint8_t dest_addr,
             continue;
         }
 
-        cctalk_monitor_frame("CCTALK_RX", &rx);
+        if (monitor_traffic) {
+            cctalk_monitor_frame("CCTALK_RX", &rx);
+        }
 
         if (response) {
             *response = rx;

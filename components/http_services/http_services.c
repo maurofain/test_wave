@@ -29,6 +29,7 @@ static const char *TAG = "HTTP_SERVICES";
 
 // Global variable to store the token
 char g_auth_token[HTTP_SERVICES_AUTH_TOKEN_MAX_LEN] = {0};
+static bool s_remote_online = false;
 
 static esp_err_t http_services_login_if_needed(bool force_refresh);
 
@@ -45,6 +46,90 @@ static esp_err_t http_services_login_if_needed(bool force_refresh);
 bool validate_token(const char *token) {
     // Add actual token validation logic here
     return token != NULL && strlen(token) > 0;
+}
+
+/**
+ * @brief Verifica se il server remoto è abilitato e configurato.
+ */
+static bool http_services_cfg_remote_enabled(const device_config_t *cfg)
+{
+    return (cfg != NULL) && cfg->server.enabled && (cfg->server.url[0] != '\0');
+}
+
+/**
+ * @brief Aggiorna lo stato ONLINE/OFFLINE del server remoto.
+ */
+static void http_services_set_online(bool online, const char *reason)
+{
+    if (s_remote_online == online) {
+        return;
+    }
+    s_remote_online = online;
+    ESP_LOGI(TAG,
+             "[C] Stato server remoto: %s (%s)",
+             online ? "ONLINE" : "OFFLINE",
+             reason ? reason : "n/a");
+}
+
+/**
+ * @brief Azzera il token remoto memorizzato.
+ */
+static void http_services_clear_token(const char *reason)
+{
+    if (g_auth_token[0] == '\0') {
+        return;
+    }
+    g_auth_token[0] = '\0';
+    ESP_LOGI(TAG, "[C] Token remoto azzerato (%s)", reason ? reason : "n/a");
+}
+
+bool http_services_is_remote_enabled(void)
+{
+    const device_config_t *cfg = device_config_get();
+    return http_services_cfg_remote_enabled(cfg);
+}
+
+bool http_services_is_remote_online(void)
+{
+    if (!http_services_is_remote_enabled()) {
+        return false;
+    }
+    return s_remote_online;
+}
+
+bool http_services_has_auth_token(void)
+{
+    return validate_token(g_auth_token);
+}
+
+esp_err_t http_services_sync_runtime_state(bool force_login)
+{
+    device_config_t *cfg = device_config_get();
+    if (!http_services_cfg_remote_enabled(cfg)) {
+        http_services_clear_token("server_disabled");
+        http_services_set_online(false, "server_disabled");
+        return ESP_OK;
+    }
+
+    if (!force_login && validate_token(g_auth_token)) {
+        http_services_set_online(true, "token_cached");
+        return ESP_OK;
+    }
+
+    if (force_login) {
+        http_services_clear_token("force_login");
+    }
+
+    esp_err_t login_err = http_services_login_if_needed(true);
+    if (login_err != ESP_OK) {
+        ESP_LOGW(TAG,
+                 "[C] Sync runtime server remoto fallita: %s",
+                 esp_err_to_name(login_err));
+        return login_err;
+    }
+
+    http_services_set_online(true, "login_ok");
+    return ESP_OK;
 }
 
 /**
@@ -273,7 +358,23 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 #else
     if (!remote_path) return ESP_ERR_INVALID_ARG;
     device_config_t *cfg = device_config_get();
-    if (!cfg || strlen(cfg->server.url) == 0) return ESP_ERR_INVALID_STATE;
+    if (!http_services_cfg_remote_enabled(cfg)) {
+        http_services_clear_token("remote_disabled");
+        http_services_set_online(false, "remote_disabled");
+        if (out_resp) {
+            *out_resp = strdup("{\"iserror\":true,\"codeerror\":503,\"deserror\":\"remote_disabled\"}");
+        }
+        if (out_status) {
+            *out_status = 503;
+        }
+        if (out_len) {
+            *out_len = 0;
+        }
+        ESP_LOGW(TAG,
+                 "[C] POST remoto bloccato: server disabilitato (path=%s)",
+                 remote_path ? remote_path : "(null)");
+        return ESP_ERR_INVALID_STATE;
+    }
 
     /* build URL (avoid double slashes) */
     const char *base = cfg->server.url;
@@ -573,6 +674,15 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
     /* report length to caller so caller can forward exact byte count (handles embedded NULs/binary) */
     if (out_len) *out_len = total;
 
+    if (err == ESP_OK && status >= 200 && status < 300) {
+        http_services_set_online(true, "http_ok");
+    } else {
+        http_services_set_online(false, "http_error");
+        if (status == 401 || status == 403) {
+            http_services_clear_token("http_unauthorized");
+        }
+    }
+
     if (out_resp) *out_resp = resp; else if (resp) free(resp);
     if (out_status) *out_status = status;
     if (generated_auth_header) {
@@ -582,9 +692,23 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 #endif
 }
 
+static esp_err_t send_remote_disabled_httpd(httpd_req_t *req)
+{
+    const char *resp = "{\"iserror\":true,\"codeerror\":503,\"deserror\":\"remote_disabled\"}";
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, resp, strlen(resp));
+}
+
 /* Helper: forward incoming POST to remote_path (uses request body or config credentials for login) */
 static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const char *override_body, bool override_with_config_credentials)
 {
+    if (!http_services_is_remote_enabled()) {
+        ESP_LOGW(TAG,
+                 "[C] Richiesta locale bloccata: server remoto disabilitato (path=%s)",
+                 remote_path ? remote_path : "(null)");
+        return send_remote_disabled_httpd(req);
+    }
+
     char *incoming_body = NULL;
     
     if (!override_body) incoming_body = read_request_body(req);
@@ -962,12 +1086,21 @@ static esp_err_t api_paymentoffline_post(httpd_req_t *req)
 
 static esp_err_t http_services_login_if_needed(bool force_refresh)
 {
+    device_config_t *cfg = device_config_get();
+    if (!http_services_cfg_remote_enabled(cfg)) {
+        http_services_clear_token("login_disabled");
+        http_services_set_online(false, "login_disabled");
+        ESP_LOGW(TAG, "[C] Login remoto bloccato: server disabilitato o URL mancante");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     if (!force_refresh && validate_token(g_auth_token)) {
+        http_services_set_online(true, "token_valid");
         return ESP_OK;
     }
 
-    device_config_t *cfg = device_config_get();
     if (!cfg || cfg->server.serial[0] == '\0' || cfg->server.password[0] == '\0') {
+        http_services_set_online(false, "login_missing_credentials");
         ESP_LOGE(TAG, "[C] Login non possibile: credenziali server non configurate");
         return ESP_ERR_INVALID_STATE;
     }
@@ -984,12 +1117,14 @@ static esp_err_t http_services_login_if_needed(bool force_refresh)
     size_t resp_len = 0;
     esp_err_t err = remote_post("/api/login", login_body, NULL, &resp, &status, &resp_len);
     if (err != ESP_OK) {
+        http_services_set_online(false, "login_http_error");
         ESP_LOGE(TAG, "[C] Login remoto fallito: %s", esp_err_to_name(err));
         if (resp) free(resp);
         return err;
     }
 
     if (status < 200 || status >= 300 || !resp) {
+        http_services_set_online(false, "login_http_status");
         ESP_LOGE(TAG, "[C] Login remoto HTTP non valido: status=%d", status);
         if (resp) free(resp);
         return ESP_FAIL;
@@ -998,6 +1133,7 @@ static esp_err_t http_services_login_if_needed(bool force_refresh)
     cJSON *root = cJSON_Parse(resp);
     free(resp);
     if (!root) {
+        http_services_set_online(false, "login_json_invalid");
         ESP_LOGE(TAG, "[C] Login remoto: risposta JSON non valida");
         return ESP_FAIL;
     }
@@ -1005,6 +1141,7 @@ static esp_err_t http_services_login_if_needed(bool force_refresh)
     cJSON *at = cJSON_GetObjectItemCaseSensitive(root, "access_token");
     if (!cJSON_IsString(at) || !at->valuestring || at->valuestring[0] == '\0') {
         cJSON_Delete(root);
+        http_services_set_online(false, "login_token_missing");
         ESP_LOGE(TAG, "[C] Login remoto: access_token mancante");
         return ESP_FAIL;
     }
@@ -1012,9 +1149,11 @@ static esp_err_t http_services_login_if_needed(bool force_refresh)
     esp_err_t store_err = store_auth_token(at->valuestring, "login_if_needed");
     cJSON_Delete(root);
     if (store_err != ESP_OK) {
+        http_services_set_online(false, "login_token_store_failed");
         return store_err;
     }
 
+    http_services_set_online(true, "login_ok");
     ESP_LOGI(TAG, "[C] Token remoto acquisito (len=%u)", (unsigned)strlen(g_auth_token));
     return ESP_OK;
 }

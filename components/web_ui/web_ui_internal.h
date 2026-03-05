@@ -4,7 +4,12 @@
 #include "esp_err.h"
 #include "esp_netif.h"
 #include "web_ui_profile.h"
+#include "webpages_embedded.h"
 #include <stdbool.h>
+
+#ifndef WEB_UI_USE_EMBEDDED_PAGES
+#define WEB_UI_USE_EMBEDDED_PAGES 1
+#endif
 
 /* I18n compact record stored in PSRAM
  * fields: numeric ids for scope/key/section and fixed-size text (32 bytes incl. NUL)
@@ -125,6 +130,12 @@ void uart_test_task(void *arg);
 // Helper spostati in web_ui_common.c e usati da più file
 void ip_to_str(esp_netif_t *netif, char *out, size_t len);
 esp_err_t perform_ota(const char *url);
+
+// Gestione pagine HTML/JS su filesystem (SPIFFS/SD) + helper external-only
+esp_err_t webpages_bootstrap(void);
+esp_err_t webpages_try_send_external(httpd_req_t *req, const char *relative_path, const char *content_type);
+esp_err_t webpages_send_external_or_error(httpd_req_t *req, const char *relative_path, const char *content_type);
+const char *webpages_source_name(void);
 
 // Profilo/UI feature flags (factory/app) per visibilità e accessibilità endpoint
 bool web_ui_feature_enabled(web_ui_feature_t feature);
