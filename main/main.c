@@ -11,6 +11,8 @@
 #include "error_log.h"
 #include "eeprom_24lc16.h"
 
+bool send_http_log = false;
+
 static const char *TAG = "APP";
 #define LOG_CTX_PREFIX "[" COMPILE_LOG_PREFIX "]"
 

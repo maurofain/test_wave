@@ -448,7 +448,7 @@ esp_err_t api_index_page_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "[C] GET /api (index)");
+    if (send_http_log) ESP_LOGI(TAG, "[C] GET /api (index)");
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     const char *extra_style = WEBPAGE_API_INDEX_EXTRA_STYLE;
     send_head(req, "API Endpoints", extra_style, true);

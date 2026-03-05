@@ -37,6 +37,7 @@ componenti.
   - `1` = pagine da SPIFFS (`/spiffs/www`)
   - `2` = pagine da SD (`/sdcard/www`)
 - **Impatto:** seleziona la sorgente delle pagine Web UI. Con `0` usa markup embedded compilato nel firmware. Con `1`/`2` abilita source esterna (`/spiffs/www` o `/sdcard/www`) e gli handler pagina lavorano in modalità external-only (niente fallback al markup embedded).
+- **Nota operativa:** il valore è definito tramite `F_WEB_UI_PAGE_SOURCE` nel `CMakeLists.txt` radice; per testare le pagine su SPIFFS impostare `F_WEB_UI_PAGE_SOURCE=1`.
 
 ### `WEB_UI_USE_EMBEDDED_PAGES`
 - **File:** `CMakeLists.txt`, `components/web_ui/*`

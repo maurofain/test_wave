@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+extern bool send_http_log;
 #include <sys/time.h>
 #include "esp_log.h"
 #include "esp_err.h"
@@ -858,7 +860,7 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
  */
 static esp_err_t api_login_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/login -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/login -> proxy to remote server");
     return forward_post(req, "/api/login", NULL, true);
 }
 
@@ -871,7 +873,7 @@ static esp_err_t api_login_post(httpd_req_t *req)
  */
 static esp_err_t api_keepalive_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/keepalive -> processing request");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/keepalive -> processing request");
 
     // Extract the Authorization header (dynamic length to support long JWT)
     size_t auth_len = httpd_req_get_hdr_value_len(req, "Authorization");
@@ -1002,7 +1004,7 @@ static esp_err_t api_keepalive_post(httpd_req_t *req)
  */
 static esp_err_t api_getimages_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/getimages -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/getimages -> proxy to remote server");
     return forward_post(req, "/api/getimages", NULL, false);
 }
 
@@ -1015,7 +1017,7 @@ static esp_err_t api_getimages_post(httpd_req_t *req)
  */
 static esp_err_t api_getconfig_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/getconfig -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/getconfig -> proxy to remote server");
     return forward_post(req, "/api/getconfig", NULL, false);
 }
 
@@ -1028,7 +1030,7 @@ static esp_err_t api_getconfig_post(httpd_req_t *req)
  */
 static esp_err_t api_gettranslations_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/gettranslations -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/gettranslations -> proxy to remote server");
     return forward_post(req, "/api/gettranslations", NULL, false);
 }
 
@@ -1041,7 +1043,7 @@ static esp_err_t api_gettranslations_post(httpd_req_t *req)
  */
 static esp_err_t api_getfirmware_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/getfirmware -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/getfirmware -> proxy to remote server");
     return forward_post(req, "/api/getfirmware", NULL, false);
 }
 
@@ -1054,7 +1056,7 @@ static esp_err_t api_getfirmware_post(httpd_req_t *req)
  */
 static esp_err_t api_payment_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/payment -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/payment -> proxy to remote server");
     return forward_post(req, "/api/payment", NULL, false);
 }
 
@@ -1067,7 +1069,7 @@ static esp_err_t api_payment_post(httpd_req_t *req)
  */
 static esp_err_t api_serviceused_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/serviceused -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/serviceused -> proxy to remote server");
     return forward_post(req, "/api/serviceused", NULL, false);
 }
 
@@ -1080,7 +1082,7 @@ static esp_err_t api_serviceused_post(httpd_req_t *req)
  */
 static esp_err_t api_paymentoffline_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/paymentoffline -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/paymentoffline -> proxy to remote server");
     return forward_post(req, "/api/paymentoffline", NULL, false);
 }
 
@@ -1489,7 +1491,7 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
  */
 static esp_err_t api_getcustomers_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/getcustomers -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/getcustomers -> proxy to remote server");
     return forward_post(req, "/api/getcustomers", NULL, false);
 }
 
@@ -1502,7 +1504,7 @@ static esp_err_t api_getcustomers_post(httpd_req_t *req)
  */
 static esp_err_t api_getoperators_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/getoperators -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/getoperators -> proxy to remote server");
     return forward_post(req, "/api/getoperators", NULL, false);
 }
 
@@ -1515,7 +1517,7 @@ static esp_err_t api_getoperators_post(httpd_req_t *req)
  */
 static esp_err_t api_activity_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/activity -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/activity -> proxy to remote server");
     return forward_post(req, "/api/activity", NULL, false);
 }
 
@@ -1528,7 +1530,7 @@ static esp_err_t api_activity_post(httpd_req_t *req)
  */
 static esp_err_t api_deviceactivity_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "POST /api/deviceactivity -> proxy to remote server");
+    if (send_http_log) ESP_LOGI(TAG, "POST /api/deviceactivity -> proxy to remote server");
     return forward_post(req, "/api/deviceactivity", NULL, false);
 }
 

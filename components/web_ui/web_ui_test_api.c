@@ -1,5 +1,6 @@
 #include "web_ui.h"
 #include "web_ui_internal.h"
+#include "init.h"
 #include "esp_log.h"
 
 /**

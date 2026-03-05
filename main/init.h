@@ -5,6 +5,10 @@
 #include "led_strip.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+/* Abilita il log delle chiamate HTTP /api (GET e POST) */
+extern bool send_http_log;
 
 typedef enum {
 	INIT_AGENT_ERR_NONE = 0,

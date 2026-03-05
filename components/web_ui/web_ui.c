@@ -557,7 +557,7 @@ esp_err_t config_page_handler(httpd_req_t *req)
  */
 esp_err_t api_debug_usb_enumerate(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/debug/usb/enumerate");
+    if (send_http_log) ESP_LOGI(TAG, "[C] GET /api/debug/usb/enumerate");
     uint8_t addr_list[16];
     int num_devs = 0;
     esp_err_t err = usb_host_device_addr_list_fill(sizeof(addr_list), addr_list, &num_devs);
@@ -623,7 +623,7 @@ esp_err_t api_debug_usb_enumerate(httpd_req_t *req)
  */
 esp_err_t api_debug_usb_restart(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST /api/debug/usb/restart (Sperimentali)");
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/debug/usb/restart (Sperimentali)");
 #ifdef CONFIG_USB_OTG_SUPPORTED
     web_ui_add_log("INFO", "USB_DBG", "[Sperimentali] Restarting USB Host via API");
     esp_err_t err = bsp_usb_host_stop();
@@ -656,7 +656,7 @@ esp_err_t api_debug_usb_restart(httpd_req_t *req)
  */
 esp_err_t api_config_get(httpd_req_t *req)
 {
-    ESP_LOGD(TAG, "[C] GET /api/config");
+    if (send_http_log) ESP_LOGD(TAG, "[C] GET /api/config");
     device_config_t *cfg = device_config_get();
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "device_name", cfg->device_name);
@@ -957,7 +957,7 @@ esp_err_t api_ui_languages_get(httpd_req_t *req)
  */
 esp_err_t api_config_backup(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST /api/config/backup");
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/config/backup");
     
     if (!sd_card_is_mounted()) {
         const char *resp_str = "{\"error\":\"Scheda SD non montata\"}";
@@ -1426,7 +1426,7 @@ esp_err_t api_config_save(httpd_req_t *req)
  */
 esp_err_t api_tasks_get(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] GET /api/tasks (Lettura da SPIFFS)");
+    if (send_http_log) ESP_LOGI(TAG, "[C] GET /api/tasks (Lettura da SPIFFS)");
 
     FILE *f = fopen("/spiffs/tasks.json", "r");
     if (!f) {
@@ -1470,7 +1470,7 @@ esp_err_t api_tasks_get(httpd_req_t *req)
  */
 esp_err_t api_tasks_save(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST /api/tasks/save");
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/tasks/save");
 
     int total_len = req->content_len;
     if (total_len <= 0 || total_len > 16384) {
@@ -1601,7 +1601,7 @@ esp_err_t api_tasks_save(httpd_req_t *req)
  */
 esp_err_t api_tasks_apply(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST /api/tasks/apply");
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/tasks/apply");
     
     // Ricarica la configurazione dal file CSV salvato su SPIFFS
     tasks_load_config("/spiffs/tasks.json");
@@ -1634,7 +1634,7 @@ esp_err_t api_config_reset(httpd_req_t *req)
         return httpd_resp_send(req, "Configurazione in sola lettura in modalità APP", -1);
     }
 
-    ESP_LOGI(TAG, "[C] POST /api/config/reset");
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/config/reset");
     device_config_reset_defaults();
     httpd_resp_set_type(req, "application/json");
     const char *ok_resp = "{\"status\":\"ok\"}";
@@ -1658,7 +1658,7 @@ esp_err_t api_ntp_sync(httpd_req_t *req)
         return httpd_resp_send(req, "Configurazione in sola lettura in modalità APP", -1);
     }
 
-    ESP_LOGI(TAG, "[C] POST /api/ntp/sync");
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/ntp/sync");
     httpd_resp_set_type(req, "application/json");
     
     esp_err_t ret = init_sync_ntp();
@@ -1690,7 +1690,7 @@ esp_err_t api_debug_crash(httpd_req_t *req)
         return httpd_resp_send(req, "Endpoint disponibile solo in Factory", -1);
     }
 
-    ESP_LOGW(TAG, "[C] POST /api/debug/crash (factory)");
+    if (send_http_log) ESP_LOGW(TAG, "[C] POST /api/debug/crash (factory)");
     httpd_resp_set_type(req, "application/json");
     const char *ok_resp = "{\"status\":\"ok\",\"message\":\"Crash intenzionale in corso\"}";
     httpd_resp_send(req, ok_resp, strlen(ok_resp));
@@ -1746,7 +1746,7 @@ esp_err_t api_debug_restore(httpd_req_t *req)
         return httpd_resp_send(req, "Dimensione OTA target insufficiente", -1);
     }
 
-    ESP_LOGW(TAG, "[C] POST /api/debug/restore running=%s target=%s source=%s", running->label, target->label, factory->label);
+    if (send_http_log) ESP_LOGW(TAG, "[C] POST /api/debug/restore running=%s target=%s source=%s", running->label, target->label, factory->label);
 
     esp_err_t err = esp_partition_erase_range(target, 0, target->size);
     if (err != ESP_OK) {
@@ -1851,7 +1851,7 @@ esp_err_t api_debug_promote_factory(httpd_req_t *req)
         return httpd_resp_send(req, err_msg, -1);
     }
 
-    ESP_LOGW(TAG, "[C] POST /api/debug/promote_factory running=%s target=%s", running->label, factory->label);
+    if (send_http_log) ESP_LOGW(TAG, "[C] POST /api/debug/promote_factory running=%s target=%s", running->label, factory->label);
 
     esp_err_t err = esp_partition_erase_range(factory, 0, factory->size);
     if (err != ESP_OK) {

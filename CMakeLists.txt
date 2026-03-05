@@ -44,7 +44,7 @@ set(F_SYS_MONITOR     0)
 set(F_SERVER_POST     0)
 set(F_LVGL_COUNTDOWN_BG 0)
 # Web pages source: 0=embedded (C), 1=SPIFFS (/spiffs/www), 2=SD (/sdcard/www)
-set(F_WEB_UI_PAGE_SOURCE 0)
+set(F_WEB_UI_PAGE_SOURCE 1)
 # Export pagine seed all'avvio quando source è esterno (0=off, 1=on)
 set(F_WEB_UI_EXPORT_ON_BOOT 0)
 
