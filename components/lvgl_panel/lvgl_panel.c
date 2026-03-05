@@ -77,9 +77,16 @@ void lvgl_panel_show_boot_logo(void)
 
 void lvgl_panel_show_language_select(void)
 {
-    if (!bsp_display_lock(0)) {
-        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_language_select");
-        return;
+    if (!bsp_display_lock(pdMS_TO_TICKS(1500))) {
+        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_language_select, provo re-init display");
+        if (init_run_display_only() != ESP_OK) {
+            ESP_LOGE(TAG, "[C] Re-init display fallita in lvgl_panel_show_language_select");
+            return;
+        }
+        if (!bsp_display_lock(pdMS_TO_TICKS(500))) {
+            ESP_LOGE(TAG, "[C] LVGL lock ancora fallito dopo re-init in lvgl_panel_show_language_select");
+            return;
+        }
     }
 
     lvgl_page_language_show();

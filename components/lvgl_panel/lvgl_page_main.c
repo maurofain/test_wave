@@ -18,6 +18,8 @@ extern const lv_font_t DroidSansMono18;
 
 static const char *TAG = "lvgl_page_main";
 
+#define PANEL_REFRESH_MS 200
+
 #define COL_BG          lv_color_make(0x1a, 0x1a, 0x2e)
 #define COL_PROG        lv_color_make(0x6c, 0x34, 0x83)
 #define COL_PROG_ACT    lv_color_make(0x1e, 0x8b, 0x45)
@@ -590,7 +592,7 @@ void lvgl_page_main_show(void)
         refresh_prog_buttons(&snap);
     }
 
-    s_panel_timer = lv_timer_create(panel_timer_cb, 700, NULL);
+    s_panel_timer = lv_timer_create(panel_timer_cb, PANEL_REFRESH_MS, NULL);
 
     ESP_LOGI(TAG, "[C] Pagina principale LVGL visualizzata");
 }

@@ -23,6 +23,7 @@
 #include "io_expander_test.h"
 #include "rs232.h"
 #include "rs485.h"
+#include "cctalk.h"
 #include "eeprom_test.h"
 #include "mdb_test.h"
 #include "mdb.h"
@@ -33,6 +34,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <ctype.h>
 
 /* needed for publishing FSM actions when scanner commands are triggered */
 #include "fsm.h"
@@ -40,6 +42,70 @@
 #define TAG "WEB_UI_TEST_API"
 
 static volatile bool s_sd_init_in_progress = false;
+static TaskHandle_t s_cctalk_test_handle = NULL;
+static bool s_cctalk_test_owned = false;
+
+static esp_err_t parse_hex_payload(const char *input, uint8_t *out, size_t out_max, size_t *out_len)
+{
+    if (!input || !out || !out_len) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    size_t len = 0;
+    const char *cursor = input;
+
+    while (*cursor != '\0') {
+        while (*cursor != '\0' &&
+               (isspace((unsigned char)*cursor) || *cursor == ',' || *cursor == ';')) {
+            cursor++;
+        }
+        if (*cursor == '\0') {
+            break;
+        }
+
+        char token[16] = {0};
+        size_t token_len = 0;
+        while (*cursor != '\0' &&
+               !isspace((unsigned char)*cursor) &&
+               *cursor != ',' &&
+               *cursor != ';') {
+            if (token_len < sizeof(token) - 1) {
+                token[token_len++] = *cursor;
+            }
+            cursor++;
+        }
+        token[token_len] = '\0';
+
+        const char *hex_ptr = token;
+        if (hex_ptr[0] == '\\') {
+            hex_ptr++;
+        }
+        if (hex_ptr[0] == '0' && (hex_ptr[1] == 'x' || hex_ptr[1] == 'X')) {
+            hex_ptr += 2;
+        }
+        if (*hex_ptr == '\0') {
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        char *endptr = NULL;
+        long value = strtol(hex_ptr, &endptr, 16);
+        if (*endptr != '\0' || value < 0 || value > 255) {
+            return ESP_ERR_INVALID_ARG;
+        }
+        if (len >= out_max) {
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        out[len++] = (uint8_t)value;
+    }
+
+    if (len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_len = len;
+    return ESP_OK;
+}
 
 
 /**
@@ -314,6 +380,51 @@ esp_err_t api_test_handler(httpd_req_t *req)
         snprintf(response, sizeof(response), "{\"message\":\"Test RS485 fermato\"}");
     }
 
+    else if (strcmp(test_name, "cctalk_start") == 0) {
+        esp_err_t rs232_err = rs232_init();
+        if (rs232_err != ESP_OK) {
+            snprintf(response, sizeof(response), "{\"error\":\"Init RS232 fallita: %s\"}", esp_err_to_name(rs232_err));
+        } else {
+            esp_err_t cctalk_err = cctalk_driver_init();
+            if (cctalk_err != ESP_OK) {
+                snprintf(response, sizeof(response), "{\"error\":\"Init CCtalk fallita: %s\"}", esp_err_to_name(cctalk_err));
+            } else if (s_cctalk_test_handle) {
+                snprintf(response, sizeof(response), "{\"error\":\"Già in esecuzione\"}");
+            } else {
+                TaskHandle_t existing = xTaskGetHandle("cctalk_task");
+                if (existing) {
+                    s_cctalk_test_handle = existing;
+                    s_cctalk_test_owned = false;
+                    snprintf(response, sizeof(response), "{\"message\":\"Monitor CCtalk agganciato a task esistente\"}");
+                } else {
+                    BaseType_t ok = xTaskCreate(cctalk_task_run, "cctalk_test", 4096, NULL, 5, &s_cctalk_test_handle);
+                    if (ok == pdPASS) {
+                        s_cctalk_test_owned = true;
+                        serial_test_clear_cctalk_monitor();
+                        snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk avviato\"}");
+                    } else {
+                        s_cctalk_test_handle = NULL;
+                        s_cctalk_test_owned = false;
+                        snprintf(response, sizeof(response), "{\"error\":\"Impossibile avviare task CCtalk\"}");
+                    }
+                }
+            }
+        }
+    } else if (strcmp(test_name, "cctalk_stop") == 0) {
+        if (s_cctalk_test_handle && s_cctalk_test_owned) {
+            vTaskDelete(s_cctalk_test_handle);
+            s_cctalk_test_handle = NULL;
+            s_cctalk_test_owned = false;
+            snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk fermato\"}");
+        } else if (s_cctalk_test_handle && !s_cctalk_test_owned) {
+            s_cctalk_test_handle = NULL;
+            s_cctalk_test_owned = false;
+            snprintf(response, sizeof(response), "{\"message\":\"Monitor CCtalk sganciato (task gestito da scheduler)\"}");
+        } else {
+            snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk non attivo\"}");
+        }
+    }
+
     else if (strcmp(test_name, "eeprom") == 0) {
         return eeprom_test_handler(req);
     }
@@ -404,6 +515,28 @@ esp_err_t api_test_handler(httpd_req_t *req)
                         snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Pacchetto MDB inviato (Addr: 0x%02X)\"}", mdb_packet[0]);
                     }
                 }
+            } else if (port_raw && strcmp(port_raw, "cctalk") == 0) {
+                if (data_str) {
+                    esp_err_t rs232_err = rs232_init();
+                    esp_err_t cctalk_err = cctalk_driver_init();
+                    if (rs232_err != ESP_OK || cctalk_err != ESP_OK) {
+                        snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Init CCtalk fallita\",\"rs232\":\"%s\",\"cctalk\":\"%s\"}",
+                                 esp_err_to_name(rs232_err), esp_err_to_name(cctalk_err));
+                    } else {
+                        esp_err_t send_err = serial_test_send_hex_uart(CONFIG_APP_RS232_UART_PORT, data_str);
+                        if (send_err == ESP_OK) {
+                            uint8_t tx_buf[64] = {0};
+                            size_t tx_len = 0;
+                            if (parse_hex_payload(data_str, tx_buf, sizeof(tx_buf), &tx_len) == ESP_OK) {
+                                serial_test_push_monitor_entry("CCTALK", tx_buf, tx_len);
+                            }
+                            snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Pacchetto CCtalk inviato\"}");
+                        } else {
+                            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Formato pacchetto non valido\",\"err\":\"%s\"}",
+                                     esp_err_to_name(send_err));
+                        }
+                    }
+                }
             } else {
                 int port = (port_raw && strcmp(port_raw, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT : CONFIG_APP_RS232_UART_PORT;
                 if (data_str) {
@@ -444,6 +577,7 @@ esp_err_t api_test_handler(httpd_req_t *req)
         cJSON_AddStringToObject(root, "rs232", serial_test_get_monitor(CONFIG_APP_RS232_UART_PORT));
         cJSON_AddStringToObject(root, "rs485", serial_test_get_monitor(CONFIG_APP_RS485_UART_PORT));
         cJSON_AddStringToObject(root, "mdb", serial_test_get_monitor(CONFIG_APP_MDB_UART_PORT));
+        cJSON_AddStringToObject(root, "cctalk", serial_test_get_cctalk_monitor());
         char *json_out = cJSON_PrintUnformatted(root);
         httpd_resp_set_type(req, "application/json");
         httpd_resp_send(req, json_out, strlen(json_out));
@@ -459,9 +593,13 @@ esp_err_t api_test_handler(httpd_req_t *req)
         if (root) {
             cJSON *port_obj = cJSON_GetObjectItem(root, "port");
             if (port_obj) {
-                int port = (strcmp(port_obj->valuestring, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT :
-                           (strcmp(port_obj->valuestring, "mdb") == 0) ? CONFIG_APP_MDB_UART_PORT : CONFIG_APP_RS232_UART_PORT;
-                serial_test_clear_monitor(port);
+                if (strcmp(port_obj->valuestring, "cctalk") == 0) {
+                    serial_test_clear_cctalk_monitor();
+                } else {
+                    int port = (strcmp(port_obj->valuestring, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT :
+                               (strcmp(port_obj->valuestring, "mdb") == 0) ? CONFIG_APP_MDB_UART_PORT : CONFIG_APP_RS232_UART_PORT;
+                    serial_test_clear_monitor(port);
+                }
             }
             cJSON_Delete(root);
         }

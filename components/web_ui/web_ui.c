@@ -2375,6 +2375,122 @@ static esp_err_t sysinfo_get_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, resp, -1);
 }
+
+/**
+ * @brief Espone l'output testuale di vTaskGetRunTimeStats.
+ *
+ * Endpoint `GET /api/runtime_stats` usato dalla Home (sezione Sistema) per
+ * visualizzare la tabella runtime dei task FreeRTOS.
+ */
+static int runtime_stats_cmp_desc(const void *a, const void *b)
+{
+    const TaskStatus_t *ta = (const TaskStatus_t *)a;
+    const TaskStatus_t *tb = (const TaskStatus_t *)b;
+
+    if (ta->ulRunTimeCounter < tb->ulRunTimeCounter) {
+        return 1;
+    }
+    if (ta->ulRunTimeCounter > tb->ulRunTimeCounter) {
+        return -1;
+    }
+
+    const char *na = ta->pcTaskName ? ta->pcTaskName : "";
+    const char *nb = tb->pcTaskName ? tb->pcTaskName : "";
+    return strcmp(na, nb);
+}
+
+static esp_err_t runtime_stats_get_handler(httpd_req_t *req)
+{
+#if defined(CONFIG_FREERTOS_USE_TRACE_FACILITY) && (CONFIG_FREERTOS_USE_TRACE_FACILITY == 1) && \
+    defined(CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS) && (CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS == 1) && \
+    defined(CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS) && (CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS == 1)
+    UBaseType_t ntasks = uxTaskGetNumberOfTasks();
+    if (ntasks == 0) {
+        httpd_resp_set_type(req, "text/plain; charset=utf-8");
+        return httpd_resp_sendstr(req, "Nessun task disponibile.");
+    }
+
+    size_t cap = (size_t)ntasks + 4U;
+    TaskStatus_t *tasks = calloc(cap, sizeof(TaskStatus_t));
+    if (!tasks) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    uint32_t total_runtime = 0;
+    UBaseType_t filled = uxTaskGetSystemState(tasks, (UBaseType_t)cap, &total_runtime);
+    if (filled == 0) {
+        free(tasks);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    qsort(tasks, filled, sizeof(TaskStatus_t), runtime_stats_cmp_desc);
+
+    size_t out_len = ((size_t)filled * 96U) + 256U;
+    char *stats = malloc(out_len);
+    if (!stats) {
+        free(tasks);
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    size_t used = 0;
+    int wrote = snprintf(stats + used, out_len - used, "%-24s %12s %8s\n", "Task", "RunTime", "CPU");
+    if (wrote < 0) {
+        free(tasks);
+        free(stats);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    used += (size_t)wrote;
+
+    wrote = snprintf(stats + used, out_len - used, "------------------------------------------------\n");
+    if (wrote < 0) {
+        free(tasks);
+        free(stats);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    used += (size_t)wrote;
+
+    for (UBaseType_t i = 0; i < filled; ++i) {
+        const char *name = tasks[i].pcTaskName ? tasks[i].pcTaskName : "?";
+        uint32_t pct = 0;
+        if (total_runtime > 0) {
+            pct = (uint32_t)(((uint64_t)tasks[i].ulRunTimeCounter * 100ULL) / (uint64_t)total_runtime);
+        }
+
+        wrote = snprintf(stats + used, out_len - used,
+                         "%-24.24s %12lu %7lu%%\n",
+                         name,
+                         (unsigned long)tasks[i].ulRunTimeCounter,
+                         (unsigned long)pct);
+        if (wrote < 0) {
+            break;
+        }
+        if ((size_t)wrote >= (out_len - used)) {
+            used = out_len - 1;
+            stats[used] = '\0';
+            break;
+        }
+        used += (size_t)wrote;
+    }
+
+    free(tasks);
+
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    esp_err_t ret = httpd_resp_send(req, stats, HTTPD_RESP_USE_STRLEN);
+    free(stats);
+    return ret;
+#else
+    const char *msg =
+        "Runtime stats non disponibili: abilita CONFIG_FREERTOS_USE_TRACE_FACILITY, "
+        "CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS e CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS.";
+    httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    return httpd_resp_send(req, msg, HTTPD_RESP_USE_STRLEN);
+#endif
+}
 #endif /* DNA_SYS_MONITOR == 0 */
 
 
@@ -2405,6 +2521,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 #if DNA_SYS_MONITOR == 0
     httpd_uri_t uri_sysinfo = {.uri = "/api/sysinfo", .method = HTTP_GET, .handler = sysinfo_get_handler};
     httpd_register_uri_handler(server, &uri_sysinfo);
+
+    httpd_uri_t uri_runtime_stats = {.uri = "/api/runtime_stats", .method = HTTP_GET, .handler = runtime_stats_get_handler};
+    httpd_register_uri_handler(server, &uri_runtime_stats);
 #endif
 
     httpd_uri_t uri_ota_get = {.uri = "/ota", .method = HTTP_GET, .handler = ota_get_handler};

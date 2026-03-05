@@ -707,10 +707,17 @@ bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_
 
     uint32_t mybit = (1u << (uint32_t)receiver_id);
     TickType_t start_tick = xTaskGetTickCount();
-    const TickType_t poll_delay = pdMS_TO_TICKS(2);
+    TickType_t poll_delay = pdMS_TO_TICKS(2);
+    TickType_t mutex_wait = pdMS_TO_TICKS(10);
+    if (poll_delay == 0) {
+        poll_delay = 1;
+    }
+    if (mutex_wait == 0) {
+        mutex_wait = 1;
+    }
 
     while (true) {
-        if (xSemaphoreTake(s_mb_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        if (xSemaphoreTake(s_mb_mutex, mutex_wait) == pdTRUE) {
             for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
                 if (s_mailbox[i].to_mask & mybit) {
                     bool slot_fully_consumed = false;

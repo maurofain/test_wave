@@ -96,7 +96,7 @@ esp_err_t test_page_handler(httpd_req_t *req)
         "</div>"
         "<div id='rs232_status' class='status-box'>Monitor:</div></div>"
 
-        "<div id='section_cctalk' class='section collapsed'><h2>📡 CCtalk <span style='font-size:14px; color:#bdc3c7'>(4800 baud — PIN 21 RX, 20 TX)</span><span class='section-toggle-icon'>▸</span></h2>"
+        "<div id='section_cctalk' class='section collapsed'><h2>📡 CCtalk <span style='font-size:14px; color:#bdc3c7'>(9600 baud — PIN 21 RX, 20 TX)</span><span class='section-toggle-icon'>▸</span></h2>"
         "<div class='test-item'><span class='test-label'>Test Loopback: invia pacchetto di prova</span>"
         "<div class='test-controls'><button id='btn_cctalk' onclick=\"toggleSimpleTest('cctalk', 'btn_cctalk', 'Test CCtalk')\">▶️ Inizia Test</button></div></div>"
         "<div class='test-item'><span>Invia Pacchetto (es: 0x01 0x02)</span>"

@@ -47,6 +47,32 @@ static void btn_style(lv_obj_t *btn, lv_color_t bg)
     lv_obj_set_style_pad_all(btn, 4, LV_PART_MAIN);
 }
 
+static void panel_reenable_scanner(const char *context)
+{
+    esp_err_t on_err = usb_cdc_scanner_send_on_command();
+    if (on_err == ESP_OK) {
+        ESP_LOGI(TAG, "[C] Riattivazione scanner %s: ON inviato", context ? context : "");
+        return;
+    }
+    ESP_LOGI(TAG, "[C] Riattivazione scanner FALLITA");
+    esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
+    esp_err_t retry_on_err = ESP_FAIL;
+    if (setup_err == ESP_OK) {
+        retry_on_err = usb_cdc_scanner_send_on_command();
+    }
+
+    if (setup_err == ESP_OK && retry_on_err == ESP_OK) {
+        ESP_LOGI(TAG, "[C] Riattivazione scanner %s: fallback setup+on riuscito", context ? context : "");
+    } else {
+        ESP_LOGW(TAG,
+                 "[C] Riattivazione scanner %s fallita (on=%s setup=%s retry_on=%s)",
+                 context ? context : "",
+                 esp_err_to_name(on_err),
+                 esp_err_to_name(setup_err),
+                 esp_err_to_name(retry_on_err));
+    }
+}
+
 static void panel_apply_selected_language_async(void *arg)
 {
     (void)arg;
@@ -62,26 +88,7 @@ static void panel_apply_selected_language_async(void *arg)
         }
     }
 
-    esp_err_t on_err = usb_cdc_scanner_send_on_command();
-    if (on_err == ESP_OK) {
-        ESP_LOGI(TAG, "[C] Riattivazione scanner dopo scelta lingua: ON inviato");
-    } else {
-        esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
-        esp_err_t retry_on_err = ESP_FAIL;
-        if (setup_err == ESP_OK) {
-            retry_on_err = usb_cdc_scanner_send_on_command();
-        }
-
-        if (setup_err == ESP_OK && retry_on_err == ESP_OK) {
-            ESP_LOGI(TAG, "[C] Riattivazione scanner dopo scelta lingua: fallback setup+on riuscito");
-        } else {
-            ESP_LOGW(TAG,
-                     "[C] Riattivazione scanner dopo scelta lingua fallita (on=%s setup=%s retry_on=%s)",
-                     esp_err_to_name(on_err),
-                     esp_err_to_name(setup_err),
-                     esp_err_to_name(retry_on_err));
-        }
-    }
+    panel_reenable_scanner("dopo scelta lingua");
 
     lvgl_page_main_show();
 }
@@ -111,6 +118,8 @@ void lvgl_page_language_show(void)
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+
+    panel_reenable_scanner("all'apertura scelta lingua");
 
     const char *current_lang = device_config_get_ui_user_language();
     if (current_lang && strlen(current_lang) == 2) {
