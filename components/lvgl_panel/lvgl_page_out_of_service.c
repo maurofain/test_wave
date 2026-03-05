@@ -7,6 +7,16 @@
 
 static const char *TAG = "lvgl_page_oos";
 
+
+/**
+ * @brief Mostra la pagina di servizio non disponibile.
+ *
+ * Questa funzione visualizza la pagina di servizio non disponibile
+ * quando il sistema ha superato il numero massimo di riavvii consentiti.
+ *
+ * @param reboots Numero di riavvii effettuati.
+ * @return void
+ */
 void lvgl_page_out_of_service_show(uint32_t reboots)
 {
     lv_obj_t *scr = lv_scr_act();

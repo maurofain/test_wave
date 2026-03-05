@@ -24,6 +24,15 @@ static SemaphoreHandle_t s_cctalk_lock = NULL;
 
 extern void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size_t len);
 
+
+/**
+ * @brief Converte un timeout in millisecondi in ticks.
+ * 
+ * Questa funzione converte un timeout espresso in millisecondi in ticks utilizzando la frequenza del sistema.
+ * 
+ * @param [in] timeout_ms Il timeout in millisecondi da convertire.
+ * @return Il timeout convertito in ticks.
+ */
 static TickType_t cctalk_ms_to_ticks(uint32_t timeout_ms)
 {
     if (timeout_ms == 0U) {
@@ -36,6 +45,16 @@ static TickType_t cctalk_ms_to_ticks(uint32_t timeout_ms)
     return ticks;
 }
 
+
+/**
+ * @brief Acquisisce un blocco sulla risorsa CCTalk.
+ * 
+ * Questa funzione tenta di acquisire un blocco sulla risorsa CCTalk utilizzando un timeout specifico.
+ * 
+ * @param timeout_ms Il timeout in millisecondi per l'acquisizione del blocco.
+ * @return true Se il blocco è stato acquisito con successo.
+ * @return false Se il blocco non è stato acquisito entro il timeout specificato.
+ */
 static bool cctalk_lock_take(uint32_t timeout_ms)
 {
     if (!s_cctalk_lock) {
@@ -44,6 +63,16 @@ static bool cctalk_lock_take(uint32_t timeout_ms)
     return (xSemaphoreTake(s_cctalk_lock, cctalk_ms_to_ticks(timeout_ms)) == pdTRUE);
 }
 
+
+/**
+ * @brief Rilascia il blocco del semaforo CCTalk.
+ * 
+ * Questa funzione rilascia il blocco del semaforo CCTalk, consentendo a altre
+ * operazioni di accedere alla risorsa protetta.
+ * 
+ * @param [in/out] s_cctalk_lock Puntatore al semaforo CCTalk da rilasciare.
+ * @return Niente.
+ */
 static void cctalk_lock_give(void)
 {
     if (s_cctalk_lock) {
@@ -51,6 +80,16 @@ static void cctalk_lock_give(void)
     }
 }
 
+
+/**
+ * @brief Monitora un frame CCTalk.
+ * 
+ * Questa funzione monitora un frame CCTalk e gestisce eventuali errori.
+ * 
+ * @param [in] label Etichetta associata al frame.
+ * @param [in] frame Puntatore al frame CCTalk da monitorare.
+ * @return Nessun valore di ritorno.
+ */
 static void cctalk_monitor_frame(const char *label, const cctalk_frame_t *frame)
 {
     if (!frame) {
@@ -75,6 +114,19 @@ static void cctalk_monitor_frame(const char *label, const cctalk_frame_t *frame)
     serial_test_push_monitor_entry(label, raw, frame_len);
 }
 
+
+/**
+ * @brief Invia un frame CCTalk senza bloccare.
+ * 
+ * @param dest_addr [in] Indirizzo del destinatario.
+ * @param src_addr [in] Indirizzo del mittente.
+ * @param header [in] Header del frame.
+ * @param data [in] Puntatore ai dati del frame.
+ * @param len [in] Lunghezza dei dati.
+ * @param monitor_tx [in] Flag per monitorare la trasmissione.
+ * @return true Se la trasmissione è stata avviata con successo.
+ * @return false Se la trasmissione non è stata avviata.
+ */
 static bool cctalk_send_frame_unlocked(uint8_t dest_addr,
                                        uint8_t src_addr,
                                        uint8_t header,
@@ -112,6 +164,16 @@ static bool cctalk_send_frame_unlocked(uint8_t dest_addr,
     return true;
 }
 
+
+/**
+ * @brief Riceve un frame CCTalk in modalità non bloccante.
+ * 
+ * @param [in/out] frame Puntatore al frame CCTalk da ricevere.
+ * @param timeout_ms Timeout in millisecondi per la ricezione del frame.
+ * @param monitor_rx Flag per attivare la monitorizzazione del ricevitore.
+ * @return true Se il frame è stato ricevuto con successo.
+ * @return false Se il frame non è stato ricevuto o si è verificato un errore.
+ */
 static bool cctalk_receive_frame_unlocked(cctalk_frame_t *frame, uint32_t timeout_ms, bool monitor_rx)
 {
     if (!s_cctalk_ready || !frame) {
@@ -173,6 +235,16 @@ static bool cctalk_receive_frame_unlocked(cctalk_frame_t *frame, uint32_t timeou
     return false;
 }
 
+
+/**
+ * @brief Copia una risposta ASCII da un frame CCTalk in un buffer di output.
+ * 
+ * @param [in] response Puntatore al frame CCTalk contenente la risposta ASCII.
+ * @param [out] out Buffer di output dove verrà copiata la risposta ASCII.
+ * @param [in] out_len Dimensione del buffer di output.
+ * @return true Se la copia è stata effettuata con successo.
+ * @return false Se la copia non è stata effettuata a causa di parametri non validi o di una risposta vuota.
+ */
 static bool cctalk_copy_ascii_response(const cctalk_frame_t *response, char *out, size_t out_len)
 {
     if (!response || !out || out_len == 0U || response->data_len == 0U) {
@@ -197,11 +269,30 @@ static bool cctalk_copy_ascii_response(const cctalk_frame_t *response, char *out
     return true;
 }
 
+
+/**
+ * @brief Controlla se la risposta contiene un ACK (Acknowledgment).
+ *
+ * Questa funzione verifica se la risposta ricevuta dal dispositivo CCTalk contiene un ACK.
+ *
+ * @param [in] response Puntatore alla struttura contenente la risposta ricevuta.
+ * @return true se la risposta contiene un ACK, false altrimenti.
+ */
 static bool cctalk_expect_ack(const cctalk_frame_t *response)
 {
     return (response && response->header == 0U);
 }
 
+
+/**
+ * @brief Inizializza la libreria CCTalk.
+ * 
+ * @param [in] uart_num Numero del canale UART da utilizzare.
+ * @param [in] tx_pin Numero del pin TX da utilizzare.
+ * @param [in] rx_pin Numero del pin RX da utilizzare.
+ * @param [in] baudrate Velocità di comunicazione in baud.
+ * @return Nessun valore di ritorno.
+ */
 void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate)
 {
     if (!s_cctalk_lock) {
@@ -252,6 +343,18 @@ void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate)
     s_cctalk_ready = true;
 }
 
+
+/**
+ * @brief Invia un frame CCTalk.
+ * 
+ * @param [in] dest_addr L'indirizzo del destinatario.
+ * @param [in] src_addr L'indirizzo del mittente.
+ * @param [in] header Il codice di intestazione del frame.
+ * @param [in] data Un puntatore al buffer contenente i dati del frame.
+ * @param [in] len La lunghezza del buffer dei dati.
+ * @return true Se il frame è stato inviato con successo.
+ * @return false Se il lock non è stato acquisito entro il timeout.
+ */
 bool cctalk_send_frame(uint8_t dest_addr,
                        uint8_t src_addr,
                        uint8_t header,
@@ -267,6 +370,16 @@ bool cctalk_send_frame(uint8_t dest_addr,
     return ok;
 }
 
+
+/**
+ * @brief Riceve un frame CCTalk.
+ * 
+ * Questa funzione riceve un frame CCTalk dal bus CCTalk.
+ * 
+ * @param [in/out] frame Puntatore al buffer dove verrà memorizzato il frame ricevuto.
+ * @param timeout_ms Timeout in millisecondi per l'acquisizione del lock.
+ * @return true se il frame è stato ricevuto con successo, false altrimenti.
+ */
 bool cctalk_receive_frame(cctalk_frame_t *frame, uint32_t timeout_ms)
 {
     if (!cctalk_lock_take(timeout_ms)) {
@@ -278,6 +391,20 @@ bool cctalk_receive_frame(cctalk_frame_t *frame, uint32_t timeout_ms)
     return ok;
 }
 
+
+/**
+ * @brief Invia un comando CCTalk a un dispositivo.
+ * 
+ * @param [in] dest_addr L'indirizzo destinatario del comando.
+ * @param [in] src_addr L'indirizzo sorgente del comando.
+ * @param [in] header Il codice header del comando.
+ * @param [in] data Un puntatore al buffer contenente i dati del comando.
+ * @param [in] len La lunghezza del buffer dei dati.
+ * @param [out] response Un puntatore al buffer dove verrà memorizzata la risposta del dispositivo.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'acquisizione del lock.
+ * @return true Se il comando è stato inviato con successo.
+ * @return false Se il comando non è stato inviato a causa di un timeout.
+ */
 bool cctalk_command(uint8_t dest_addr,
                     uint8_t src_addr,
                     uint8_t header,
@@ -338,6 +465,16 @@ bool cctalk_command(uint8_t dest_addr,
     return false;
 }
 
+
+/**
+ * @brief Invia dati tramite la protocollo CCTalk.
+ * 
+ * @param [in] dest_addr L'indirizzo del destinatario.
+ * @param [in] data Un puntatore ai dati da inviare.
+ * @param [in] len La lunghezza dei dati da inviare.
+ * @return true Se l'invio è stato avviato con successo.
+ * @return false Se l'invio non è stato avviato, ad esempio perché i dati sono nulli o la lunghezza è zero.
+ */
 bool cctalk_send(uint8_t dest_addr, const uint8_t *data, uint8_t len)
 {
     if (!data || len == 0U) {
@@ -350,6 +487,17 @@ bool cctalk_send(uint8_t dest_addr, const uint8_t *data, uint8_t len)
     return cctalk_send_frame(dest_addr, CCTALK_MASTER_ADDRESS, header, payload, payload_len);
 }
 
+
+/**
+ * @brief Riceve dati tramite il protocollo CCTalk.
+ * 
+ * @param [in] src_addr Puntatore all'indirizzo sorgente.
+ * @param [out] data Puntatore al buffer dove memorizzare i dati ricevuti.
+ * @param [out] len Puntatore alla lunghezza del buffer dei dati ricevuti.
+ * @param timeout_ms Timeout in millisecondi per l'attesa della ricezione.
+ * @return true Se la ricezione è stata completata con successo.
+ * @return false Se la ricezione ha fallito o è stata interrotta.
+ */
 bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t timeout_ms)
 {
     if (!src_addr || !data || !len) {
@@ -370,6 +518,16 @@ bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t tim
     return true;
 }
 
+
+/**
+ * @brief Calcola il checksum di un pacchetto CCTalk.
+ *
+ * Questa funzione calcola il checksum di un pacchetto CCTalk utilizzando l'algoritmo specifico.
+ *
+ * @param [in] packet Puntatore al pacchetto di dati per cui calcolare il checksum.
+ * @param [in] len Lunghezza del pacchetto di dati.
+ * @return Il valore del checksum calcolato.
+ */
 uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len)
 {
     uint16_t sum = 0;
@@ -379,6 +537,14 @@ uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len)
     return (uint8_t)(-sum);
 }
 
+
+/**
+ * @brief Invia un comando di sondaggio all'indirizzo CCTalk specificato.
+ *
+ * @param [in] dest_addr Indirizzo CCTalk del dispositivo da sondare.
+ * @param [in] timeout_ms Timeout in millisecondi per l'attesa della risposta.
+ * @return true se la richiesta è stata inviata con successo, false altrimenti.
+ */
 bool cctalk_address_poll(uint8_t dest_addr, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -388,6 +554,16 @@ bool cctalk_address_poll(uint8_t dest_addr, uint32_t timeout_ms)
     return cctalk_expect_ack(&response);
 }
 
+
+/**
+ * @brief Invia una richiesta di stato al dispositivo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del dispositivo CCTalk.
+ * @param [out] status Un puntatore a una variabile dove verrà memorizzato lo stato del dispositivo.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_status(uint8_t dest_addr, uint8_t *status, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -404,6 +580,17 @@ bool cctalk_request_status(uint8_t dest_addr, uint8_t *status, uint32_t timeout_
     return true;
 }
 
+
+/**
+ * @brief Invia una richiesta per ottenere l'ID del produttore tramite il protocollo CCTalk.
+ *
+ * @param dest_addr [in] Indirizzo destinatario del messaggio.
+ * @param out [out] Buffer per memorizzare la risposta ricevuta.
+ * @param out_len [in] Dimensione del buffer di output.
+ * @param timeout_ms [in] Timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_manufacturer_id(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -413,6 +600,16 @@ bool cctalk_request_manufacturer_id(uint8_t dest_addr, char *out, size_t out_len
     return cctalk_copy_ascii_response(&response, out, out_len);
 }
 
+
+/**
+ * @brief Invia una richiesta di categoria di equipaggiamento CCTalk.
+ *
+ * @param dest_addr [in] Indirizzo destinatario del messaggio.
+ * @param out [out] Buffer per la ricezione della risposta.
+ * @param out_len [in] Dimensione del buffer di output.
+ * @param timeout_ms [in] Timeout in millisecondi per la ricezione della risposta.
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_equipment_category(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -422,6 +619,17 @@ bool cctalk_request_equipment_category(uint8_t dest_addr, char *out, size_t out_
     return cctalk_copy_ascii_response(&response, out, out_len);
 }
 
+
+/**
+ * @brief Invia una richiesta di codice prodotto al dispositivo CCTalk.
+ *
+ * @param dest_addr [in] Indirizzo destinatario del dispositivo CCTalk.
+ * @param out [out] Buffer per contenere il codice prodotto ricevuto.
+ * @param out_len [in] Dimensione del buffer di output.
+ * @param timeout_ms [in] Timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false altrimenti.
+ */
 bool cctalk_request_product_code(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -431,6 +639,16 @@ bool cctalk_request_product_code(uint8_t dest_addr, char *out, size_t out_len, u
     return cctalk_copy_ascii_response(&response, out, out_len);
 }
 
+
+/**
+ * @brief Invia una richiesta per ottenere il numero di serie di un dispositivo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del dispositivo CCTalk.
+ * @param [out] serial Un array di 3 byte che riceverà il numero di serie del dispositivo.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_serial_number(uint8_t dest_addr, uint8_t serial[3], uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -449,6 +667,16 @@ bool cctalk_request_serial_number(uint8_t dest_addr, uint8_t serial[3], uint32_t
     return true;
 }
 
+
+/**
+ * @brief Costruisce il codice di richiesta CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario della richiesta.
+ * @param [out] out Buffer in cui memorizzare il codice di richiesta.
+ * @param [in] out_len Dimensione del buffer di output.
+ * @param [in] timeout_ms Timeout in millisecondi per la richiesta.
+ * @return true se la richiesta è stata costruita con successo, false altrimenti.
+ */
 bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -458,6 +686,15 @@ bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uin
     return cctalk_copy_ascii_response(&response, out, out_len);
 }
 
+
+/**
+ * @brief Abilita o disabilita l'inibizione del dispositivo master.
+ *
+ * @param [in] dest_addr L'indirizzo del dispositivo destinatario.
+ * @param [in] enable Flag booleano per abilitare (true) o disabilitare (false) l'inibizione.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'operazione.
+ * @return true se l'operazione ha successo, false in caso di errore.
+ */
 bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms)
 {
     uint8_t data = enable ? 1U : 0U;
@@ -468,6 +705,17 @@ bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeo
     return cctalk_expect_ack(&response);
 }
 
+
+/**
+ * @brief Richiede lo stato di inibizione CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario della richiesta.
+ * @param [out] mask_low Un puntatore al buffer dove verrà memorizzato il byte basso della maschera.
+ * @param [out] mask_high Un puntatore al buffer dove verrà memorizzato il byte alto della maschera.
+ * @param [in] timeout_ms Il timeout in millisecondi per la richiesta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_inhibit_status(uint8_t dest_addr, uint8_t *mask_low, uint8_t *mask_high, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -485,6 +733,18 @@ bool cctalk_request_inhibit_status(uint8_t dest_addr, uint8_t *mask_low, uint8_t
     return true;
 }
 
+
+/**
+ * @brief Invia una richiesta per ottenere l'ID della moneta utilizzando il protocollo CCTalk.
+ *
+ * @param dest_addr [in] L'indirizzo destinatario del dispositivo CCTalk.
+ * @param channel [in] Il canale su cui inviare la richiesta.
+ * @param out [out] Un buffer per contenere la risposta ricevuta.
+ * @param out_len [in] La dimensione del buffer di output.
+ * @param timeout_ms [in] Il tempo massimo di attesa per una risposta in millisecondi.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_coin_id(uint8_t dest_addr, uint8_t channel, char *out, size_t out_len, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -495,6 +755,16 @@ bool cctalk_request_coin_id(uint8_t dest_addr, uint8_t channel, char *out, size_
     return cctalk_copy_ascii_response(&response, out, out_len);
 }
 
+
+/**
+ * @brief Modifica i percorsi del sorter tramite il protocollo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del comando.
+ * @param [in] paths Un puntatore al buffer contenente i percorsi da modificare.
+ * @param [in] len La lunghezza del buffer dei percorsi.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'attesa della risposta.
+ * @return true se la modifica è stata avvenuta con successo, false altrimenti.
+ */
 bool cctalk_modify_sorter_paths(uint8_t dest_addr, const uint8_t *paths, uint8_t len, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -507,6 +777,16 @@ bool cctalk_modify_sorter_paths(uint8_t dest_addr, const uint8_t *paths, uint8_t
     return cctalk_expect_ack(&response);
 }
 
+
+/**
+ * @brief Legge dati dal buffer CCTalk in modo buffered.
+ *
+ * @param [in] dest_addr L'indirizzo del dispositivo di destinazione.
+ * @param [out] buffer Puntatore al buffer in cui memorizzare i dati letti.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'operazione di lettura.
+ *
+ * @return true se la lettura è stata completata con successo, false in caso di errore.
+ */
 bool cctalk_read_buffered_credit(uint8_t dest_addr, cctalk_buffer_t *buffer, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -529,6 +809,15 @@ bool cctalk_read_buffered_credit(uint8_t dest_addr, cctalk_buffer_t *buffer, uin
     return true;
 }
 
+
+/**
+ * @brief Richiede lo stato di inserimento alla scheda CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario della richiesta.
+ * @param [out] status Un puntatore a una variabile dove verrà memorizzato lo stato di inserimento.
+ * @param [in] timeout_ms Il timeout in millisecondi per la ricezione della risposta.
+ * @return true se la richiesta è stata inviata con successo, false altrimenti.
+ */
 bool cctalk_request_insertion_status(uint8_t dest_addr, uint8_t *status, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -545,6 +834,14 @@ bool cctalk_request_insertion_status(uint8_t dest_addr, uint8_t *status, uint32_
     return true;
 }
 
+
+/**
+ * @brief Resetta il dispositivo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo del dispositivo da resettare.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'operazione di reset.
+ * @return true se il reset è stato avviato con successo, false altrimenti.
+ */
 bool cctalk_reset_device(uint8_t dest_addr, uint32_t timeout_ms)
 {
     cctalk_frame_t response = {0};
@@ -562,23 +859,65 @@ bool cctalk_reset_device(uint8_t dest_addr, uint32_t timeout_ms)
  */
 #if defined(DNA_CCTALK) && (DNA_CCTALK == 1)
 
+
+/**
+ * @brief Inizializza la comunicazione CCTalk.
+ *
+ * @param [in] uart_num Numero del canale UART da utilizzare.
+ * @param [in] tx_pin Numero del pin TX per la comunicazione UART.
+ * @param [in] rx_pin Numero del pin RX per la comunicazione UART.
+ * @param [in] baudrate Velocità di comunicazione in baud.
+ *
+ * @return Nessun valore di ritorno.
+ */
 void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate)
 {
     (void)uart_num; (void)tx_pin; (void)rx_pin; (void)baudrate;
 }
 
+
+/**
+ * @brief Invia dati tramite la protocollo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo del destinatario.
+ * @param [in] data Un puntatore ai dati da inviare.
+ * @param [in] len La lunghezza dei dati da inviare.
+ * @return true Se l'invio è stato completato con successo.
+ * @return false Se l'invio è fallito.
+ */
 bool cctalk_send(uint8_t dest_addr, const uint8_t *data, uint8_t len)
 {
     (void)dest_addr; (void)data; (void)len;
     return true;
 }
 
+
+/**
+ * @brief Riceve dati tramite la protocollo CCTalk.
+ *
+ * @param [in] src_addr Indirizzo sorgente del messaggio.
+ * @param [out] data Buffer per memorizzare i dati ricevuti.
+ * @param [in/out] len Puntatore al numero di byte da ricevere e dimensione del buffer.
+ * @param timeout_ms Timeout in millisecondi per l'attesa della ricezione.
+ *
+ * @return true se la ricezione è stata completata con successo, false altrimenti.
+ */
 bool cctalk_receive(uint8_t *src_addr, uint8_t *data, uint8_t *len, uint32_t timeout_ms)
 {
     (void)src_addr; (void)data; (void)len; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Calcola il checksum di un pacchetto CCTalk.
+ *
+ * Questa funzione calcola il checksum di un pacchetto CCTalk utilizzando l'algoritmo specifico.
+ *
+ * @param [in] packet Puntatore al pacchetto di dati per cui calcolare il checksum.
+ * @param [in] len Lunghezza del pacchetto di dati.
+ * @return Il valore del checksum calcolato.
+ */
 uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len)
 {
     uint16_t sum = 0;
@@ -588,6 +927,18 @@ uint8_t cctalk_checksum(const uint8_t *packet, uint8_t len)
     return (uint8_t)(-sum);
 }
 
+
+/**
+ * @brief Invia un frame CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del frame.
+ * @param [in] src_addr L'indirizzo sorgente del frame.
+ * @param [in] header Il codice header del frame.
+ * @param [in] data Un puntatore al buffer contenente i dati del frame.
+ * @param [in] len La lunghezza del buffer dei dati.
+ * @return true Se il frame è stato inviato con successo.
+ * @return false In caso di errore durante l'invio del frame.
+ */
 bool cctalk_send_frame(uint8_t dest_addr,
                        uint8_t src_addr,
                        uint8_t header,
@@ -598,12 +949,35 @@ bool cctalk_send_frame(uint8_t dest_addr,
     return true;
 }
 
+
+/**
+ * @brief Riceve un frame CCTalk.
+ *
+ * Questa funzione riceve un frame CCTalk dal bus di comunicazione.
+ *
+ * @param [in/out] frame Puntatore al buffer dove viene memorizzato il frame ricevuto.
+ * @param timeout_ms Timeout in millisecondi per l'attesa del frame.
+ * @return true se il frame è stato ricevuto con successo, false altrimenti.
+ */
 bool cctalk_receive_frame(cctalk_frame_t *frame, uint32_t timeout_ms)
 {
     (void)frame; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Invia un comando CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del comando.
+ * @param [in] src_addr L'indirizzo sorgente del comando.
+ * @param [in] header Il codice header del comando.
+ * @param [in] data Un puntatore al buffer contenente i dati del comando.
+ * @param [in] len La lunghezza del buffer dei dati.
+ * @param [out] response Un puntatore al buffer dove verrà memorizzata la risposta del dispositivo.
+ * @param [in] timeout_ms Il timeout in millisecondi per la ricezione della risposta.
+ * @return true se il comando è stato inviato con successo, false altrimenti.
+ */
 bool cctalk_command(uint8_t dest_addr,
                     uint8_t src_addr,
                     uint8_t header,
@@ -617,84 +991,227 @@ bool cctalk_command(uint8_t dest_addr,
     return false;
 }
 
+
+/**
+ * @brief Invia un comando di polling all'indirizzo CCTalk specificato.
+ *
+ * @param [in] dest_addr Indirizzo CCTalk del dispositivo di destinazione.
+ * @param [in] timeout_ms Timeout in millisecondi per l'attesa della risposta.
+ * @return true se il polling è stato completato con successo, false altrimenti.
+ */
 bool cctalk_address_poll(uint8_t dest_addr, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Invia una richiesta di stato al dispositivo CCTalk.
+ *
+ * @param dest_addr [in] Indirizzo del dispositivo destinatario.
+ * @param status [out] Puntatore al buffer dove verrà memorizzato lo stato del dispositivo.
+ * @param timeout_ms [in] Timeout in millisecondi per l'attesa della risposta.
+ * @return true se la richiesta è stata inviata con successo, false altrimenti.
+ */
 bool cctalk_request_status(uint8_t dest_addr, uint8_t *status, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)status; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Invia una richiesta per ottenere l'ID del produttore tramite il protocollo CCTalk.
+ *
+ * @param dest_addr [in] Indirizzo destinatario del messaggio.
+ * @param out [out] Buffer per memorizzare la risposta ricevuta.
+ * @param out_len [in] Dimensione del buffer di output.
+ * @param timeout_ms [in] Timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_manufacturer_id(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)out; (void)out_len; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Invia una richiesta di categoria di equipaggiamento al dispositivo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del dispositivo CCTalk.
+ * @param [out] out Buffer per memorizzare la risposta del dispositivo.
+ * @param [in] out_len Dimensione del buffer di output.
+ * @param [in] timeout_ms Timeout in millisecondi per la ricezione della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_equipment_category(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)out; (void)out_len; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Invia una richiesta di codice prodotto al dispositivo CCTalk.
+ *
+ * @param dest_addr [in] Indirizzo destinatario del dispositivo CCTalk.
+ * @param out [out] Buffer per memorizzare il codice prodotto ricevuto.
+ * @param out_len [in] Dimensione del buffer di output.
+ * @param timeout_ms [in] Timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false altrimenti.
+ */
 bool cctalk_request_product_code(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)out; (void)out_len; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Invia una richiesta per ottenere il numero di serie di un dispositivo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del dispositivo CCTalk.
+ * @param [out] serial Un array di 3 byte che riceverà il numero di serie del dispositivo.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_serial_number(uint8_t dest_addr, uint8_t serial[3], uint32_t timeout_ms)
 {
     (void)dest_addr; (void)serial; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Costruisce il codice di richiesta CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario della richiesta.
+ * @param [out] out Buffer per memorizzare il codice di richiesta generato.
+ * @param [in] out_len Dimensione massima del buffer di output.
+ * @param [in] timeout_ms Timeout in millisecondi per l'attesa della risposta.
+ * @return true se la generazione del codice di richiesta è stata completata con successo, false altrimenti.
+ */
 bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)out; (void)out_len; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Abilita o disabilita l'inibizione del maestro CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del comando.
+ * @param [in] enable Flag booleano per abilitare (true) o disabilitare (false) l'inibizione.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'operazione.
+ * @return true se l'operazione è stata completata con successo, false altrimenti.
+ */
 bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)enable; (void)timeout_ms;
     return true;
 }
 
+
+/**
+ * @brief Invia una richiesta di stato di inibizione CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario della richiesta.
+ * @param [out] mask_low Un puntatore al buffer dove verrà memorizzata la maschera bassa dello stato.
+ * @param [out] mask_high Un puntatore al buffer dove verrà memorizzata la maschera alta dello stato.
+ * @param [in] timeout_ms Il timeout in millisecondi per la ricezione della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false altrimenti.
+ */
 bool cctalk_request_inhibit_status(uint8_t dest_addr, uint8_t *mask_low, uint8_t *mask_high, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)mask_low; (void)mask_high; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Invia una richiesta per ottenere l'ID della moneta all'indirizzo destinatario specificato.
+ *
+ * @param dest_addr Indirizzo destinatario del dispositivo.
+ * @param channel Canale su cui inviare la richiesta.
+ * @param out Buffer per memorizzare la risposta ricevuta.
+ * @param out_len Dimensione del buffer di output.
+ * @param timeout_ms Timeout massimo in millisecondi per la ricezione della risposta.
+ * @return true se la richiesta è stata inviata con successo, false altrimenti.
+ */
 bool cctalk_request_coin_id(uint8_t dest_addr, uint8_t channel, char *out, size_t out_len, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)channel; (void)out; (void)out_len; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Modifica i percorsi del sorter tramite il protocollo CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del comando.
+ * @param [in] paths Un puntatore al buffer contenente i percorsi da modificare.
+ * @param [in] len La lunghezza del buffer paths.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'attesa della risposta.
+ * @return true se la modifica è stata avvenuta con successo, false altrimenti.
+ */
 bool cctalk_modify_sorter_paths(uint8_t dest_addr, const uint8_t *paths, uint8_t len, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)paths; (void)len; (void)timeout_ms;
     return true;
 }
 
+
+/**
+ * @brief Legge i dati dal buffer CCTalk in modo buffered.
+ *
+ * @param [in] dest_addr L'indirizzo del dispositivo di destinazione.
+ * @param [out] buffer Puntatore al buffer in cui memorizzare i dati letti.
+ * @param [in] timeout_ms Il timeout in millisecondi per l'attesa della risposta.
+ *
+ * @return true se la lettura è stata completata con successo, false altrimenti.
+ */
 bool cctalk_read_buffered_credit(uint8_t dest_addr, cctalk_buffer_t *buffer, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)buffer; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Richiede lo stato di inserimento alla scheda CCTalk.
+ *
+ * @param [in] dest_addr L'indirizzo destinatario della richiesta.
+ * @param [out] status Un puntatore a una variabile dove verrà memorizzato lo stato di inserimento.
+ * @param [in] timeout_ms Il timeout in millisecondi per la ricezione della risposta.
+ *
+ * @return true se la richiesta è stata inviata con successo, false in caso di errore.
+ */
 bool cctalk_request_insertion_status(uint8_t dest_addr, uint8_t *status, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)status; (void)timeout_ms;
     return false;
 }
 
+
+/**
+ * @brief Resetta il dispositivo CCTalk.
+ *
+ * Questa funzione invia un comando di reset al dispositivo CCTalk specificato
+ * tramite l'indirizzo di destinazione e attende una risposta entro il timeout
+ * specificato.
+ *
+ * @param [in] dest_addr Indirizzo di destinazione del dispositivo CCTalk.
+ * @param [in] timeout_ms Timeout in millisecondi per l'attesa della risposta.
+ * @return true se il reset è stato avviato con successo, false altrimenti.
+ */
 bool cctalk_reset_device(uint8_t dest_addr, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)timeout_ms;

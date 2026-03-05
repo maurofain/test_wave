@@ -20,6 +20,14 @@ static const char *TAG = "lvgl_panel";
 #define BOOT_LOGO_SPIFFS_PATH "/spiffs/logo.jpg"
 #define BOOT_LOGO_LVGL_PATH   "S:/spiffs/logo.jpg"
 
+
+/**
+ * @brief Controlla se il file del logo del pannello esiste.
+ *
+ * Questa funzione verifica la presenza del file del logo del pannello.
+ *
+ * @return true se il file esiste, false altrimenti.
+ */
 static bool panel_boot_logo_file_exists(void)
 {
     FILE *f = fopen(BOOT_LOGO_SPIFFS_PATH, "rb");
@@ -30,6 +38,14 @@ static bool panel_boot_logo_file_exists(void)
     return true;
 }
 
+
+/**
+ * @brief Mostra lo schermo del logo di avvio del pannello.
+ *
+ * Questa funzione visualizza lo schermo del logo di avvio del pannello.
+ *
+ * @return Niente.
+ */
 static void panel_show_boot_logo_screen(void)
 {
     lv_obj_t *scr = lv_scr_act();
@@ -59,11 +75,25 @@ static void panel_show_boot_logo_screen(void)
     ESP_LOGW(TAG, "[C] Logo SPIFFS non trovato (%s), uso fallback testuale", BOOT_LOGO_SPIFFS_PATH);
 }
 
+
+/** @brief Mostra il pannello LVGL.
+ *  
+ *  Questa funzione mostra il pannello LVGL sullo schermo.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void lvgl_panel_show(void)
 {
     lvgl_panel_show_boot_logo();
 }
 
+
+/**
+ * @brief Mostra il logo di avvio sul pannello.
+ * 
+ * @param [in] Nessun parametro.
+ * @return void Nessun valore di ritorno.
+ */
 void lvgl_panel_show_boot_logo(void)
 {
     if (!bsp_display_lock(0)) {
@@ -76,6 +106,15 @@ void lvgl_panel_show_boot_logo(void)
     bsp_display_unlock();
 }
 
+
+/**
+ * @brief Mostra la finestra di selezione della lingua.
+ * 
+ * Questa funzione mostra la finestra di selezione della lingua sul display.
+ * 
+ * @param [in] Nessun parametro di input.
+ * @return void Nessun valore di ritorno.
+ */
 void lvgl_panel_show_language_select(void)
 {
     if (!bsp_display_lock(pdMS_TO_TICKS(1500))) {
@@ -97,6 +136,17 @@ void lvgl_panel_show_language_select(void)
     ESP_LOGI(TAG, "[C] Pagina selezione lingua visualizzata");
 }
 
+
+/**
+ * @brief Aggiorna i testi del pannello LVGL.
+ * 
+ * Questa funzione si occupa di aggiornare i testi visualizzati sul pannello LVGL.
+ * Effettua un tentativo di acquisire un blocco di esclusione per 100 millisecondi.
+ * Se il blocco non può essere acquisito entro questo periodo, la funzione termina.
+ * 
+ * @param Nessun parametro.
+ * @return Nessun valore di ritorno.
+ */
 void lvgl_panel_refresh_texts(void)
 {
     if (!bsp_display_lock(100)) {
@@ -108,6 +158,13 @@ void lvgl_panel_refresh_texts(void)
     bsp_display_unlock();
 }
 
+
+/**
+ * @brief Mostra il pannello di servizio non disponibile.
+ * 
+ * @param reboots Numero di riavvii effettuati.
+ * @return void Nessun valore di ritorno.
+ */
 void lvgl_panel_show_out_of_service(uint32_t reboots)
 {
     if (!bsp_display_lock(pdMS_TO_TICKS(200))) {

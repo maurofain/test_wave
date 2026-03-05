@@ -52,6 +52,20 @@ Esempi rapidi:
 | POST | `/api/test/serial/monitor` | `{}` | `{"rs232":"...","rs485":"...","mdb":"...","cctalk":"..."}` |
 | POST | `/api/test/serial/clear` | `{"port":"rs232"}` | `{"status":"ok"}` |
 
+### Modbus RTU su RS485 (ESP-IDF `freemodbus`)
+
+Endpoint di test disponibili:
+
+| Method | Endpoint | Body (JSON) | Risposta attesa (esempio) |
+|---|---|---|---|
+| POST | `/api/test/modbus/status` | `{}` | `{"status":"ok","running":true,"coils":[...],"inputs":[...]}` |
+| POST | `/api/test/modbus/read/di` | `{"slave_id":1,"start":0,"count":8}` | `{"status":"ok","type":"discrete_inputs","values":[0,1,...]}` |
+| POST | `/api/test/modbus/read/coils` | `{"slave_id":1,"start":0,"count":8}` | `{"status":"ok","type":"coils","values":[1,0,...]}` |
+| POST | `/api/test/modbus/write/coil` | `{"slave_id":1,"coil":0,"state":1}` | `{"status":"ok","message":"Coil aggiornata",...}` |
+| POST | `/api/test/modbus/write/coils` | `{"slave_id":1,"start":0,"states":[1,1,0,0]}` | `{"status":"ok","message":"Coils aggiornate",...}` |
+
+Nota: quando il controller Modbus è attivo, i test raw RS485 (`/api/test/rs485/start` e `serial/send` su `port=rs485`) vengono bloccati per evitare conflitti sulla UART.
+
 ## Build
 1. Install ESP-IDF (v5.1+ recommended for ESP32-P4) and set `IDF_PATH`/`idf.py` in PATH.
 2. Configure (adjust pins if needed):
@@ -64,6 +78,28 @@ Esempi rapidi:
    idf.py build
    idf.py -p <PORT> flash monitor
    ```
+
+## Rigenerazione pagine HTML (Web UI)
+
+Se modifichi i template embedded o il generatore, rigenera i file statici in `data/www` con:
+
+```bash
+python3 scripts/export_embedded_pages.py --output data/www
+```
+
+Esempio (solo home):
+
+```bash
+python3 scripts/export_embedded_pages.py --output data/www --pages index.html
+```
+
+Per aggiornare sul device solo la partizione SPIFFS (senza ricompilare il firmware):
+
+```bash
+bash scripts/flash_spiffs.sh
+```
+
+Nota: in modalità pagine esterne (`WEB_UI_PAGE_SOURCE=1` su SPIFFS), questi file sono quelli serviti dalla Web UI.
 
 ### Codice unificato APP/FACTORY
 - Il progetto usa una singola base sorgente in `main/`.

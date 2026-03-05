@@ -94,6 +94,21 @@ typedef struct {
 } device_serial_config_t;
 
 /**
+ * @brief Struttura di configurazione Modbus RTU su RS485
+ */
+typedef struct {
+    bool enabled;            ///< Abilita servizio Modbus RTU Master
+    uint8_t slave_id;        ///< Indirizzo slave Modbus (1..255)
+    uint16_t poll_ms;        ///< Intervallo polling task RS485/Modbus
+    uint16_t timeout_ms;     ///< Timeout logico richiesta (uso applicativo)
+    uint8_t retries;         ///< Numero retry in caso di errore/timeout
+    uint16_t relay_start;    ///< Registro coil iniziale (base 0)
+    uint16_t relay_count;    ///< Numero coil da gestire
+    uint16_t input_start;    ///< Registro DI iniziale (base 0)
+    uint16_t input_count;    ///< Numero ingressi discreti da leggere
+} device_modbus_config_t;
+
+/**
  * @brief Configurazione GPIO configurabili (GPIO33)
  */
 typedef enum {
@@ -172,6 +187,7 @@ typedef struct {
     device_timeouts_config_t timeouts;  ///< Timeout applicativi
     device_serial_config_t rs232;       ///< Configurazione RS232
     device_serial_config_t rs485;       ///< Configurazione RS485
+    device_modbus_config_t modbus;      ///< Configurazione Modbus RTU su RS485
     device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB
     device_gpios_config_t gpios;        ///< Configurazione GPIO extra
     device_ui_texts_config_t ui;        ///< Configurazione testi UI multilingua

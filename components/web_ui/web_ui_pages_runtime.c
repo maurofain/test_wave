@@ -166,11 +166,11 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "<div class='sm-row'><span class='sm-lbl'>SPIRAM</span>"
           "<div class='sm-bar'><div class='sm-fill' id='sm_spi'></div></div>"
           "<span class='sm-val' id='sm_spi_v'>\xe2\x80\x94</span></div>"
-        "<div class='sm-row' id='sm_cpu0_r' style='display:none'>"
+                "<div class='sm-row' id='sm_cpu0_r'>"
           "<span class='sm-lbl'>Core 0</span>"
           "<div class='sm-bar'><div class='sm-fill sm-cpu' id='sm_c0'></div></div>"
           "<span class='sm-val' id='sm_c0v'>\xe2\x80\x94</span></div>"
-        "<div class='sm-row' id='sm_cpu1_r' style='display:none'>"
+                "<div class='sm-row' id='sm_cpu1_r'>"
           "<span class='sm-lbl'>Core 1</span>"
           "<div class='sm-bar'><div class='sm-fill sm-cpu' id='sm_c1'></div></div>"
           "<span class='sm-val' id='sm_c1v'>\xe2\x80\x94</span></div>"
@@ -207,14 +207,14 @@ esp_err_t root_get_handler(httpd_req_t *req)
         "document.getElementById('sm_dram_v').textContent=fb(d.heap.dram_free)+' lib ('+dp+'%)';"
         "document.getElementById('sm_spi').style.width=sp+'%';"
         "document.getElementById('sm_spi_v').textContent=fb(d.heap.spiram_free)+' lib ('+sp+'%)';"
-        "if(d.cpu.available&&d.cpu.core0_pct>=0){"
-        "  document.getElementById('sm_cpu0_r').style.display='';"
-        "  document.getElementById('sm_cpu1_r').style.display='';"
-        "  document.getElementById('sm_c0').style.width=d.cpu.core0_pct+'%';"
-        "  document.getElementById('sm_c0v').textContent=d.cpu.core0_pct+'%';"
-        "  document.getElementById('sm_c1').style.width=d.cpu.core1_pct+'%';"
-        "  document.getElementById('sm_c1v').textContent=d.cpu.core1_pct+'%';"
-        "}"
+        "var c0=(d&&d.cpu&&typeof d.cpu.core0_pct==='number'&&d.cpu.core0_pct>=0)?d.cpu.core0_pct:-1;"
+        "var c1=(d&&d.cpu&&typeof d.cpu.core1_pct==='number'&&d.cpu.core1_pct>=0)?d.cpu.core1_pct:-1;"
+        "var c0p=(c0<0)?0:Math.max(0,Math.min(100,c0));"
+        "var c1p=(c1<0)?0:Math.max(0,Math.min(100,c1));"
+        "document.getElementById('sm_c0').style.width=c0p+'%';"
+        "document.getElementById('sm_c0v').textContent=(c0<0?'n/d':(Math.round(c0*10)/10+'%'));"
+        "document.getElementById('sm_c1').style.width=c1p+'%';"
+        "document.getElementById('sm_c1v').textContent=(c1<0?'n/d':(Math.round(c1*10)/10+'%'));"
         "document.getElementById('sm_up').textContent=fu(d.uptime_s);"
         "}catch(e){}"
         "}"
@@ -307,6 +307,11 @@ esp_err_t status_get_handler(httpd_req_t *req)
              "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%lu},"
              "\"sd\":{\"mounted\":%s,\"present\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"},"
              "\"env\":{\"temp\":%.1f,\"hum\":%.1f},"
+             "\"dna\":{"
+               "\"pwm\":%d,\"led_strip\":%d,\"rs232\":%d,\"rs485\":%d,\"mdb\":%d,"
+               "\"sht40\":%d,\"cctalk\":%d,\"sd_card\":%d,\"ethernet\":%d,"
+               "\"wifi\":%d,\"usb_scanner\":%d,\"io_expander\":%d,\"remote_logging\":%d"
+             "},"
              "\"config\":%s}",
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,
              web_ui_is_running() ? "true" : "false",
@@ -318,6 +323,9 @@ esp_err_t status_get_handler(httpd_req_t *req)
              (unsigned long long)sd_total_kb, (unsigned long long)sd_used_kb,
              sd_card_get_last_error(),
              tasks_get_temperature(), tasks_get_humidity(),
+             DNA_PWM, DNA_LED_STRIP, DNA_RS232, DNA_RS485, DNA_MDB,
+             DNA_SHT40, DNA_CCTALK, DNA_SD_CARD, DNA_ETHERNET,
+             DNA_WIFI, DNA_USB_SCANNER, DNA_IO_EXPANDER, DNA_REMOTE_LOGGING,
              config_json ? config_json : "{}");
 
     if (config_json) free(config_json);

@@ -99,6 +99,12 @@ const char *webpages_source_name(void)
     return webpages_source_name_impl();
 }
 
+
+/**
+ * @brief Controlla se le pagine esterne sono abilitate.
+ *
+ * @return true se le pagine esterne sono abilitate, false altrimenti.
+ */
 static bool webpages_external_enabled(void)
 {
 #if WEB_UI_PAGE_SOURCE == 1 || WEB_UI_PAGE_SOURCE == 2
@@ -119,6 +125,16 @@ static const char *webpages_base_path(void)
 #endif
 }
 
+
+/**
+ * @brief Controlla se lo storage per le pagine web è pronto.
+ *
+ * Questa funzione verifica se lo storage dedicato alle pagine web è pronto
+ * per l'uso. Questo è importante per assicurare che tutte le risorse
+ * necessarie siano state correttamente inizializzate e siano accessibili.
+ *
+ * @return true se lo storage è pronto, false altrimenti.
+ */
 static bool webpages_storage_ready(void)
 {
 #if WEB_UI_PAGE_SOURCE == 2
@@ -152,6 +168,17 @@ static const char *mime_from_filename(const char *name)
     return "text/plain; charset=utf-8";
 }
 
+
+/**
+ * @brief Controlla se un percorso relativo è sicuro.
+ * 
+ * Questa funzione verifica se il percorso relativo fornito è sicuro da utilizzare.
+ * Un percorso relativo è considerato sicuro se non inizia con un carattere di barra (/),
+ * il che potrebbe indicare un percorso assoluto.
+ * 
+ * @param [in] relative_path Il percorso relativo da controllare.
+ * @return true se il percorso è sicuro, false altrimenti.
+ */
 static bool is_relative_path_safe(const char *relative_path)
 {
     if (!relative_path || relative_path[0] == '\0') {
@@ -169,6 +196,20 @@ static bool is_relative_path_safe(const char *relative_path)
     return true;
 }
 
+
+/**
+ * @brief Invia un file in blocchi attraverso una richiesta HTTP.
+ *
+ * Questa funzione invia il contenuto di un file specificato in blocchi
+ * attraverso una richiesta HTTP. Il file viene aperto e letto in piccoli
+ * segmenti, che vengono poi inviati al client. Questo approccio è utile
+ * per gestire file di grandi dimensioni senza utilizzare troppa memoria.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @param full_path Percorso completo del file da inviare.
+ * @param content_type Tipo di contenuto del file.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t send_file_as_chunks(httpd_req_t *req, const char *full_path, const char *content_type)
 {
     FILE *f = fopen(full_path, "rb");
@@ -201,6 +242,17 @@ static esp_err_t send_file_as_chunks(httpd_req_t *req, const char *full_path, co
     return httpd_resp_send_chunk(req, NULL, 0);
 }
 
+
+/**
+ * @brief Tenta di inviare una pagina web esterna.
+ * 
+ * Questa funzione cerca di inviare una pagina web esterna al client HTTP.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @param relative_path Percorso relativo alla pagina web da inviare.
+ * @param content_type Tipo di contenuto della pagina web.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t webpages_try_send_external(httpd_req_t *req, const char *relative_path, const char *content_type)
 {
     if (!webpages_external_enabled()) {
@@ -227,6 +279,15 @@ esp_err_t webpages_try_send_external(httpd_req_t *req, const char *relative_path
     return send_file_as_chunks(req, full_path, content_type);
 }
 
+
+/**
+ * @brief Invia una pagina web esterna o un errore in base al percorso relativo fornito.
+ *
+ * @param req Puntatore alla richiesta HTTP.
+ * @param relative_path Percorso relativo della pagina web da inviare.
+ * @param content_type Tipo di contenuto della pagina web.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t webpages_send_external_or_error(httpd_req_t *req, const char *relative_path, const char *content_type)
 {
     esp_err_t ret = webpages_try_send_external(req, relative_path, content_type);
@@ -257,6 +318,13 @@ esp_err_t webpages_send_external_or_error(httpd_req_t *req, const char *relative
     return httpd_resp_send(req, "Errore caricamento pagina esterna", HTTPD_RESP_USE_STRLEN);
 }
 
+
+/**
+ * @brief Assicura che un determinato percorso sia una directory.
+ * 
+ * @param [in] path Il percorso della directory da verificare.
+ * @return esp_err_t Errore se il percorso non è una directory o se si verifica un errore.
+ */
 static esp_err_t ensure_dir(const char *path)
 {
     if (!path) {
@@ -269,6 +337,14 @@ static esp_err_t ensure_dir(const char *path)
 }
 
 #if WEB_UI_EXPORT_ON_BOOT == 1
+
+/**
+ * @brief Scrive il contenuto in un file solo se il file non esiste già.
+ *
+ * @param [in] path Percorso del file da scrivere.
+ * @param [in] content Contenuto da scrivere nel file.
+ * @return esp_err_t Errore se la scrittura fallisce, OK se la scrittura è andata a buon fine.
+ */
 static esp_err_t write_file_if_missing(const char *path, const char *content)
 {
     FILE *check = fopen(path, "rb");
@@ -289,6 +365,18 @@ static esp_err_t write_file_if_missing(const char *path, const char *content)
 }
 #endif
 
+
+/**
+ * @brief Avvia il servizio web per gestire le pagine web.
+ *
+ * Questa funzione inizializza e avvia il servizio web, pronto a gestire le richieste HTTP
+ * per le pagine web. Questo include la configurazione del server web, l'elaborazione delle richieste
+ * e la gestione delle risposte.
+ *
+ * @return esp_err_t
+ * - ESP_OK: Se l'avvio del servizio web è stato completato con successo.
+ * - ESP_FAIL: Se si è verificato un errore durante l'avvio del servizio web.
+ */
 esp_err_t webpages_bootstrap(void)
 {
     ESP_LOGI(TAG, "[C] Web pages source: %s", webpages_source_name_impl());

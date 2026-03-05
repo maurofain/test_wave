@@ -1,0 +1,5 @@
+## IDF Component Manager manifest for modbus_relay
+version: "1.0.0"
+dependencies:
+  espressif/esp-modbus:
+    version: ">=1.0.0"

@@ -123,6 +123,15 @@ static init_agent_status_t s_agent_status_table[] = {
     {AGN_ID_WAVESHARE_LCD, 1, INIT_AGENT_ERR_NOT_EVALUATED},
 };
 
+
+/**
+ * @brief Inizializza il contatore degli errori di aggiornamento dello stato dell'agente.
+ * 
+ * Questa funzione si occupa di inizializzare il contatore degli errori associato all'aggiornamento dello stato dell'agente.
+ * 
+ * @param [in/out] Non applicabile per questa funzione.
+ * @return Non applicabile per questa funzione.
+ */
 static void init_agent_status_update_error_counter(void)
 {
     int32_t error_count = 0;
@@ -136,6 +145,14 @@ static void init_agent_status_update_error_counter(void)
     s_agent_status_table[0].error_code = INIT_AGENT_ERR_NONE;
 }
 
+
+/**
+ * @brief Resetta i valori di default dello stato dell'agente.
+ *
+ * Questa funzione reimposta tutti i valori dello stato dell'agente ai loro valori di default.
+ *
+ * @return Niente.
+ */
 void init_agent_status_reset_defaults(void)
 {
     const size_t count = sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
@@ -147,6 +164,15 @@ void init_agent_status_reset_defaults(void)
     s_agent_status_table[0].error_code = INIT_AGENT_ERR_NONE;
 }
 
+
+/**
+ * @brief Inizializza lo stato dell'agente.
+ *
+ * @param [in] agn_value Valore dell'agente.
+ * @param [in] state Stato dell'agente.
+ * @param [in] error_code Codice di errore dell'agente.
+ * @return Nessun valore di ritorno.
+ */
 void init_agent_status_set(int32_t agn_value, int32_t state, init_agent_error_code_t error_code)
 {
     const size_t count = sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
@@ -1689,16 +1715,24 @@ esp_err_t init_run_factory(void)
 
     if (cfg->sensors.rs485_enabled)
     {
-        esp_err_t rs485_ret = rs485_init();
-        if (rs485_ret != ESP_OK)
+        if (cfg->modbus.enabled)
         {
-            ESP_LOGE(TAG, "[M] Inizializzazione RS485 fallita (%s): periferica disabilitata a runtime", esp_err_to_name(rs485_ret));
-            cfg->sensors.rs485_enabled = false;
-            init_agent_status_set(AGN_ID_RS485, 0, INIT_AGENT_ERR_INIT_FAILED);
+            ESP_LOGI(TAG, "[M] RS485 gestita da Modbus: init UART differita al task rs485");
+            init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_NONE);
         }
         else
         {
-            init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_NONE);
+            esp_err_t rs485_ret = rs485_init();
+            if (rs485_ret != ESP_OK)
+            {
+                ESP_LOGE(TAG, "[M] Inizializzazione RS485 fallita (%s): periferica disabilitata a runtime", esp_err_to_name(rs485_ret));
+                cfg->sensors.rs485_enabled = false;
+                init_agent_status_set(AGN_ID_RS485, 0, INIT_AGENT_ERR_INIT_FAILED);
+            }
+            else
+            {
+                init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_NONE);
+            }
         }
     }
     else

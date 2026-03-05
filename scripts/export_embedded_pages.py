@@ -57,6 +57,50 @@ CONFIG_READ_ONLY_SCRIPT = (
     "})();</script>"
 )
 
+HOME_SYS_TASK_WIDGET = (
+    "<div class='card' id='home_sys_task'>"
+    "<h2>💻 CPU e Task</h2>"
+    "<div style='margin-top:6px'>"
+    "<div class='hst-row'><span class='hst-lbl'>Core 0</span><div class='hst-bar'><div class='hst-fill hst-cpu' id='hst_c0_fill'></div></div><span class='hst-val' id='hst_cpu0'>--</span></div>"
+    "<div class='hst-row'><span class='hst-lbl'>Core 1</span><div class='hst-bar'><div class='hst-fill hst-cpu' id='hst_c1_fill'></div></div><span class='hst-val' id='hst_cpu1'>--</span></div>"
+    "<div class='hst-row'><span class='hst-lbl'>Uptime</span><div class='hst-bar'></div><span class='hst-val' id='hst_uptime'>--</span></div>"
+    "</div>"
+    "<style>"
+    ".hst-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #ecf0f1}"
+    ".hst-lbl{width:60px;font-size:12px;font-weight:bold;color:#34495e;flex-shrink:0}"
+    ".hst-bar{flex:1;background:#ecf0f1;border-radius:4px;height:13px;overflow:hidden}"
+    ".hst-fill{height:100%;background:#3498db;border-radius:4px;width:0%;transition:width .35s}"
+    ".hst-cpu{background:#e67e22}"
+    ".hst-val{width:130px;font-size:12px;font-family:monospace;color:#555;text-align:right;flex-shrink:0}"
+    "</style>"
+    "<div style='margin-top:10px'>"
+    "<label style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-weight:bold;color:#2c3e50'>"
+    "<span>RunTime Stats</span>"
+    "<span style='font-size:12px;color:#7f8c8d'>refresh 2s</span>"
+    "</label>"
+    "<textarea id='hst_runtime' readonly style='width:100%;min-height:170px;resize:vertical;font-family:monospace;font-size:11px;line-height:1.35;padding:8px;border:1px solid #dfe6e9;border-radius:6px;background:#f8fafc;color:#2d3436'></textarea>"
+    "</div>"
+    "<script>(function(){"
+    "function fmtUptime(s){var n=Math.max(0,parseInt(s||0,10));var d=Math.floor(n/86400);var h=Math.floor((n%86400)/3600);var m=Math.floor((n%3600)/60);var ss=n%60;return (d?d+'g ':'')+h+'h '+m+'m '+ss+'s';}"
+    "async function loadSys(){try{var r=await fetch('/api/sysinfo',{cache:'no-store'});if(!r.ok)return;var j=await r.json();"
+    "var c0=(j&&j.cpu&&typeof j.cpu.core0_pct==='number')?j.cpu.core0_pct:((j&&typeof j.core0_pct==='number')?j.core0_pct:null);"
+    "var c1=(j&&j.cpu&&typeof j.cpu.core1_pct==='number')?j.cpu.core1_pct:((j&&typeof j.core1_pct==='number')?j.core1_pct:null);"
+    "var c0ok=(typeof c0==='number'&&isFinite(c0)&&c0>=0);"
+    "var c1ok=(typeof c1==='number'&&isFinite(c1)&&c1>=0);"
+    "var c0p=c0ok?Math.max(0,Math.min(100,c0)):0;"
+    "var c1p=c1ok?Math.max(0,Math.min(100,c1)):0;"
+    "document.getElementById('hst_c0_fill').style.width=c0p+'%';"
+    "document.getElementById('hst_c1_fill').style.width=c1p+'%';"
+    "document.getElementById('hst_cpu0').textContent=(c0ok?(Math.round(c0*10)/10+'%'):'n/d');"
+    "document.getElementById('hst_cpu1').textContent=(c1ok?(Math.round(c1*10)/10+'%'):'n/d');"
+    "document.getElementById('hst_uptime').textContent=fmtUptime(j&&j.uptime_s);"
+    "}catch(e){}}"
+    "async function loadRt(){try{var r=await fetch('/api/runtime_stats',{cache:'no-store'});if(!r.ok)return;var t=await r.text();var b=document.getElementById('hst_runtime');if(b)b.value=t||'';}catch(e){}}"
+    "loadSys();loadRt();setInterval(loadSys,2000);setInterval(loadRt,2000);"
+    "})();</script>"
+    "</div>"
+)
+
 
 @dataclass(frozen=True)
 class PageSpec:
@@ -280,6 +324,7 @@ def build_home_body(constants: dict[str, str], args: argparse.Namespace) -> str:
         + require_symbol(constants, "WEBPAGE_HOME_LINK_PROMOTE_FACTORY")
         + "</div></div></div></div>"
         + require_symbol(constants, "WEBPAGE_HOME_SERVICE_STATUS_WIDGET")
+        + HOME_SYS_TASK_WIDGET
         + "</div></body></html>"
     )
 

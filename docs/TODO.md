@@ -4,15 +4,12 @@
 
 ## 📋 DA FARE
 
-### 0. Caricamento remoto artefatti
+1. Caricamento remoto artefatti
+   - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
 
-Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
+2. Piano test endpoint e funzioni
 
-- 
-
-### 2. Piano test endpoint e funzioni
-
-Strutturare i test in 4 livelli:
+​	Strutturare i test in 4 livelli:
 - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
 - **Contract**: campi obbligatori e tipi minimi della risposta
 - **Flow**: sequenze operative (es. `sd_init → sd_list`, `serial_send → monitor → clear`, `config/save → config/get`)
@@ -33,6 +30,34 @@ Primo MVP:
 - 3 flow critici: SD, seriale unificato, backup config su SD
 - Report `junit.xml` + riepilogo markdown
 
+3. Protocollo moduli 8 I/O RS485 esterni
+   - Driver RS485 presente ma nessun protocollo per slave 8-I/O esterni (uno o due moduli)
+   - Definire il protocollo di comunicazione (Modbus RTU o proprietario)
+   - Implementare lettura ingressi e scrittura uscite ciclica
+   - Aggiungere in /config: numero schede I/O esterne (0, 1, 2)
+
+4. PLC esterno
+   - Definire protocollo di collegamento (seriale RS485 o input digitale diretto)
+   - Implementare ricezione impulsi/segnali da PLC (es. segnale avanzamento ciclo)
+   - Aggiungere in /config: abilitazione PLC, input/output associati, protocollo
+
+5. Config: assegnazione programmi a I/O e relay
+   - I programmi sono configurabili (tempo, pausa) ma non mappati a uscite fisiche
+   - Aggiungere in /config per ogni programma: maschera relay/output attivati durante l'erogazione
+
+6. Config: valore per metodo di pagamento
+   - Aggiungere in /config i valori configurabili per: gettone MDB, moneta, QR code, tessera
+   - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
+
+7. Ricezione config da server (`api/getconfig`)
+   - L'API server `POST /api/getconfig` è definita ma il device non applica la configurazione ricevuta
+   - Implementare il parsing della risposta e aggiornamento della config locale
+
+8. Slideshow immagini idle in standby
+   - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
+   - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
+   - Uscita dallo slideshow al primo evento (credito, touch, tasto)
+
 ---
 
 ## ⏸️ RITARDATI
@@ -40,6 +65,10 @@ Primo MVP:
 1. Abilitazione WiFi
 2. Display minimale 1.44"
 3. Connessione HTTPS
+4. in config/sdcard metti un tasto per copiare le pagine web da SPIFFS a SD
+5. Integrazione display LVGL con ciclo operativo
+   - Visualizzazione credito, countdown, selezione programma e stati macchina su display 7"/5"
+   - Dipende da: ciclo operativo FSM completo (SPECIFICHE §1.1–1.5)
 
 ---
 

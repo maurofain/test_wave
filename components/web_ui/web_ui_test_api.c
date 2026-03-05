@@ -32,6 +32,7 @@
 #include "sd_card.h"
 #include "aux_gpio.h"
 #include "sht40.h"
+#include "modbus_relay.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -41,11 +42,46 @@
 #include "fsm.h"
 
 #define TAG "WEB_UI_TEST_API"
+#define CCTALK_WEB_CMD_TIMEOUT_MS (700U)
 
 static volatile bool s_sd_init_in_progress = false;
 static TaskHandle_t s_cctalk_test_handle = NULL;
 static bool s_cctalk_test_owned = false;
 
+static uint16_t clamp_u16_value(int value, uint16_t min, uint16_t max)
+{
+    if (value < (int)min) {
+        return min;
+    }
+    if (value > (int)max) {
+        return max;
+    }
+    return (uint16_t)value;
+}
+
+static uint8_t clamp_u8_value(int value, uint8_t min, uint8_t max)
+{
+    if (value < (int)min) {
+        return min;
+    }
+    if (value > (int)max) {
+        return max;
+    }
+    return (uint8_t)value;
+}
+
+
+/**
+ * @brief Analizza un payload in formato esadecimale.
+ *
+ * Questa funzione prende in input una stringa in formato esadecimale e la converte in un array di byte.
+ *
+ * @param [in] input Puntatore alla stringa in formato esadecimale da analizzare.
+ * @param [out] out Puntatore all'array di byte dove verrà memorizzato il risultato.
+ * @param [in] out_max Dimensione massima dell'array di output.
+ * @param [out] out_len Puntatore alla variabile dove verrà memorizzata la lunghezza dell'array di output.
+ * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore.
+ */
 static esp_err_t parse_hex_payload(const char *input, uint8_t *out, size_t out_max, size_t *out_len)
 {
     if (!input || !out || !out_len) {
@@ -368,7 +404,9 @@ esp_err_t api_test_handler(httpd_req_t *req)
     }
 
     else if (strcmp(test_name, "rs485_start") == 0) {
-        if (!s_rs485_test_handle) {
+        if (modbus_relay_is_running()) {
+            snprintf(response, sizeof(response), "{\"error\":\"RS485 occupata da Modbus\"}");
+        } else if (!s_rs485_test_handle) {
             rs485_init();
             xTaskCreate(uart_test_task, "rs485_test",
             /* same reasoning as rs232_test above */
@@ -379,6 +417,460 @@ esp_err_t api_test_handler(httpd_req_t *req)
     } else if (strcmp(test_name, "rs485_stop") == 0) {
         if (s_rs485_test_handle) { vTaskDelete(s_rs485_test_handle); s_rs485_test_handle = NULL; }
         snprintf(response, sizeof(response), "{\"message\":\"Test RS485 fermato\"}");
+    }
+
+    else if (strcmp(test_name, "modbus_status") == 0 || strcmp(test_name, "modbus/status") == 0) {
+        modbus_relay_status_t st = {0};
+        esp_err_t err = modbus_relay_get_status(&st);
+        if (err != ESP_OK) {
+            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Stato Modbus non disponibile\",\"err\":\"%s\"}", esp_err_to_name(err));
+        } else {
+            cJSON *root = cJSON_CreateObject();
+            cJSON_AddStringToObject(root, "status", "ok");
+            cJSON_AddBoolToObject(root, "running", st.running);
+            cJSON_AddBoolToObject(root, "initialized", st.initialized);
+            cJSON_AddNumberToObject(root, "slave_id", st.slave_id);
+            cJSON_AddNumberToObject(root, "relay_start", st.relay_start);
+            cJSON_AddNumberToObject(root, "relay_count", st.relay_count);
+            cJSON_AddNumberToObject(root, "input_start", st.input_start);
+            cJSON_AddNumberToObject(root, "input_count", st.input_count);
+            cJSON_AddNumberToObject(root, "poll_ok", st.poll_ok_count);
+            cJSON_AddNumberToObject(root, "poll_err", st.poll_err_count);
+            cJSON_AddNumberToObject(root, "last_error", st.last_error);
+            cJSON_AddNumberToObject(root, "last_update_ms", st.last_update_ms);
+
+            cJSON *coils = cJSON_CreateArray();
+            for (uint16_t i = 0; i < st.relay_count && i < MODBUS_RELAY_MAX_POINTS; ++i) {
+                int bit = (st.relay_bits[i / 8U] >> (i % 8U)) & 0x01;
+                cJSON_AddItemToArray(coils, cJSON_CreateNumber(bit));
+            }
+            cJSON_AddItemToObject(root, "coils", coils);
+
+            cJSON *inputs = cJSON_CreateArray();
+            for (uint16_t i = 0; i < st.input_count && i < MODBUS_RELAY_MAX_POINTS; ++i) {
+                int bit = (st.input_bits[i / 8U] >> (i % 8U)) & 0x01;
+                cJSON_AddItemToArray(inputs, cJSON_CreateNumber(bit));
+            }
+            cJSON_AddItemToObject(root, "inputs", inputs);
+
+            char *json_out = cJSON_PrintUnformatted(root);
+            if (!json_out) {
+                cJSON_Delete(root);
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"JSON build failed\"}");
+            } else {
+                httpd_resp_set_type(req, "application/json");
+                httpd_resp_send(req, json_out, strlen(json_out));
+                free(json_out);
+                cJSON_Delete(root);
+                return ESP_OK;
+            }
+        }
+    }
+
+    else if (strcmp(test_name, "modbus_read_di") == 0 || strcmp(test_name, "modbus/read/di") == 0 ||
+             strcmp(test_name, "modbus_read_coils") == 0 || strcmp(test_name, "modbus/read/coils") == 0) {
+        if (s_rs485_test_handle) {
+            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Test RS485 attivo: fermarlo prima\"}");
+        } else {
+            const bool read_coils = (strcmp(test_name, "modbus_read_coils") == 0 || strcmp(test_name, "modbus/read/coils") == 0);
+            device_config_t *cfg = device_config_get();
+            uint8_t slave_id = (cfg ? cfg->modbus.slave_id : 1);
+            uint16_t start = (cfg ? cfg->modbus.input_start : 0);
+            uint16_t count = (cfg ? cfg->modbus.input_count : 8);
+
+            if (read_coils) {
+                start = (cfg ? cfg->modbus.relay_start : 0);
+                count = (cfg ? cfg->modbus.relay_count : 8);
+            }
+
+            if (count < 1U) count = 1U;
+            if (count > MODBUS_RELAY_MAX_POINTS) count = MODBUS_RELAY_MAX_POINTS;
+
+            cJSON *root = NULL;
+            char buf[256] = {0};
+            if (req->content_len > 0) {
+                if (req->content_len >= (int)sizeof(buf)) {
+                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Payload troppo grande\"}");
+                    goto modbus_read_end;
+                }
+                int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+                if (ret <= 0) {
+                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Lettura payload fallita\"}");
+                    goto modbus_read_end;
+                }
+                root = cJSON_Parse(buf);
+                if (!root) {
+                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"JSON non valido\"}");
+                    goto modbus_read_end;
+                }
+
+                cJSON *slave_obj = cJSON_GetObjectItem(root, "slave_id");
+                if (slave_obj && cJSON_IsNumber(slave_obj)) {
+                    slave_id = clamp_u8_value(slave_obj->valueint, 1, 255);
+                }
+
+                cJSON *start_obj = cJSON_GetObjectItem(root, "start");
+                if (start_obj && cJSON_IsNumber(start_obj)) {
+                    start = clamp_u16_value(start_obj->valueint, 0, 65535);
+                }
+
+                cJSON *count_obj = cJSON_GetObjectItem(root, "count");
+                if (count_obj && cJSON_IsNumber(count_obj)) {
+                    count = clamp_u16_value(count_obj->valueint, 1, MODBUS_RELAY_MAX_POINTS);
+                }
+            }
+
+            {
+                uint8_t bits[MODBUS_RELAY_MAX_BYTES] = {0};
+                esp_err_t init_err = modbus_relay_init();
+                if (init_err != ESP_OK) {
+                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Init Modbus fallita\",\"err\":\"%s\"}", esp_err_to_name(init_err));
+                } else {
+                    esp_err_t read_err;
+                    if (read_coils) {
+                        read_err = modbus_relay_read_coils(slave_id, start, count, bits, sizeof(bits));
+                    } else {
+                        read_err = modbus_relay_read_discrete_inputs(slave_id, start, count, bits, sizeof(bits));
+                    }
+
+                    if (read_err != ESP_OK) {
+                        snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Lettura Modbus fallita\",\"err\":\"%s\"}", esp_err_to_name(read_err));
+                    } else {
+                        cJSON *out = cJSON_CreateObject();
+                        cJSON_AddStringToObject(out, "status", "ok");
+                        cJSON_AddStringToObject(out,
+                                                "type",
+                                                read_coils ? "coils" : "discrete_inputs");
+                        cJSON_AddNumberToObject(out, "slave_id", slave_id);
+                        cJSON_AddNumberToObject(out, "start", start);
+                        cJSON_AddNumberToObject(out, "count", count);
+
+                        cJSON *values = cJSON_CreateArray();
+                        for (uint16_t i = 0; i < count; ++i) {
+                            int bit = (bits[i / 8U] >> (i % 8U)) & 0x01;
+                            cJSON_AddItemToArray(values, cJSON_CreateNumber(bit));
+                        }
+                        cJSON_AddItemToObject(out, "values", values);
+
+                        char *json_out = cJSON_PrintUnformatted(out);
+                        if (!json_out) {
+                            cJSON_Delete(out);
+                            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"JSON build failed\"}");
+                        } else {
+                            httpd_resp_set_type(req, "application/json");
+                            httpd_resp_send(req, json_out, strlen(json_out));
+                            free(json_out);
+                            cJSON_Delete(out);
+                            if (root) cJSON_Delete(root);
+                            return ESP_OK;
+                        }
+                    }
+                }
+            }
+
+modbus_read_end:
+            if (root) {
+                cJSON_Delete(root);
+            }
+        }
+    }
+
+    else if (strcmp(test_name, "modbus_write_coil") == 0 || strcmp(test_name, "modbus/write/coil") == 0) {
+        if (s_rs485_test_handle) {
+            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Test RS485 attivo: fermarlo prima\"}");
+        } else {
+            char buf[256] = {0};
+            int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+            if (ret <= 0) {
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Payload mancante\"}");
+            } else {
+                cJSON *root = cJSON_Parse(buf);
+                if (!root) {
+                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"JSON non valido\"}");
+                } else {
+                    device_config_t *cfg = device_config_get();
+                    uint8_t slave_id = (cfg ? cfg->modbus.slave_id : 1);
+                    uint16_t coil = (cfg ? cfg->modbus.relay_start : 0);
+                    bool state = false;
+
+                    cJSON *slave_obj = cJSON_GetObjectItem(root, "slave_id");
+                    if (slave_obj && cJSON_IsNumber(slave_obj)) {
+                        slave_id = clamp_u8_value(slave_obj->valueint, 1, 255);
+                    }
+
+                    cJSON *coil_obj = cJSON_GetObjectItem(root, "coil");
+                    if (coil_obj && cJSON_IsNumber(coil_obj)) {
+                        coil = clamp_u16_value(coil_obj->valueint, 0, 65535);
+                    }
+
+                    cJSON *state_obj = cJSON_GetObjectItem(root, "state");
+                    if (state_obj) {
+                        if (cJSON_IsBool(state_obj)) {
+                            state = cJSON_IsTrue(state_obj);
+                        } else if (cJSON_IsNumber(state_obj)) {
+                            state = (state_obj->valueint != 0);
+                        }
+                    }
+
+                    esp_err_t init_err = modbus_relay_init();
+                    if (init_err != ESP_OK) {
+                        snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Init Modbus fallita\",\"err\":\"%s\"}", esp_err_to_name(init_err));
+                    } else {
+                        esp_err_t wr_err = modbus_relay_write_single_coil(slave_id, coil, state);
+                        if (wr_err != ESP_OK) {
+                            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Scrittura coil fallita\",\"err\":\"%s\"}", esp_err_to_name(wr_err));
+                        } else {
+                            snprintf(response,
+                                     sizeof(response),
+                                     "{\"status\":\"ok\",\"message\":\"Coil aggiornata\",\"slave_id\":%u,\"coil\":%u,\"state\":%d}",
+                                     (unsigned)slave_id,
+                                     (unsigned)coil,
+                                     state ? 1 : 0);
+                        }
+                    }
+                    cJSON_Delete(root);
+                }
+            }
+        }
+    }
+
+    else if (strcmp(test_name, "modbus_write_coils") == 0 || strcmp(test_name, "modbus/write/coils") == 0) {
+        if (s_rs485_test_handle) {
+            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Test RS485 attivo: fermarlo prima\"}");
+        } else {
+            char buf[512] = {0};
+            int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+            if (ret <= 0) {
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Payload mancante\"}");
+            } else {
+                cJSON *root = cJSON_Parse(buf);
+                if (!root) {
+                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"JSON non valido\"}");
+                } else {
+                    device_config_t *cfg = device_config_get();
+                    uint8_t slave_id = (cfg ? cfg->modbus.slave_id : 1);
+                    uint16_t start = (cfg ? cfg->modbus.relay_start : 0);
+
+                    cJSON *slave_obj = cJSON_GetObjectItem(root, "slave_id");
+                    if (slave_obj && cJSON_IsNumber(slave_obj)) {
+                        slave_id = clamp_u8_value(slave_obj->valueint, 1, 255);
+                    }
+
+                    cJSON *start_obj = cJSON_GetObjectItem(root, "start");
+                    if (start_obj && cJSON_IsNumber(start_obj)) {
+                        start = clamp_u16_value(start_obj->valueint, 0, 65535);
+                    }
+
+                    cJSON *states = cJSON_GetObjectItem(root, "states");
+                    if (!states || !cJSON_IsArray(states)) {
+                        snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Campo 'states' non valido\"}");
+                    } else {
+                        uint8_t packed[MODBUS_RELAY_MAX_BYTES] = {0};
+                        uint16_t count = 0;
+                        cJSON *item = NULL;
+                        cJSON_ArrayForEach(item, states) {
+                            if (count >= MODBUS_RELAY_MAX_POINTS) {
+                                break;
+                            }
+
+                            bool on = false;
+                            if (cJSON_IsBool(item)) {
+                                on = cJSON_IsTrue(item);
+                            } else if (cJSON_IsNumber(item)) {
+                                on = (item->valueint != 0);
+                            }
+
+                            if (on) {
+                                packed[count / 8U] |= (uint8_t)(1U << (count % 8U));
+                            }
+                            count++;
+                        }
+
+                        if (count == 0U) {
+                            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Array 'states' vuoto\"}");
+                        } else {
+                            esp_err_t init_err = modbus_relay_init();
+                            if (init_err != ESP_OK) {
+                                snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Init Modbus fallita\",\"err\":\"%s\"}", esp_err_to_name(init_err));
+                            } else {
+                                esp_err_t wr_err = modbus_relay_write_multiple_coils(slave_id, start, packed, count);
+                                if (wr_err != ESP_OK) {
+                                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Scrittura multipla coil fallita\",\"err\":\"%s\"}", esp_err_to_name(wr_err));
+                                } else {
+                                    snprintf(response,
+                                             sizeof(response),
+                                             "{\"status\":\"ok\",\"message\":\"Coils aggiornate\",\"slave_id\":%u,\"start\":%u,\"count\":%u}",
+                                             (unsigned)slave_id,
+                                             (unsigned)start,
+                                             (unsigned)count);
+                                }
+                            }
+                        }
+                    }
+                    cJSON_Delete(root);
+                }
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* modbus/scan — discover which slave IDs respond on the RS485 bus      */
+    /* POST body (optional): {"id_min":1,"id_max":16}                       */
+    /* ------------------------------------------------------------------ */
+    else if (strcmp(test_name, "modbus/scan") == 0) {
+        uint8_t id_min = 1;
+        uint8_t id_max = 16;
+
+        char body[128] = {0};
+        int body_len = httpd_req_recv(req, body, sizeof(body) - 1);
+        if (body_len > 0) {
+            body[body_len] = '\0';
+            cJSON *root = cJSON_Parse(body);
+            if (root) {
+                cJSON *jmin = cJSON_GetObjectItem(root, "id_min");
+                cJSON *jmax = cJSON_GetObjectItem(root, "id_max");
+                if (cJSON_IsNumber(jmin) && jmin->valueint >= 1) {
+                    id_min = (uint8_t)jmin->valueint;
+                }
+                if (cJSON_IsNumber(jmax) && jmax->valueint <= 247) {
+                    id_max = (uint8_t)jmax->valueint;
+                }
+                cJSON_Delete(root);
+            }
+        }
+        if (id_max < id_min) { id_max = id_min; }
+
+        esp_err_t init_err = modbus_relay_init();
+        if (init_err != ESP_OK) {
+            snprintf(response, sizeof(response),
+                     "{\"status\":\"error\",\"error\":\"Init Modbus fallita\",\"err\":\"%s\"}",
+                     esp_err_to_name(init_err));
+        } else {
+            device_config_t *cfg = device_config_get();
+            uint16_t relay_count = cfg ? cfg->modbus.relay_count : 8;
+            uint16_t input_count = cfg ? cfg->modbus.input_count : 8;
+            uint16_t relay_start = cfg ? cfg->modbus.relay_start : 0;
+            uint16_t input_start = cfg ? cfg->modbus.input_start : 0;
+
+            /* Build JSON response manually (may have many slaves) */
+            const size_t scan_cap = 2048;
+            char *scan_out = malloc(scan_cap);
+            if (!scan_out) {
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"OOM\"}");
+            } else {
+                size_t pos = 0;
+                pos += snprintf(scan_out + pos, scan_cap - pos,
+                                "{\"status\":\"ok\",\"id_min\":%u,\"id_max\":%u,\"found\":[",
+                                (unsigned)id_min, (unsigned)id_max);
+
+                bool first = true;
+                for (uint8_t sid = id_min; sid <= id_max; ++sid) {
+                    uint8_t probe[1] = {0};
+                    esp_err_t probe_err = modbus_relay_read_coils(sid, relay_start, 1, probe, sizeof(probe));
+                    if (probe_err == ESP_OK) {
+                        pos += snprintf(scan_out + pos, scan_cap - pos,
+                                        "%s{\"slave_id\":%u,\"relay_count\":%u,\"input_count\":%u,"
+                                        "\"relay_start\":%u,\"input_start\":%u}",
+                                        first ? "" : ",",
+                                        (unsigned)sid,
+                                        (unsigned)relay_count,
+                                        (unsigned)input_count,
+                                        (unsigned)relay_start,
+                                        (unsigned)input_start);
+                        first = false;
+                    }
+                    if (pos >= scan_cap - 64) break; /* safety */
+                }
+
+                snprintf(scan_out + pos, scan_cap - pos, "]}");
+                httpd_resp_set_type(req, "application/json");
+                esp_err_t ret = httpd_resp_send(req, scan_out, strlen(scan_out));
+                free(scan_out);
+                return ret;
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* modbus/poll — read coils + discrete inputs for a given slave_id      */
+    /* POST body: {"slave_id":1}  (optional, uses config default)           */
+    /* ------------------------------------------------------------------ */
+    else if (strcmp(test_name, "modbus/poll") == 0) {
+        char body[128] = {0};
+        int body_len = httpd_req_recv(req, body, sizeof(body) - 1);
+        device_config_t *cfg = device_config_get();
+
+        uint8_t slave_id   = cfg ? cfg->modbus.slave_id   : 1;
+        uint16_t relay_start = cfg ? cfg->modbus.relay_start : 0;
+        uint16_t relay_count = cfg ? cfg->modbus.relay_count : 8;
+        uint16_t input_start = cfg ? cfg->modbus.input_start : 0;
+        uint16_t input_count = cfg ? cfg->modbus.input_count : 8;
+        if (relay_count > MODBUS_RELAY_MAX_POINTS) relay_count = MODBUS_RELAY_MAX_POINTS;
+        if (input_count > MODBUS_RELAY_MAX_POINTS) input_count = MODBUS_RELAY_MAX_POINTS;
+
+        if (body_len > 0) {
+            body[body_len] = '\0';
+            cJSON *root = cJSON_Parse(body);
+            if (root) {
+                cJSON *jsid = cJSON_GetObjectItem(root, "slave_id");
+                if (cJSON_IsNumber(jsid) && jsid->valueint >= 1) {
+                    slave_id = (uint8_t)jsid->valueint;
+                }
+                cJSON_Delete(root);
+            }
+        }
+
+        esp_err_t init_err = modbus_relay_init();
+        if (init_err != ESP_OK) {
+            snprintf(response, sizeof(response),
+                     "{\"status\":\"error\",\"error\":\"Init Modbus fallita\",\"err\":\"%s\"}",
+                     esp_err_to_name(init_err));
+        } else {
+            uint8_t relay_bits[MODBUS_RELAY_MAX_BYTES] = {0};
+            uint8_t input_bits[MODBUS_RELAY_MAX_BYTES] = {0};
+
+            esp_err_t err_co = modbus_relay_read_coils(slave_id, relay_start, relay_count,
+                                                       relay_bits, sizeof(relay_bits));
+            esp_err_t err_di = modbus_relay_read_discrete_inputs(slave_id, input_start, input_count,
+                                                                  input_bits, sizeof(input_bits));
+
+            const size_t poll_cap = 1024;
+            char *poll_out = malloc(poll_cap);
+            if (!poll_out) {
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"OOM\"}");
+            } else {
+                size_t pos = 0;
+                pos += snprintf(poll_out + pos, poll_cap - pos,
+                                "{\"status\":\"%s\",\"slave_id\":%u,",
+                                (err_co == ESP_OK || err_di == ESP_OK) ? "ok" : "error",
+                                (unsigned)slave_id);
+
+                /* relay array */
+                pos += snprintf(poll_out + pos, poll_cap - pos, "\"relays\":[");
+                for (uint16_t i = 0; i < relay_count; ++i) {
+                    uint8_t bit = (relay_bits[i / 8] >> (i % 8)) & 1;
+                    pos += snprintf(poll_out + pos, poll_cap - pos,
+                                    "%s%u", i ? "," : "", (unsigned)bit);
+                }
+
+                /* inputs array */
+                pos += snprintf(poll_out + pos, poll_cap - pos, "],\"inputs\":[");
+                for (uint16_t i = 0; i < input_count; ++i) {
+                    uint8_t bit = (input_bits[i / 8] >> (i % 8)) & 1;
+                    pos += snprintf(poll_out + pos, poll_cap - pos,
+                                    "%s%u", i ? "," : "", (unsigned)bit);
+                }
+
+                pos += snprintf(poll_out + pos, poll_cap - pos,
+                                "],\"err_co\":\"%s\",\"err_di\":\"%s\"}",
+                                esp_err_to_name(err_co), esp_err_to_name(err_di));
+
+                httpd_resp_set_type(req, "application/json");
+                esp_err_t ret = httpd_resp_send(req, poll_out, strlen(poll_out));
+                free(poll_out);
+                return ret;
+            }
+        }
     }
 
     else if (strcmp(test_name, "cctalk_start") == 0) {
@@ -465,6 +957,53 @@ esp_err_t api_test_handler(httpd_req_t *req)
         } else {
             serial_test_push_monitor_action("CCTALK", "STOP errore sequenza gettoniera");
             snprintf(response, sizeof(response), "{\"error\":\"Stop gettoniera fallito: %s\"}", esp_err_to_name(stop_err));
+        }
+    } else if (strcmp(test_name, "cctalk_retention_on") == 0 ||
+               strcmp(test_name, "cctalk_retention_off") == 0) {
+        bool retention_on = (strcmp(test_name, "cctalk_retention_on") == 0);
+        serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON richiesta" : "RETENZIONE OFF richiesta");
+
+        esp_err_t rs232_err = rs232_init();
+        if (rs232_err != ESP_OK) {
+            snprintf(response, sizeof(response),
+                     "{\"error\":\"Init RS232 fallita: %s\"}",
+                     esp_err_to_name(rs232_err));
+        } else {
+            esp_err_t cctalk_err = cctalk_driver_init();
+            if (cctalk_err != ESP_OK) {
+                snprintf(response, sizeof(response),
+                         "{\"error\":\"Init CCtalk fallita: %s\"}",
+                         esp_err_to_name(cctalk_err));
+            } else {
+                bool inhibit_ok = cctalk_modify_master_inhibit(CCTALK_DEFAULT_DEVICE_ADDR,
+                                                               retention_on,
+                                                               CCTALK_WEB_CMD_TIMEOUT_MS);
+                if (!inhibit_ok) {
+                    serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON FAIL" : "RETENZIONE OFF FAIL");
+                    snprintf(response, sizeof(response),
+                             "{\"error\":\"Comando ritenzione fallito\"}");
+                } else {
+                    uint8_t mask_low = 0;
+                    uint8_t mask_high = 0;
+                    bool status_ok = cctalk_request_inhibit_status(CCTALK_DEFAULT_DEVICE_ADDR,
+                                                                   &mask_low,
+                                                                   &mask_high,
+                                                                   CCTALK_WEB_CMD_TIMEOUT_MS);
+
+                    serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON ok" : "RETENZIONE OFF ok");
+                    if (status_ok) {
+                        snprintf(response, sizeof(response),
+                                 "{\"message\":\"Ritenzione %s\",\"mask_low\":%u,\"mask_high\":%u}",
+                                 retention_on ? "attivata" : "disattivata",
+                                 (unsigned)mask_low,
+                                 (unsigned)mask_high);
+                    } else {
+                        snprintf(response, sizeof(response),
+                                 "{\"message\":\"Ritenzione %s\"}",
+                                 retention_on ? "attivata" : "disattivata");
+                    }
+                }
+            }
         }
     }
 
@@ -583,9 +1122,13 @@ esp_err_t api_test_handler(httpd_req_t *req)
             } else {
                 int port = (port_raw && strcmp(port_raw, "rs485") == 0) ? CONFIG_APP_RS485_UART_PORT : CONFIG_APP_RS232_UART_PORT;
                 if (data_str) {
-                    if (port_raw && strcmp(port_raw, "rs485") == 0) rs485_init(); else rs232_init();
-                    serial_test_send_uart(port, data_str);
-                    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Inviato su %s\"}", port_raw);
+                    if (port_raw && strcmp(port_raw, "rs485") == 0 && modbus_relay_is_running()) {
+                        snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"RS485 occupata da Modbus\"}");
+                    } else {
+                        if (port_raw && strcmp(port_raw, "rs485") == 0) rs485_init(); else rs232_init();
+                        serial_test_send_uart(port, data_str);
+                        snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Inviato su %s\"}", port_raw);
+                    }
                 }
             }
             cJSON_Delete(root);

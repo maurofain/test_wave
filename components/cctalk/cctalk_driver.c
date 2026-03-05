@@ -31,6 +31,15 @@ static uint32_t s_poll_error_streak = 0;
 static char s_coin_id_cache[16][16] = {{0}};
 static bool s_coin_id_cache_valid[16] = {0};
 
+
+/**
+ * @brief Inizializza una volta lo stato CCTalk.
+ * 
+ * Questa funzione inizializza lo stato CCTalk una volta sola, controllando se la variabile di lock è già stata impostata.
+ * 
+ * @param [in/out] s_cctalk_state_lock Puntatore alla variabile di lock che indica se lo stato CCTalk è già stato inizializzato.
+ * @return Nessun valore di ritorno.
+ */
 static void cctalk_state_init_once(void)
 {
     if (!s_cctalk_state_lock) {
@@ -38,6 +47,15 @@ static void cctalk_state_init_once(void)
     }
 }
 
+
+/**
+ * @brief Esegue lo stato di prelievo CCTalk.
+ *
+ * Questa funzione gestisce lo stato di prelievo CCTalk, attendendo fino al timeout specificato.
+ *
+ * @param [in] timeout_ms Il timeout in millisecondi per l'attesa dello stato di prelievo.
+ * @return true se lo stato di prelievo è stato raggiunto entro il timeout, false altrimenti.
+ */
 static bool cctalk_state_take(uint32_t timeout_ms)
 {
     cctalk_state_init_once();
@@ -51,6 +69,15 @@ static bool cctalk_state_take(uint32_t timeout_ms)
     return (xSemaphoreTake(s_cctalk_state_lock, ticks) == pdTRUE);
 }
 
+
+/**
+ * @brief Gestisce lo stato di "give" del protocollo CCTalk.
+ * 
+ * Questa funzione controlla se lo stato di lock CCTalk è attivo.
+ * 
+ * @param [in/out] Nessun parametro di input/output.
+ * @return Nessun valore di ritorno.
+ */
 static void cctalk_state_give(void)
 {
     if (s_cctalk_state_lock) {
@@ -58,6 +85,15 @@ static void cctalk_state_give(void)
     }
 }
 
+
+/**
+ * @brief Cancella la cache degli ID delle monete.
+ * 
+ * Questa funzione svuota la cache che contiene gli ID delle monete rilevate.
+ * 
+ * @param Nessun parametro.
+ * @return Nessun valore di ritorno.
+ */
 static void cctalk_clear_coin_id_cache(void)
 {
     if (!cctalk_state_take(20)) {
@@ -81,6 +117,18 @@ static const char *cctalk_error_to_text(uint8_t code)
     }
 }
 
+
+/**
+ * @brief Ottiene etichetta del moneta da un canale CCTalk.
+ * 
+ * @param channel [in] Numero del canale CCTalk (1-16).
+ * @param out [out] Buffer per la stringa dell'etichetta del moneta.
+ * @param out_len [in] Dimensione del buffer di output.
+ * 
+ * @return true se l'operazione ha successo, false altrimenti.
+ * 
+ * @note La funzione controlla se il buffer di output è valido e se il numero del canale è compreso tra 1 e 16.
+ */
 static bool cctalk_fetch_coin_label(uint8_t channel, char *out, size_t out_len)
 {
     if (!out || out_len == 0U || channel == 0U || channel > 16U) {
@@ -114,6 +162,16 @@ static bool cctalk_fetch_coin_label(uint8_t channel, char *out, size_t out_len)
     return true;
 }
 
+
+/**
+ * @brief Gestisce la registrazione delle informazioni di avvio della batteria.
+ * 
+ * Questa funzione registra le informazioni di avvio della batteria, inclusi
+ * livelli di carica, temperatura e altre statistiche pertinenti.
+ * 
+ * @param [in] Nessun parametro di input.
+ * @return Nessun valore di ritorno.
+ */
 static void cctalk_log_powerup_info(void)
 {
     uint8_t status = 0;
@@ -234,6 +292,15 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
     }
 }
 
+
+/**
+ * @brief Esegue una singola iterazione del polling CCTalk.
+ *
+ * Questa funzione esegue una singola iterazione del polling CCTalk, gestendo le comunicazioni
+ * con dispositivi CCTalk collegati.
+ *
+ * @return Nessun valore di ritorno.
+ */
 static void cctalk_poll_once(void)
 {
     cctalk_buffer_t buffer = {0};
@@ -302,6 +369,18 @@ esp_err_t cctalk_driver_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Avvia il driver per l'acettore CCTalk.
+ *
+ * Questa funzione inizia il processo di accettazione per l'acettore CCTalk.
+ * Se il driver non è stato inizializzato, la funzione restituirà un errore.
+ *
+ * @return esp_err_t - Codice di errore che indica lo stato dell'operazione.
+ * @retval ESP_OK - Operazione completata con successo.
+ * @retval ESP_FAIL - Operazione fallita.
+ * @retval ESP_ERR_INVALID_STATE - Driver non inizializzato.
+ */
 esp_err_t cctalk_driver_start_acceptor(void)
 {
     if (!s_driver_initialized) {
@@ -349,6 +428,16 @@ esp_err_t cctalk_driver_start_acceptor(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Arresta l'acquisizione dei dati dal driver CCTalk.
+ * 
+ * Questa funzione si occupa di arrestare l'acquisizione dei dati dal driver CCTalk.
+ * Se il driver non è stato inizializzato, la funzione non ha alcun effetto.
+ * 
+ * @return esp_err_t - Codice di errore che indica il successo o la fallita dell'operazione.
+ * @param [in/out] - Non applicabile in questo caso.
+ */
 esp_err_t cctalk_driver_stop_acceptor(void)
 {
     if (!s_driver_initialized) {
@@ -374,6 +463,15 @@ esp_err_t cctalk_driver_stop_acceptor(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Controlla se l'acettore CCTalk è abilitato.
+ *
+ * Questa funzione verifica lo stato dell'acettore CCTalk e restituisce
+ * un valore booleano che indica se l'acettore è attualmente abilitato.
+ *
+ * @return true se l'acettore CCTalk è abilitato, false altrimenti.
+ */
 bool cctalk_driver_is_acceptor_enabled(void)
 {
     bool enabled = false;
@@ -410,6 +508,16 @@ esp_err_t cctalk_driver_init(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Avvia il driver del rifiutatore CCTalk.
+ *
+ * Questa funzione inizia il processo di accettazione del rifiutatore CCTalk.
+ *
+ * @return esp_err_t - Codice di errore che indica lo stato dell'operazione.
+ *         - ESP_OK: Operazione completata con successo.
+ *         - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t cctalk_driver_start_acceptor(void)
 {
     s_mock_acceptor_enabled = true;
@@ -417,6 +525,16 @@ esp_err_t cctalk_driver_start_acceptor(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Arresta l'acettatore CCTalk.
+ *
+ * Questa funzione interrompe il processo di accettazione CCTalk e libera eventuali risorse allocate.
+ *
+ * @return
+ * - ESP_OK: Operazione completata con successo.
+ * - ESP_FAIL: Operazione fallita.
+ */
 esp_err_t cctalk_driver_stop_acceptor(void)
 {
     s_mock_acceptor_enabled = false;
@@ -424,6 +542,15 @@ esp_err_t cctalk_driver_stop_acceptor(void)
     return ESP_OK;
 }
 
+
+/**
+ * @brief Controlla se l'acettore CCTalk è abilitato.
+ *
+ * Questa funzione verifica lo stato dell'acettore CCTalk e restituisce
+ * un valore booleano che indica se l'acettore è attualmente abilitato.
+ *
+ * @return true se l'acettore CCTalk è abilitato, false altrimenti.
+ */
 bool cctalk_driver_is_acceptor_enabled(void)
 {
     return s_mock_acceptor_enabled;

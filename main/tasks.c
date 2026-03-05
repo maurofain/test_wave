@@ -15,6 +15,7 @@
 #include "mdb.h"             // mdb_init + mdb_engine_run
 #include "sd_card.h"         // sd_card_init_monitor + sd_card_monitor_run
 #include "http_services.h"
+#include "modbus_relay.h"
 #include "freertos/idf_additions.h"
 #include <stdio.h>
 #include <string.h>
@@ -52,6 +53,12 @@ static bool s_last_customer_available = false;
 
 static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event);
 
+
+/**
+ * @brief Ottiene il timeout in millisecondi per la restituzione della lingua.
+ *
+ * @return uint32_t Il timeout in millisecondi.
+ */
 static uint32_t fsm_get_language_return_timeout_ms(void)
 {
     uint32_t timeout_ms = FSM_LANGUAGE_RETURN_DEFAULT_MS;
@@ -70,6 +77,13 @@ static uint32_t fsm_get_language_return_timeout_ms(void)
     return timeout_ms;
 }
 
+
+/**
+ * @brief Applica la gestione del timeout per il ritorno alla lingua.
+ * 
+ * @param [in] fsm Puntatore al contesto del finite state machine.
+ * @return Nessun valore di ritorno.
+ */
 static void fsm_apply_language_return_timeout(fsm_ctx_t *fsm)
 {
     if (!fsm) {
@@ -285,8 +299,49 @@ static void rs485_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
     TickType_t last_wake = xTaskGetTickCount();
+    esp_err_t last_init_err = ESP_OK;
+    esp_err_t last_poll_err = ESP_OK;
+
     while (true) {
-        vTaskDelayUntil(&last_wake, param->period_ticks);
+        device_config_t *cfg = device_config_get();
+        bool should_run_modbus = false;
+        uint32_t delay_ms = (uint32_t)pdTICKS_TO_MS(param->period_ticks);
+
+        if (cfg) {
+            should_run_modbus = (cfg->sensors.rs485_enabled && cfg->modbus.enabled);
+            if (cfg->modbus.poll_ms > 0U) {
+                delay_ms = cfg->modbus.poll_ms;
+            }
+        }
+
+        if (delay_ms < 20U) {
+            delay_ms = 20U;
+        }
+
+        if (should_run_modbus) {
+            esp_err_t init_err = modbus_relay_init();
+            if (init_err != ESP_OK) {
+                if (init_err != last_init_err) {
+                    ESP_LOGW(TAG, "[M] Modbus init RS485 fallita: %s", esp_err_to_name(init_err));
+                    last_init_err = init_err;
+                }
+            } else {
+                last_init_err = ESP_OK;
+                esp_err_t poll_err = modbus_relay_poll_once();
+                if (poll_err != ESP_OK && poll_err != last_poll_err) {
+                    ESP_LOGW(TAG, "[M] Modbus poll RS485 fallita: %s", esp_err_to_name(poll_err));
+                    last_poll_err = poll_err;
+                } else if (poll_err == ESP_OK) {
+                    last_poll_err = ESP_OK;
+                }
+            }
+        } else if (modbus_relay_is_running()) {
+            (void)modbus_relay_deinit();
+            last_init_err = ESP_OK;
+            last_poll_err = ESP_OK;
+        }
+
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(delay_ms));
     }
 }
 
@@ -762,6 +817,15 @@ static bool scanner_extract_clean_barcode(const char *raw_barcode, char *clean_b
     return true;
 }
 
+
+/**
+ * @brief Callback chiamata quando viene rilevato un barcode.
+ * 
+ * Questa funzione viene invocata quando il sistema rileva un barcode.
+ * 
+ * @param barcode [in] Il codice barcode rilevato.
+ * @return void Nessun valore di ritorno.
+ */
 static void scanner_on_barcode_cb(const char *barcode)
 {
     if (!barcode || barcode[0] == '\0') {
@@ -1179,7 +1243,7 @@ static task_param_t s_tasks[] = {
         .state = TASK_STATE_IDLE,
         .priority = 5,
         .core_id = 0,
-        .period_ticks = pdMS_TO_TICKS(10),
+        .period_ticks = pdMS_TO_TICKS(100),
         .task_fn = rs485_task,
         .stack_words = 4096,                  /* RISC-V: 4KB; skeleton con margine */
         .stack_caps = MALLOC_CAP_SPIRAM,

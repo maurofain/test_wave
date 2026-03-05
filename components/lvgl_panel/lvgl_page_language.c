@@ -37,6 +37,14 @@ static const panel_language_option_t s_panel_lang_opts[] = {
 
 static char s_selected_user_lang[8] = "it";
 
+
+/**
+ * @brief Imposta lo stile di un pulsante LVGL.
+ *
+ * @param btn Puntatore all'oggetto pulsante da stилиizzare.
+ * @param bg Colore di sfondo del pulsante.
+ * @return void Nessun valore di ritorno.
+ */
 static void btn_style(lv_obj_t *btn, lv_color_t bg)
 {
     lv_obj_set_style_bg_color(btn, bg, LV_PART_MAIN);
@@ -47,6 +55,15 @@ static void btn_style(lv_obj_t *btn, lv_color_t bg)
     lv_obj_set_style_pad_all(btn, 4, LV_PART_MAIN);
 }
 
+
+/**
+ * @brief Riabilita lo scanner del pannello.
+ *
+ * Questa funzione riabilita lo scanner del pannello utilizzando il contesto fornito.
+ *
+ * @param [in] context Il contesto utilizzato per riabilitare lo scanner.
+ * @return Nessun valore di ritorno.
+ */
 static void panel_reenable_scanner(const char *context)
 {
     esp_err_t on_err = usb_cdc_scanner_send_on_command();
@@ -73,6 +90,16 @@ static void panel_reenable_scanner(const char *context)
     }
 }
 
+
+/**
+ * @brief Applica la lingua selezionata in modo asincrono.
+ *
+ * Questa funzione si occupa dell'applicazione della lingua selezionata in modo asincrono.
+ * Il parametro 'arg' è un puntatore generico che può essere utilizzato per passare informazioni aggiuntive.
+ *
+ * @param [in] arg Puntatore generico contenente informazioni aggiuntive.
+ * @return Nessun valore di ritorno.
+ */
 static void panel_apply_selected_language_async(void *arg)
 {
     (void)arg;
@@ -93,6 +120,15 @@ static void panel_apply_selected_language_async(void *arg)
     lvgl_page_main_show();
 }
 
+
+/**
+ * @brief Gestisce l'evento del bottone di lingua.
+ *
+ * Questa funzione viene chiamata quando si verifica un evento sul bottone di lingua.
+ * 
+ * @param [in] e Puntatore all'evento generato dal bottone di lingua.
+ * @return Nessun valore di ritorno.
+ */
 static void on_lang_btn(lv_event_t *e)
 {
     lv_obj_t *btn = lv_event_get_target(e);
@@ -107,6 +143,13 @@ static void on_lang_btn(lv_event_t *e)
     lv_async_call(panel_apply_selected_language_async, NULL);
 }
 
+
+/** @brief Mostra la pagina di selezione della lingua.
+ *  
+ *  Questa funzione visualizza la pagina che consente all'utente di selezionare la lingua dell'applicazione.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void lvgl_page_language_show(void)
 {
     lv_obj_t *scr = lv_scr_act();

@@ -1,4 +1,5 @@
 #include "device_config.h"
+#include "i18n_map_defs.h"
 #include <stdint.h>
 
 /* Minimal forward declaration to avoid including web_ui_internal.h here.
@@ -24,6 +25,7 @@ char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id);
 static const char *TAG = "DEVICE_CFG";
 static const char *NVS_NAMESPACE = "device_config";
 static const char *UI_LANG_DEFAULT = "it";
+#define DEVICE_CFG_MODBUS_MAX_POINTS 64
 static const char *UI_TEXTS_DEFAULT_IT_JSON =
     "["
     "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"home\",\"text\":\"Home\"},"
@@ -60,108 +62,10 @@ static const char *_effective_lang(const char *language);
 static cJSON *s_i18n_lookup_cache = NULL;
 static char s_i18n_lookup_lang[8] = {0};
 
-/* Optional map cache (loaded from /spiffs/i18n_<lang>.map.json) */
-static cJSON *s_i18n_map_cache = NULL;
-static char s_i18n_map_lang[8] = {0};
-
-
-/**
- * @brief Cancella la cache del mappatore internazionale.
- * 
- * Questa funzione svuota la cache del mappatore internazionale, deallocando
- * eventuali risorse allocate e reimpostando il puntatore alla cache a NULL.
- * 
- * @param [in/out] s_i18n_map_cache Puntatore alla cache del mappatore internazionale.
- * @return void Nessun valore di ritorno.
- */
-static void _i18n_map_cache_clear(void)
-{
-    if (s_i18n_map_cache) {
-        cJSON_Delete(s_i18n_map_cache);
-        s_i18n_map_cache = NULL;
-    }
-    s_i18n_map_lang[0] = '\0';
-}
-
-
-/**
- * @brief Costruisce il percorso del file di mappatura i18n.
- *
- * @param [in] language Il codice del linguaggio per cui costruire il percorso.
- * @param [out] out Buffer in cui memorizzare il percorso del file.
- * @param [in] out_len Dimensione del buffer di output.
- *
- * @return void
- */
-static void _build_i18n_map_path(const char *language, char *out, size_t out_len)
-{
-    snprintf(out, out_len, "/spiffs/i18n_%s.map.json", _effective_lang(language));
-}
-
-
-/**
- * @brief Costruisce la mappa di cache per un determinato linguaggio.
- *
- * Questa funzione prende in input un puntatore a una stringa che rappresenta il codice del linguaggio
- * e costruisce una mappa di cache utilizzata per memorizzare i dati localizzati per quel linguaggio.
- *
- * @param [in] language Puntatore a una stringa che rappresenta il codice del linguaggio.
- * @return esp_err_t Valore di ritorno dell'operazione, ESP_OK in caso di successo, altrimenti un errore.
- */
-static esp_err_t _i18n_map_cache_build_for_lang(const char *language)
-{
-    const char *lang = _effective_lang(language);
-    if (s_i18n_map_cache && strcmp(s_i18n_map_lang, lang) == 0) {
-        return ESP_OK;
-    }
-
-    _i18n_map_cache_clear();
-
-    char path[64] = {0};
-    _build_i18n_map_path(lang, path, sizeof(path));
-
-    FILE *f = fopen(path, "r");
-    if (!f) {
-        return ESP_ERR_NOT_FOUND;
-    }
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (size <= 0) {
-        fclose(f);
-        return ESP_ERR_INVALID_SIZE;
-    }
-    char *buf = malloc((size_t)size + 1);
-    if (!buf) {
-        fclose(f);
-        return ESP_ERR_NO_MEM;
-    }
-    size_t r = fread(buf, 1, (size_t)size, f);
-    fclose(f);
-    if (r != (size_t)size) {
-        free(buf);
-        return ESP_ERR_INVALID_SIZE;
-    }
-    buf[size] = '\0';
-
-    cJSON *root = cJSON_Parse(buf);
-    free(buf);
-    if (!root) return ESP_ERR_INVALID_STATE;
-
-    s_i18n_map_cache = root;
-    strncpy(s_i18n_map_lang, lang, sizeof(s_i18n_map_lang) - 1);
-    s_i18n_map_lang[sizeof(s_i18n_map_lang) - 1] = '\0';
-    return ESP_OK;
-}
 
 
 /**
  * @brief Cancella la cache di ricerca internazionale.
- * 
- * Questa funzione svuota la cache di ricerca internazionale, se presente.
- * 
- * @param [in/out] s_i18n_lookup_cache Puntatore alla cache di ricerca internazionale.
- * @return void Nessun valore di ritorno.
  */
 static void _i18n_lookup_cache_clear(void)
 {
@@ -172,20 +76,6 @@ static void _i18n_lookup_cache_clear(void)
     s_i18n_lookup_lang[0] = '\0';
 }
 
-static const char *_lookup_map_text_from_id(cJSON *map_section, int id)
-{
-    if (!cJSON_IsObject(map_section) || id <= 0) {
-        return NULL;
-    }
-
-    char id_key[16] = {0};
-    snprintf(id_key, sizeof(id_key), "%d", id);
-    cJSON *item = cJSON_GetObjectItemCaseSensitive(map_section, id_key);
-    if (cJSON_IsString(item) && item->valuestring) {
-        return item->valuestring;
-    }
-    return NULL;
-}
 
 
 /**
@@ -305,12 +195,6 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
         return ESP_ERR_NO_MEM;
     }
 
-    cJSON *map_scopes = NULL;
-    cJSON *map_keys = NULL;
-    if (_i18n_map_cache_build_for_lang(lang) == ESP_OK && s_i18n_map_cache) {
-        map_scopes = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "scopes");
-        map_keys = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "keys");
-    }
 
     cJSON *item = NULL;
     cJSON_ArrayForEach(item, records) {
@@ -336,8 +220,8 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
             snprintf(scoped_key, sizeof(scoped_key), "%d.%d", scope_id, key_id);
             _append_json_text(aggregated, scoped_key, text->valuestring);
 
-            const char *scope_text = _lookup_map_text_from_id(map_scopes, scope_id);
-            const char *key_text = _lookup_map_text_from_id(map_keys, key_id);
+            const char *scope_text = i18n_scope_name(scope_id);
+            const char *key_text   = i18n_key_name(key_id);
             if (scope_text && !cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key)) {
                 cJSON_AddStringToObject(aggregated_scope, scoped_key, scope_text);
             }
@@ -697,6 +581,17 @@ static void _set_defaults(device_config_t *config)
     config->rs485.stop_bits = 1;
     config->rs485.rx_buf_size = 2048;
     config->rs485.tx_buf_size = 0;
+
+    // Default Modbus RTU su RS485
+    config->modbus.enabled = false;
+    config->modbus.slave_id = 1;
+    config->modbus.poll_ms = 100;
+    config->modbus.timeout_ms = 200;
+    config->modbus.retries = 2;
+    config->modbus.relay_start = 0;
+    config->modbus.relay_count = 8;
+    config->modbus.input_start = 0;
+    config->modbus.input_count = 8;
 
     // Default MDB Serial
     config->mdb_serial.baud_rate = 9600;
@@ -1187,6 +1082,75 @@ esp_err_t device_config_load(device_config_t *config)
                     config->rs485.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "rx_buf"));
                     config->rs485.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "tx_buf"));
                 }
+                cJSON *modbus_obj = cJSON_GetObjectItem(root, "modbus");
+                if (modbus_obj) {
+                    cJSON *enabled = cJSON_GetObjectItem(modbus_obj, "enabled");
+                    if (enabled) {
+                        config->modbus.enabled = cJSON_IsTrue(enabled);
+                    }
+
+                    cJSON *slave_id = cJSON_GetObjectItem(modbus_obj, "slave_id");
+                    if (slave_id && cJSON_IsNumber(slave_id)) {
+                        int val = slave_id->valueint;
+                        if (val < 1) val = 1;
+                        if (val > 255) val = 255;
+                        config->modbus.slave_id = (uint8_t)val;
+                    }
+
+                    cJSON *poll_ms = cJSON_GetObjectItem(modbus_obj, "poll_ms");
+                    if (poll_ms && cJSON_IsNumber(poll_ms)) {
+                        int val = poll_ms->valueint;
+                        if (val < 20) val = 20;
+                        if (val > 5000) val = 5000;
+                        config->modbus.poll_ms = (uint16_t)val;
+                    }
+
+                    cJSON *timeout_ms = cJSON_GetObjectItem(modbus_obj, "timeout_ms");
+                    if (timeout_ms && cJSON_IsNumber(timeout_ms)) {
+                        int val = timeout_ms->valueint;
+                        if (val < 50) val = 50;
+                        if (val > 2000) val = 2000;
+                        config->modbus.timeout_ms = (uint16_t)val;
+                    }
+
+                    cJSON *retries = cJSON_GetObjectItem(modbus_obj, "retries");
+                    if (retries && cJSON_IsNumber(retries)) {
+                        int val = retries->valueint;
+                        if (val < 0) val = 0;
+                        if (val > 5) val = 5;
+                        config->modbus.retries = (uint8_t)val;
+                    }
+
+                    cJSON *relay_start = cJSON_GetObjectItem(modbus_obj, "relay_start");
+                    if (relay_start && cJSON_IsNumber(relay_start)) {
+                        int val = relay_start->valueint;
+                        if (val < 0) val = 0;
+                        config->modbus.relay_start = (uint16_t)val;
+                    }
+
+                    cJSON *relay_count = cJSON_GetObjectItem(modbus_obj, "relay_count");
+                    if (relay_count && cJSON_IsNumber(relay_count)) {
+                        int val = relay_count->valueint;
+                        if (val < 1) val = 1;
+                        if (val > DEVICE_CFG_MODBUS_MAX_POINTS) val = DEVICE_CFG_MODBUS_MAX_POINTS;
+                        config->modbus.relay_count = (uint16_t)val;
+                    }
+
+                    cJSON *input_start = cJSON_GetObjectItem(modbus_obj, "input_start");
+                    if (input_start && cJSON_IsNumber(input_start)) {
+                        int val = input_start->valueint;
+                        if (val < 0) val = 0;
+                        config->modbus.input_start = (uint16_t)val;
+                    }
+
+                    cJSON *input_count = cJSON_GetObjectItem(modbus_obj, "input_count");
+                    if (input_count && cJSON_IsNumber(input_count)) {
+                        int val = input_count->valueint;
+                        if (val < 1) val = 1;
+                        if (val > DEVICE_CFG_MODBUS_MAX_POINTS) val = DEVICE_CFG_MODBUS_MAX_POINTS;
+                        config->modbus.input_count = (uint16_t)val;
+                    }
+                }
                 cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial");
                 if (mdb_s_obj) {
                     config->mdb_serial.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "baud"));
@@ -1376,6 +1340,19 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(rs485_obj, "rx_buf", config->rs485.rx_buf_size);
     cJSON_AddNumberToObject(rs485_obj, "tx_buf", config->rs485.tx_buf_size);
     cJSON_AddItemToObject(root, "rs485", rs485_obj);
+
+    // Modbus RTU
+    cJSON *modbus_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(modbus_obj, "enabled", config->modbus.enabled);
+    cJSON_AddNumberToObject(modbus_obj, "slave_id", config->modbus.slave_id);
+    cJSON_AddNumberToObject(modbus_obj, "poll_ms", config->modbus.poll_ms);
+    cJSON_AddNumberToObject(modbus_obj, "timeout_ms", config->modbus.timeout_ms);
+    cJSON_AddNumberToObject(modbus_obj, "retries", config->modbus.retries);
+    cJSON_AddNumberToObject(modbus_obj, "relay_start", config->modbus.relay_start);
+    cJSON_AddNumberToObject(modbus_obj, "relay_count", config->modbus.relay_count);
+    cJSON_AddNumberToObject(modbus_obj, "input_start", config->modbus.input_start);
+    cJSON_AddNumberToObject(modbus_obj, "input_count", config->modbus.input_count);
+    cJSON_AddItemToObject(root, "modbus", modbus_obj);
 
     // Seriale MDB
     cJSON *mdb_s_obj = cJSON_CreateObject();
@@ -1733,32 +1710,10 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* Prefer numeric lookup via PSRAM when we have a map and PSRAM dictionary loaded.
-       If that fails or map isn't present, fall back to the textual lookup cache. */
-    if (_i18n_map_cache_build_for_lang(NULL) == ESP_OK && s_i18n_map_cache) {
-        cJSON *scopes = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "scopes");
-        cJSON *keys = cJSON_GetObjectItemCaseSensitive(s_i18n_map_cache, "keys");
-        uint8_t scope_id = 0;
-        uint16_t key_id = 0;
-        if (cJSON_IsObject(scopes) && cJSON_IsObject(keys)) {
-            cJSON *it = NULL;
-            cJSON_ArrayForEach(it, scopes) {
-                if (!cJSON_IsString(it) || !it->valuestring) continue;
-                if (strcmp(it->valuestring, scope) == 0) {
-                    scope_id = (uint8_t)atoi(it->string);
-                    break;
-                }
-            }
-            cJSON *jt = NULL;
-            cJSON_ArrayForEach(jt, keys) {
-                if (!cJSON_IsString(jt) || !jt->valuestring) continue;
-                if (strcmp(jt->valuestring, key) == 0) {
-                    key_id = (uint16_t)atoi(jt->string);
-                    break;
-                }
-            }
-        }
-
+    /* Prefer numeric lookup via PSRAM when the dictionary is loaded. */
+    {
+        uint8_t  scope_id = (uint8_t)i18n_scope_id(scope);
+        uint16_t key_id   = (uint16_t)i18n_key_id(key);
         if (scope_id != 0 && key_id != 0) {
             char *concat = i18n_concat_from_psram(scope_id, key_id);
             if (concat) {

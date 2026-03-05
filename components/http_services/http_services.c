@@ -85,12 +85,28 @@ static void http_services_clear_token(const char *reason)
     ESP_LOGI(TAG, "[C] Token remoto azzerato (%s)", reason ? reason : "n/a");
 }
 
+
+/**
+ * @brief Controlla se i servizi HTTP sono abilitati per l'accesso remoto.
+ *
+ * Questa funzione verifica se i servizi HTTP sono configurati per consentire
+ * l'accesso remoto.
+ *
+ * @return true se i servizi HTTP sono abilitati per l'accesso remoto, false altrimenti.
+ */
 bool http_services_is_remote_enabled(void)
 {
     const device_config_t *cfg = device_config_get();
     return http_services_cfg_remote_enabled(cfg);
 }
 
+
+/**
+ * @brief Controlla se il servizio remoto HTTP è online.
+ * 
+ * @return true se il servizio remoto HTTP è online, false altrimenti.
+ * @param [in] Nessun parametro di input.
+ */
 bool http_services_is_remote_online(void)
 {
     if (!http_services_is_remote_enabled()) {
@@ -99,11 +115,27 @@ bool http_services_is_remote_online(void)
     return s_remote_online;
 }
 
+
+/**
+ * @brief Controlla se il servizio HTTP ha un token di autenticazione.
+ *
+ * @return true se il servizio HTTP ha un token di autenticazione, false altrimenti.
+ */
 bool http_services_has_auth_token(void)
 {
     return validate_token(g_auth_token);
 }
 
+
+/**
+ * @brief Sincronizza lo stato di runtime dei servizi HTTP.
+ *
+ * Questa funzione sincronizza lo stato di runtime dei servizi HTTP.
+ * Se il parametro force_login è true, la funzione forza il login prima di sincronizzare lo stato.
+ *
+ * @param [in] force_login Flag booleano che indica se forzare il login.
+ * @return esp_err_t Codice di errore.
+ */
 esp_err_t http_services_sync_runtime_state(bool force_login)
 {
     device_config_t *cfg = device_config_get();
@@ -694,6 +726,13 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 #endif
 }
 
+
+/**
+ * @brief Invia una richiesta HTTPD remota disabilitata.
+ *
+ * @param req Puntatore alla richiesta HTTPD.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t send_remote_disabled_httpd(httpd_req_t *req)
 {
     const char *resp = "{\"iserror\":true,\"codeerror\":503,\"deserror\":\"remote_disabled\"}";
@@ -1086,6 +1125,13 @@ static esp_err_t api_paymentoffline_post(httpd_req_t *req)
     return forward_post(req, "/api/paymentoffline", NULL, false);
 }
 
+
+/**
+ * @brief Verifica se è necessario eseguire il login HTTP e, in caso, esegue l'operazione.
+ *
+ * @param force_refresh Flag booleano che indica se il login deve essere forzato anche se non è necessario.
+ * @return esp_err_t Codice di errore che indica il risultato dell'operazione.
+ */
 static esp_err_t http_services_login_if_needed(bool force_refresh)
 {
     device_config_t *cfg = device_config_get();

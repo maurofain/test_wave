@@ -90,6 +90,15 @@ static char s_tr_credit[32] = "Credito";
 static char s_tr_elapsed_fmt[32] = "Secondi   %s";
 static char s_tr_pause_fmt[32] = "Pausa: %s";
 
+
+/**
+ * @brief Carica le traduzioni per il pannello.
+ * 
+ * Questa funzione carica le traduzioni necessarie per il pannello utilizzando la configurazione del dispositivo.
+ * 
+ * @param [in/out] s_tr_credit Puntatore alla stringa dove verrà memorizzata la traduzione del label "Credito".
+ * @return void
+ */
 static void panel_load_translations(void)
 {
     if (device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", s_tr_credit, sizeof(s_tr_credit)) != ESP_OK) {
@@ -106,6 +115,14 @@ static void panel_load_translations(void)
     }
 }
 
+
+/**
+ * @brief Imposta lo stile di un pulsante LVGL.
+ *
+ * @param btn Puntatore all'oggetto pulsante da stилиizzare.
+ * @param bg Colore di sfondo del pulsante.
+ * @return void
+ */
 static void btn_style(lv_obj_t *btn, lv_color_t bg)
 {
     lv_obj_set_style_bg_color(btn, bg, LV_PART_MAIN);
@@ -132,6 +149,13 @@ static const web_ui_program_entry_t *find_program_entry(uint8_t pid)
     return NULL;
 }
 
+
+/**
+ * @brief Aggiorna i pulsanti del programma in base allo stato corrente del contesto del finite state machine.
+ *
+ * @param [in] snap Puntatore al contesto del finite state machine.
+ * @return Nessun valore di ritorno.
+ */
 static void refresh_prog_buttons(const fsm_ctx_t *snap)
 {
     bool has_snap = (snap != NULL);
@@ -177,12 +201,29 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
     }
 }
 
+
+/**
+ * @brief Formatta un tempo in millisecondi in una stringa nel formato "mm:ss".
+ *
+ * @param [out] buf Puntatore al buffer dove verrà memorizzata la stringa formattata.
+ * @param len Lunghezza massima del buffer.
+ * @param ms Tempo in millisecondi da formattare.
+ *
+ * @return void
+ */
 static void fmt_mm_ss(char *buf, size_t len, uint32_t ms)
 {
     uint32_t s = ms / 1000;
     snprintf(buf, len, "%02lu:%02lu", (unsigned long)(s / 60), (unsigned long)(s % 60));
 }
 
+
+/**
+ * @brief Aggiorna il tempo e pubblica un messaggio se richiesto.
+ * 
+ * @param publish_minute_message Flag booleano che indica se pubblicare un messaggio ogni minuto.
+ * @return void Non restituisce alcun valore.
+ */
 static void update_time(bool publish_minute_message)
 {
     if (!s_time_lbl) {
@@ -225,12 +266,30 @@ static void update_time(bool publish_minute_message)
     }
 }
 
+
+/**
+ * @brief Callback per il timer del clock.
+ *
+ * Questa funzione viene chiamata periodicamente dal timer del clock.
+ *
+ * @param [in] t Puntatore al timer LVGL.
+ * @return Nessun valore di ritorno.
+ */
 static void clock_timer_cb(lv_timer_t *t)
 {
     (void)t;
     update_time(true);
 }
 
+
+/**
+ * @brief Aggiorna lo stato del contesto del finite state machine.
+ * 
+ * Questa funzione aggiorna lo stato del contesto del finite state machine utilizzando lo stato snapshot fornito.
+ * 
+ * @param [in] snap Puntatore al contesto del finite state machine da aggiornare.
+ * @return Nessun valore di ritorno.
+ */
 static void update_state(const fsm_ctx_t *snap)
 {
     if (!snap) {
@@ -315,6 +374,16 @@ static void update_state(const fsm_ctx_t *snap)
     }
 }
 
+
+/**
+ * @brief Pubblica un programma in base all'ID fornito e gestisce il pausa/toggle.
+ * 
+ * @param prog_id ID del programma da pubblicare.
+ * @param pause_toggle Flag per attivare/disattivare il pausa/toggle.
+ * @param entry Puntatore alla struttura del programma da pubblicare.
+ * @return true Se la pubblicazione è stata avviata con successo.
+ * @return false Se la pubblicazione non è stata avviata.
+ */
 static bool publish_program(uint8_t prog_id, bool pause_toggle, const web_ui_program_entry_t *entry)
 {
     if (!fsm_event_queue_init(0)) {
@@ -372,6 +441,15 @@ static bool publish_program(uint8_t prog_id, bool pause_toggle, const web_ui_pro
     return ok;
 }
 
+
+/**
+ * @brief Gestisce l'evento del pulsante di programmazione.
+ *
+ * Questa funzione viene chiamata quando viene generato un evento sul pulsante di programmazione.
+ *
+ * @param e Puntatore all'evento generato.
+ * @return Nessun valore di ritorno.
+ */
 static void on_prog_btn(lv_event_t *e)
 {
     lv_obj_t *btn = lv_event_get_target(e);
@@ -417,6 +495,13 @@ static void on_prog_btn(lv_event_t *e)
     publish_program(pid, pause_toggle, entry);
 }
 
+
+/**
+ * @brief Costruisce l'intestazione della schermata.
+ *
+ * @param scr Puntatore all'oggetto di schermata su cui costruire l'intestazione.
+ * @return void Nessun valore di ritorno.
+ */
 static void build_header(lv_obj_t *scr)
 {
     lv_obj_t *parent = s_center_box ? s_center_box : (s_status_box ? s_status_box : scr);
@@ -431,6 +516,12 @@ static void build_header(lv_obj_t *scr)
     lv_obj_align(s_time_lbl, LV_ALIGN_BOTTOM_MID, 0, -10);
 }
 
+
+/** @brief Costruisce lo stato dell'interfaccia utente.
+ *  
+ *  @param scr Puntatore all'oggetto di schermo su cui costruire lo stato.
+ *  @return Nessun valore di ritorno.
+ */
 static void build_status(lv_obj_t *scr)
 {
     s_credit_box = lv_obj_create(scr);
@@ -506,6 +597,21 @@ static void build_status(lv_obj_t *scr)
     lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_MID, 0, -8);
 }
 
+
+/**
+ * Crea un pulsante per un programma.
+ * 
+ * @brief Crea un pulsante per un programma all'interno di un oggetto genitore.
+ * 
+ * @param parent Puntatore all'oggetto genitore in cui verrà creato il pulsante.
+ * @param pid Identificatore del programma associato al pulsante.
+ * @param x Coordinata x dell'angolo superiore sinistro del pulsante.
+ * @param y Coordinata y dell'angolo superiore sinistro del pulsante.
+ * @param w Larghezza del pulsante.
+ * @param h Altezza del pulsante.
+ * 
+ * @return Niente.
+ */
 static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t y, int32_t w, int32_t h)
 {
     if (pid == 0 || pid > PROG_COUNT) {
@@ -537,6 +643,14 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     lv_obj_set_style_opa(btn, LV_OPA_50, LV_PART_MAIN);
 }
 
+
+/** @brief Costruisce i pulsanti del programma.
+ *  
+ *  Questa funzione si occupa di creare e configurare i pulsanti utilizzati
+ *  all'interno dell'interfaccia del programma.
+ *  
+ *  @return Niente.
+ */
 static void build_prog_buttons(void)
 {
     const int32_t btn_gap = 10;
@@ -555,6 +669,17 @@ static void build_prog_buttons(void)
     }
 }
 
+
+/**
+ * @brief Cancella tutti i gestori del pannello.
+ *
+ * Questa funzione rimuove tutti i gestori associati ai pannelli, liberando la memoria e
+ * preparando il sistema per una nuova sessione.
+ *
+ * @param [in/out] Nessun parametro specifico.
+ *
+ * @return Nessun valore di ritorno.
+ */
 static void clear_panel_handles(void)
 {
     s_time_lbl = NULL;
@@ -583,6 +708,13 @@ static void clear_panel_handles(void)
     s_last_minute_epoch = (time_t)-1;
 }
 
+
+/**
+ * @brief Callback chiamata quando scade il timer del pannello.
+ * 
+ * @param t Puntatore al timer LVGL.
+ * @return void Nessun valore di ritorno.
+ */
 static void panel_timer_cb(lv_timer_t *t)
 {
     (void)t;
@@ -594,6 +726,15 @@ static void panel_timer_cb(lv_timer_t *t)
     }
 }
 
+
+/**
+ * @brief Disattiva la pagina principale.
+ * 
+ * Questa funzione disattiva la pagina principale dell'interfaccia utente.
+ * 
+ * @param [in/out] Nessun parametro specifico.
+ * @return Nessun valore di ritorno.
+ */
 void lvgl_page_main_deactivate(void)
 {
     if (s_panel_timer) {
@@ -610,6 +751,13 @@ void lvgl_page_main_deactivate(void)
     s_active_prog = 0;
 }
 
+
+/** @brief Mostra la pagina principale dell'interfaccia grafica LVGL.
+ *  
+ *  Questa funzione visualizza la pagina principale dell'interfaccia grafica LVGL.
+ *  
+ *  @return Nessun valore di ritorno.
+ */
 void lvgl_page_main_show(void)
 {
     lv_obj_t *scr = lv_scr_act();
@@ -644,6 +792,15 @@ void lvgl_page_main_show(void)
     ESP_LOGI(TAG, "[C] Pagina principale LVGL visualizzata");
 }
 
+
+/**
+ * @brief Aggiorna i testi principali della pagina LVGL.
+ *
+ * Questa funzione si occupa di aggiornare i testi principali della pagina LVGL.
+ * Non ha parametri di input o output.
+ *
+ * @return Nessun valore di ritorno.
+ */
 void lvgl_page_main_refresh_texts(void)
 {
     panel_load_translations();

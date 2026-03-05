@@ -114,6 +114,16 @@ void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size
     }
 }
 
+
+/**
+ * @brief Esegue un'azione di monitoraggio sul seriale.
+ * 
+ * Questa funzione invia un'azione di monitoraggio al dispositivo seriale.
+ * 
+ * @param [in] label Etichetta associata all'azione di monitoraggio.
+ * @param [in] action Azione di monitoraggio da eseguire.
+ * @return void Nessun valore di ritorno.
+ */
 void serial_test_push_monitor_action(const char *label, const char *action) {
     if (!action) return;
     if (!s_monitor_mux) serial_test_init();

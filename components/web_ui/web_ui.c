@@ -73,6 +73,7 @@
 #define WEB_UI_CCTALK_STOP_BITS 1
 #define WEB_UI_CCTALK_RX_BUF    256
 #define WEB_UI_CCTALK_TX_BUF    256
+#define WEB_UI_MODBUS_MAX_POINTS 64
 
 /* Log store e handler spostati in components/web_ui/web_ui_logs.c */
 
@@ -735,6 +736,19 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(rs485, "tx_buf", cfg->rs485.tx_buf_size);
     cJSON_AddItemToObject(root, "rs485", rs485);
 
+    // Modbus RTU
+    cJSON *modbus = cJSON_CreateObject();
+    cJSON_AddBoolToObject(modbus, "enabled", cfg->modbus.enabled);
+    cJSON_AddNumberToObject(modbus, "slave_id", cfg->modbus.slave_id);
+    cJSON_AddNumberToObject(modbus, "poll_ms", cfg->modbus.poll_ms);
+    cJSON_AddNumberToObject(modbus, "timeout_ms", cfg->modbus.timeout_ms);
+    cJSON_AddNumberToObject(modbus, "retries", cfg->modbus.retries);
+    cJSON_AddNumberToObject(modbus, "relay_start", cfg->modbus.relay_start);
+    cJSON_AddNumberToObject(modbus, "relay_count", cfg->modbus.relay_count);
+    cJSON_AddNumberToObject(modbus, "input_start", cfg->modbus.input_start);
+    cJSON_AddNumberToObject(modbus, "input_count", cfg->modbus.input_count);
+    cJSON_AddItemToObject(root, "modbus", modbus);
+
     // MDB Serial
     cJSON *mdb_s = cJSON_CreateObject();
     cJSON_AddNumberToObject(mdb_s, "baud", cfg->mdb_serial.baud_rate);
@@ -1027,6 +1041,19 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddNumberToObject(rs485, "tx_buf", cfg->rs485.tx_buf_size);
     cJSON_AddItemToObject(root, "rs485", rs485);
 
+    // Modbus RTU
+    cJSON *modbus = cJSON_CreateObject();
+    cJSON_AddBoolToObject(modbus, "enabled", cfg->modbus.enabled);
+    cJSON_AddNumberToObject(modbus, "slave_id", cfg->modbus.slave_id);
+    cJSON_AddNumberToObject(modbus, "poll_ms", cfg->modbus.poll_ms);
+    cJSON_AddNumberToObject(modbus, "timeout_ms", cfg->modbus.timeout_ms);
+    cJSON_AddNumberToObject(modbus, "retries", cfg->modbus.retries);
+    cJSON_AddNumberToObject(modbus, "relay_start", cfg->modbus.relay_start);
+    cJSON_AddNumberToObject(modbus, "relay_count", cfg->modbus.relay_count);
+    cJSON_AddNumberToObject(modbus, "input_start", cfg->modbus.input_start);
+    cJSON_AddNumberToObject(modbus, "input_count", cfg->modbus.input_count);
+    cJSON_AddItemToObject(root, "modbus", modbus);
+
     // MDB Serial
     cJSON *mdb_s = cJSON_CreateObject();
     cJSON_AddNumberToObject(mdb_s, "baud", cfg->mdb_serial.baud_rate);
@@ -1252,6 +1279,74 @@ esp_err_t api_config_save(httpd_req_t *req)
         cfg->rs485.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "stop_bits"));
         cfg->rs485.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "rx_buf"));
         cfg->rs485.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "tx_buf"));
+    }
+
+    cJSON *modbus_obj = cJSON_GetObjectItem(root, "modbus");
+    if (modbus_obj) {
+        cJSON *enabled = cJSON_GetObjectItem(modbus_obj, "enabled");
+        if (enabled) cfg->modbus.enabled = cJSON_IsTrue(enabled);
+
+        cJSON *slave_id = cJSON_GetObjectItem(modbus_obj, "slave_id");
+        if (slave_id && cJSON_IsNumber(slave_id)) {
+            int val = slave_id->valueint;
+            if (val < 1) val = 1;
+            if (val > 255) val = 255;
+            cfg->modbus.slave_id = (uint8_t)val;
+        }
+
+        cJSON *poll_ms = cJSON_GetObjectItem(modbus_obj, "poll_ms");
+        if (poll_ms && cJSON_IsNumber(poll_ms)) {
+            int val = poll_ms->valueint;
+            if (val < 20) val = 20;
+            if (val > 5000) val = 5000;
+            cfg->modbus.poll_ms = (uint16_t)val;
+        }
+
+        cJSON *timeout_ms = cJSON_GetObjectItem(modbus_obj, "timeout_ms");
+        if (timeout_ms && cJSON_IsNumber(timeout_ms)) {
+            int val = timeout_ms->valueint;
+            if (val < 50) val = 50;
+            if (val > 2000) val = 2000;
+            cfg->modbus.timeout_ms = (uint16_t)val;
+        }
+
+        cJSON *retries = cJSON_GetObjectItem(modbus_obj, "retries");
+        if (retries && cJSON_IsNumber(retries)) {
+            int val = retries->valueint;
+            if (val < 0) val = 0;
+            if (val > 5) val = 5;
+            cfg->modbus.retries = (uint8_t)val;
+        }
+
+        cJSON *relay_start = cJSON_GetObjectItem(modbus_obj, "relay_start");
+        if (relay_start && cJSON_IsNumber(relay_start)) {
+            int val = relay_start->valueint;
+            if (val < 0) val = 0;
+            cfg->modbus.relay_start = (uint16_t)val;
+        }
+
+        cJSON *relay_count = cJSON_GetObjectItem(modbus_obj, "relay_count");
+        if (relay_count && cJSON_IsNumber(relay_count)) {
+            int val = relay_count->valueint;
+            if (val < 1) val = 1;
+            if (val > WEB_UI_MODBUS_MAX_POINTS) val = WEB_UI_MODBUS_MAX_POINTS;
+            cfg->modbus.relay_count = (uint16_t)val;
+        }
+
+        cJSON *input_start = cJSON_GetObjectItem(modbus_obj, "input_start");
+        if (input_start && cJSON_IsNumber(input_start)) {
+            int val = input_start->valueint;
+            if (val < 0) val = 0;
+            cfg->modbus.input_start = (uint16_t)val;
+        }
+
+        cJSON *input_count = cJSON_GetObjectItem(modbus_obj, "input_count");
+        if (input_count && cJSON_IsNumber(input_count)) {
+            int val = input_count->valueint;
+            if (val < 1) val = 1;
+            if (val > WEB_UI_MODBUS_MAX_POINTS) val = WEB_UI_MODBUS_MAX_POINTS;
+            cfg->modbus.input_count = (uint16_t)val;
+        }
     }
     // MDB cfg
     cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial");
@@ -1996,6 +2091,13 @@ static int runtime_stats_cmp_desc(const void *a, const void *b)
     return strcmp(na, nb);
 }
 
+
+/**
+ * @brief Gestisce la richiesta per ottenere le statistiche di runtime.
+ *
+ * @param req Puntatore alla richiesta HTTPD.
+ * @return esp_err_t Codice di errore.
+ */
 static esp_err_t runtime_stats_get_handler(httpd_req_t *req)
 {
 #if defined(CONFIG_FREERTOS_USE_TRACE_FACILITY) && (CONFIG_FREERTOS_USE_TRACE_FACILITY == 1) && \

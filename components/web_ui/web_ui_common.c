@@ -1,6 +1,7 @@
 #include "web_ui_internal.h"
 #include "webpages_embedded.h"
 #include "device_config.h"
+#include "i18n_map_defs.h"
 #include "app_version.h"
 #include "esp_log.h"
 #include "esp_http_client.h"
@@ -601,76 +602,6 @@ static bool append_table_mapping(cJSON *table, const char *key, const char *valu
     return true;
 }
 
-static cJSON *load_i18n_map_json(const char *language)
-{
-    char path[64] = {0};
-    const char *lang = (language && strlen(language) == 2) ? language : "it";
-    snprintf(path, sizeof(path), "/spiffs/i18n_%s.map.json", lang);
-
-    FILE *f = fopen(path, "r");
-    if (!f && strcmp(lang, "it") != 0)
-    {
-        snprintf(path, sizeof(path), "/spiffs/i18n_it.map.json");
-        f = fopen(path, "r");
-    }
-    if (!f)
-    {
-        return NULL;
-    }
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (size <= 0)
-    {
-        fclose(f);
-        return NULL;
-    }
-
-    char *buf = malloc((size_t)size + 1);
-    if (!buf)
-    {
-        fclose(f);
-        return NULL;
-    }
-
-    size_t read = fread(buf, 1, (size_t)size, f);
-    fclose(f);
-    if (read != (size_t)size)
-    {
-        free(buf);
-        return NULL;
-    }
-    buf[size] = '\0';
-
-    cJSON *root = cJSON_Parse(buf);
-    free(buf);
-    return root;
-}
-
-static const char *lookup_map_name(cJSON *map_root, const char *section_name, int id)
-{
-    if (!map_root || !section_name || id <= 0)
-    {
-        return NULL;
-    }
-
-    cJSON *section = cJSON_GetObjectItemCaseSensitive(map_root, section_name);
-    if (!cJSON_IsObject(section))
-    {
-        return NULL;
-    }
-
-    char id_key[16] = {0};
-    snprintf(id_key, sizeof(id_key), "%d", id);
-    cJSON *value = cJSON_GetObjectItemCaseSensitive(section, id_key);
-    if (cJSON_IsString(value) && value->valuestring)
-    {
-        return value->valuestring;
-    }
-    return NULL;
-}
-
 static char *build_i18n_table_json(const char *records_json, const char *base_records_json, const char *language)
 {
     if (!records_json)
@@ -719,8 +650,6 @@ static char *build_i18n_table_json(const char *records_json, const char *base_re
         return NULL;
     }
 
-    cJSON *map_root = load_i18n_map_json(language);
-
     cJSON *item = NULL;
     cJSON_ArrayForEach(item, records)
     {
@@ -750,8 +679,8 @@ static char *build_i18n_table_json(const char *records_json, const char *base_re
             snprintf(scoped_key, sizeof(scoped_key), "%d.%d", scope_id, key_id);
             append_table_mapping(target_lookup, scoped_key, text->valuestring);
 
-            const char *scope_text = lookup_map_name(map_root, "scopes", scope_id);
-            const char *key_text = lookup_map_name(map_root, "keys", key_id);
+            const char *scope_text = i18n_scope_name(scope_id);
+            const char *key_text   = i18n_key_name(key_id);
             if (scope_text && !cJSON_GetObjectItemCaseSensitive(target_scope_names, scoped_key))
             {
                 cJSON_AddStringToObject(target_scope_names, scoped_key, scope_text);
@@ -903,10 +832,6 @@ static char *build_i18n_table_json(const char *records_json, const char *base_re
     cJSON_Delete(target_key_names);
     cJSON_Delete(target_scope_names);
     cJSON_Delete(target_lookup);
-    if (map_root)
-    {
-        cJSON_Delete(map_root);
-    }
     cJSON_Delete(table);
     cJSON_Delete(records);
     return out;
@@ -936,8 +861,6 @@ static char *filter_i18n_records_json_for_scope(const char *records_json, const 
         return NULL;
     }
 
-    cJSON *map_root = load_i18n_map_json(language);
-
     cJSON *item = NULL;
     cJSON_ArrayForEach(item, root)
     {
@@ -954,7 +877,7 @@ static char *filter_i18n_records_json_for_scope(const char *records_json, const 
         }
         else if (cJSON_IsNumber(scope))
         {
-            scope_name = lookup_map_name(map_root, "scopes", scope->valueint);
+            scope_name = i18n_scope_name(scope->valueint);
         }
 
         if (scope_name && !i18n_scope_allowed(scope_name, page_scope))
@@ -973,10 +896,6 @@ static char *filter_i18n_records_json_for_scope(const char *records_json, const 
     }
 
     char *out = cJSON_PrintUnformatted(filtered);
-    if (map_root)
-    {
-        cJSON_Delete(map_root);
-    }
     cJSON_Delete(filtered);
     cJSON_Delete(root);
     return out;

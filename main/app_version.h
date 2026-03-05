@@ -1,7 +1,7 @@
 #ifndef APP_VERSION_H
 #define APP_VERSION_H
 
-#define APP_VERSION "1.3.35"
+#define APP_VERSION "1.4.0"
 #define APP_DATE    "2026-03-05"
 
 /* 1 = build APP, 0 = build FACTORY */
