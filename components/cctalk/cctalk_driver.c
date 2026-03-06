@@ -577,6 +577,11 @@ esp_err_t cctalk_driver_start_acceptor(void)
         return ESP_FAIL;
     }
 
+    if (!cctalk_modify_master_inhibit(acceptor_addr, false, CCTALK_CMD_TIMEOUT_MS)) {
+        serial_test_push_monitor_action("CCTALK", "Master Inhibit OFF FAIL");
+        return ESP_FAIL;
+    }
+
     {
         uint8_t mask_low = 0;
         uint8_t mask_high = 0;
@@ -596,7 +601,7 @@ esp_err_t cctalk_driver_start_acceptor(void)
         cctalk_state_give();
     }
 
-    serial_test_push_monitor_action("CCTALK", "GETTONIERA abilitata");
+    serial_test_push_monitor_action("CCTALK", "GETTONIERA abilitata (accettazione ON)");
     return ESP_OK;
 }
 
@@ -617,7 +622,7 @@ esp_err_t cctalk_driver_stop_acceptor(void)
     }
 
     uint8_t acceptor_addr = cctalk_get_acceptor_addr();
-    bool inhibit_ok = cctalk_modify_master_inhibit(acceptor_addr, false, CCTALK_CMD_TIMEOUT_MS);
+    bool inhibit_ok = cctalk_modify_master_inhibit(acceptor_addr, true, CCTALK_CMD_TIMEOUT_MS);
 
     if (cctalk_state_take(20)) {
         s_acceptor_enabled = false;
@@ -628,7 +633,7 @@ esp_err_t cctalk_driver_stop_acceptor(void)
     }
 
     if (!inhibit_ok) {
-        serial_test_push_monitor_action("CCTALK", "Master Inhibit OFF FAIL");
+        serial_test_push_monitor_action("CCTALK", "Master Inhibit ON FAIL");
         return ESP_FAIL;
     }
 

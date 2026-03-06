@@ -25,6 +25,7 @@ static SemaphoreHandle_t s_cctalk_lock = NULL;
 
 extern void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size_t len);
 extern bool dump_cctalk_log;
+extern bool enable_api_log;
 
 
 /**
@@ -203,7 +204,8 @@ static bool cctalk_send_frame_unlocked(uint8_t dest_addr,
     }
     packet[frame_len - 1U] = cctalk_checksum(packet, (uint8_t)(frame_len - 1U));
 
-    cctalk_log_hex_dump("TX", packet, frame_len);
+    /* Dump TX hex only when dump_cctalk_log or enable_api_log is true */
+    if (dump_cctalk_log || enable_api_log) cctalk_log_hex_dump("TX", packet, frame_len);
 
     int sent = uart_write_bytes(s_cctalk_uart_num, (const char *)packet, (size_t)frame_len);
     if (sent != (int)frame_len) {
@@ -272,7 +274,7 @@ static bool cctalk_receive_frame_unlocked(cctalk_frame_t *frame, uint32_t timeou
                 continue;
             }
 
-            cctalk_log_hex_dump("RX", raw, expected_len);
+            if (dump_cctalk_log || enable_api_log) cctalk_log_hex_dump("RX", raw, expected_len);
 
             frame->destination = raw[0];
             frame->data_len = raw[1];
@@ -759,19 +761,12 @@ bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uin
  */
 bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms)
 {
-    uint8_t data[2];
-    /* invia maschera a 2 byte: low = CH1..8, high = CH9..16 */
-    if (enable) {
-        /* abilitare tutti i canali => maschera 0x00 0x00 */
-        data[0] = 0x00U;
-        data[1] = 0x00U;
-    } else {
-        /* inibire tutti i canali => maschera 0xFF 0xFF */
-        data[0] = 0xFFU;
-        data[1] = 0xFFU;
-    }
+    /* enable=true: Master Inhibit ON (blocca monete) => [0]=Rifiuta
+     * enable=false: Master Inhibit OFF (accetta monete) => [1]=Accetta
+     * Ref: gettoniera.md header 231, [1]=Accetta [0]=Rifiuta */
+    uint8_t data = enable ? 0x00U : 0x01U;
     cctalk_frame_t response = {0};
-    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, data, 2U, &response, timeout_ms)) {
+    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, &data, 1U, &response, timeout_ms)) {
         return false;
     }
     return cctalk_expect_ack(&response);
@@ -791,7 +786,8 @@ bool cctalk_modify_inhibit_status(uint8_t dest_addr, uint8_t mask_low, uint8_t m
 {
     uint8_t data[2] = {mask_low, mask_high};
     cctalk_frame_t response = {0};
-    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, data, 2U, &response, timeout_ms)) {
+    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 134U, data, 2U, &response, timeout_ms)) {
+    //if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 99U, data, 2U, &response, timeout_ms)) {
         return false;
     }
     return cctalk_expect_ack(&response);

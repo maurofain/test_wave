@@ -101,6 +101,8 @@ esp_err_t api_config_save(httpd_req_t *req);
 esp_err_t api_config_backup(httpd_req_t *req);
 esp_err_t api_cctalk_log_txrx_get(httpd_req_t *req);
 esp_err_t api_cctalk_log_txrx_set(httpd_req_t *req);
+esp_err_t api_runtime_enable_api_log_get(httpd_req_t *req);
+esp_err_t api_runtime_enable_api_log_post(httpd_req_t *req);
 esp_err_t api_ui_texts_get(httpd_req_t *req);
 esp_err_t api_ui_languages_get(httpd_req_t *req);
 esp_err_t api_config_reset(httpd_req_t *req);

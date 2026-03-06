@@ -15,6 +15,8 @@
 bool send_http_log = false;
 /// @brief Abilita il dump dei log CCTalk in seriale per debug.
 bool dump_cctalk_log = false;
+/// @brief Abilita log API (GET/POST) temporaneo
+bool enable_api_log = false;
 
 static const char *TAG = "APP";
 #define LOG_CTX_PREFIX "[" COMPILE_LOG_PREFIX "]"

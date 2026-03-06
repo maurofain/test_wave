@@ -9,6 +9,7 @@
 
 /* Abilita il log delle chiamate HTTP /api (GET e POST) */
 extern bool send_http_log;
+extern bool enable_api_log;
 
 typedef enum {
 	INIT_AGENT_ERR_NONE = 0,

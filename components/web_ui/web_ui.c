@@ -2457,6 +2457,47 @@ static esp_err_t runtime_stats_get_handler(httpd_req_t *req)
 #endif /* DNA_SYS_MONITOR == 0 */
 
 
+esp_err_t api_runtime_enable_api_log_get(httpd_req_t *req)
+{
+    extern bool enable_api_log;
+    if (send_http_log) ESP_LOGI(TAG, "[C] GET /api/runtime/enable_api_log");
+    char resp[64];
+    snprintf(resp, sizeof(resp), "{\"enabled\":%s}", enable_api_log ? "true" : "false");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, resp, -1);
+}
+
+esp_err_t api_runtime_enable_api_log_post(httpd_req_t *req)
+{
+    extern bool enable_api_log;
+    char buf[128];
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Bad request", -1);
+    }
+    buf[ret] = '\0';
+    cJSON *root = cJSON_Parse(buf);
+    if (root) {
+        cJSON *item = cJSON_GetObjectItem(root, "enabled");
+        if (item) {
+            if (cJSON_IsBool(item)) enable_api_log = cJSON_IsTrue(item);
+            else if (cJSON_IsNumber(item)) enable_api_log = (item->valueint != 0);
+        }
+        cJSON_Delete(root);
+    } else {
+        if (strstr(buf, "true") != NULL) enable_api_log = true;
+        else enable_api_log = false;
+    }
+    /* Mirror to legacy flag so existing logging checks work */
+    send_http_log = enable_api_log;
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/runtime/enable_api_log -> true");
+    char resp[64];
+    snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"enabled\":%s}", enable_api_log ? "true" : "false");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, resp, -1);
+}
+
 /**
  * @brief Registra tutti gli endpoint HTTP del Web UI
  *
@@ -2553,6 +2594,12 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 
     httpd_uri_t uri_api_cctalk_log_set = {.uri = "/api/cctalk/log_txrx", .method = HTTP_POST, .handler = api_cctalk_log_txrx_set};
     httpd_register_uri_handler(server, &uri_api_cctalk_log_set);
+
+    /* Runtime flag: enable_api_log (GET/POST) */
+    httpd_uri_t uri_api_runtime_get = {.uri = "/api/runtime/enable_api_log", .method = HTTP_GET, .handler = api_runtime_enable_api_log_get};
+    httpd_register_uri_handler(server, &uri_api_runtime_get);
+    httpd_uri_t uri_api_runtime_post = {.uri = "/api/runtime/enable_api_log", .method = HTTP_POST, .handler = api_runtime_enable_api_log_post};
+    httpd_register_uri_handler(server, &uri_api_runtime_post);
 
     httpd_uri_t uri_api_ui_texts = {.uri = "/api/ui/texts", .method = HTTP_GET, .handler = api_ui_texts_get};
     httpd_register_uri_handler(server, &uri_api_ui_texts);
