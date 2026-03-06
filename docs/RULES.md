@@ -45,3 +45,5 @@
   attivare/disattivare rapidamente il comportamento simulato cambiando il
   valore del simbolo.
 
+
+- le modifiche alle pagine HTML vanno eseguite nel file sorgente `components/web_ui/webpages_embedded.c` e poi propagate ai file HTML eseguendo lo script `scripts/export_embedded_pages.py`; non modificare mai i file HTML in `data/www/` o `build/exported_www_subset/` direttamente.

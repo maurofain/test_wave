@@ -109,6 +109,13 @@ typedef struct {
 } device_modbus_config_t;
 
 /**
+ * @brief Struttura di configurazione CCtalk
+ */
+typedef struct {
+    uint8_t address;         ///< Indirizzo gettoniera CCtalk (1..255)
+} device_cctalk_config_t;
+
+/**
  * @brief Configurazione GPIO configurabili (GPIO33)
  */
 typedef enum {
@@ -188,6 +195,7 @@ typedef struct {
     device_serial_config_t rs232;       ///< Configurazione RS232
     device_serial_config_t rs485;       ///< Configurazione RS485
     device_modbus_config_t modbus;      ///< Configurazione Modbus RTU su RS485
+    device_cctalk_config_t cctalk;      ///< Configurazione CCtalk
     device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB
     device_gpios_config_t gpios;        ///< Configurazione GPIO extra
     device_ui_texts_config_t ui;        ///< Configurazione testi UI multilingua

@@ -74,6 +74,150 @@
 #define WEB_UI_CCTALK_RX_BUF    256
 #define WEB_UI_CCTALK_TX_BUF    256
 #define WEB_UI_MODBUS_MAX_POINTS 64
+#define WEB_UI_SERIAL_BAUD_MIN 300
+#define WEB_UI_SERIAL_BAUD_MAX 3000000
+#define WEB_UI_SERIAL_DATA_BITS_MIN 5
+#define WEB_UI_SERIAL_DATA_BITS_MAX 8
+#define WEB_UI_SERIAL_PARITY_MIN 0
+#define WEB_UI_SERIAL_PARITY_MAX 2
+#define WEB_UI_SERIAL_STOP_BITS_MIN 1
+#define WEB_UI_SERIAL_STOP_BITS_MAX 2
+#define WEB_UI_SERIAL_RX_BUF_MIN 64
+#define WEB_UI_SERIAL_BUF_MAX 65536
+
+static const device_serial_config_t s_web_ui_serial_default_rs232 = {
+    .baud_rate = 9600,
+    .data_bits = 8,
+    .parity = 0,
+    .stop_bits = 1,
+    .rx_buf_size = 2048,
+    .tx_buf_size = 0,
+};
+
+static const device_serial_config_t s_web_ui_serial_default_rs485 = {
+    .baud_rate = 9600,
+    .data_bits = 8,
+    .parity = 0,
+    .stop_bits = 1,
+    .rx_buf_size = 2048,
+    .tx_buf_size = 0,
+};
+
+static const device_serial_config_t s_web_ui_serial_default_mdb = {
+    .baud_rate = 9600,
+    .data_bits = 8,
+    .parity = 0,
+    .stop_bits = 1,
+    .rx_buf_size = 1024,
+    .tx_buf_size = 1024,
+};
+
+
+/**
+ * @brief Legge un intero da un oggetto JSON con chiave primaria/legacy.
+ *
+ * @param [in] obj Oggetto JSON sorgente.
+ * @param [in] primary_key Chiave principale.
+ * @param [in] legacy_key Chiave legacy opzionale.
+ * @param [out] out_value Valore estratto.
+ * @return true Se il campo è presente e numerico.
+ * @return false Altrimenti.
+ */
+static bool web_ui_json_read_int(cJSON *obj,
+                                 const char *primary_key,
+                                 const char *legacy_key,
+                                 int *out_value)
+{
+    if (!obj || !primary_key || !out_value) {
+        return false;
+    }
+
+    cJSON *item = cJSON_GetObjectItem(obj, primary_key);
+    if ((!item || !cJSON_IsNumber(item)) && legacy_key) {
+        item = cJSON_GetObjectItem(obj, legacy_key);
+    }
+
+    if (!item || !cJSON_IsNumber(item)) {
+        return false;
+    }
+
+    *out_value = item->valueint;
+    return true;
+}
+
+
+/**
+ * @brief Valida un valore intero e applica fallback se fuori range.
+ *
+ * @param [in] value Valore da validare.
+ * @param [in] min_value Limite minimo incluso.
+ * @param [in] max_value Limite massimo incluso.
+ * @param [in] default_value Fallback se valore non valido.
+ * @return int Valore finale validato.
+ */
+static int web_ui_clamp_int_or_default(int value, int min_value, int max_value, int default_value)
+{
+    if (value < min_value || value > max_value) {
+        return default_value;
+    }
+    return value;
+}
+
+
+/**
+ * @brief Applica parsing robusto della configurazione seriale da JSON.
+ *
+ * @param [in] serial_obj Oggetto JSON con campi seriali.
+ * @param [in/out] target Destinazione da aggiornare.
+ * @param [in] defaults Valori fallback per campi invalidi.
+ */
+static void web_ui_apply_serial_cfg_from_json(cJSON *serial_obj,
+                                              device_serial_config_t *target,
+                                              const device_serial_config_t *defaults)
+{
+    if (!serial_obj || !target || !defaults) {
+        return;
+    }
+
+    int value = 0;
+
+    if (web_ui_json_read_int(serial_obj, "baud", "baud_rate", &value)) {
+        target->baud_rate = web_ui_clamp_int_or_default(value,
+                                                        WEB_UI_SERIAL_BAUD_MIN,
+                                                        WEB_UI_SERIAL_BAUD_MAX,
+                                                        defaults->baud_rate);
+    }
+    if (web_ui_json_read_int(serial_obj, "data_bits", NULL, &value)) {
+        target->data_bits = web_ui_clamp_int_or_default(value,
+                                                        WEB_UI_SERIAL_DATA_BITS_MIN,
+                                                        WEB_UI_SERIAL_DATA_BITS_MAX,
+                                                        defaults->data_bits);
+    }
+    if (web_ui_json_read_int(serial_obj, "parity", NULL, &value)) {
+        target->parity = web_ui_clamp_int_or_default(value,
+                                                     WEB_UI_SERIAL_PARITY_MIN,
+                                                     WEB_UI_SERIAL_PARITY_MAX,
+                                                     defaults->parity);
+    }
+    if (web_ui_json_read_int(serial_obj, "stop_bits", NULL, &value)) {
+        target->stop_bits = web_ui_clamp_int_or_default(value,
+                                                        WEB_UI_SERIAL_STOP_BITS_MIN,
+                                                        WEB_UI_SERIAL_STOP_BITS_MAX,
+                                                        defaults->stop_bits);
+    }
+    if (web_ui_json_read_int(serial_obj, "rx_buf", "rx_buf_size", &value)) {
+        target->rx_buf_size = web_ui_clamp_int_or_default(value,
+                                                          WEB_UI_SERIAL_RX_BUF_MIN,
+                                                          WEB_UI_SERIAL_BUF_MAX,
+                                                          defaults->rx_buf_size);
+    }
+    if (web_ui_json_read_int(serial_obj, "tx_buf", "tx_buf_size", &value)) {
+        target->tx_buf_size = web_ui_clamp_int_or_default(value,
+                                                          0,
+                                                          WEB_UI_SERIAL_BUF_MAX,
+                                                          defaults->tx_buf_size);
+    }
+}
 
 /* Log store e handler spostati in components/web_ui/web_ui_logs.c */
 
@@ -86,6 +230,7 @@
 // Handle dei task di test per Serial Blink Test
 TaskHandle_t s_rs232_test_handle = NULL;
 TaskHandle_t s_rs485_test_handle = NULL;
+extern bool dump_cctalk_log;
 
 /**
  * @brief Estrae il codice lingua da un nome file i18n_<lang>.json
@@ -645,6 +790,101 @@ esp_err_t api_debug_usb_restart(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * @brief Legge lo stato runtime del log CCTALK TX/RX.
+ *
+ * Endpoint: `GET /api/cctalk/log_txrx`
+ */
+esp_err_t api_cctalk_log_txrx_get(httpd_req_t *req)
+{
+    if (send_http_log) ESP_LOGD(TAG, "[C] GET /api/cctalk/log_txrx");
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    cJSON_AddStringToObject(root, "status", "ok");
+    cJSON_AddBoolToObject(root, "enabled", dump_cctalk_log);
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
+/**
+ * @brief Aggiorna lo stato runtime del log CCTALK TX/RX (non persistente).
+ *
+ * Endpoint: `POST /api/cctalk/log_txrx` body JSON `{enabled:true|false}`
+ */
+esp_err_t api_cctalk_log_txrx_set(httpd_req_t *req)
+{
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/cctalk/log_txrx");
+
+    char body[128] = {0};
+    int received = httpd_req_recv(req, body, sizeof(body) - 1);
+    if (received <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"empty body\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    body[received] = '\0';
+
+    cJSON *root = cJSON_Parse(body);
+    if (!root) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"invalid json\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    cJSON *enabled = cJSON_GetObjectItem(root, "enabled");
+    bool new_state = false;
+    if (cJSON_IsBool(enabled)) {
+        new_state = cJSON_IsTrue(enabled);
+    } else if (cJSON_IsNumber(enabled)) {
+        new_state = (enabled->valueint != 0);
+    } else {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"missing/invalid enabled\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    dump_cctalk_log = new_state;
+    cJSON_Delete(root);
+
+    ESP_LOGI(TAG,
+             "[C] CCTALK Log TX/RX %s",
+             dump_cctalk_log ? "abilitato" : "disabilitato");
+
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    cJSON_AddStringToObject(resp, "status", "ok");
+    cJSON_AddBoolToObject(resp, "enabled", dump_cctalk_log);
+
+    char *json = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
 // Handler API GET /api/config
 
 /**
@@ -767,8 +1007,13 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(cctalk_s, "stop_bits", WEB_UI_CCTALK_STOP_BITS);
     cJSON_AddNumberToObject(cctalk_s, "rx_buf", WEB_UI_CCTALK_RX_BUF);
     cJSON_AddNumberToObject(cctalk_s, "tx_buf", WEB_UI_CCTALK_TX_BUF);
+    cJSON_AddNumberToObject(cctalk_s, "addr", cfg->cctalk.address);
     cJSON_AddBoolToObject(cctalk_s, "read_only", true);
     cJSON_AddItemToObject(root, "cctalk_serial", cctalk_s);
+
+    cJSON *cctalk_cfg = cJSON_CreateObject();
+    cJSON_AddNumberToObject(cctalk_cfg, "address", cfg->cctalk.address);
+    cJSON_AddItemToObject(root, "cctalk", cctalk_cfg);
 
     // GPIOs
     cJSON *gpios = cJSON_CreateObject();
@@ -1072,8 +1317,13 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddNumberToObject(cctalk_s, "stop_bits", WEB_UI_CCTALK_STOP_BITS);
     cJSON_AddNumberToObject(cctalk_s, "rx_buf", WEB_UI_CCTALK_RX_BUF);
     cJSON_AddNumberToObject(cctalk_s, "tx_buf", WEB_UI_CCTALK_TX_BUF);
+    cJSON_AddNumberToObject(cctalk_s, "addr", cfg->cctalk.address);
     cJSON_AddBoolToObject(cctalk_s, "read_only", true);
     cJSON_AddItemToObject(root, "cctalk_serial", cctalk_s);
+
+    cJSON *cctalk_cfg = cJSON_CreateObject();
+    cJSON_AddNumberToObject(cctalk_cfg, "address", cfg->cctalk.address);
+    cJSON_AddItemToObject(root, "cctalk", cctalk_cfg);
 
     // UI multilingua
     cJSON *ui = cJSON_CreateObject();
@@ -1263,22 +1513,16 @@ esp_err_t api_config_save(httpd_req_t *req)
     // RS232 cfg
     cJSON *rs232_obj = cJSON_GetObjectItem(root, "rs232");
     if (rs232_obj) {
-        cfg->rs232.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "baud"));
-        cfg->rs232.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "data_bits"));
-        cfg->rs232.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "parity"));
-        cfg->rs232.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "stop_bits"));
-        cfg->rs232.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "rx_buf"));
-        cfg->rs232.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "tx_buf"));
+        web_ui_apply_serial_cfg_from_json(rs232_obj,
+                                          &cfg->rs232,
+                                          &s_web_ui_serial_default_rs232);
     }
     // RS485 cfg
     cJSON *rs485_obj = cJSON_GetObjectItem(root, "rs485");
     if (rs485_obj) {
-        cfg->rs485.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "baud"));
-        cfg->rs485.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "data_bits"));
-        cfg->rs485.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "parity"));
-        cfg->rs485.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "stop_bits"));
-        cfg->rs485.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "rx_buf"));
-        cfg->rs485.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "tx_buf"));
+        web_ui_apply_serial_cfg_from_json(rs485_obj,
+                                          &cfg->rs485,
+                                          &s_web_ui_serial_default_rs485);
     }
 
     cJSON *modbus_obj = cJSON_GetObjectItem(root, "modbus");
@@ -1348,15 +1592,35 @@ esp_err_t api_config_save(httpd_req_t *req)
             cfg->modbus.input_count = (uint16_t)val;
         }
     }
+
+    cJSON *cctalk_obj = cJSON_GetObjectItem(root, "cctalk");
+    if (cctalk_obj) {
+        cJSON *address = cJSON_GetObjectItem(cctalk_obj, "address");
+        if (address && cJSON_IsNumber(address)) {
+            int val = address->valueint;
+            if (val < 1) val = 1;
+            if (val > 255) val = 255;
+            cfg->cctalk.address = (uint8_t)val;
+        }
+    }
+
+    cJSON *cctalk_serial_obj = cJSON_GetObjectItem(root, "cctalk_serial");
+    if (cctalk_serial_obj) {
+        cJSON *addr = cJSON_GetObjectItem(cctalk_serial_obj, "addr");
+        if (addr && cJSON_IsNumber(addr)) {
+            int val = addr->valueint;
+            if (val < 1) val = 1;
+            if (val > 255) val = 255;
+            cfg->cctalk.address = (uint8_t)val;
+        }
+    }
+
     // MDB cfg
     cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial");
     if (mdb_s_obj) {
-        cfg->mdb_serial.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "baud"));
-        cfg->mdb_serial.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "data_bits"));
-        cfg->mdb_serial.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "parity"));
-        cfg->mdb_serial.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "stop_bits"));
-        cfg->mdb_serial.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "rx_buf"));
-        cfg->mdb_serial.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "tx_buf"));
+        web_ui_apply_serial_cfg_from_json(mdb_s_obj,
+                                          &cfg->mdb_serial,
+                                          &s_web_ui_serial_default_mdb);
     }
 
     // Remote logging configuration
@@ -2283,6 +2547,12 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     // API
     httpd_uri_t uri_api_get = {.uri = "/api/config", .method = HTTP_GET, .handler = api_config_get};
     httpd_register_uri_handler(server, &uri_api_get);
+
+    httpd_uri_t uri_api_cctalk_log_get = {.uri = "/api/cctalk/log_txrx", .method = HTTP_GET, .handler = api_cctalk_log_txrx_get};
+    httpd_register_uri_handler(server, &uri_api_cctalk_log_get);
+
+    httpd_uri_t uri_api_cctalk_log_set = {.uri = "/api/cctalk/log_txrx", .method = HTTP_POST, .handler = api_cctalk_log_txrx_set};
+    httpd_register_uri_handler(server, &uri_api_cctalk_log_set);
 
     httpd_uri_t uri_api_ui_texts = {.uri = "/api/ui/texts", .method = HTTP_GET, .handler = api_ui_texts_get};
     httpd_register_uri_handler(server, &uri_api_ui_texts);

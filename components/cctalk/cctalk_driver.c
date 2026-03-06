@@ -1,4 +1,5 @@
 #include "cctalk.h"
+#include "device_config.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -10,6 +11,7 @@
 static const char *TAG = "CCTALK_DRV";
 
 extern void serial_test_push_monitor_action(const char *tag, const char *message);
+extern bool dump_cctalk_log;
 
 #ifndef DNA_CCTALK
 #define DNA_CCTALK 0
@@ -18,7 +20,6 @@ extern void serial_test_push_monitor_action(const char *tag, const char *message
 /* Codice reale — escluso se mockup attivo */
 #if DNA_CCTALK == 0
 
-#define CCTALK_COIN_ACCEPTOR_ADDR  (0x02U)
 #define CCTALK_CMD_TIMEOUT_MS      (700U)
 #define CCTALK_POLL_INTERVAL_MS    (250U)
 
@@ -30,6 +31,22 @@ static uint8_t s_last_event_counter = 0;
 static uint32_t s_poll_error_streak = 0;
 static char s_coin_id_cache[16][16] = {{0}};
 static bool s_coin_id_cache_valid[16] = {0};
+
+
+/**
+ * @brief Restituisce l'indirizzo CCtalk configurato per la gettoniera.
+ *
+ * @return uint8_t Indirizzo dispositivo (default 0x02 se non configurato).
+ */
+static uint8_t cctalk_get_acceptor_addr(void)
+{
+    uint8_t addr = CCTALK_DEFAULT_DEVICE_ADDR;
+    device_config_t *cfg = device_config_get();
+    if (cfg && cfg->cctalk.address >= 1U) {
+        addr = cfg->cctalk.address;
+    }
+    return addr;
+}
 
 
 /**
@@ -117,6 +134,115 @@ static const char *cctalk_error_to_text(uint8_t code)
     }
 }
 
+static uint8_t cctalk_event_counter_delta(uint8_t previous_counter, uint8_t current_counter)
+{
+    return (uint8_t)(current_counter - previous_counter);
+}
+
+static void cctalk_log_buffered_credit_dump(const cctalk_buffer_t *buffer,
+                                            bool previous_counter_valid,
+                                            uint8_t previous_counter)
+{
+    if (!buffer || !dump_cctalk_log) {
+        return;
+    }
+
+    char log_line[224] = {0};
+    size_t offset = 0U;
+    int written = snprintf(log_line + offset,
+                           sizeof(log_line) - offset,
+                           "[C] 229 ev=%u",
+                           (unsigned)buffer->event_counter);
+    if (written < 0) {
+        return;
+    }
+    offset += (size_t)written;
+    if (offset >= sizeof(log_line)) {
+        log_line[sizeof(log_line) - 1U] = '\0';
+        ESP_LOGI(TAG, "%s", log_line);
+        return;
+    }
+
+    if (previous_counter_valid) {
+        uint8_t delta = cctalk_event_counter_delta(previous_counter, buffer->event_counter);
+        written = snprintf(log_line + offset,
+                           sizeof(log_line) - offset,
+                           " prev=%u delta=%u",
+                           (unsigned)previous_counter,
+                           (unsigned)delta);
+    } else {
+        written = snprintf(log_line + offset, sizeof(log_line) - offset, " prev=NA");
+    }
+
+    if (written < 0) {
+        return;
+    }
+    offset += (size_t)written;
+    if (offset >= sizeof(log_line)) {
+        log_line[sizeof(log_line) - 1U] = '\0';
+        ESP_LOGI(TAG, "%s", log_line);
+        return;
+    }
+
+    for (size_t i = 0; i < 5 && offset < sizeof(log_line); ++i) {
+        written = snprintf(log_line + offset,
+                           sizeof(log_line) - offset,
+                           " [%u:%u/%u]",
+                           (unsigned)(i + 1U),
+                           (unsigned)buffer->events[i].coin_id,
+                           (unsigned)buffer->events[i].error_code);
+        if (written < 0) {
+            return;
+        }
+
+        offset += (size_t)written;
+        if (offset >= sizeof(log_line)) {
+            log_line[sizeof(log_line) - 1U] = '\0';
+            break;
+        }
+    }
+
+    ESP_LOGI(TAG, "%s", log_line);
+}
+
+static void cctalk_push_buffered_credit_hex_action(const cctalk_buffer_t *buffer)
+{
+    if (!buffer) {
+        return;
+    }
+
+    uint8_t payload[11] = {0};
+    payload[0] = buffer->event_counter;
+    for (size_t i = 0; i < 5U; ++i) {
+        size_t base = 1U + (i * 2U);
+        payload[base] = buffer->events[i].coin_id;
+        payload[base + 1U] = buffer->events[i].error_code;
+    }
+
+    char msg[64] = {0};
+    size_t offset = 0U;
+    int written = snprintf(msg, sizeof(msg), "RX229 HEX");
+    if (written < 0) {
+        return;
+    }
+    offset = (size_t)written;
+
+    for (size_t i = 0; i < sizeof(payload) && offset < sizeof(msg); ++i) {
+        written = snprintf(msg + offset, sizeof(msg) - offset, " %02X", payload[i]);
+        if (written < 0) {
+            return;
+        }
+        size_t wrote_size = (size_t)written;
+        if (wrote_size >= (sizeof(msg) - offset)) {
+            msg[sizeof(msg) - 1U] = '\0';
+            break;
+        }
+        offset += wrote_size;
+    }
+
+    serial_test_push_monitor_action("CCTALK", msg);
+}
+
 
 /**
  * @brief Ottiene etichetta del moneta da un canale CCTalk.
@@ -148,7 +274,8 @@ static bool cctalk_fetch_coin_label(uint8_t channel, char *out, size_t out_len)
     }
 
     char label[16] = {0};
-    if (!cctalk_request_coin_id(CCTALK_COIN_ACCEPTOR_ADDR, channel, label, sizeof(label), CCTALK_CMD_TIMEOUT_MS)) {
+    uint8_t acceptor_addr = cctalk_get_acceptor_addr();
+    if (!cctalk_request_coin_id(acceptor_addr, channel, label, sizeof(label), CCTALK_CMD_TIMEOUT_MS)) {
         return false;
     }
 
@@ -174,40 +301,41 @@ static bool cctalk_fetch_coin_label(uint8_t channel, char *out, size_t out_len)
  */
 static void cctalk_log_powerup_info(void)
 {
+    uint8_t acceptor_addr = cctalk_get_acceptor_addr();
     uint8_t status = 0;
     char text[64] = {0};
 
-    if (cctalk_request_status(CCTALK_COIN_ACCEPTOR_ADDR, &status, CCTALK_CMD_TIMEOUT_MS)) {
+    if (cctalk_request_status(acceptor_addr, &status, CCTALK_CMD_TIMEOUT_MS)) {
         snprintf(text, sizeof(text), "STATUS=%u", (unsigned)status);
         serial_test_push_monitor_action("CCTALK", text);
     }
 
-    if (cctalk_request_manufacturer_id(CCTALK_COIN_ACCEPTOR_ADDR, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
+    if (cctalk_request_manufacturer_id(acceptor_addr, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
         char msg[80] = {0};
         snprintf(msg, sizeof(msg), "MANUF %s", text);
         serial_test_push_monitor_action("CCTALK", msg);
     }
 
-    if (cctalk_request_equipment_category(CCTALK_COIN_ACCEPTOR_ADDR, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
+    if (cctalk_request_equipment_category(acceptor_addr, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
         char msg[80] = {0};
         snprintf(msg, sizeof(msg), "CAT %s", text);
         serial_test_push_monitor_action("CCTALK", msg);
     }
 
-    if (cctalk_request_product_code(CCTALK_COIN_ACCEPTOR_ADDR, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
+    if (cctalk_request_product_code(acceptor_addr, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
         char msg[80] = {0};
         snprintf(msg, sizeof(msg), "MODEL %s", text);
         serial_test_push_monitor_action("CCTALK", msg);
     }
 
-    if (cctalk_request_build_code(CCTALK_COIN_ACCEPTOR_ADDR, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
+    if (cctalk_request_build_code(acceptor_addr, text, sizeof(text), CCTALK_CMD_TIMEOUT_MS)) {
         char msg[80] = {0};
         snprintf(msg, sizeof(msg), "FW %s", text);
         serial_test_push_monitor_action("CCTALK", msg);
     }
 
     uint8_t serial[3] = {0};
-    if (cctalk_request_serial_number(CCTALK_COIN_ACCEPTOR_ADDR, serial, CCTALK_CMD_TIMEOUT_MS)) {
+    if (cctalk_request_serial_number(acceptor_addr, serial, CCTALK_CMD_TIMEOUT_MS)) {
         char msg[80] = {0};
         snprintf(msg, sizeof(msg), "SER %02X%02X%02X", serial[0], serial[1], serial[2]);
         serial_test_push_monitor_action("CCTALK", msg);
@@ -228,7 +356,9 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
 
     bool baseline = false;
     bool changed = false;
+    bool previous_counter_valid = false;
     uint8_t previous_counter = 0;
+    uint8_t new_event_count = 0;
 
     if (!cctalk_state_take(20)) {
         return;
@@ -238,13 +368,18 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
         s_event_counter_valid = true;
         s_last_event_counter = buffer->event_counter;
         baseline = true;
-    } else if (s_last_event_counter != buffer->event_counter) {
+    } else {
         previous_counter = s_last_event_counter;
-        s_last_event_counter = buffer->event_counter;
-        changed = true;
+        previous_counter_valid = true;
+        if (s_last_event_counter != buffer->event_counter) {
+            s_last_event_counter = buffer->event_counter;
+            changed = true;
+            new_event_count = cctalk_event_counter_delta(previous_counter, buffer->event_counter);
+        }
     }
 
     cctalk_state_give();
+    cctalk_log_buffered_credit_dump(buffer, previous_counter_valid, previous_counter);
 
     if (baseline) {
         char msg[64] = {0};
@@ -259,11 +394,29 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
 
     {
         char msg[64] = {0};
-        snprintf(msg, sizeof(msg), "BUFFER ev %u->%u", (unsigned)previous_counter, (unsigned)buffer->event_counter);
+        snprintf(msg,
+                 sizeof(msg),
+                 "BUFFER ev %u->%u (+%u)",
+                 (unsigned)previous_counter,
+                 (unsigned)buffer->event_counter,
+                 (unsigned)new_event_count);
         serial_test_push_monitor_action("CCTALK", msg);
     }
 
-    for (size_t i = 0; i < 5; ++i) {
+    cctalk_push_buffered_credit_hex_action(buffer);
+
+    if (new_event_count > 5U) {
+        char msg[72] = {0};
+        snprintf(msg,
+                 sizeof(msg),
+                 "BUFFER overflow: +%u eventi, elaboro ultimi 5",
+                 (unsigned)new_event_count);
+        serial_test_push_monitor_action("CCTALK", msg);
+        ESP_LOGW(TAG, "[C] buffered credit overflow: delta=%u, elaboro ultimi 5", (unsigned)new_event_count);
+        new_event_count = 5U;
+    }
+
+    for (size_t i = 0; i < (size_t)new_event_count; ++i) {
         uint8_t channel = buffer->events[i].coin_id;
         uint8_t error = buffer->events[i].error_code;
 
@@ -303,8 +456,9 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
  */
 static void cctalk_poll_once(void)
 {
+    uint8_t acceptor_addr = cctalk_get_acceptor_addr();
     cctalk_buffer_t buffer = {0};
-    if (!cctalk_read_buffered_credit(CCTALK_COIN_ACCEPTOR_ADDR, &buffer, CCTALK_CMD_TIMEOUT_MS)) {
+    if (!cctalk_read_buffered_credit(acceptor_addr, &buffer, CCTALK_CMD_TIMEOUT_MS)) {
         s_poll_error_streak++;
         if (s_poll_error_streak == 1U || (s_poll_error_streak % 20U) == 0U) {
             serial_test_push_monitor_action("CCTALK", "POLL buffered credit timeout/errore");
@@ -352,14 +506,21 @@ esp_err_t cctalk_driver_init(void)
 {
     cctalk_state_init_once();
 
+    if (!cctalk_state_take(200)) {
+        ESP_LOGE(TAG, "[C] driver init lock timeout");
+        return ESP_FAIL;
+    }
+
+    if (s_driver_initialized) {
+        cctalk_state_give();
+        return ESP_OK;
+    }
+
     const int cctalk_tx_gpio = 20; /* TX */
     const int cctalk_rx_gpio = 21; /* RX */
     cctalk_init(CONFIG_APP_RS232_UART_PORT, cctalk_tx_gpio, cctalk_rx_gpio, 9600);
-
-    if (cctalk_state_take(20)) {
-        s_driver_initialized = true;
-        cctalk_state_give();
-    }
+    s_driver_initialized = true;
+    cctalk_state_give();
 
     ESP_LOGI(TAG,
              "[C] driver init UART=%d tx=%d rx=%d (single-wire adattato su RX/TX MH1001)",
@@ -383,32 +544,43 @@ esp_err_t cctalk_driver_init(void)
  */
 esp_err_t cctalk_driver_start_acceptor(void)
 {
-    if (!s_driver_initialized) {
-        esp_err_t init_ret = cctalk_driver_init();
-        if (init_ret != ESP_OK) {
-            return init_ret;
-        }
+    esp_err_t init_ret = cctalk_driver_init();
+    if (init_ret != ESP_OK) {
+        return init_ret;
     }
 
     serial_test_push_monitor_action("CCTALK", "GETTONIERA start sequenza");
 
-    if (!cctalk_address_poll(CCTALK_COIN_ACCEPTOR_ADDR, CCTALK_CMD_TIMEOUT_MS)) {
-        serial_test_push_monitor_action("CCTALK", "Address Poll FAIL (addr 0x02)");
+    uint8_t acceptor_addr = cctalk_get_acceptor_addr();
+
+    if (!cctalk_address_poll(acceptor_addr, CCTALK_CMD_TIMEOUT_MS)) {
+        char msg[64] = {0};
+        snprintf(msg, sizeof(msg), "Address Poll FAIL (addr 0x%02X)", (unsigned)acceptor_addr);
+        serial_test_push_monitor_action("CCTALK", msg);
         return ESP_ERR_NOT_FOUND;
     }
 
-    serial_test_push_monitor_action("CCTALK", "Address Poll OK (addr 0x02)");
+    {
+        char msg[64] = {0};
+        snprintf(msg, sizeof(msg), "Address Poll OK (addr 0x%02X)", (unsigned)acceptor_addr);
+        serial_test_push_monitor_action("CCTALK", msg);
+    }
     cctalk_log_powerup_info();
 
-    if (!cctalk_modify_master_inhibit(CCTALK_COIN_ACCEPTOR_ADDR, true, CCTALK_CMD_TIMEOUT_MS)) {
+    if (!cctalk_modify_master_inhibit(acceptor_addr, true, CCTALK_CMD_TIMEOUT_MS)) {
         serial_test_push_monitor_action("CCTALK", "Master Inhibit ON FAIL");
+        return ESP_FAIL;
+    }
+
+    if (!cctalk_modify_inhibit_status(acceptor_addr, 0x00U, 0x00U, CCTALK_CMD_TIMEOUT_MS)) {
+        serial_test_push_monitor_action("CCTALK", "Inhibit mask 00 00 FAIL");
         return ESP_FAIL;
     }
 
     {
         uint8_t mask_low = 0;
         uint8_t mask_high = 0;
-        if (cctalk_request_inhibit_status(CCTALK_COIN_ACCEPTOR_ADDR, &mask_low, &mask_high, CCTALK_CMD_TIMEOUT_MS)) {
+        if (cctalk_request_inhibit_status(acceptor_addr, &mask_low, &mask_high, CCTALK_CMD_TIMEOUT_MS)) {
             char msg[64] = {0};
             snprintf(msg, sizeof(msg), "Inhibit mask %02X %02X", mask_low, mask_high);
             serial_test_push_monitor_action("CCTALK", msg);
@@ -444,7 +616,8 @@ esp_err_t cctalk_driver_stop_acceptor(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    bool inhibit_ok = cctalk_modify_master_inhibit(CCTALK_COIN_ACCEPTOR_ADDR, false, CCTALK_CMD_TIMEOUT_MS);
+    uint8_t acceptor_addr = cctalk_get_acceptor_addr();
+    bool inhibit_ok = cctalk_modify_master_inhibit(acceptor_addr, false, CCTALK_CMD_TIMEOUT_MS);
 
     if (cctalk_state_take(20)) {
         s_acceptor_enabled = false;

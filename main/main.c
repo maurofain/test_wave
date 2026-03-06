@@ -6,12 +6,15 @@
 #include "init.h"
 #include "tasks.h"
 #include "lvgl_panel.h"
+#include "cctalk.h"
 #include "app_version.h"
 #include "device_config.h"
 #include "error_log.h"
 #include "eeprom_24lc16.h"
-
+/// @brief Abilita l'invio dei log a un server remoto via HTTP per debug.
 bool send_http_log = false;
+/// @brief Abilita il dump dei log CCTalk in seriale per debug.
+bool dump_cctalk_log = false;
 
 static const char *TAG = "APP";
 #define LOG_CTX_PREFIX "[" COMPILE_LOG_PREFIX "]"
@@ -241,6 +244,20 @@ void app_main(void)
     }
 
     device_config_t *cfg = device_config_get();
+
+    if (cfg && cfg->sensors.cctalk_enabled) {
+        esp_err_t cctalk_ret = cctalk_driver_init();
+        if (cctalk_ret != ESP_OK) {
+            ESP_LOGW(TAG,
+                     LOG_CTX_PREFIX " init CCTALK prima uscita logo fallita: %s",
+                     esp_err_to_name(cctalk_ret));
+        } else {
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " init CCTALK completata prima uscita logo");
+        }
+    } else {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " init CCTALK pre-logo skip (disabilitato da config)");
+    }
+
     if (cfg && cfg->display.enabled) {
         lvgl_panel_show_language_select();
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: pagina selezione lingua attivata");

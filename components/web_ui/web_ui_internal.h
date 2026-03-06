@@ -99,6 +99,8 @@ esp_err_t ota_upload_handler(httpd_req_t *req);
 esp_err_t api_config_get(httpd_req_t *req);
 esp_err_t api_config_save(httpd_req_t *req);
 esp_err_t api_config_backup(httpd_req_t *req);
+esp_err_t api_cctalk_log_txrx_get(httpd_req_t *req);
+esp_err_t api_cctalk_log_txrx_set(httpd_req_t *req);
 esp_err_t api_ui_texts_get(httpd_req_t *req);
 esp_err_t api_ui_languages_get(httpd_req_t *req);
 esp_err_t api_config_reset(httpd_req_t *req);

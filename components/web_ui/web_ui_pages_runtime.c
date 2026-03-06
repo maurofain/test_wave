@@ -310,7 +310,7 @@ esp_err_t status_get_handler(httpd_req_t *req)
              "\"dna\":{"
                "\"pwm\":%d,\"led_strip\":%d,\"rs232\":%d,\"rs485\":%d,\"mdb\":%d,"
                "\"sht40\":%d,\"cctalk\":%d,\"sd_card\":%d,\"ethernet\":%d,"
-               "\"wifi\":%d,\"usb_scanner\":%d,\"io_expander\":%d,\"remote_logging\":%d"
+               "\"wifi\":%d,\"scanner\":%d,\"io_expander\":%d,\"remote_logging\":%d"
              "},"
              "\"config\":%s}",
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,

@@ -72,6 +72,87 @@ static uint8_t clamp_u8_value(int value, uint8_t min, uint8_t max)
 
 
 /**
+ * @brief Restituisce l'indirizzo CCtalk configurato (default 2).
+ *
+ * @return uint8_t Indirizzo gettoniera valido (1..255).
+ */
+static uint8_t get_cctalk_address_configured(void)
+{
+    uint8_t addr = CCTALK_DEFAULT_DEVICE_ADDR;
+    device_config_t *cfg = device_config_get();
+    if (cfg && cfg->cctalk.address >= 1U) {
+        addr = cfg->cctalk.address;
+    }
+    return clamp_u8_value(addr, 1U, 255U);
+}
+
+
+/**
+ * @brief Salva in configurazione l'indirizzo CCtalk.
+ *
+ * @param [in] addr Nuovo indirizzo gettoniera.
+ * @return esp_err_t ESP_OK su successo.
+ */
+static esp_err_t set_cctalk_address_configured(uint8_t addr)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    cfg->cctalk.address = clamp_u8_value(addr, 1U, 255U);
+    cfg->updated = true;
+    return device_config_save(cfg);
+}
+
+
+/**
+ * @brief Estrae l'indirizzo CCtalk dal payload JSON della richiesta.
+ *
+ * Formato atteso: {"addr":<1..255>}
+ *
+ * @param [in] req Richiesta HTTP con payload JSON.
+ * @param [out] out_addr Indirizzo estratto.
+ * @return esp_err_t ESP_OK su successo.
+ */
+static esp_err_t parse_cctalk_addr_from_request(httpd_req_t *req, uint8_t *out_addr)
+{
+    if (!req || !out_addr) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (req->content_len <= 0) {
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    char buf[128] = {0};
+    if (req->content_len >= (int)sizeof(buf)) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret <= 0) {
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    cJSON *addr_obj = cJSON_GetObjectItem(root, "addr");
+    if (!addr_obj || !cJSON_IsNumber(addr_obj)) {
+        cJSON_Delete(root);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_addr = clamp_u8_value(addr_obj->valueint, 1U, 255U);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+
+/**
  * @brief Analizza un payload in formato esadecimale.
  *
  * Questa funzione prende in input una stringa in formato esadecimale e la converte in un array di byte.
@@ -873,7 +954,44 @@ modbus_read_end:
         }
     }
 
+    else if (strcmp(test_name, "cctalk_addr_get") == 0) {
+        uint8_t cctalk_addr = get_cctalk_address_configured();
+        snprintf(response,
+                 sizeof(response),
+                 "{\"status\":\"ok\",\"addr\":%u}",
+                 (unsigned)cctalk_addr);
+    }
+    else if (strcmp(test_name, "cctalk_addr_set") == 0) {
+        uint8_t cctalk_addr = 0;
+        esp_err_t parse_err = parse_cctalk_addr_from_request(req, &cctalk_addr);
+        if (parse_err != ESP_OK) {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"status\":\"error\",\"error\":\"ADDR non valido\",\"err\":\"%s\"}",
+                     esp_err_to_name(parse_err));
+        } else {
+            esp_err_t save_err = set_cctalk_address_configured(cctalk_addr);
+            if (save_err != ESP_OK) {
+                snprintf(response,
+                         sizeof(response),
+                         "{\"status\":\"error\",\"error\":\"Salvataggio ADDR fallito\",\"err\":\"%s\"}",
+                         esp_err_to_name(save_err));
+            } else {
+                serial_test_push_monitor_action("CCTALK", "ADDR aggiornato");
+                snprintf(response,
+                         sizeof(response),
+                         "{\"status\":\"ok\",\"message\":\"ADDR CCtalk salvato\",\"addr\":%u}",
+                         (unsigned)cctalk_addr);
+            }
+        }
+    }
     else if (strcmp(test_name, "cctalk_start") == 0) {
+        uint8_t req_addr = 0;
+        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
+            (void)set_cctalk_address_configured(req_addr);
+        }
+
+        uint8_t cctalk_addr = get_cctalk_address_configured();
         serial_test_clear_cctalk_monitor();
         serial_test_push_monitor_action("CCTALK", "START richiesta");
         esp_err_t rs232_err = rs232_init();
@@ -922,6 +1040,9 @@ modbus_read_end:
                         serial_test_push_monitor_action("CCTALK", "START errore sequenza gettoniera");
                         snprintf(response, sizeof(response), "{\"error\":\"Avvio gettoniera fallito: %s\"}", esp_err_to_name(start_err));
                     } else {
+                        char addr_msg[48] = {0};
+                        snprintf(addr_msg, sizeof(addr_msg), "ADDR 0x%02X", (unsigned)cctalk_addr);
+                        serial_test_push_monitor_action("CCTALK", addr_msg);
                         serial_test_push_monitor_action("CCTALK", "START ok");
                         if (own_task) {
                             snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk avviato (task locale)\"}");
@@ -933,6 +1054,11 @@ modbus_read_end:
             }
         }
     } else if (strcmp(test_name, "cctalk_stop") == 0) {
+        uint8_t req_addr = 0;
+        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
+            (void)set_cctalk_address_configured(req_addr);
+        }
+
         serial_test_push_monitor_action("CCTALK", "STOP richiesta");
 
         esp_err_t stop_err = cctalk_driver_stop_acceptor();
@@ -961,6 +1087,11 @@ modbus_read_end:
     } else if (strcmp(test_name, "cctalk_retention_on") == 0 ||
                strcmp(test_name, "cctalk_retention_off") == 0) {
         bool retention_on = (strcmp(test_name, "cctalk_retention_on") == 0);
+        uint8_t req_addr = 0;
+        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
+            (void)set_cctalk_address_configured(req_addr);
+        }
+        uint8_t cctalk_addr = get_cctalk_address_configured();
         serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON richiesta" : "RETENZIONE OFF richiesta");
 
         esp_err_t rs232_err = rs232_init();
@@ -975,17 +1106,28 @@ modbus_read_end:
                          "{\"error\":\"Init CCtalk fallita: %s\"}",
                          esp_err_to_name(cctalk_err));
             } else {
-                bool inhibit_ok = cctalk_modify_master_inhibit(CCTALK_DEFAULT_DEVICE_ADDR,
+                bool inhibit_ok = cctalk_modify_master_inhibit(cctalk_addr,
                                                                retention_on,
                                                                CCTALK_WEB_CMD_TIMEOUT_MS);
-                if (!inhibit_ok) {
+                bool mask_ok = true;
+                if (inhibit_ok && !retention_on) {
+                    mask_ok = cctalk_modify_inhibit_status(cctalk_addr,
+                                                           0x00U,
+                                                           0x00U,
+                                                           CCTALK_WEB_CMD_TIMEOUT_MS);
+                }
+
+                if (!inhibit_ok || !mask_ok) {
                     serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON FAIL" : "RETENZIONE OFF FAIL");
                     snprintf(response, sizeof(response),
-                             "{\"error\":\"Comando ritenzione fallito\"}");
+                             "{\"error\":\"Comando ritenzione/abilitazione formati fallito\"}");
                 } else {
+                    if (!retention_on) {
+                        serial_test_push_monitor_action("CCTALK", "FORMATI abilitati mask 00 00");
+                    }
                     uint8_t mask_low = 0;
                     uint8_t mask_high = 0;
-                    bool status_ok = cctalk_request_inhibit_status(CCTALK_DEFAULT_DEVICE_ADDR,
+                    bool status_ok = cctalk_request_inhibit_status(cctalk_addr,
                                                                    &mask_low,
                                                                    &mask_high,
                                                                    CCTALK_WEB_CMD_TIMEOUT_MS);
@@ -1001,6 +1143,66 @@ modbus_read_end:
                         snprintf(response, sizeof(response),
                                  "{\"message\":\"Ritenzione %s\"}",
                                  retention_on ? "attivata" : "disattivata");
+                    }
+                }
+            }
+        }
+    } else if (strcmp(test_name, "cctalk_retention_ch1_4") == 0) {
+        const uint8_t mask_low = 0xF0U;
+        const uint8_t mask_high = 0xFFU;
+        uint8_t req_addr = 0;
+        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
+            (void)set_cctalk_address_configured(req_addr);
+        }
+        uint8_t cctalk_addr = get_cctalk_address_configured();
+        serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH4 richiesta");
+
+        esp_err_t rs232_err = rs232_init();
+        if (rs232_err != ESP_OK) {
+            snprintf(response, sizeof(response),
+                     "{\"error\":\"Init RS232 fallita: %s\"}",
+                     esp_err_to_name(rs232_err));
+        } else {
+            esp_err_t cctalk_err = cctalk_driver_init();
+            if (cctalk_err != ESP_OK) {
+                snprintf(response, sizeof(response),
+                         "{\"error\":\"Init CCtalk fallita: %s\"}",
+                         esp_err_to_name(cctalk_err));
+            } else {
+                bool master_ok = cctalk_modify_master_inhibit(cctalk_addr,
+                                                              false,
+                                                              CCTALK_WEB_CMD_TIMEOUT_MS);
+                bool mask_ok = false;
+                if (master_ok) {
+                    mask_ok = cctalk_modify_inhibit_status(cctalk_addr,
+                                                           mask_low,
+                                                           mask_high,
+                                                           CCTALK_WEB_CMD_TIMEOUT_MS);
+                }
+
+                if (!master_ok || !mask_ok) {
+                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH4 FAIL");
+                    snprintf(response, sizeof(response),
+                             "{\"error\":\"Comando abilita CH1-CH4 fallito\"}");
+                } else {
+                    uint8_t read_low = 0;
+                    uint8_t read_high = 0;
+                    bool status_ok = cctalk_request_inhibit_status(cctalk_addr,
+                                                                   &read_low,
+                                                                   &read_high,
+                                                                   CCTALK_WEB_CMD_TIMEOUT_MS);
+
+                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH4 ok");
+                    if (status_ok) {
+                        snprintf(response, sizeof(response),
+                                 "{\"message\":\"Abilitazione CH1-CH4 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
+                                 (unsigned)read_low,
+                                 (unsigned)read_high);
+                    } else {
+                        snprintf(response, sizeof(response),
+                                 "{\"message\":\"Abilitazione CH1-CH4 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
+                                 (unsigned)mask_low,
+                                 (unsigned)mask_high);
                     }
                 }
             }

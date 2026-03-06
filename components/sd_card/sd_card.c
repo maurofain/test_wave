@@ -385,6 +385,7 @@ esp_err_t sd_card_format(void) {
  */
 void *sd_card_read_file(const char *path, size_t *out_size) {
     if (!s_mounted) return NULL;
+    ESP_LOGI(TAG, "*** READ SDCARD **"); 
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;
     if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
@@ -413,6 +414,7 @@ void *sd_card_read_file(const char *path, size_t *out_size) {
  */
 esp_err_t sd_card_list_dir(const char *path, char *out_buf, size_t out_size) {
     if (!s_mounted) return ESP_ERR_INVALID_STATE;
+    ESP_LOGI(TAG, "*** READ SDCARDDIR **"); 
     DIR *dir = opendir(path);
     if (!dir) return ESP_FAIL;
 

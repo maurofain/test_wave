@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include <stdio.h>
 #include <string.h>
 
 #ifndef DNA_CCTALK
@@ -23,6 +24,7 @@ static bool s_cctalk_ready = false;
 static SemaphoreHandle_t s_cctalk_lock = NULL;
 
 extern void serial_test_push_monitor_entry(const char *label, const uint8_t *data, size_t len);
+extern bool dump_cctalk_log;
 
 
 /**
@@ -114,6 +116,57 @@ static void cctalk_monitor_frame(const char *label, const cctalk_frame_t *frame)
     serial_test_push_monitor_entry(label, raw, frame_len);
 }
 
+static void cctalk_log_hex_dump(const char *direction, const uint8_t *data, size_t len)
+{
+    if (!dump_cctalk_log) {
+        return;
+    }
+
+    if (!direction || !data || len == 0U) {
+        return;
+    }
+
+    const size_t bytes_per_line = 32U;
+    char line[(32U * 3U)] = {0};
+
+    for (size_t offset = 0; offset < len; offset += bytes_per_line) {
+        size_t chunk = len - offset;
+        if (chunk > bytes_per_line) {
+            chunk = bytes_per_line;
+        }
+
+        size_t pos = 0;
+        for (size_t i = 0; i < chunk; ++i) {
+            size_t remaining = sizeof(line) - pos;
+            if (remaining <= 1U) {
+                break;
+            }
+            int wrote = snprintf(line + pos,
+                                 remaining,
+                                 "%02X%s",
+                                 data[offset + i],
+                                 (i + 1U < chunk) ? " " : "");
+            if (wrote < 0) {
+                break;
+            }
+            size_t wrote_size = (size_t)wrote;
+            if (wrote_size >= remaining) {
+                pos = sizeof(line) - 1U;
+                break;
+            }
+            pos += wrote_size;
+        }
+        line[sizeof(line) - 1U] = '\0';
+
+        ESP_LOGI(TAG,
+                 "[C] CCTALK %s HEX %u/%u: %s",
+                 direction,
+                 (unsigned)(offset + chunk),
+                 (unsigned)len,
+                 line);
+    }
+}
+
 
 /**
  * @brief Invia un frame CCTalk senza bloccare.
@@ -149,6 +202,8 @@ static bool cctalk_send_frame_unlocked(uint8_t dest_addr,
         memcpy(&packet[4], data, len);
     }
     packet[frame_len - 1U] = cctalk_checksum(packet, (uint8_t)(frame_len - 1U));
+
+    cctalk_log_hex_dump("TX", packet, frame_len);
 
     int sent = uart_write_bytes(s_cctalk_uart_num, (const char *)packet, (size_t)frame_len);
     if (sent != (int)frame_len) {
@@ -216,6 +271,8 @@ static bool cctalk_receive_frame_unlocked(cctalk_frame_t *frame, uint32_t timeou
                 expected_len = 0;
                 continue;
             }
+
+            cctalk_log_hex_dump("RX", raw, expected_len);
 
             frame->destination = raw[0];
             frame->data_len = raw[1];
@@ -297,6 +354,11 @@ void cctalk_init(int uart_num, int tx_pin, int rx_pin, int baudrate)
 {
     if (!s_cctalk_lock) {
         s_cctalk_lock = xSemaphoreCreateMutex();
+    }
+
+    if (s_cctalk_ready && s_cctalk_uart_num == uart_num) {
+        ESP_LOGI(TAG, "[C] cctalk_init già attivo su UART=%d", uart_num);
+        return;
     }
 
     if (s_cctalk_uart_num != uart_num && uart_is_driver_installed(s_cctalk_uart_num)) {
@@ -697,9 +759,39 @@ bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uin
  */
 bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms)
 {
-    uint8_t data = enable ? 1U : 0U;
+    uint8_t data[2];
+    /* invia maschera a 2 byte: low = CH1..8, high = CH9..16 */
+    if (enable) {
+        /* abilitare tutti i canali => maschera 0x00 0x00 */
+        data[0] = 0x00U;
+        data[1] = 0x00U;
+    } else {
+        /* inibire tutti i canali => maschera 0xFF 0xFF */
+        data[0] = 0xFFU;
+        data[1] = 0xFFU;
+    }
     cctalk_frame_t response = {0};
-    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, &data, 1U, &response, timeout_ms)) {
+    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, data, 2U, &response, timeout_ms)) {
+        return false;
+    }
+    return cctalk_expect_ack(&response);
+}
+
+
+/**
+ * @brief Imposta la maschera di inibizione canali della gettoniera.
+ *
+ * @param [in] dest_addr Indirizzo del dispositivo destinatario.
+ * @param [in] mask_low Maschera bit canali 1..8.
+ * @param [in] mask_high Maschera bit canali 9..16.
+ * @param [in] timeout_ms Timeout in millisecondi per l'operazione.
+ * @return true se il comando è stato accettato, false altrimenti.
+ */
+bool cctalk_modify_inhibit_status(uint8_t dest_addr, uint8_t mask_low, uint8_t mask_high, uint32_t timeout_ms)
+{
+    uint8_t data[2] = {mask_low, mask_high};
+    cctalk_frame_t response = {0};
+    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, data, 2U, &response, timeout_ms)) {
         return false;
     }
     return cctalk_expect_ack(&response);
@@ -1115,6 +1207,22 @@ bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uin
 bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)enable; (void)timeout_ms;
+    return true;
+}
+
+
+/**
+ * @brief Imposta la maschera di inibizione canali della gettoniera.
+ *
+ * @param [in] dest_addr Indirizzo del dispositivo destinatario.
+ * @param [in] mask_low Maschera bit canali 1..8.
+ * @param [in] mask_high Maschera bit canali 9..16.
+ * @param [in] timeout_ms Timeout in millisecondi per l'operazione.
+ * @return true se il comando è stato accettato, false altrimenti.
+ */
+bool cctalk_modify_inhibit_status(uint8_t dest_addr, uint8_t mask_low, uint8_t mask_high, uint32_t timeout_ms)
+{
+    (void)dest_addr; (void)mask_low; (void)mask_high; (void)timeout_ms;
     return true;
 }
 

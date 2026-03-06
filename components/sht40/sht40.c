@@ -1,3 +1,5 @@
+/* DNA_SHT40: imposta a 1 nel CMakeLists del progetto per attivare il mockup
+ * senza hardware reale (nessun I2C/SHT40). Default: 0. */
 #ifndef DNA_SHT40
 #define DNA_SHT40 0
 #endif
@@ -284,7 +286,7 @@ bool sht40_is_ready(void)
 esp_err_t sht40_init(void)
 {
     s_sht40_ready = true;
-    ESP_LOGI(TAG, "[MOCK] SHT40 inizializzato (T=%.1f°C, H=%.1f%%)",
+    ESP_LOGI(TAG, "[C] [MOCK] SHT40 inizializzato (T=%.1f°C, H=%.1f%%)",
              SHT40_MOCK_TEMP_C, SHT40_MOCK_HUM_PCT);
     return ESP_OK;
 }
@@ -300,11 +302,14 @@ esp_err_t sht40_init(void)
 esp_err_t sht40_read(float *temp, float *hum)
 {
     if (!s_sht40_ready) {
-        return ESP_ERR_INVALID_STATE;
+        esp_err_t init_ret = sht40_init();
+        if (init_ret != ESP_OK) {
+            return init_ret;
+        }
     }
     if (temp) *temp = SHT40_MOCK_TEMP_C;
     if (hum)  *hum  = SHT40_MOCK_HUM_PCT;
-    ESP_LOGI(TAG, "[MOCK] sht40_read → T=%.1f°C, H=%.1f%%",
+    ESP_LOGI(TAG, "[C] [MOCK] sht40_read → T=%.1f°C, H=%.1f%%",
              SHT40_MOCK_TEMP_C, SHT40_MOCK_HUM_PCT);
     return ESP_OK;
 }

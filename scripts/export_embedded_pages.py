@@ -42,6 +42,8 @@ GLOBAL_FETCH_WRAPPER = (
     "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };"
     "window.goProtectedPath=function(path){window.location.href=path;return false;};"
     "(function(){function tc(){var e=document.getElementById('hdr_clock');if(e)e.textContent=new Date().toTimeString().slice(0,8);}tc();setInterval(tc,1000);})();"
+    # Aggiorna dinamicamente l'etichetta partizione nell'header leggendo /status
+    "(function(){fetch('/status',{cache:'no-store'}).then(function(r){return r.json();}).then(function(s){var el=document.getElementById('hdr_run_mode');if(el&&s&&s.partition_running)el.textContent=s.partition_running.toUpperCase();}).catch(function(){});})();"
     "})();</script>"
 )
 
@@ -110,6 +112,19 @@ class PageSpec:
     body_builder: Callable[[dict[str, str], argparse.Namespace], str]
     show_nav: bool = True
     is_emulator_page: bool = False
+
+
+def read_app_version(source_path: Path) -> tuple[str, str]:
+    """Legge APP_VERSION e APP_DATE da main/app_version.h relativo al sorgente."""
+    version_file = source_path.parent.parent.parent / "main" / "app_version.h"
+    if not version_file.is_file():
+        return "dev", "N/A"
+    content = version_file.read_text(encoding="utf-8")
+    ver_match = re.search(r'#define\s+APP_VERSION\s+"([^"]+)"', content)
+    date_match = re.search(r'#define\s+APP_DATE\s+"([^"]+)"', content)
+    version = ver_match.group(1) if ver_match else "dev"
+    build_date = date_match.group(1) if date_match else "N/A"
+    return version, build_date
 
 
 def parse_args() -> argparse.Namespace:
@@ -264,9 +279,9 @@ def build_head(
         + "<header>"
         + "<div style='display:flex;align-items:center;'><img src='/logo.jpg' alt='Logo' style='max-height:40px;margin-right:15px;'><h1 style='margin:0;font-size:22px;'>"
         + html.escape(title)
-        + " ["
+        + " [<span id='hdr_run_mode'>"
         + html.escape(args.app_name)
-        + "] - <span id='hdr_clock'>"
+        + "</span>] - <span id='hdr_clock'>"
         + html.escape(args.time_text)
         + "</span></h1>"
         + emu_button
@@ -432,6 +447,14 @@ def main() -> int:
     if not source_path.is_file():
         print(f"Errore: file sorgente non trovato: {source_path}", file=sys.stderr)
         return 1
+
+    # Popola version e build_date da app_version.h se non passati esplicitamente
+    if args.version == "dev" or args.build_date == "N/A":
+        auto_version, auto_date = read_app_version(source_path)
+        if args.version == "dev":
+            args.version = auto_version
+        if args.build_date == "N/A":
+            args.build_date = auto_date
 
     content = source_path.read_text(encoding="utf-8")
     constants = extract_string_constants(content)

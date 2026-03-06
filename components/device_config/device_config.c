@@ -26,6 +26,148 @@ static const char *TAG = "DEVICE_CFG";
 static const char *NVS_NAMESPACE = "device_config";
 static const char *UI_LANG_DEFAULT = "it";
 #define DEVICE_CFG_MODBUS_MAX_POINTS 64
+#define DEVICE_CFG_SERIAL_BAUD_MIN 300
+#define DEVICE_CFG_SERIAL_BAUD_MAX 3000000
+#define DEVICE_CFG_SERIAL_DATA_BITS_MIN 5
+#define DEVICE_CFG_SERIAL_DATA_BITS_MAX 8
+#define DEVICE_CFG_SERIAL_PARITY_MIN 0
+#define DEVICE_CFG_SERIAL_PARITY_MAX 2
+#define DEVICE_CFG_SERIAL_STOP_BITS_MIN 1
+#define DEVICE_CFG_SERIAL_STOP_BITS_MAX 2
+#define DEVICE_CFG_SERIAL_RX_BUF_MIN 64
+#define DEVICE_CFG_SERIAL_BUF_MAX 65536
+
+static const device_serial_config_t s_serial_default_rs232 = {
+    .baud_rate = 9600,
+    .data_bits = 8,
+    .parity = 0,
+    .stop_bits = 1,
+    .rx_buf_size = 2048,
+    .tx_buf_size = 0,
+};
+
+static const device_serial_config_t s_serial_default_rs485 = {
+    .baud_rate = 9600,
+    .data_bits = 8,
+    .parity = 0,
+    .stop_bits = 1,
+    .rx_buf_size = 2048,
+    .tx_buf_size = 0,
+};
+
+static const device_serial_config_t s_serial_default_mdb = {
+    .baud_rate = 9600,
+    .data_bits = 8,
+    .parity = 0,
+    .stop_bits = 1,
+    .rx_buf_size = 1024,
+    .tx_buf_size = 1024,
+};
+
+
+/**
+ * @brief Legge un intero da un oggetto JSON con chiave primaria e legacy.
+ *
+ * @param [in] obj Oggetto JSON sorgente.
+ * @param [in] primary_key Chiave principale.
+ * @param [in] legacy_key Chiave legacy opzionale (può essere NULL).
+ * @param [out] out_value Valore letto.
+ * @return true Se il campo numerico è stato trovato.
+ * @return false Se il campo non è presente o non è numerico.
+ */
+static bool _json_read_int(cJSON *obj, const char *primary_key, const char *legacy_key, int *out_value)
+{
+    if (!obj || !primary_key || !out_value) {
+        return false;
+    }
+
+    cJSON *item = cJSON_GetObjectItem(obj, primary_key);
+    if ((!item || !cJSON_IsNumber(item)) && legacy_key) {
+        item = cJSON_GetObjectItem(obj, legacy_key);
+    }
+
+    if (!item || !cJSON_IsNumber(item)) {
+        return false;
+    }
+
+    *out_value = item->valueint;
+    return true;
+}
+
+
+/**
+ * @brief Restituisce il valore se nel range, altrimenti il default.
+ *
+ * @param [in] value Valore da validare.
+ * @param [in] min_value Limite minimo incluso.
+ * @param [in] max_value Limite massimo incluso.
+ * @param [in] default_value Default di fallback.
+ * @return int Valore validato o fallback.
+ */
+static int _clamp_int_or_default(int value, int min_value, int max_value, int default_value)
+{
+    if (value < min_value || value > max_value) {
+        return default_value;
+    }
+    return value;
+}
+
+
+/**
+ * @brief Esegue parsing sicuro della configurazione seriale da JSON.
+ *
+ * @param [in] serial_obj Oggetto JSON seriale.
+ * @param [in/out] target Struttura target da aggiornare.
+ * @param [in] defaults Valori di fallback per campi invalidi.
+ */
+static void _parse_serial_cfg_json(cJSON *serial_obj,
+                                   device_serial_config_t *target,
+                                   const device_serial_config_t *defaults)
+{
+    if (!serial_obj || !target || !defaults) {
+        return;
+    }
+
+    int value = 0;
+
+    if (_json_read_int(serial_obj, "baud", "baud_rate", &value)) {
+        target->baud_rate = _clamp_int_or_default(value,
+                                                  DEVICE_CFG_SERIAL_BAUD_MIN,
+                                                  DEVICE_CFG_SERIAL_BAUD_MAX,
+                                                  defaults->baud_rate);
+    }
+    if (_json_read_int(serial_obj, "data_bits", NULL, &value)) {
+        target->data_bits = _clamp_int_or_default(value,
+                                                  DEVICE_CFG_SERIAL_DATA_BITS_MIN,
+                                                  DEVICE_CFG_SERIAL_DATA_BITS_MAX,
+                                                  defaults->data_bits);
+    }
+    if (_json_read_int(serial_obj, "parity", NULL, &value)) {
+        target->parity = _clamp_int_or_default(value,
+                                               DEVICE_CFG_SERIAL_PARITY_MIN,
+                                               DEVICE_CFG_SERIAL_PARITY_MAX,
+                                               defaults->parity);
+    }
+    if (_json_read_int(serial_obj, "stop_bits", NULL, &value)) {
+        target->stop_bits = _clamp_int_or_default(value,
+                                                  DEVICE_CFG_SERIAL_STOP_BITS_MIN,
+                                                  DEVICE_CFG_SERIAL_STOP_BITS_MAX,
+                                                  defaults->stop_bits);
+    }
+    if (_json_read_int(serial_obj, "rx_buf", "rx_buf_size", &value)) {
+        target->rx_buf_size = _clamp_int_or_default(value,
+                                                    DEVICE_CFG_SERIAL_RX_BUF_MIN,
+                                                    DEVICE_CFG_SERIAL_BUF_MAX,
+                                                    defaults->rx_buf_size);
+    }
+    if (_json_read_int(serial_obj, "tx_buf", "tx_buf_size", &value)) {
+        target->tx_buf_size = _clamp_int_or_default(value,
+                                                    0,
+                                                    DEVICE_CFG_SERIAL_BUF_MAX,
+                                                    defaults->tx_buf_size);
+    }
+}
+
 static const char *UI_TEXTS_DEFAULT_IT_JSON =
     "["
     "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"home\",\"text\":\"Home\"},"
@@ -593,6 +735,9 @@ static void _set_defaults(device_config_t *config)
     config->modbus.input_start = 0;
     config->modbus.input_count = 8;
 
+    // Default CCtalk
+    config->cctalk.address = 2;
+
     // Default MDB Serial
     config->mdb_serial.baud_rate = 9600;
     config->mdb_serial.data_bits = 8;
@@ -1066,21 +1211,11 @@ esp_err_t device_config_load(device_config_t *config)
                 // Analisi config Seriali (RS232, RS485, MDB)
                 cJSON *rs232_obj = cJSON_GetObjectItem(root, "rs232");
                 if (rs232_obj) {
-                    config->rs232.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "baud"));
-                    config->rs232.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "data_bits"));
-                    config->rs232.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "parity"));
-                    config->rs232.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "stop_bits"));
-                    config->rs232.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "rx_buf"));
-                    config->rs232.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs232_obj, "tx_buf"));
+                    _parse_serial_cfg_json(rs232_obj, &config->rs232, &s_serial_default_rs232);
                 }
                 cJSON *rs485_obj = cJSON_GetObjectItem(root, "rs485");
                 if (rs485_obj) {
-                    config->rs485.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "baud"));
-                    config->rs485.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "data_bits"));
-                    config->rs485.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "parity"));
-                    config->rs485.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "stop_bits"));
-                    config->rs485.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "rx_buf"));
-                    config->rs485.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(rs485_obj, "tx_buf"));
+                    _parse_serial_cfg_json(rs485_obj, &config->rs485, &s_serial_default_rs485);
                 }
                 cJSON *modbus_obj = cJSON_GetObjectItem(root, "modbus");
                 if (modbus_obj) {
@@ -1151,14 +1286,32 @@ esp_err_t device_config_load(device_config_t *config)
                         config->modbus.input_count = (uint16_t)val;
                     }
                 }
+
+                cJSON *cctalk_obj = cJSON_GetObjectItem(root, "cctalk");
+                if (cctalk_obj) {
+                    cJSON *addr = cJSON_GetObjectItem(cctalk_obj, "address");
+                    if (addr && cJSON_IsNumber(addr)) {
+                        int val = addr->valueint;
+                        if (val < 1) val = 1;
+                        if (val > 255) val = 255;
+                        config->cctalk.address = (uint8_t)val;
+                    }
+                }
+
+                cJSON *cctalk_serial_obj = cJSON_GetObjectItem(root, "cctalk_serial");
+                if (cctalk_serial_obj) {
+                    cJSON *addr = cJSON_GetObjectItem(cctalk_serial_obj, "addr");
+                    if (addr && cJSON_IsNumber(addr)) {
+                        int val = addr->valueint;
+                        if (val < 1) val = 1;
+                        if (val > 255) val = 255;
+                        config->cctalk.address = (uint8_t)val;
+                    }
+                }
+
                 cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial");
                 if (mdb_s_obj) {
-                    config->mdb_serial.baud_rate = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "baud"));
-                    config->mdb_serial.data_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "data_bits"));
-                    config->mdb_serial.parity = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "parity"));
-                    config->mdb_serial.stop_bits = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "stop_bits"));
-                    config->mdb_serial.rx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "rx_buf"));
-                    config->mdb_serial.tx_buf_size = cJSON_GetNumberValue(cJSON_GetObjectItem(mdb_s_obj, "tx_buf"));
+                    _parse_serial_cfg_json(mdb_s_obj, &config->mdb_serial, &s_serial_default_mdb);
                 }
 
                 // Analisi GPIOs configurabili
@@ -1353,6 +1506,11 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(modbus_obj, "input_start", config->modbus.input_start);
     cJSON_AddNumberToObject(modbus_obj, "input_count", config->modbus.input_count);
     cJSON_AddItemToObject(root, "modbus", modbus_obj);
+
+    // CCtalk
+    cJSON *cctalk_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(cctalk_obj, "address", config->cctalk.address);
+    cJSON_AddItemToObject(root, "cctalk", cctalk_obj);
 
     // Seriale MDB
     cJSON *mdb_s_obj = cJSON_CreateObject();
