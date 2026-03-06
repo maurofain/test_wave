@@ -20,42 +20,43 @@ static const char *TAG = "lvgl_page_main";
 
 #define PANEL_REFRESH_MS 200
 
-#define COL_BG          lv_color_make(0x1a, 0x1a, 0x2e)
-#define COL_PROG        lv_color_make(0x6c, 0x34, 0x83)
-#define COL_PROG_ACT    lv_color_make(0x1e, 0x8b, 0x45)
-#define COL_PROG_LOW    lv_color_make(0xc0, 0x39, 0x2b)
-#define COL_PROG_PAUSE  lv_color_make(0xe6, 0x7e, 0x22)
-#define COL_WHITE       lv_color_make(0xEE, 0xEE, 0xEE)
-#define COL_GREY        lv_color_make(0x88, 0x88, 0x99)
-#define COL_STATE_IDL   lv_color_make(0x20, 0x20, 0x48)
+#define COL_BG lv_color_make(0x1a, 0x1a, 0x2e)
+#define COL_PROG lv_color_make(0x6c, 0x34, 0x83)
+#define COL_PROG_ACT lv_color_make(0x1e, 0x8b, 0x45)
+#define COL_PROG_LOW lv_color_make(0xc0, 0x39, 0x2b)
+#define COL_PROG_PAUSE lv_color_make(0xe6, 0x7e, 0x22)
+#define COL_WHITE lv_color_make(0xEE, 0xEE, 0xEE)
+#define COL_GREY lv_color_make(0x88, 0x88, 0x99)
+#define COL_STATE_IDL lv_color_make(0x20, 0x20, 0x48)
 
-#define PROG_COUNT       10
-#define PROG_ROWS        5
+#define PROG_COUNT 10
+#define PROG_ROWS 5
 
-#define PANEL_W          720
-#define PANEL_H          1280
-#define PANEL_PAD_X      14
-#define PANEL_PAD_Y      14
-#define PANEL_COL_GAP    10
-#define PANEL_LEFT_W     120
-#define PANEL_RIGHT_W    120
-#define PANEL_CONTENT_H  (PANEL_H - (PANEL_PAD_Y * 2))
+#define PANEL_W 720
+#define PANEL_H 1280
+#define PANEL_PAD_X 14
+#define PANEL_PAD_Y 14
+#define PANEL_COL_GAP 10
+#define PANEL_LEFT_W 120
+#define PANEL_RIGHT_W 120
+#define PANEL_CONTENT_H (PANEL_H - (PANEL_PAD_Y * 2))
 #define PANEL_BUTTONS_TOP_FREE_PCT 30
-#define PANEL_FULL_W     (PANEL_W - (PANEL_PAD_X * 2))
-#define PANEL_CREDIT_H   ((PANEL_CONTENT_H * PANEL_BUTTONS_TOP_FREE_PCT) / 100)
-#define PANEL_WORK_H     (PANEL_CONTENT_H - PANEL_CREDIT_H)
-#define PANEL_COUNTER_W  (PANEL_FULL_W - PANEL_LEFT_W - PANEL_RIGHT_W - (PANEL_COL_GAP * 2))
-#define PANEL_LEFT_X     0
-#define PANEL_COUNTER_X  (PANEL_LEFT_W + PANEL_COL_GAP)
-#define PANEL_RIGHT_X    (PANEL_COUNTER_X + PANEL_COUNTER_W + PANEL_COL_GAP)
+#define PANEL_FULL_W (PANEL_W - (PANEL_PAD_X * 2))
+#define PANEL_CREDIT_H ((PANEL_CONTENT_H * PANEL_BUTTONS_TOP_FREE_PCT) / 100)
+#define PANEL_WORK_H (PANEL_CONTENT_H - PANEL_CREDIT_H)
+#define PANEL_COUNTER_W (PANEL_FULL_W - PANEL_LEFT_W - PANEL_RIGHT_W - (PANEL_COL_GAP * 2))
+#define PANEL_LEFT_X 0
+#define PANEL_COUNTER_X (PANEL_LEFT_W + PANEL_COL_GAP)
+#define PANEL_RIGHT_X (PANEL_COUNTER_X + PANEL_COUNTER_W + PANEL_COL_GAP)
 
-#define FONT_TIME        (&lv_font_montserrat_18)
-#define FONT_BIGNUM      (&sevensegments_300)
-#define FONT_LABEL       (&lv_font_montserrat_32)
-#define FONT_PROG_BTN    (&lv_font_montserrat_32)
-#define FONT_DATETIME    (&DroidSansMono18)
+#define FONT_TIME (&lv_font_montserrat_18)
+#define FONT_BIGNUM (&sevensegments_300)
+#define FONT_LABEL (&lv_font_montserrat_32)
+#define FONT_PROG_BTN (&lv_font_montserrat_32)
+#define FONT_DATETIME (&DroidSansMono18)
 
-typedef struct {
+typedef struct
+{
     uint8_t prog_id;
 } prog_btn_ud_t;
 
@@ -90,31 +91,32 @@ static char s_tr_credit[32] = "Credito";
 static char s_tr_elapsed_fmt[32] = "Secondi   %s";
 static char s_tr_pause_fmt[32] = "Pausa: %s";
 
-
 /**
  * @brief Carica le traduzioni per il pannello.
- * 
+ *
  * Questa funzione carica le traduzioni necessarie per il pannello utilizzando la configurazione del dispositivo.
- * 
+ *
  * @param [in/out] s_tr_credit Puntatore alla stringa dove verrà memorizzata la traduzione del label "Credito".
  * @return void
  */
 static void panel_load_translations(void)
 {
-    if (device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", s_tr_credit, sizeof(s_tr_credit)) != ESP_OK) {
+    if (device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", s_tr_credit, sizeof(s_tr_credit)) != ESP_OK)
+    {
         strncpy(s_tr_credit, "Credito", sizeof(s_tr_credit) - 1);
         s_tr_credit[sizeof(s_tr_credit) - 1] = '\0';
     }
-    if (device_config_get_ui_text_scoped("lvgl", "elapsed_fmt", "Secondi   %s", s_tr_elapsed_fmt, sizeof(s_tr_elapsed_fmt)) != ESP_OK) {
+    if (device_config_get_ui_text_scoped("lvgl", "elapsed_fmt", "Secondi   %s", s_tr_elapsed_fmt, sizeof(s_tr_elapsed_fmt)) != ESP_OK)
+    {
         strncpy(s_tr_elapsed_fmt, "Secondi   %s", sizeof(s_tr_elapsed_fmt) - 1);
         s_tr_elapsed_fmt[sizeof(s_tr_elapsed_fmt) - 1] = '\0';
     }
-    if (device_config_get_ui_text_scoped("lvgl", "pause_fmt", "Pausa: %s", s_tr_pause_fmt, sizeof(s_tr_pause_fmt)) != ESP_OK) {
+    if (device_config_get_ui_text_scoped("lvgl", "pause_fmt", "Pausa: %s", s_tr_pause_fmt, sizeof(s_tr_pause_fmt)) != ESP_OK)
+    {
         strncpy(s_tr_pause_fmt, "Pausa: %s", sizeof(s_tr_pause_fmt) - 1);
         s_tr_pause_fmt[sizeof(s_tr_pause_fmt) - 1] = '\0';
     }
 }
-
 
 /**
  * @brief Imposta lo stile di un pulsante LVGL.
@@ -136,19 +138,21 @@ static void btn_style(lv_obj_t *btn, lv_color_t bg)
 static const web_ui_program_entry_t *find_program_entry(uint8_t pid)
 {
     const web_ui_program_table_t *tbl = web_ui_program_table_get();
-    if (!tbl) {
+    if (!tbl)
+    {
         return NULL;
     }
 
-    for (uint8_t i = 0; i < tbl->count; i++) {
-        if (tbl->programs[i].program_id == pid) {
+    for (uint8_t i = 0; i < tbl->count; i++)
+    {
+        if (tbl->programs[i].program_id == pid)
+        {
             return &tbl->programs[i];
         }
     }
 
     return NULL;
 }
-
 
 /**
  * @brief Aggiorna i pulsanti del programma in base allo stato corrente del contesto del finite state machine.
@@ -162,13 +166,16 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
     bool running_or_paused = has_snap &&
                              (snap->state == FSM_STATE_RUNNING || snap->state == FSM_STATE_PAUSED);
 
-    if (has_snap && snap->credit_cents <= 0) {
+    if (has_snap && snap->credit_cents <= 0)
+    {
         s_active_prog = 0;
     }
 
-    for (int i = 0; i < PROG_COUNT; i++) {
+    for (int i = 0; i < PROG_COUNT; i++)
+    {
         lv_obj_t *btn = s_prog_btns[i];
-        if (!btn) {
+        if (!btn)
+        {
             continue;
         }
 
@@ -181,16 +188,21 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
         bool is_active = running_or_paused && (s_active_prog == pid) && has_snap && (snap->credit_cents > 0);
         bool can_click = program_enabled && credit_ok;
 
-        if (!s_btn_state_valid[i] || s_btn_last_active[i] != is_active) {
+        if (!s_btn_state_valid[i] || s_btn_last_active[i] != is_active)
+        {
             btn_style(btn, is_active ? COL_PROG_ACT : COL_PROG);
             s_btn_last_active[i] = is_active;
         }
 
-        if (!s_btn_state_valid[i] || s_btn_last_clickable[i] != can_click) {
-            if (can_click) {
+        if (!s_btn_state_valid[i] || s_btn_last_clickable[i] != can_click)
+        {
+            if (can_click)
+            {
                 lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
                 lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
-            } else {
+            }
+            else
+            {
                 lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
                 lv_obj_set_style_opa(btn, LV_OPA_50, LV_PART_MAIN);
             }
@@ -200,7 +212,6 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
         s_btn_state_valid[i] = true;
     }
 }
-
 
 /**
  * @brief Formatta un tempo in millisecondi in una stringa nel formato "mm:ss".
@@ -217,23 +228,25 @@ static void fmt_mm_ss(char *buf, size_t len, uint32_t ms)
     snprintf(buf, len, "%02lu:%02lu", (unsigned long)(s / 60), (unsigned long)(s % 60));
 }
 
-
 /**
  * @brief Aggiorna il tempo e pubblica un messaggio se richiesto.
- * 
+ *
  * @param publish_minute_message Flag booleano che indica se pubblicare un messaggio ogni minuto.
  * @return void Non restituisce alcun valore.
  */
 static void update_time(bool publish_minute_message)
 {
-    if (!s_time_lbl) {
+    if (!s_time_lbl)
+    {
         return;
     }
 
     time_t now = time(NULL);
-    if (now == (time_t)-1) {
+    if (now == (time_t)-1)
+    {
         const char *fallback = "--/--/---- --:--";
-        if (strcmp(s_last_time_text, fallback) != 0) {
+        if (strcmp(s_last_time_text, fallback) != 0)
+        {
             lv_label_set_text(s_time_lbl, fallback);
             strncpy(s_last_time_text, fallback, sizeof(s_last_time_text) - 1);
             s_last_time_text[sizeof(s_last_time_text) - 1] = '\0';
@@ -247,17 +260,22 @@ static void update_time(bool publish_minute_message)
     char buf[40] = {0};
     strftime(buf, sizeof(buf), "%d/%m/%Y %H:%M", &ti);
 
-    if (strcmp(s_last_time_text, buf) != 0) {
+    if (strcmp(s_last_time_text, buf) != 0)
+    {
         lv_label_set_text(s_time_lbl, buf);
         strncpy(s_last_time_text, buf, sizeof(s_last_time_text) - 1);
         s_last_time_text[sizeof(s_last_time_text) - 1] = '\0';
     }
 
-    if (publish_minute_message) {
+    if (publish_minute_message)
+    {
         time_t minute_epoch = now / 60;
-        if (s_last_minute_epoch == (time_t)-1) {
+        if (s_last_minute_epoch == (time_t)-1)
+        {
             s_last_minute_epoch = minute_epoch;
-        } else if (minute_epoch != s_last_minute_epoch) {
+        }
+        else if (minute_epoch != s_last_minute_epoch)
+        {
             char msg[FSM_EVENT_TEXT_MAX_LEN] = {0};
             s_last_minute_epoch = minute_epoch;
             strftime(msg, sizeof(msg), "Ora %H:%M", &ti);
@@ -265,7 +283,6 @@ static void update_time(bool publish_minute_message)
         }
     }
 }
-
 
 /**
  * @brief Callback per il timer del clock.
@@ -281,75 +298,90 @@ static void clock_timer_cb(lv_timer_t *t)
     update_time(true);
 }
 
-
 /**
  * @brief Aggiorna lo stato del contesto del finite state machine.
- * 
+ *
  * Questa funzione aggiorna lo stato del contesto del finite state machine utilizzando lo stato snapshot fornito.
- * 
+ *
  * @param [in] snap Puntatore al contesto del finite state machine da aggiornare.
  * @return Nessun valore di ritorno.
  */
 static void update_state(const fsm_ctx_t *snap)
 {
-    if (!snap) {
+    if (!snap)
+    {
         return;
     }
 
     bool running = (snap->state == FSM_STATE_RUNNING);
     bool paused = (snap->state == FSM_STATE_PAUSED);
 
-    if (s_status_box) {
+    if (s_status_box)
+    {
         lv_obj_set_style_bg_color(s_status_box, COL_STATE_IDL, LV_PART_MAIN);
     }
 
-    if (s_credit_lbl) {
+    if (s_credit_lbl)
+    {
         char buf[16] = {0};
 
-        if ((running || paused) && snap->running_target_ms > 0) {
+        if ((running || paused) && snap->running_target_ms > 0)
+        {
             uint32_t rem_ms = (snap->running_target_ms > snap->running_elapsed_ms)
-                                ? (snap->running_target_ms - snap->running_elapsed_ms)
-                                : 0;
+                                  ? (snap->running_target_ms - snap->running_elapsed_ms)
+                                  : 0;
             snprintf(buf, sizeof(buf), "%lu", (unsigned long)(rem_ms / 1000));
-        } else {
-            snprintf(buf, sizeof(buf), "%ld", (long)snap->credit_cents);
+        }
+        else
+        {
+            //snprintf(buf, sizeof(buf), "%ld", (long)snap->credit_cents);
+            snprintf(buf, sizeof(buf), "%ld", (long)snap->credit_cents / 100);
         }
 
-        if (strcmp(s_last_credit_text, buf) != 0) {
+        if (strcmp(s_last_credit_text, buf) != 0)
+        {
             lv_label_set_text(s_credit_lbl, buf);
             strncpy(s_last_credit_text, buf, sizeof(s_last_credit_text) - 1);
             s_last_credit_text[sizeof(s_last_credit_text) - 1] = '\0';
         }
     }
 
-    if (s_elapsed_lbl) {
+    if (s_elapsed_lbl)
+    {
         char buf[32] = {0};
 
-        if (running || paused) {
+        if (running || paused)
+        {
             char mm[10] = {0};
             fmt_mm_ss(mm, sizeof(mm), snap->running_elapsed_ms);
             snprintf(buf, sizeof(buf), s_tr_elapsed_fmt, mm);
-        } else {
+        }
+        else
+        {
             snprintf(buf, sizeof(buf), "%s", s_tr_credit);
         }
 
-        if (strcmp(s_last_elapsed_text, buf) != 0) {
+        if (strcmp(s_last_elapsed_text, buf) != 0)
+        {
             lv_label_set_text(s_elapsed_lbl, buf);
             strncpy(s_last_elapsed_text, buf, sizeof(s_last_elapsed_text) - 1);
             s_last_elapsed_text[sizeof(s_last_elapsed_text) - 1] = '\0';
         }
     }
 
-    if (s_pause_lbl) {
+    if (s_pause_lbl)
+    {
         char buf[32] = {0};
 
-        if (paused && snap->pause_elapsed_ms > 0) {
+        if (paused && snap->pause_elapsed_ms > 0)
+        {
             char mm[10] = {0};
             fmt_mm_ss(mm, sizeof(mm), snap->pause_elapsed_ms);
             snprintf(buf, sizeof(buf), s_tr_pause_fmt, mm);
         }
 
-        if (strcmp(s_last_pause_text, buf) != 0) {
+        if (strcmp(s_last_pause_text, buf) != 0)
+        {
             lv_label_set_text(s_pause_lbl, buf);
             strncpy(s_last_pause_text, buf, sizeof(s_last_pause_text) - 1);
             s_last_pause_text[sizeof(s_last_pause_text) - 1] = '\0';
@@ -357,14 +389,16 @@ static void update_state(const fsm_ctx_t *snap)
     }
 
     int32_t pct = 0;
-    if (snap->running_target_ms > 0 && (running || paused)) {
+    if (snap->running_target_ms > 0 && (running || paused))
+    {
         uint32_t rem = (snap->running_target_ms > snap->running_elapsed_ms)
-                         ? (snap->running_target_ms - snap->running_elapsed_ms)
-                         : 0;
+                           ? (snap->running_target_ms - snap->running_elapsed_ms)
+                           : 0;
         pct = (int32_t)((rem * 100U) / snap->running_target_ms);
     }
 
-    if (s_gauge && pct != s_last_gauge_pct) {
+    if (s_gauge && pct != s_last_gauge_pct)
+    {
         lv_color_t gauge_col = (pct > 30) ? COL_PROG_ACT : COL_PROG_LOW;
         lv_obj_set_style_bg_color(s_gauge, gauge_col, LV_PART_INDICATOR);
         lv_obj_set_style_bg_grad_color(s_gauge, gauge_col, LV_PART_INDICATOR);
@@ -374,10 +408,9 @@ static void update_state(const fsm_ctx_t *snap)
     }
 }
 
-
 /**
  * @brief Pubblica un programma in base all'ID fornito e gestisce il pausa/toggle.
- * 
+ *
  * @param prog_id ID del programma da pubblicare.
  * @param pause_toggle Flag per attivare/disattivare il pausa/toggle.
  * @param entry Puntatore alla struttura del programma da pubblicare.
@@ -386,11 +419,13 @@ static void update_state(const fsm_ctx_t *snap)
  */
 static bool publish_program(uint8_t prog_id, bool pause_toggle, const web_ui_program_entry_t *entry)
 {
-    if (!fsm_event_queue_init(0)) {
+    if (!fsm_event_queue_init(0))
+    {
         return false;
     }
 
-    if (pause_toggle) {
+    if (pause_toggle)
+    {
         fsm_input_event_t ev = {
             .from = AGN_ID_LVGL,
             .to = {AGN_ID_FSM},
@@ -404,7 +439,8 @@ static bool publish_program(uint8_t prog_id, bool pause_toggle, const web_ui_pro
             .text = {0},
         };
 
-        if (entry) {
+        if (entry)
+        {
             strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
         }
 
@@ -429,18 +465,19 @@ static bool publish_program(uint8_t prog_id, bool pause_toggle, const web_ui_pro
         .text = {0},
     };
 
-    if (entry) {
+    if (entry)
+    {
         strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
     }
 
     bool ok = fsm_event_publish(&ev, pdMS_TO_TICKS(20));
-    if (!ok) {
+    if (!ok)
+    {
         ESP_LOGW(TAG, "[C] Coda FSM piena per prog=%u", prog_id);
     }
 
     return ok;
 }
-
 
 /**
  * @brief Gestisce l'evento del pulsante di programmazione.
@@ -454,24 +491,28 @@ static void on_prog_btn(lv_event_t *e)
 {
     lv_obj_t *btn = lv_event_get_target(e);
     prog_btn_ud_t *ud = (prog_btn_ud_t *)lv_obj_get_user_data(btn);
-    if (!ud) {
+    if (!ud)
+    {
         return;
     }
 
     uint8_t pid = ud->prog_id;
     const web_ui_program_entry_t *entry = find_program_entry(pid);
-    if (!entry || !entry->enabled) {
+    if (!entry || !entry->enabled)
+    {
         ESP_LOGW(TAG, "[C] Programma non disponibile: id=%u", pid);
         return;
     }
 
     fsm_ctx_t snap = {0};
-    if (!fsm_runtime_snapshot(&snap)) {
+    if (!fsm_runtime_snapshot(&snap))
+    {
         ESP_LOGW(TAG, "[C] Snapshot FSM non disponibile, click programma ignorato");
         return;
     }
 
-    if (snap.credit_cents <= 0 || snap.credit_cents < (int32_t)entry->price_units) {
+    if (snap.credit_cents <= 0 || snap.credit_cents < (int32_t)entry->price_units)
+    {
         s_active_prog = 0;
         refresh_prog_buttons(&snap);
         ESP_LOGI(TAG,
@@ -483,18 +524,19 @@ static void on_prog_btn(lv_event_t *e)
     }
 
     bool pause_toggle = (s_active_prog == pid);
-    if (!pause_toggle) {
+    if (!pause_toggle)
+    {
         s_active_prog = pid;
     }
 
     refresh_prog_buttons(&snap);
-    if (!pause_toggle) {
+    if (!pause_toggle)
+    {
         btn_style(btn, COL_PROG_ACT);
     }
 
     publish_program(pid, pause_toggle, entry);
 }
-
 
 /**
  * @brief Costruisce l'intestazione della schermata.
@@ -516,9 +558,8 @@ static void build_header(lv_obj_t *scr)
     lv_obj_align(s_time_lbl, LV_ALIGN_BOTTOM_MID, 0, -10);
 }
 
-
 /** @brief Costruisce lo stato dell'interfaccia utente.
- *  
+ *
  *  @param scr Puntatore all'oggetto di schermo su cui costruire lo stato.
  *  @return Nessun valore di ritorno.
  */
@@ -597,24 +638,24 @@ static void build_status(lv_obj_t *scr)
     lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_MID, 0, -8);
 }
 
-
 /**
  * Crea un pulsante per un programma.
- * 
+ *
  * @brief Crea un pulsante per un programma all'interno di un oggetto genitore.
- * 
+ *
  * @param parent Puntatore all'oggetto genitore in cui verrà creato il pulsante.
  * @param pid Identificatore del programma associato al pulsante.
  * @param x Coordinata x dell'angolo superiore sinistro del pulsante.
  * @param y Coordinata y dell'angolo superiore sinistro del pulsante.
  * @param w Larghezza del pulsante.
  * @param h Altezza del pulsante.
- * 
+ *
  * @return Niente.
  */
 static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t y, int32_t w, int32_t h)
 {
-    if (pid == 0 || pid > PROG_COUNT) {
+    if (pid == 0 || pid > PROG_COUNT)
+    {
         return;
     }
 
@@ -643,12 +684,11 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     lv_obj_set_style_opa(btn, LV_OPA_50, LV_PART_MAIN);
 }
 
-
 /** @brief Costruisce i pulsanti del programma.
- *  
+ *
  *  Questa funzione si occupa di creare e configurare i pulsanti utilizzati
  *  all'interno dell'interfaccia del programma.
- *  
+ *
  *  @return Niente.
  */
 static void build_prog_buttons(void)
@@ -660,7 +700,8 @@ static void build_prog_buttons(void)
     const int32_t left_btn_x = PANEL_LEFT_X + ((PANEL_LEFT_W - left_btn_w) / 2);
     const int32_t right_btn_x = PANEL_RIGHT_X + ((PANEL_RIGHT_W - right_btn_w) / 2);
 
-    for (int row = 0; row < PROG_ROWS; row++) {
+    for (int row = 0; row < PROG_ROWS; row++)
+    {
         int32_t y = row * (btn_h + btn_gap);
         uint8_t pid_left = (uint8_t)(row + 1);
         uint8_t pid_right = (uint8_t)(row + 6);
@@ -668,7 +709,6 @@ static void build_prog_buttons(void)
         create_prog_button(s_status_box, pid_right, right_btn_x, y, right_btn_w, btn_h);
     }
 }
-
 
 /**
  * @brief Cancella tutti i gestori del pannello.
@@ -692,7 +732,8 @@ static void clear_panel_handles(void)
     s_gauge = NULL;
     s_counter_fill = NULL;
 
-    for (int i = 0; i < PROG_COUNT; i++) {
+    for (int i = 0; i < PROG_COUNT; i++)
+    {
         s_prog_btns[i] = NULL;
         s_prog_lbls[i] = NULL;
         s_btn_last_clickable[i] = false;
@@ -708,10 +749,9 @@ static void clear_panel_handles(void)
     s_last_minute_epoch = (time_t)-1;
 }
 
-
 /**
  * @brief Callback chiamata quando scade il timer del pannello.
- * 
+ *
  * @param t Puntatore al timer LVGL.
  * @return void Nessun valore di ritorno.
  */
@@ -720,29 +760,31 @@ static void panel_timer_cb(lv_timer_t *t)
     (void)t;
 
     fsm_ctx_t snap = {0};
-    if (fsm_runtime_snapshot(&snap)) {
+    if (fsm_runtime_snapshot(&snap))
+    {
         update_state(&snap);
         refresh_prog_buttons(&snap);
     }
 }
 
-
 /**
  * @brief Disattiva la pagina principale.
- * 
+ *
  * Questa funzione disattiva la pagina principale dell'interfaccia utente.
- * 
+ *
  * @param [in/out] Nessun parametro specifico.
  * @return Nessun valore di ritorno.
  */
 void lvgl_page_main_deactivate(void)
 {
-    if (s_panel_timer) {
+    if (s_panel_timer)
+    {
         lv_timer_del(s_panel_timer);
         s_panel_timer = NULL;
     }
 
-    if (s_clock_timer) {
+    if (s_clock_timer)
+    {
         lv_timer_del(s_clock_timer);
         s_clock_timer = NULL;
     }
@@ -751,11 +793,10 @@ void lvgl_page_main_deactivate(void)
     s_active_prog = 0;
 }
 
-
 /** @brief Mostra la pagina principale dell'interfaccia grafica LVGL.
- *  
+ *
  *  Questa funzione visualizza la pagina principale dell'interfaccia grafica LVGL.
- *  
+ *
  *  @return Nessun valore di ritorno.
  */
 void lvgl_page_main_show(void)
@@ -781,7 +822,8 @@ void lvgl_page_main_show(void)
     update_time(true);
 
     fsm_ctx_t snap = {0};
-    if (fsm_runtime_snapshot(&snap)) {
+    if (fsm_runtime_snapshot(&snap))
+    {
         update_state(&snap);
         refresh_prog_buttons(&snap);
     }
@@ -791,7 +833,6 @@ void lvgl_page_main_show(void)
 
     ESP_LOGI(TAG, "[C] Pagina principale LVGL visualizzata");
 }
-
 
 /**
  * @brief Aggiorna i testi principali della pagina LVGL.
@@ -807,8 +848,10 @@ void lvgl_page_main_refresh_texts(void)
     s_last_elapsed_text[0] = '\0';
     s_last_pause_text[0] = '\0';
 
-    for (int i = 0; i < PROG_COUNT; ++i) {
-        if (!s_prog_lbls[i]) {
+    for (int i = 0; i < PROG_COUNT; ++i)
+    {
+        if (!s_prog_lbls[i])
+        {
             continue;
         }
 
@@ -818,7 +861,8 @@ void lvgl_page_main_refresh_texts(void)
     }
 
     fsm_ctx_t snap = {0};
-    if (fsm_runtime_snapshot(&snap)) {
+    if (fsm_runtime_snapshot(&snap))
+    {
         update_state(&snap);
         refresh_prog_buttons(&snap);
     }

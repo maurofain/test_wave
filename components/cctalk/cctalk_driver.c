@@ -553,6 +553,10 @@ esp_err_t cctalk_driver_start_acceptor(void)
 
     uint8_t acceptor_addr = cctalk_get_acceptor_addr();
 
+    // Passo 1: Address Poll - Verifica che la gettoniera sia presente e risponda
+    // Invia comando 254 (0xFE) senza dati, aspetta ACK
+    // Se risponde, la gettoniera è attiva e comunica
+    // 02 00 01 FE FF → Address Poll
     if (!cctalk_address_poll(acceptor_addr, CCTALK_CMD_TIMEOUT_MS)) {
         char msg[64] = {0};
         snprintf(msg, sizeof(msg), "Address Poll FAIL (addr 0x%02X)", (unsigned)acceptor_addr);
@@ -567,21 +571,66 @@ esp_err_t cctalk_driver_start_acceptor(void)
     }
     cctalk_log_powerup_info();
 
-    if (!cctalk_modify_master_inhibit(acceptor_addr, true, CCTALK_CMD_TIMEOUT_MS)) {
-        serial_test_push_monitor_action("CCTALK", "Master Inhibit ON FAIL");
+    // Delay 50ms tra comandi per stabilità comunicazione
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // Passo 2: Richiesta Status - Ottiene lo stato corrente della gettoniera
+    // Comando 248 (0xF8), riceve 1 byte di stato
+    // Utile per verificare che la gettoniera sia pronta
+    // 02 00 01 F8 05 → Status
+    {
+        uint8_t status = 0;
+        if (cctalk_request_status(acceptor_addr, &status, CCTALK_CMD_TIMEOUT_MS)) {
+            char msg[64] = {0};
+            snprintf(msg, sizeof(msg), "Status OK: 0x%02X", (unsigned)status);
+            serial_test_push_monitor_action("CCTALK", msg);
+        } else {
+            serial_test_push_monitor_action("CCTALK", "Status FAIL");
+            return ESP_FAIL;
+        }
+    }
+
+    // Delay 50ms
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // Passo 3: Master Inhibit = 0 (inibito)
+    // Comando 231 (0xE7) con dato 0x00
+    // Questo permette di controllare i canali individualmente
+    if (!cctalk_modify_master_inhibit(acceptor_addr, false, CCTALK_CMD_TIMEOUT_MS)) {
+        serial_test_push_monitor_action("CCTALK", "Master Inhibit=0 (inibito) FAIL");
         return ESP_FAIL;
     }
 
+    // Delay 100ms per permettere alla gettoniera di processare
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Passo 4: Modify Inhibit Status - Imposta maschera canali
+    // Comando 231 (0xE7) con 2 byte: mask_low, mask_high
+    // Bit 0 = canale attivo, Bit 1 = canale inibito
+    // 00 00 = tutti i 16 canali attivi/abilitati
+    // 02 02 01 86 00 00 76 → Tutti 16 canali ABILITATI
     if (!cctalk_modify_inhibit_status(acceptor_addr, 0x00U, 0x00U, CCTALK_CMD_TIMEOUT_MS)) {
         serial_test_push_monitor_action("CCTALK", "Inhibit mask 00 00 FAIL");
         return ESP_FAIL;
     }
 
-    if (!cctalk_modify_master_inhibit(acceptor_addr, false, CCTALK_CMD_TIMEOUT_MS)) {
-        serial_test_push_monitor_action("CCTALK", "Master Inhibit OFF FAIL");
+    // Delay 100ms
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Passo 5: Master Inhibit = 1 (abilitato)
+    // Comando 231 (0xE7) con dato 0x01
+    // Ora la gettoniera accetta monete normalmente
+    if (!cctalk_modify_master_inhibit(acceptor_addr, true, CCTALK_CMD_TIMEOUT_MS)) {
+        serial_test_push_monitor_action("CCTALK", "Master Inhibit=1 (abilitato) FAIL");
         return ESP_FAIL;
     }
 
+    // Delay 100ms
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Passo 6: Request Inhibit Status - Verifica la maschera impostata
+    // Comando 230 (0xE6), riceve 2 byte: mask_low, mask_high
+    // Dovrebbe restituire 00 00 (tutti canali attivi)
     {
         uint8_t mask_low = 0;
         uint8_t mask_high = 0;
@@ -622,7 +671,7 @@ esp_err_t cctalk_driver_stop_acceptor(void)
     }
 
     uint8_t acceptor_addr = cctalk_get_acceptor_addr();
-    bool inhibit_ok = cctalk_modify_master_inhibit(acceptor_addr, true, CCTALK_CMD_TIMEOUT_MS);
+    bool inhibit_ok = cctalk_modify_master_inhibit(acceptor_addr, false, CCTALK_CMD_TIMEOUT_MS);
 
     if (cctalk_state_take(20)) {
         s_acceptor_enabled = false;
@@ -633,7 +682,7 @@ esp_err_t cctalk_driver_stop_acceptor(void)
     }
 
     if (!inhibit_ok) {
-        serial_test_push_monitor_action("CCTALK", "Master Inhibit ON FAIL");
+        serial_test_push_monitor_action("CCTALK", "Master Inhibit=0 (inibito) FAIL");
         return ESP_FAIL;
     }
 

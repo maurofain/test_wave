@@ -752,19 +752,20 @@ bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uin
 
 
 /**
- * @brief Abilita o disabilita l'inibizione del dispositivo master.
+ * @brief Imposta lo stato di accettazione del master inhibit.
  *
  * @param [in] dest_addr L'indirizzo del dispositivo destinatario.
- * @param [in] enable Flag booleano per abilitare (true) o disabilitare (false) l'inibizione.
+ * @param [in] accept_enabled true => invia valore 1 (abilitato), false => invia valore 0 (inibito).
  * @param [in] timeout_ms Il timeout in millisecondi per l'operazione.
  * @return true se l'operazione ha successo, false in caso di errore.
  */
-bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms)
+bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool accept_enabled, uint32_t timeout_ms)
 {
-    /* enable=true: Master Inhibit ON (blocca monete) => [0]=Rifiuta
-     * enable=false: Master Inhibit OFF (accetta monete) => [1]=Accetta
+    /* Semantica esplicita:
+     * 1 = abilitato (accetta)
+     * 0 = inibito (rifiuta)
      * Ref: gettoniera.md header 231, [1]=Accetta [0]=Rifiuta */
-    uint8_t data = enable ? 0x00U : 0x01U;
+    uint8_t data = accept_enabled ? 0x01U : 0x00U;
     cctalk_frame_t response = {0};
     if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, &data, 1U, &response, timeout_ms)) {
         return false;
@@ -786,8 +787,8 @@ bool cctalk_modify_inhibit_status(uint8_t dest_addr, uint8_t mask_low, uint8_t m
 {
     uint8_t data[2] = {mask_low, mask_high};
     cctalk_frame_t response = {0};
-    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 134U, data, 2U, &response, timeout_ms)) {
-    //if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 99U, data, 2U, &response, timeout_ms)) {
+    //if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 134U, data, 2U, &response, timeout_ms)) {
+    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 231U, data, 2U, &response, timeout_ms)) {
         return false;
     }
     return cctalk_expect_ack(&response);
@@ -1193,16 +1194,16 @@ bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uin
 
 
 /**
- * @brief Abilita o disabilita l'inibizione del maestro CCTalk.
+ * @brief Imposta lo stato di accettazione del master inhibit CCTalk.
  *
  * @param [in] dest_addr L'indirizzo destinatario del comando.
- * @param [in] enable Flag booleano per abilitare (true) o disabilitare (false) l'inibizione.
+ * @param [in] accept_enabled true => invia valore 1 (abilitato), false => invia valore 0 (inibito).
  * @param [in] timeout_ms Il timeout in millisecondi per l'operazione.
  * @return true se l'operazione è stata completata con successo, false altrimenti.
  */
-bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms)
+bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool accept_enabled, uint32_t timeout_ms)
 {
-    (void)dest_addr; (void)enable; (void)timeout_ms;
+    (void)dest_addr; (void)accept_enabled; (void)timeout_ms;
     return true;
 }
 

@@ -1087,12 +1087,13 @@ modbus_read_end:
     } else if (strcmp(test_name, "cctalk_retention_on") == 0 ||
                strcmp(test_name, "cctalk_retention_off") == 0) {
         bool retention_on = (strcmp(test_name, "cctalk_retention_on") == 0);
+        bool accept_enabled = !retention_on;
         uint8_t req_addr = 0;
         if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
             (void)set_cctalk_address_configured(req_addr);
         }
         uint8_t cctalk_addr = get_cctalk_address_configured();
-        serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON richiesta" : "RETENZIONE OFF richiesta");
+        serial_test_push_monitor_action("CCTALK", accept_enabled ? "Master Inhibit=1 (abilitato) richiesta" : "Master Inhibit=0 (inibito) richiesta");
 
         esp_err_t rs232_err = rs232_init();
         if (rs232_err != ESP_OK) {
@@ -1107,18 +1108,18 @@ modbus_read_end:
                          esp_err_to_name(cctalk_err));
             } else {
                 bool inhibit_ok = cctalk_modify_master_inhibit(cctalk_addr,
-                                                               retention_on,
+                                                               accept_enabled,
                                                                CCTALK_WEB_CMD_TIMEOUT_MS);
                 bool mask_ok = true;
                 if (inhibit_ok && !retention_on) {
                     mask_ok = cctalk_modify_inhibit_status(cctalk_addr,
-                                                           0x00U,
-                                                           0x00U,
+                                                           0xFFU,
+                                                           0xFFU,
                                                            CCTALK_WEB_CMD_TIMEOUT_MS);
                 }
 
                 if (!inhibit_ok || !mask_ok) {
-                    serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON FAIL" : "RETENZIONE OFF FAIL");
+                    serial_test_push_monitor_action("CCTALK", accept_enabled ? "Master Inhibit=1 (abilitato) FAIL" : "Master Inhibit=0 (inibito) FAIL");
                     snprintf(response, sizeof(response),
                              "{\"error\":\"Comando ritenzione/abilitazione formati fallito\"}");
                 } else {
@@ -1132,7 +1133,7 @@ modbus_read_end:
                                                                    &mask_high,
                                                                    CCTALK_WEB_CMD_TIMEOUT_MS);
 
-                    serial_test_push_monitor_action("CCTALK", retention_on ? "RETENZIONE ON ok" : "RETENZIONE OFF ok");
+                    serial_test_push_monitor_action("CCTALK", accept_enabled ? "Master Inhibit=1 (abilitato) ok" : "Master Inhibit=0 (inibito) ok");
                     if (status_ok) {
                         snprintf(response, sizeof(response),
                                  "{\"message\":\"Ritenzione %s\",\"mask_low\":%u,\"mask_high\":%u}",
@@ -1170,7 +1171,7 @@ modbus_read_end:
                          esp_err_to_name(cctalk_err));
             } else {
                 bool master_ok = cctalk_modify_master_inhibit(cctalk_addr,
-                                                              false,
+                                                              true,
                                                               CCTALK_WEB_CMD_TIMEOUT_MS);
                 bool mask_ok = false;
                 if (master_ok) {

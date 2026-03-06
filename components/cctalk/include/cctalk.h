@@ -64,7 +64,7 @@ bool cctalk_request_equipment_category(uint8_t dest_addr, char *out, size_t out_
 bool cctalk_request_product_code(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms);
 bool cctalk_request_serial_number(uint8_t dest_addr, uint8_t serial[3], uint32_t timeout_ms);
 bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uint32_t timeout_ms);
-bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool enable, uint32_t timeout_ms);
+bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool accept_enabled, uint32_t timeout_ms);
 bool cctalk_modify_inhibit_status(uint8_t dest_addr, uint8_t mask_low, uint8_t mask_high, uint32_t timeout_ms);
 bool cctalk_request_inhibit_status(uint8_t dest_addr, uint8_t *mask_low, uint8_t *mask_high, uint32_t timeout_ms);
 bool cctalk_request_coin_id(uint8_t dest_addr, uint8_t channel, char *out, size_t out_len, uint32_t timeout_ms);

@@ -3,6 +3,24 @@
 Documentazione tecnica dei comandi ccTalk per l'integrazione con microcontrollori (ESP32). 
 *Modelli di riferimento: Microhard HBD5, HBD2, serie ST.*
 
+## Nota di compatibilità con standard ccTalk
+
+Questa pagina descrive il profilo operativo usato con le gettoniere Microhard nel progetto.
+
+Riferimento standard ufficiale:
+- `docs/cctalk44-3.pdf` (Appendix 1 - cctalk Command Cross Reference)
+
+Riferimento tabella standard sintetica nel repository:
+- `docs/cctalk_comandi.md`
+
+Differenze principali rispetto ai nomi standard del PDF:
+
+| Funzione nel progetto | Header usato | Nome standard PDF | Nota |
+|:---|:---:|:---|:---|
+| Poll iniziale presenza | 254 | `Simple poll` | In alcuni documenti commerciali viene chiamato "Address Poll" |
+| Master inhibit globale | 231 | `Modify inhibit status` | Nel PDF il `Modify master inhibit status` è header 228 |
+| Lettura presenza/inserimenti | 226 | `Request insertion counter` | Nel progetto viene usato come stato presenza in polling |
+
 ## 1. Parametri di Comunicazione
 - **Baud Rate**: 9600 bps
 - **Data bits**: 8
@@ -30,7 +48,7 @@ Documentazione tecnica dei comandi ccTalk per l'integrazione con microcontrollor
 ### A. Identificazione e Stato (Power-Up)
 | Header | Comando | Descrizione | Risposta Microhard |
 |:---:|:---|:---|:---|
-| **254** | `Address Poll` | Verifica presenza periferica | ACK (0 data bytes) |
+| **254** | `Simple Poll` | Verifica presenza periferica | ACK (0 data bytes) |
 | **248** | `Request Status` | Stato operativo | 0: OK, 1: Errore/Inceppamento |
 | **246** | `Manufacturer ID` | Identifica il produttore | `"Microhard"` |
 | **245** | `Equipment Cat.` | Categoria dispositivo | `"Coin Acceptor"` |
@@ -50,7 +68,7 @@ Documentazione tecnica dei comandi ccTalk per l'integrazione con microcontrollor
 | Header | Comando | Descrizione |
 |:---:|:---|:---|
 | **229** | `Read Buffered Credit` | Legge gli eventi di incasso (11 byte di risposta) |
-| **226** | `Request Insertion Status` | Dice se c'è una moneta nel canale di lettura |
+| **226** | `Request Insertion Counter` | Usato nel progetto come stato presenza in polling |
 | **1** | `Reset Device` | Riavvio software della gettoniera |
 
 ---
