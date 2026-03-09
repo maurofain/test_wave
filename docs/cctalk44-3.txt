@@ -1,0 +1,4420 @@
+Public Domain Document
+
+Part 3 - Contents
+1. Appendix 1 - cctalk Command Cross Reference............................................................................................3
+1.1 Core Commands.............................................................................................................................................7
+1.2 Core Plus Commands....................................................................................................................................7
+1.3 Multi-drop Commands..................................................................................................................................7
+1.4 Coin Acceptor Commands...........................................................................................................................7
+1.5 Payout Commands.........................................................................................................................................7
+1.6 Bill Validator Commands.............................................................................................................................8
+1.7 Obsolete Commands .....................................................................................................................................8
+2. Appendix 2 - OSI 7-layer Network Model ......................................................................................................9
+An encryption layer is used on some peripherals where security is paramount. ................9
+3. Appendix 3 - Coin Types and Coin Values ...................................................................................................10
+3.1 Automatic Coin Configuration ..................................................................................................................11
+3.2 CVF ................................................................................................................................................................13
+3.3 BACTA Token Selection ...........................................................................................................................14
+3.3.1. Token Selection...................................................................................................................................14
+3.3.2. Tokens as Coins..................................................................................................................................15
+4. Appendix 4 - Polled Serial Credit Timing for Coin Acceptors ..................................................................16
+4.1 Polled Retries................................................................................................................................................17
+5. Appendix 5 - Multi-Master Applications.......................................................................................................18
+5.1 Arbitration Controllers ................................................................................................................................20
+6. Appendix 6 - Naming Convention ..................................................................................................................21
+6.1 Money Controls Product Examples ..........................................................................................................23
+7. Appendix 7 - Flash Memory Support .............................................................................................................25
+8. Appendix 8 - Address Clash Probability........................................................................................................26
+8.1 Clash Results ................................................................................................................................................27
+9. Appendix 9 - CRC Checksum Algorithm......................................................................................................28
+9.1 Outline ...........................................................................................................................................................28
+9.2 Example Command .....................................................................................................................................28
+9.3 Algorithm in C++ ........................................................................................................................................28
+9.4 Look-up Table ..............................................................................................................................................29
+9.5 Verification Data..........................................................................................................................................30
+10. Appendix 10 - Common Country Codes......................................................................................................31
+10.1 Europe..........................................................................................................................................................31
+10.2 Rest of the World.......................................................................................................................................32
+10.3 Islands..........................................................................................................................................................34
+10.4 Exceptions...................................................................................................................................................36
+11. Appendix 11 - Coin Acceptor Messaging Example ...................................................................................37
+11.1 Initialisation................................................................................................................................................37
+11.2 Pre-Acceptance ..........................................................................................................................................38
+11.3 Credit Polling .............................................................................................................................................38
+12. Appendix 12 - Italian Flavour Specification Changes...............................................................................40
+13. Appendix 13 - Minimum Acceptable Implementations............................................................................41
+13.1 Coin Acceptors...........................................................................................................................................41
+13.1.1. Add for Sorter / Diverter Support ..................................................................................................41
+13.1.2. Add for Date Support.......................................................................................................................41
+13.1.3. Add for Encrypted Serial Communication...................................................................................41
+13.2 Bill Validators ............................................................................................................................................42
+13.2.1. Add for Bank Switching Support...................................................................................................42
+13.2.2. Add for Date Support.......................................................................................................................42
+13.2.3. Add for Barcode Support ................................................................................................................42
+13.3 Payouts ........................................................................................................................................................43
+13.3.1. Add for Encrypted Payout...............................................................................................................43
+13.3.2. Add for Enhanced Security.............................................................................................................43
+13.3.3. Add for Date Support.......................................................................................................................43
+13.3.4. Add for Parameter Support .............................................................................................................43
+13.3.5. Add for Accumulator Mode............................................................................................................43
+14. Appendix 14 - Large Packet Exchange ........................................................................................................44
+14.1 Host to Device............................................................................................................................................44
+14.2 Device to Host............................................................................................................................................44
+cctalk Generic Specification -  Money Controls - Page 1 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+15. Appendix 15 – Bill Types and Bill Values ..................................................................................................46
+16. Table 1 - cctalk Standard Category Strings & Default Addresses...........................................................48
+17. Table 2 - cctalk Coin Acceptor Error Code Table ......................................................................................49
+17.1 cctalk Coin Acceptor Error Code Descriptions....................................................................................51
+18. Table 3 - cctalk Fault Code Table .................................................................................................................53
+18.1 cctalk Fault Code Descriptions ...............................................................................................................55
+19. Table 4 - cctalk Coin Acceptor Status Codes ..............................................................................................57
+20. Table 5 - cctalk Coin Calibration Reply Codes ..........................................................................................58
+21. Table 6 - cctalk Standard Manufacturer Strings.........................................................................................59
+21.1 Manufacturer Names .................................................................................................................................59
+22. Table 7 - cctalk Bill Event Codes..................................................................................................................60
+23. Circuit 1 - cctalk Standard Interface .............................................................................................................61
+Typical Components..........................................................................................................................................61
+24. Circuit 2 - cctalk Low Cost Interface............................................................................................................62
+25. Circuit 3 - cctalk Direct Interface..................................................................................................................63
+26. Circuit 4 - PC Interface ...................................................................................................................................64
+27. Glossary .............................................................................................................................................................65
+
+cctalk Generic Specification -  Money Controls - Page 2 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+1. Appendix 1 - cctalk Command Cross Reference
+1 - Core commands
+2 - Core Plus commands
+3 - Multi-drop commands
+C - Coin Acceptor commands
+P - Payout commands ( for serial hoppers )
+B - Bill Validator commands
+O - Obsolete commands
+Header
+255
+254
+253
+252
+251
+250
+249
+248
+247
+246
+245
+244
+243
+242
+241
+240
+239
+238
+237
+236
+235
+234
+233
+232
+231
+230
+229
+228
+227
+226
+225
+224
+223
+222
+221
+220
+
+Function
+Factory set-up and test
+Simple poll
+Address poll
+Address clash
+Address change
+Address random
+Request polling priority
+Request status
+Request variable set
+Request manufacturer id
+Request equipment category id
+Request product code
+Request database version
+Request serial number
+Request software revision
+Test solenoids
+Operate motors
+Test output lines
+Read input lines
+Read opto states
+Read last credit or error code
+Issue guard code
+Latch output lines
+Perform self-check
+Modify inhibit status
+Request inhibit status
+Read buffered credit or error
+codes
+Modify master inhibit status
+Request master inhibit status
+Request insertion counter
+Request accept counter
+Dispense coins
+Dispense change
+Modify sorter override status
+Request sorter override status
+One-shot credit
+
+1
+
+2
+
+3
+
+C
+
+P
+
+B
+
+O
+
+1
+3
+3
+3
+3
+C
+C
+C
+
+B
+P
+
+B
+
+P
+
+B
+B
+B
+B
+
+1
+1
+1
+C
+2
+2
+C
+C
+C
+C
+
+O
+O
+C
+C
+C
+C
+C
+
+B
+B
+B
+B
+
+C
+C
+C
+C
+
+B
+B
+B
+B
+O
+O
+
+C
+C
+O
+
+cctalk Generic Specification -  Money Controls - Page 3 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+219
+218
+217
+216
+215
+214
+213
+212
+211
+210
+209
+208
+207
+206
+205
+204
+203
+202
+201
+200
+199
+198
+197
+196
+195
+194
+193
+192
+191
+190
+189
+188
+187
+186
+185
+184
+183
+182
+181
+180
+179
+178
+177
+176
+175
+174
+173
+172
+171
+
+Enter new PIN number
+Enter PIN number
+Request payout high / low status
+Request data storage availability
+Read data block
+Write data block
+Request option flags
+Request coin position
+Power management control
+Modify sorter paths
+Request sorter paths
+Modify payout absolute count
+Request payout absolute count
+Empty payout
+Request audit information block
+Meter control
+Display control
+Teach mode control
+Request teach status
+Upload coin data
+Configuration to EEPROM
+Counters to EEPROM
+Calculate ROM checksum
+Request creation date
+Request last modification date
+Request reject counter
+Request fraud counter
+Request build code
+Keypad control
+Request payout status
+Modify default sorter path
+Request default sorter path
+Modify payout capacity
+Request payout capacity
+Modify coin id
+Request coin id
+Upload window data
+Download calibration info
+Modify security setting
+Request security setting
+Modify bank select
+Request bank select
+Handheld function
+Request alarm counter
+Modify payout float
+Request payout float
+Request thermistor reading
+Emergency stop
+Request hopper coin
+
+C
+C
+C
+C
+C
+C
+C
+
+P
+P
+P
+P
+P
+P
+
+B
+B
+B
+B
+
+C
+C
+P
+P
+O
+O
+
+C
+C
+
+B
+B
+O
+
+C
+C
+2
+C
+C
+C
+C
+
+B
+B
+
+1
+O
+C
+C
+P
+P
+C
+C
+C
+C
+C
+C
+C
+C
+C
+C
+
+B
+B
+B
+B
+
+P
+P
+C
+P
+P
+
+cctalk Generic Specification -  Money Controls - Page 4 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+170
+169
+168
+167
+166
+165
+164
+163
+162
+161
+160
+159
+158
+157
+156
+155
+154
+153
+152
+151
+150
+149
+148
+147
+146
+145
+144
+143
+142
+141
+140
+139
+138
+137
+136
+135
+134
+133
+132
+131
+130
+129
+128
+to
+104
+103
+
+Request base year
+Request address mode
+Request hopper dispense count
+Dispense hopper coins
+Request hopper status
+Modify variable set
+Enable hopper
+Test hopper
+Modify inhibit and override
+registers
+Pump RNG
+Request cipher key
+Read buffered bill events
+Modify bill id
+Request bill id
+Request country scaling factor
+Request bill position
+Route bill
+Modify bill operating mode
+Request bill operating mode
+Test lamps
+Request individual accept counter
+Request individual error counter
+Read opto voltages
+Perform stacker cycle
+Operate bi-directional motors
+Request currency revision
+Upload bill tables
+Begin bill table upgrade
+Finish bill table upgrade
+Request firmware upgrade
+capability
+Upload firmware
+Begin firmware upgrade
+Finish firmware upgrade
+Switch encryption code
+Store encryption code
+Set accept limit
+Dispense hopper value
+Request hopper polling value
+Emergency stop value
+Request hopper coin value
+Request indexed hopper dispense
+count
+Read barcode data
+
+C
+C
+
+P
+P
+P
+P
+P
+P
+P
+
+B
+B
+
+C
+P
+P
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+B
+C
+P
+P
+P
+P
+P
+B
+
+Available for future products
+Expansion header 4
+
+cctalk Generic Specification -  Money Controls - Page 5 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+102
+101
+100
+99 to 20
+19 to 7
+6
+5
+4
+3
+2
+1
+0
+
+Expansion header 3
+Expansion header 2
+Expansion header 1
+Application specific
+Reserved
+BUSY message
+NAK message
+Request comms revision
+Clear comms status variables
+Request comms status variables
+Reset device
+Return Message Header
+
+2
+C
+C
+
+P
+P
+
+B
+B
+
+2
+
+cctalk Generic Specification -  Money Controls - Page 6 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+1.1 Core Commands
+These are the commands which should be supported by all cctalk peripherals. They
+allow the device at the address specified to be precisely identified, even if the rest of
+the command set is unknown.
+Here is an example for Money Controls product…
+Command
+Simple poll
+Request equipment category id
+Request product code
+Request build code
+Request manufacturer id
+
+Response
+ACK
+“Coin Acceptor”
+“SR3”
+“TSTD”
+“Money Controls”
+
+1.2 Core Plus Commands
+These commands are useful but not essential for all cctalk peripherals. For instance, it
+can be useful to have an electronic serial number in the product but not all devices
+support this feature.
+1.3 Multi-drop Commands
+These commands are not needed if the host is connected to only one cctalk peripheral,
+or if all the addresses on the bus are known in advance. Otherwise these commands
+are needed to perform address resolution and dynamic address changing.
+1.4 Coin Acceptor Commands
+This is the recommended command subset for all cctalk peripherals which return
+‘Coin Acceptor’ as the category identification.
+Note that not all commands will be implemented by every product. The serial
+communication manual for the product concerned should provide a definitive
+command list. See Appendix 13 for a minimum acceptable implementation.
+1.5 Payout Commands
+This is the recommended command subset for all cctalk peripherals which return
+‘Payout’ as the category identification. This is the case for serial compact hoppers etc.
+Note that not all commands will be implemented by every product. The serial
+communication manual for the product concerned should provide a definitive
+command list. See Appendix 13 for a minimum acceptable implementation.
+
+cctalk Generic Specification -  Money Controls - Page 7 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+1.6 Bill Validator Commands
+This is the recommended command subset for all cctalk peripherals which return ‘Bill
+Validator’ as the category identification.
+Note that not all commands will be implemented by every product. The serial
+communication manual for the product concerned should provide a definitive
+command list. See Appendix 13 for a minimum acceptable implementation.
+1.7 Obsolete Commands
+These commands are either discouraged or not in widespread use. They should not be
+used in any new designs.
+
+cctalk Generic Specification -  Money Controls - Page 8 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+2. Appendix 2 - OSI 7-layer Network Model
+The OSI 7-layer network model is of limited use for a simple control protocol such as
+cctalk. Whereas the task of writing software for full-blown networking protocols is
+made simpler by having a structured and modular approach, cctalk is usually written
+from scratch on each new platform as the entire code is only a couple of kilobytes in
+size. Any artificial layering would be counter-productive.
+For PC-based host software, writing a cctalk DLL or OCX is an elegant way of
+separating the low level serial communication packet drivers from the high level
+application software. A generic cctalk message sender can be made available through
+a public interface.
+However, for completeness...
+Number
+7
+6
+5
+4
+3
+2
+1
+
+Name
+Application Layer
+Presentation Layer
+Session Layer
+Transport Layer
+Network Layer
+Data Link Layer
+Physical Layer
+
+Description
+API & high- level functions
+Transformations ( e.g. encryption )
+Network connection open / close
+Delivery of information ( e.g. TCP )
+Routing & virtual addresses ( e.g. IP )
+Packet formation ( packet switching )
+Voltage, pinout, speed, connectivity...
+
+In broad terms...
+RS232 deals with layers 1 & 2.
+cctalk deals with layers 3 & 4.
+An encryption layer is used on some peripherals where security is paramount.
+
+cctalk Generic Specification -  Money Controls - Page 9 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+3. Appendix 3 - Coin Types and Coin Values
+The ‘Read buffered credit or error codes’ command returns a ‘coin type’ or ‘coin
+position’ which is typically a number between 1 and 16. The host machine needs to
+translate this number into a monetary value for accumulating towards game credit or
+price settings. The method was chosen because it is the closest match to the existing
+parallel credit system and minimises changes to the host software when converting
+from parallel to serial operation.
+The link between the coin type and the coin name is determined by the ‘coin
+specification’ programmed into the coin acceptor either at the factory or by portable
+equipment supplied to customers and service centres. The product label usually details
+which coins are programmed into which positions.
+An example of a product label for a coin acceptor is…
+C435A
+
+GB
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+1.00
+
+0.50
+
+0.20
+
+0.10
+
+TK
+
+2.00
+
+0.05
+
+8
+
+The label shows that coins are programmed into positions 1 to 7 of a 16 coin acceptor.
+The upper bank ( coins 9 to 16 ) is not used in this example.
+When polling for serial credits, the following codes are obtained…
+Code
+
+Coin Name
+
+1
+2
+3
+4
+5
+6
+7
+
+GB 1.00
+GB 0.50
+GB 0.20
+GB 0.10
+TK Token
+GB 2.00
+GB 0.05
+
+Monetary
+Value
+100
+50
+20
+10
+25
+200
+5
+
+The host machine can be programmed with these assignments in a look-up table. Any
+coin acceptor ordered from the factory must be programmed with the correct coin
+specification.
+
+cctalk Generic Specification -  Money Controls - Page 10 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+3.1 Automatic Coin Configuration
+It is possible using cctalk to have the coin type table automatically downloaded from
+the coin acceptor into the host machine during power-up initialisation.
+For this to work, there needs to be support for the ‘Request coin id’ command.
+Each coin position, for example 1 to 16, is interrogated for an ASCII identifier. This
+consists of 6 characters representing the coin name.
+The identifier is made up as follows…
+[C][C][V][V][V][I]
+CC
+= Standard 2 letter country code e.g. GB for the U.K. ( Great Britain )
+VVV = Coin value in terms of the base unit appropriate to that country
+I
+= Mint Issue. Starts at A and progresses B, C, D, E…
+Refer to Appendix 10 for a list of country codes.
+The country code for the ‘Euro’, the Common European currency, is ‘EU’.
+If the country code is ‘TK’ then a token occupies this position rather than a coin. In
+this case the VVV field represents a token number in ASCII rather than a value which
+could change from one jurisdiction to another.
+It is possible to have more than one mint issue in circulation at any particular time for instance during a transition period from ‘old’ coins to ‘new’ coins. Serial coin
+acceptors can be programmed with both types and the ‘old’ coins inhibited by the host
+machine when they officially go out of circulation.
+
+cctalk Generic Specification -  Money Controls - Page 11 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+The coin value is defined more fully as follows…
+3 x ASCII
+Characters
+5m0
+10m
+20m
+25m
+50m
+.10
+.20
+.25
+.50
+001
+002
+2.5
+005
+010
+020
+025
+050
+100
+200
+250
+500
+1K0
+2K0
+2K5
+5K0
+10K
+20K
+25K
+50K
+M10
+M20
+M25
+M50
+1M0
+2M0
+2M5
+5M0
+10M
+20M
+25M
+50M
+G10
+
+Value
+0.005
+0.01
+0.02
+0.025
+0.05
+0.10
+0.20
+0.25
+0.50
+1
+2
+2.5
+5
+10
+20
+25
+50
+100
+200
+250
+500
+1,000
+2,000
+2,500
+5,000
+10,000
+20,000
+25,000
+50,000
+100,000
+200,000
+250,000
+500,000
+1,000,000
+2,000,000
+2,500,000
+5,000,000
+10,000,000
+20,000,000
+25,000,000
+50,000,000
+100,000,000
+
+cctalk Generic Specification -  Money Controls - Page 12 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+As can be seen from the table, a scientific notation is used to compress large and
+small coin values into 3 characters. The shaded area represents the identifiers used for
+the vast majority of countries.
+Some examples…
+GB010B - 2nd mint issue of the U.K. 10p coin
+US100B - 2nd mint issue of the U.S.A. 1$ coin
+US005A - 1st mint issue of the U.S.A. 5c coin
+3.2 CVF
+The Coin Value Format or CVF is a quick method for returning coin value rather than
+coin position in the ‘Read buffered credit or error codes’ command. It is a useful
+option when the ‘Request coin id’ command is not supported but only works for coin
+values in the range 1 to 1000 in standard increments.
+The CVF is basically a method for compressing coin values into a single byte.
+A CVF byte consists of a multiplier bit ( bit 7 ) and a 7-bit data value…
+[ multiplier bit | data value ]
+If the multiplier bit is set then the data value is multiplied by 10. This allows a
+convenient way of transmitting credit codes as monetary values with a ratio between
+largest and smallest coins in excess of 1000 to 1. A CVF byte of 255 is reserved for a
+token of unspecified value.
+Here are the most common CVF values…
+Coin Value
+1
+2
+5
+10
+20
+25
+50
+100
+200
+250
+500
+1000
+Token
+
+CVF code
+1
+2
+5
+10
+20
+25
+50
+100
+148
+153
+178
+228
+255
+
+The CVF bytes 0 and 128 have no monetary value. The maximum CVF byte is 254 (
+255 is a token ) which corresponds to a coin value of 1260.
+To determine whether a coin acceptor has been programmed with CVF codes, read
+option flag 0 with the ‘Read option flags’ command.
+cctalk Generic Specification -  Money Controls - Page 13 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+3.3 BACTA Token Selection
+Token acceptance in a coin acceptor can be handled by cctalk in a number of different
+ways. The first method shown here is the BACTA industry standard for the UK and is
+recommended for new designs. The second method is optional and could lead to
+compatibility issues with existing gaming machine software.
+3.3.1. Token Selection
+Each game has 1 active token. The coin acceptor can be programmed with a number
+of different tokens but only one of them can be selected at any one time. The selected
+token is used in place of coin position 5 which historically ( in the days of parallel
+coin acceptors ) has always been the token. When a token is inserted into the coin
+acceptor and is validated as true, credit code 5 is stored in the event buffer. The host
+machine knows that a token has been inserted and assigns the correct monetary value
+to it.
+Any coins programmed into coin position 5 are disabled in this mode as a token
+substitution has been made. A coin acceptor may typically have 6, 12 or 16
+programmed tokens and a manual method of selecting which one to use with a DIP
+switch or rotary switch.
+To maximise the benefits of serial operation it makes sense to have a serial command
+to select the token to use. The convention has been to use cctalk header 177,
+‘Handheld function’. This is a general purpose command which allows manual
+switch-selectable configuration options ( literally selected by ‘hand’ ) to be replaced
+with a serial equivalent. In this case we define ‘function 1’ to be token selection
+across all coin acceptors which support it.
+Header byte = 177
+Data byte 1 = 1 ( mode = 0, function = 1 )
+Data byte 2 = Token selected
+
+For example…
+To select token 1
+TX = 002 002 001 177 001 001 072
+RX = 001 000 002 000 253 - ACK
+To select token 5
+TX = 002 002 001 177 001 005 068
+RX = 001 000 002 000 253 - ACK
+The commands for reading coin identifiers ( cctalk header 184 ) are unsupported for
+tokens as there is no standardised database as yet for token descriptors. So requesting
+the coin identifier for position 5 will produce undefined results.
+In some coin acceptor configurations, the coins are programmed as 2 banks. For
+instance a coin acceptor with 12 programmed coins may be seen as having 2 banks of
+6 coins or a coin acceptor with 16 programmed coins may be seen as having 2 banks
+of 8 coins. One bank may contain standard security coins and the other bank high
+cctalk Generic Specification -  Money Controls - Page 14 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+security coins. Or one bank may contain old coinage still in circulation and the other
+bank new coinage. Or each bank may have a different currency. In these cases it is
+preferable to substitute the token into the upper bank as well so if the second bank is
+selected ( through inhibits ) then the token is selected as well. In a 12 coin acceptor
+then the corresponding upper bank token position is 11 and in a 16 coin acceptor it is
+13.
+3.3.2. Tokens as Coins
+In this alternative method the tokens are treated identically to coins and programmed
+into the coin space as part of the currency specification. The country code is set to
+‘TK’ and the value field becomes an arbitrary catalogue number ( as yet not
+standardised ). A credit code is obtained in the same way as coins when the coin
+acceptor is polled. Tokens can fill 1, 2 or all of the available coin positions.
+Token selection is made by use of inhibits rather than the method described above.
+The disadvantage of this method is that adding tokens to a coin specification reduces
+the number of coins that can be programmed in as well. Some dual currency
+specifications such as GB & Euro require nearly all 16 coin positions to be available
+for coins rather than tokens.
+
+cctalk Generic Specification -  Money Controls - Page 15 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+4. Appendix 4 - Polled Serial Credit Timing for Coin
+Acceptors
+For a coin acceptor, a key consideration of the serial protocol is how long it takes to
+read out new credit information. There are 2 commands which will be considered
+here, the 'Read last credit or error code' command ( obsolete ) and the 'Read buffered
+credit or error codes' command.
+Read last credit or error code ( 4800 baud, SLOW option )
+Host sends 5 bytes : [ 2 ] [ 0 ] [ 1 ] [ 235 ] [ 18 ]
+Slave returns 6 bytes : [ 1 ] [ 1 ] [ 2 ] [ 0 ] [ coin position ] [ checksum ]
+Each byte takes 2ms @ 4800 baud
+Assume no gap between host bytes ( fired out fast )
+Assume a slave command response time of 3ms
+Assume a gap between slave bytes of 1ms
+Overall message time = 10 + 3 + 17 = 30ms
+For a coin acceptor that can accept 5 coins per second, we must poll it every 200ms.
+This means on a multi-drop network, we can support 200 / 30 = 6 identical coin
+acceptors.
+Read buffered credit or error codes ( 9600 baud, 5 event buffer )
+Host sends 5 bytes : [ 2 ] [ 0 ] [ 1 ] [ 229 ] [ 18 ]
+Slave returns 16 bytes : [ 1 ] [ 11 ] [ 2 ] [ 0 ] [ events ]
+[ result 1A ] [ result 1B ] [ result 2A ] [ result 2B ] [ result 3A ] [ result 3B ]
+[ result 4A ] [ result 4B ] [ result 5A ] [ result 5B ] [ checksum ]
+Each byte takes 1ms @ 9600 baud
+Assume no gap between host bytes ( fired out fast )
+Assume a slave command response time of 2ms
+Assume a gap between slave bytes of 1ms
+Overall message time = 5 + 2 + 31 = 38ms
+For a coin acceptor that can accept 5 coins per second, we must poll it every 1000ms (
+because we have a 5 event buffer ). This means on a multi-drop network, we can
+support 1000 / 38 = 26 identical coin acceptors.
+For multi-drop networks, the use of the buffered serial credit command gives
+much better performance and allows more slave devices to be networked
+together.
+
+cctalk Generic Specification -  Money Controls - Page 16 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+4.1 Polled Retries
+Some protocols have a single-shot credit system such that each coin generates a single
+credit message that disappears after reading it. For this method to be secure, a retry
+mechanism needs to be in place at a low level to cope with an error in sending the
+credit information from the coin acceptor back to the host. If this data is corrupted and
+the credit information is re-read, the device may report no new credits !
+The buffered credit system of cctalk allows the message to be retransmitted repeatedly
+in the event of a communication error. The only limiting factor is the size of the event
+buffer as there will reach a point when new credits are over-written. A typical
+network configuration will allow plenty of retries before this could happen and if
+there is still a communication problem the coin acceptor could be shut down.
+
+cctalk Generic Specification -  Money Controls - Page 17 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+5. Appendix 5 - Multi-Master Applications
+The cctalk protocol is designed for single- master, multiple-slave applications.. It is
+not recommended that cctalk is used in multi-master applications . There are other
+control protocols more suited to multi- master operation. This section is included for
+interest only.
+Master
+
+Master
+
+Slave
+
+Slave
+
+Slave
+
+Multi- master
+Slave
+
+Master
+
+Network
+
+Master
+
+Slave
+
+The addition of a source address field in cctalk message packets allows any network
+device to talk to any other network device. If each cctalk message packet on the bus is
+plucked out and examined, it knows where it is going and it knows where it has come
+from. So although the host machine could ask a coin acceptor for its serial number, a
+coin acceptor could in theory ask a bill validator for its escrow status.
+The biggest problem with this approach is network clashes. If 2 masters decide to
+transmit a message simultaneously or even near simultaneously then the message
+packets will collide. On a single data line this means any message bit could be
+‘scrambled’. Although this sounds bad, some networking protocols make use of this
+feature. If the data is scrambled then it is re-sent later, ideally after a random amount
+of time. With any luck the next retry will get through. This type of network is usually
+referred to as CSMA/CD, i.e. Carrier Sense Multiple Access with Collision Delay.
+There is a chance of a message collision which can be estimated for any degree of
+network loading. Clearly the more masters that exist on a network, the more
+frequently they transfer information and the longer the message packets, the less
+chance there is of a message getting through. When the network loading is low, the
+chances of collisions are so small that they can effectively be ignored and we have a
+true network. As loading increases, the number of retries goes up and eventually the
+network becomes unusable.
+For cctalk to detect a network clash, one or more of the following events must occur.
+a) RS232 framing error ( the stop bit was low not high )
+b) 8-bit checksum error
+Reliance on these conditions for money transactions would be represent a big security
+lapse as a collision would not always be detected. Messages could collide and
+transform themselves into different but seemingly authentic ones.
+The addition of some simple electronics allows far more reliable data transfer in such
+situations. We can detect the condition whereby a device is transmitting a logic 1 but
+another device on the bus is transmitting a logic 0. Since a logic 0 on the serial bus is
+cctalk Generic Specification -  Money Controls - Page 18 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+an overriding condition which cannot be changed by another cctalk peripheral, this is
+the one illegal state we can detect. The circuit below clocks a latch ( D-type flip- flop )
+when a logic 1 output by a device on the bus is forced low by another peripheral. The
+transmitting device would only enable the latch when sending data and would read
+back the clash detect signal immediately afterwards. If it is high then a collision has
+occurred ( presumably due to another master on the system ) and the device can resend the message packet after a fixed or random delay. This system can be
+implemented by the host for sending a command to a slave device and by the slave
+device when replying with data.
+A small filter can be included on the clock line to the latch to remove glitches due to
+transmission / reception delays.
+
+/TX
+/RX
+
+NOR
+
+Filter
+NOR
+
+CLK
+
+1/4 74HC02
+
+ENABLE
+
+1/4 74HC02 1
+
+D
+/CLR
+
+1
+CLASH DETECT
+
+Q
+
+/PRE
+1/2 74HC74
+
+The ability of a device to successfully talk to a slave on a multi- master network can be
+estimated with probability theory. Unlike a deterministic network with time slots that
+can be allocated according to priority, cctalk is non-deterministic in that there is no
+way of knowing in advance whether a particular command will succeed.
+Network Loading Equations
+Define...
+n = no. of masters on bus
+f = frequency of communication ( /s )
+t = average length of message ( s )
+r = no. of retries before command aborted
+When a device transmits a command, the chance of a collision = ( n - 1 ) . f . t
+This is a simple estimate based on the available time in each second during which a
+short command could be sent. Note that when there is only 1 master there is no
+chance of a collision.
+Allowing for retries, the success of a particular command = 1 - ( ( n - 1 ) . f . t ) ^ r
+
+cctalk Generic Specification -  Money Controls - Page 19 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+Here is an example for illustration :
+Let... f = 1 ( once per second ), t = 40ms ( typical command ), r = 3 ( 3 goes max. )
+Probability of Success in a cctalk
+Multi-Master Network
+
+1
+0.8
+0.6
+p
+0.4
+0.2
+0
+1 3 5 7 9 11 13 15 17 19 21 23 25
+No. of Masters
+
+As can be seen from the graph, the performance is fairly flat to start off with and then
+drops dramatically as the network limit approaches. In this example, the network can
+support 12 masters quite comfortably ( i.e. > 90% success rate ).
+5.1 Arbitration Controllers
+For a network which only requires 2 masters, another solution to the problem would
+be a small controller pod which isolates the 2 masters from each other. The controller
+
+Master 1
+Multi-drop
+Bus
+Master 2
+
+pod would arbitrate between the 2 masters and decide which one has access to the
+multi-drop bus. If both masters require access together, one of them could be delayed
+by replying with the cctalk BUSY message.
+
+cctalk Generic Specification -  Money Controls - Page 20 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+6. Appendix 6 - Naming Convention
+The following naming convention may be adopted in technical literature to indicate
+the exact cctalk interface specification in use on the product. The idea is to allow
+some kind of serial communication to be set up given only this name and no product
+manual ( the usual situation in engineering ! ).
+The cctalk feature list currently runs to 11 items…
+cctalk
+b
+p
+v
+a
+d
+c
+m
+x
+e
+i
+r
+
+baud rate ÷ 100
+interface port
+supply voltage
+data voltage
+supply direction
+connector type
+master / slave configuration
+checksum type
+encryption type
+specification release - minor ( previously the level )
+specification release - major
+
+b. The baud rate may be…
+48 - 4800 baud
+96 - 9600 baud ( default )
+192 - 19200 baud
+p. The interface port is defined as follows…
+0 - open-collector interface ( default )
+1 - RS485 interface
+v. The supply voltage refers to the nominal power supply voltage to the product,
+specified in volts.
+5 - 5V
+12 - 12V ( default )
+24 - 24V
+48 - 48V
+It is assumed that all voltages are positive, regulated D.C.
+a. The data voltage is the bus pull- up voltage when using an open-collector interface.
+Note that cctalk always uses 0V as the active state ( start bit condition ) but the idle
+state can be altered to suit the application.
+5 - 5V ( default )
+12 - 12V
+24 - 24V
+It is assumed that for voltages other than 5V, the data voltage will usually track the
+supply voltage.
+cctalk Generic Specification -  Money Controls - Page 21 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+d. The supply direction is defined as follows…
+0 - supply sink ( default, an external power supply must be connected )
+1 - supply source ( can be used to power other peripherals )
+2 - supply sink or source
+c. The connector type is defined elsewhere in this document.
+m. The master / slave configuration is defined as follows…
+0 - slave device ( default, only replies to cctalk messages )
+1 - master device ( initiates cctalk messages )
+2 - master or slave device ( manual switching )
+3 - master or slave device ( automatic switching )
+x. The checksum type is defined as follows…
+8 - addition checksum, byte ( default )
+12 - addition checksum, 16-bit word
+16 - CRC CCITT checksum, 16-bit word
+e. The encryption type is defined as follows…
+0 - none ( default )
+1 - encryption type 1
+i. For specification release - minor, use the minor issue number of this document.
+On older cctalk products, this number refers to the implementation level.
+r. For specification release - major, use the major issue number of this document.
+If a feature isn’t specified then assume the default setting.
+
+cctalk Generic Specification -  Money Controls - Page 22 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+6.1 Money Controls Product Examples
+SCH3
+cctalk b96.p0.v24.a5.d0.c8.m0.x8.e0.i4.r4
+Expands as 9600 baud, open-collector, +24V supply, +5V data, supply sink, connector type 8, slave
+device, 8-bit checksum, no encryption, minor release 4, major release 4
+
+SR5i
+cctalk b96.p0.v12.a5.d0.c5.m0.x8.e0.i2.r4
+Expands as 9600 baud, open-collector, +12V supply, +5V data, supply sink, connector type 5, slave
+device, 8-bit checksum, no encryption, minor release 2, major release 4
+
+SR3i
+cctalk b96.p0.v12.a5.d0.c7.m0.x8.e0.i2.r4
+Expands as 9600 baud, open-collector, +12V supply, +5V data, supply sink, connector type 7, slave
+device, 8-bit checksum, no encryption, minor release 2, major release 4
+
+C120S
+cctalk b48.p0.v5.a5.d0.c3.m0.x8.e0.i2.r4
+Expands as 4800 baud, open-collector, +5V supply, +5V data, supply sink, connector type 3, slave
+device, 8-bit checksum, no encryption, minor release 2, major release 4
+
+Lumina
+cctalk b96.p0.v12.a5.d0.c5.m0.x16.e1.i2.r4
+Expands as 9600 baud, open-collector, +12V supply, +5V data, supply sink, connector type 5, slave
+device, CRC CCITT checksum, encryption type 1, minor release 2, major release 4
+
+SCH2
+cctalk b96.p0.v24.a5.d0.c8.m0.x8.i1.r3
+Expands as 9600 baud, open-collector, +24V supply, +5V data, supply sink, connector type 8, slave
+device, 8-bit checksum, level 1, release 3
+
+SR5
+cctalk b96.p0.v12.a5.d0.c5.m0.x8.i1.r3
+Expands as 9600 baud, open-collector, +12V supply, +5V data, supply sink, connector type 5, slave
+device, 8-bit checksum, level 1, release 3
+
+SR3
+cctalk b96.p0.v12.a5.d0.c7.m0.x8.i1.r3
+Expands as 9600 baud, open-collector, +12V supply, +5V data, supply sink, connector type 7, slave
+device, 8-bit checksum, level 1, release 3
+
+cctalk Generic Specification -  Money Controls - Page 23 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+Condor Plus
+cctalk b96.p0.v12.a5.d0.c7.m0.x8.i1.r3
+Expands as 9600 baud, open-collector, +12V supply, +5V data, supply sink, connector type 7, slave
+device, 8-bit checksum, level 1, release 3
+
+Serial Compact Hopper Mk1
+cctalk b96.p0.v24.a5.d0.c6.m0.x8.i1.r3
+Expands as 9600 baud, open-collector, +24V supply, +5V data, supply sink, connector type 6, slave
+device, 8-bit checksum, level 1, release 3
+
+C435S
+cctalk b96.p0.v12.a12.d0.c5.m0.x8.i1.r3
+Expands as 9600 baud, open-collector, +12V supply, +12V data, supply sink, connector type 5, slave
+device, 8-bit checksum, level 1, release 3
+
+C435SR
+cctalk b48.p0.v12.a5.d0.c1.m0.x8.i1.r2
+Expands as 4800 baud, open-collector, +12V supply, +5V data, supply sink, connector type 1, slave
+device, 8-bit checksum, level 1, release 2
+
+C120P
+cctalk b48.p0.v5.a5.d0.c3.m0.x8.i4.r2
+Expands as 4800 baud, open-collector, +5V supply, +5V data, supply sink, connector type 3, slave
+device, 8-bit checksum, level 4, release 2
+
+cctalk Demonstration Board
+cctalk b48.p0.v12.a5.d2.c1.m0.x8.i4.r2
+Expands as 4800 baud, open-collector, +12V supply, +5V data, supply sink or source, connector type
+1, slave device, 8-bit checksum, level 4, release 2
+
+cctalk Generic Specification -  Money Controls - Page 24 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+7. Appendix 7 - Flash Memory Support
+Many processors now support flash uploading of code which has obvious advantages
+for manufacturing and field upgrades. If a product has a cctalk serial interface then it
+makes sense to use the same connector for on-circuit flash re-programming.
+Commands have been added into the BNV command set for flash programming - see
+headers 138 to 141.
+The limitations at present centre around the slow baud rate. 9600 baud is fine for
+control messages but slow for firmware upgrades. A 64K block of memory would
+take 1 minute 8 seconds to transfer without the associated protocol overheads. The net
+result could typically be 2 to 3 minutes for each 64K block.
+Future revisions of the protocol may see faster baud rates for use during flash
+programming.
+
+cctalk Generic Specification -  Money Controls - Page 25 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+8. Appendix 8 - Address Clash Probability
+A section for aficionados of probability theory !
+Question : What is the probability of an address clash when ‘n’ devices are connected
+to the cctalk bus with random addresses ?
+Solution : This question crops up in many forms in probability theory, a particular
+favourite being how many people in a room before there is a better than evens chance
+of two people sharing the same birthday.
+Like most problems, the solution is often easier when turned on its head. Instead of
+calculating how many devices could share an address, calculate how many outcomes
+there are of all the addresses being different.
+Let total no. of addresses = m
+Let no. of devices on bus = n
+Assuming all addresses are different, the number of possible permutations we can
+have is…
+m! / ( m - n )!
+! = Factorial, i.e. m! = m * ( m-1 ) * ( m-2 ) * ( m-3 ) *… * 1
+The total possible number of address permutations = m ^ n
+This is ‘m’ possibilities for the first device multiplied by ‘m’ possibilities for the
+second device multiplied by… etc.
+We now flip it back to find the chance of a clash ( 2 or more devices with the same
+address… )
+p clash = ( m ^ n ) - ( m! / ( m - n )! ) / ( m ^ n )
+Rewriting…
+p clash = 1 - ( m! / ( ( m - n )! * ( m ^ n ) ) )
+For cctalk, m = 254. There are 254 possible addresses as the broadcast address and
+host address are excluded.
+
+cctalk Generic Specification -  Money Controls - Page 26 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+8.1 Clash Results
+n
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+25
+30
+40
+
+p clash
+0.0000%
+0.3937%
+1.1780%
+2.3452%
+3.8831%
+5.7751%
+8.0009%
+10.5363%
+13.3541%
+16.4242%
+19.7146%
+23.1915%
+26.8203%
+30.5657%
+34.3928%
+38.2672%
+42.1559%
+46.0274%
+49.8522%
+53.6034%
+70.5071%
+83.1874%
+96.0981%
+
+So for 3 serial compact hoppers attached to the bus, randomising their addresses
+would be successful a fraction less than 99 times out of a 100 first pass ( the process
+could obviously be repeated ). However, as the number of devices attached to the bus
+increase, there is a dramatic fall off in success rate. The break even point is 20
+devices.
+
+cctalk Generic Specification -  Money Controls - Page 27 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+9. Appendix 9 - CRC Checksum Algorithm
+9.1 Outline
+The particular CRC checksum used in cctalk is taken from the CRC-CCITT standard.
+•
+•
+•
+
+CRC-CCITT
+Polynomial = x^16 + x^12 + x^5 + 1
+Initial crc register = 0x0000
+
+9.2 Example Command
+To calculate the CRC protected message packets for the ‘Reset device’ command…
+TX : [ 40 ] [ 0 ] [ crc_lsb ] [ 1 ] [ crc_msb ]
+RX : [ 1 ] [ 0 ] [ crc_lsb ] [ 0 ] [ crc_msb ]
+The TX packet is to address 40 ( bill validator ) with header 1 ( Reset device ) and no
+data. The receive packet is to address 1 ( host controller ) with a null header and no
+data ( the ACK message ).
+TX crc = CRC( 40, 0, 1 ) = 3F46 hex
+RX crc = CRC( 1, 0, 0 ) = 3730 hex
+TX crc_lsb = 46 hex, 70 dec
+TX crc_msb = 3F hex, 63 dec
+RX crc_lsb = 30 hex, 48 dec
+RX crc_msb = 37 hex, 55 dec
+Therefore, the completed message packets are…
+TX : [ 40 ] [ 0 ] [ 70 ] [ 1 ] [ 63 ]
+RX : [ 1 ] [ 0 ] [ 48 ] [ 0 ] [ 55 ]
+
+9.3 Algorithm in C++
+void generate_crc_lookup_CCITT_A( void )
+{
+int i;
+BYTE z = 0;
+for ( i = 0; i < 256; ++i )
+crc_lookup_table_CCITT_A[ i ] = calculate_crc_loop_CCITT_A( 1, &z, i << 8 );
+}
+
+cctalk Generic Specification -  Money Controls - Page 28 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+WORD calculate_crc_lookup_CCITT_A( int l, BYTE *p, WORD seed )
+{
+int i;
+WORD crc = seed;
+for ( i = 0; i < l; ++i )
+crc = ( crc << 8 ) ^ crc_lookup_table_CCITT_A[ ( crc >> 8 ) ^ p[ i ] ];
+return crc;
+}
+WORD calculate_crc_loop_CCITT_A( int l, BYTE *p, WORD seed )
+{
+int i, j;
+WORD crc = seed;
+for ( i = 0; i < l; ++i )
+{
+crc ^= ( p[ i ] << 8 );
+for ( j = 0; j < 8; ++j )
+{
+if ( crc & 0x8000 )
+crc = ( crc << 1 ) ^ 0x1021; // 0001.0000 0010.0001 = x^12 + x^5
++ 1 ( + x^16 )
+else
+crc <<= 1;
+}
+}
+return crc;
+}
+
+9.4 Look-up Table
+512 bytes
+const unsigned short crc_ccitt_lookup[] =
+{
+0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
+0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
+0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
+0x9339, 0x8318, 0xB37B, 0xA35A, 0xD3BD, 0xC39C, 0xF3FF, 0xE3DE,
+0x2462, 0x3443, 0x0420, 0x1401, 0x64E6, 0x74C7, 0x44A4, 0x5485,
+0xA56A, 0xB54B, 0x8528, 0x9509, 0xE5EE, 0xF5CF, 0xC5AC, 0xD58D,
+0x3653, 0x2672, 0x1611, 0x0630, 0x76D7, 0x66F6, 0x5695, 0x46B4,
+0xB75B, 0xA77A, 0x9719, 0x8738, 0xF7DF, 0xE7FE, 0xD79D, 0xC7BC,
+0x48C4, 0x58E5, 0x6886, 0x78A7, 0x0840, 0x1861, 0x2802, 0x3823,
+0xC9CC, 0xD9ED, 0xE98E, 0xF9AF, 0x8948, 0x9969, 0xA90A, 0xB92B,
+0x5AF5, 0x4AD4, 0x7AB7, 0x6A96, 0x1A71, 0x0A50, 0x3A33, 0x2A12,
+0xDBFD, 0xCBDC, 0xFBBF, 0xEB9E, 0x9B79, 0x8B58, 0xBB3B, 0xAB1A,
+0x6CA6, 0x7C87, 0x4CE4, 0x5CC5, 0x2C22, 0x3C03, 0x0C60, 0x1C41,
+0xEDAE, 0xFD8F, 0xCDEC, 0xDDCD, 0xAD2A, 0xBD0B, 0x8D68, 0x9D49,
+0x7E97, 0x6EB6, 0x5ED5, 0x4EF4, 0x3E13, 0x2E32, 0x1E51, 0x0E70,
+0xFF9F, 0xEFBE, 0xDFDD, 0xCFFC, 0xBF1B, 0xAF3A, 0x9F59, 0x8F78,
+0x9188, 0x81A9, 0xB1CA, 0xA1EB, 0xD10C, 0xC12D, 0xF14E, 0xE16F,
+0x1080, 0x00A1, 0x30C2, 0x20E3, 0x5004, 0x4025, 0x7046, 0x6067,
+0x83B9, 0x9398, 0xA3FB, 0xB3DA, 0xC33D, 0xD31C, 0xE37F, 0xF35E,
+0x02B1, 0x1290, 0x22F3, 0x32D2, 0x4235, 0x5214, 0x6277, 0x7256,
+0xB5EA, 0xA5CB, 0x95A8, 0x8589, 0xF56E, 0xE54F, 0xD52C, 0xC50D,
+0x34E2, 0x24C3, 0x14A0, 0x0481, 0x7466, 0x6447, 0x5424, 0x4405,
+0xA7DB, 0xB7FA, 0x8799, 0x97B8, 0xE75F, 0xF77E, 0xC71D, 0xD73C,
+0x26D3, 0x36F2, 0x0691, 0x16B0, 0x6657, 0x7676, 0x4615, 0x5634,
+0xD94C, 0xC96D, 0xF90E, 0xE92F, 0x99C8, 0x89E9, 0xB98A, 0xA9AB,
+0x5844, 0x4865, 0x7806, 0x6827, 0x18C0, 0x08E1, 0x3882, 0x28A3,
+0xCB7D, 0xDB5C, 0xEB3F, 0xFB1E, 0x8BF9, 0x9BD8, 0xABBB, 0xBB9A,
+0x4A75, 0x5A54, 0x6A37, 0x7A16, 0x0AF1, 0x1AD0, 0x2AB3, 0x3A92,
+0xFD2E, 0xED0F, 0xDD6C, 0xCD4D, 0xBDAA, 0xAD8B, 0x9DE8, 0x8DC9,
+0x7C26, 0x6C07, 0x5C64, 0x4C45, 0x3CA2, 0x2C83, 0x1CE0, 0x0CC1,
+0xEF1F, 0xFF3E, 0xCF5D, 0xDF7C, 0xAF9B, 0xBFBA, 0x8FD9, 0x9FF8,
+0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
+};
+
+cctalk Generic Specification -  Money Controls - Page 29 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+9.5 Verification Data
+Random test data…
+Data = 49 D5 F2 / CRC-CCITT Checksum = A6B3
+Data = 2F BD 9D / CRC-CCITT Checksum = 90B2
+Data = D9 53 D1 / CRC-CCITT Checksum = 7BB5
+Data = 70 B8 D9 64 04 15 / CRC-CCITT Checksum = FB00
+Data = 72 61 B9 4E D0 78 / CRC-CCITT Checksum = 93E3
+Data = 63 FA D1 9F E6 19 / CRC-CCITT Checksum = 5BB3
+
+cctalk Generic Specification -  Money Controls - Page 30 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+10. Appendix 10 - Common Country Codes
+Each country of the world has a 2 letter designator which conforms to ISO 3166-1A2. Listed below are all the countries, split into ‘Europe’, ‘Rest of the World’ and
+‘Islands’. Note that some serial protocols use ISO 4217 which identifies currencies
+rather than countries with a 3 letter code e.g. USD for U.S.A. Dollars.
+10.1 Europe
+Country
+3166-1-A2
+Albania
+AL
+€ Andorra
+AD
+€ Austria
+AT
+€ Belgium
+BE
+Bosnia Herzegovina
+BA
+Bulgaria
+BG
+Croatia
+HR
+Czech Republic
+CZ
+Denmark
+DK
+Estonia
+EE
+EURO
+EU
+€ Finland
+FI
+€ France
+FR
+Gibraltar
+GI
+€ Germany
+DE
+€ Greece
+GR
+Hungary
+HU
+Iceland
+IS
+€ Irish Republic
+IE
+Israel
+IL
+€ Italy
+IT
+Latvia
+LV
+Liechtenstein
+LI
+Lithuania
+LT
+€ Luxembourg
+LU
+Macedonia
+MK
+Moldova
+MD
+€ Monaco
+MC
+€ Netherlands
+NL
+Norway
+NO
+Poland
+PL
+€ Portugal
+PT
+Romania
+RO
+€ San Marino
+SM
+Serbia & Montenegro
+SX
+Slovakia
+SK
+Slovenia
+SI
+€ Spain
+ES
+Sweden
+SE
+Switzerland
+CH
+Turkey
+TR
+United Kingdom
+GB
+€ Vatican City
+VA
+cctalk Generic Specification -  Money Controls - Page 31 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+€ = Euroland country
+
+10.2 Rest of the World
+Country
+Afghanistan
+Algeria
+Angola
+Antarctica
+Argentina
+Armenia
+Australia
+Azerbaijan
+Bahrain
+Bangladesh
+Bhutan
+Belarus
+Belize
+Benin
+Bolivia
+Botswana
+Brazil
+Brunei
+Burkina Faso
+Burundi
+Cambodia
+Cameroon
+Canada
+Central African Rep.
+Chad
+Chile
+China
+Columbia
+Congo
+Costa Rica
+Cote D’Ivoire
+Djibouti
+East Timor
+Ecuador
+Egypt
+El Salvador
+Eritrea
+Ethiopia
+Equatorial Guinea
+French Guiana
+French Polynesia
+Gabon
+Gambia
+Georgia
+Ghana
+Greenland
+Guatemala
+Guinea
+
+3166-1-A2
+AF
+DZ
+AO
+AQ
+AR
+AM
+AU
+AZ
+BH
+BD
+BT
+BY
+BZ
+BJ
+BO
+BW
+BR
+BN
+BF
+BI
+KH
+CM
+CA
+CF
+TD
+CL
+CN
+CO
+CG
+CR
+CI
+DJ
+TP
+EC
+EG
+SV
+ER
+ET
+GQ
+GF
+PF
+GA
+GM
+GE
+GH
+GL
+GT
+GN
+
+cctalk Generic Specification -  Money Controls - Page 32 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+Guinea-Bissau
+Guyana
+Honduras
+Hong Kong
+India
+Indonesia
+Iran
+Iraq
+Japan
+Jordan
+Kazakhstan
+Kenya
+Korea North
+Korea South
+Kuwait
+Kyrgyzstan
+Laos
+Lebanon
+Lesotho
+Liberia
+Libya
+Macau
+Malaysia
+Malawi
+Mali
+Mauritania
+Mexico
+Mongolia
+Morocco
+Mozambique
+Myanmar
+Namibia
+Nepal
+New Zealand
+Nicaragua
+Niger
+Nigeria
+Oman
+Pakistan
+Panama
+Papua New Guinea
+Paraguay
+Peru
+Philippines
+Puerto Rico
+Qatar
+Russia
+Rwanda
+Samoa
+Saudi Arabia
+Senegal
+Sierra Leone
+Singapore
+Somalia
+
+GW
+GY
+HN
+HK
+IN
+ID
+IR
+IQ
+JP
+JO
+KZ
+KE
+KP
+KR
+KW
+KG
+LA
+LB
+LS
+LR
+LY
+MO
+MY
+MW
+ML
+MR
+MX
+MN
+MA
+MZ
+MM
+NA
+NP
+NZ
+NI
+NE
+NG
+OM
+PK
+PA
+PG
+PY
+PE
+PH
+PR
+QA
+RU
+RW
+WS
+SA
+SN
+SL
+SG
+SO
+
+cctalk Generic Specification -  Money Controls - Page 33 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+South Africa
+Sudan
+Suriname
+Swaziland
+Syria
+Tajikistan
+Tanzania
+Thailand
+Taiwan
+Togo
+Tunisia
+Turkmenistan
+Uganda
+Ukraine
+United Arab Emirates
+United States
+Uruguay
+Uzbekistan
+Venezuela
+Western Sahara
+Vietnam
+Yemen
+Zaire
+Zambia
+Zimbabwe
+
+ZA
+SD
+SR
+SZ
+SY
+TJ
+TZ
+TH
+TW
+TG
+TN
+TM
+UG
+UA
+AE
+US
+UY
+UZ
+VE
+EH
+VN
+YE
+ZR
+ZM
+ZW
+
+10.3 Islands
+Country
+American Samoa
+Anguilla
+Antigua & Barbuda
+Aruba
+Bahamas
+Barbados
+Bermuda
+Bonaire
+Bouvet Island
+Cape Verde
+Cayman Islands
+Christmas Island
+Cocos ( Keeling ) Islands
+Comoros
+Cook Islands
+Cuba
+Cyprus
+Dominica
+Dominican Republic
+East Caribbean
+Falkland Islands / Malvinas
+Faroe Islands
+Fiji
+Jamaica
+
+3166-1-A2
+AS
+AI
+AG
+AW
+BS
+BB
+BM
+QQ
+BV
+CV
+KY
+CX
+CC
+KM
+CK
+CU
+CY
+DM
+DO
+EA
+FK
+FO
+FJ
+JM
+
+cctalk Generic Specification -  Money Controls - Page 34 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+Jersey
+Grenada
+Guadeloupe
+Guam
+Guernsey
+Haiti
+Heard & McDonald Islands
+Isle of Man
+Jamaica
+Kiribati
+Madagascar
+Maldives
+Malta
+Marshall Islands
+Martinique
+Mauritius
+Mayotte
+Micronesia, Fed. States of
+Montserrat
+Nauru
+Netherlands Antilles
+New Caledonia
+Niue
+Norfolk Island
+Northern Mariana Islands
+Palau
+Pitcairn
+Reunion
+Seychelles
+Solomon Islands
+Sri Lanka
+St. Kitts & Nevis
+St. Helena
+St. Lucia
+St. Pierre & Miquelon
+St. Vincent & Grenadines
+Svalbard & Jan Mayen Islands
+Tokelau
+Tonga
+Trinidad & Tobago
+Turks & Caicos
+Tuvalu
+Vanuatu
+Virgin Islands (GB)
+Virgin Islands (US)
+Wallis & Futuna
+
+GB (JS)
+GD
+GP
+GU
+GB (GS)
+HT
+HM
+IM
+JM
+KI
+MG
+MV
+MT
+MH
+MQ
+MU
+YT
+FM
+MS
+NR
+AN
+NC
+NU
+NF
+MP
+PW
+PN
+RE
+SC
+SB
+LK
+KN
+SH
+LC
+PM
+VC
+SJ
+TK
+TO
+TT
+TC
+TV
+VU
+VG
+VI
+WF
+
+cctalk Generic Specification -  Money Controls - Page 35 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+10.4 Exceptions
+Example token : TK830A
+At Money Controls we have adopted TK to designate a token. A token code number
+then follows the letters. Token code numbers have not yet been standardised across
+the industry. Note that in the ISO standard, TK is used for ‘Tokelau’.
+
+Aruba can use AA as well as AW.
+Ecuador can use ED as well as EC.
+
+cctalk Generic Specification -  Money Controls - Page 36 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+11. Appendix 11 - Coin Acceptor Messaging Example
+11.1 Initialisation
+This is a typical initialisation or enrolment process for a gaming machine. The idea is
+to confirm the cctalk link to the coin acceptor is operational and that the device fitted
+is approved for use in this environment.
+Simple poll = ACK
+TX = 002 000 001 254 255
+RX = 001 000 002 000 253
+
+Request equipment category id = ‘Coin Acceptor’
+TX = 002 000 001 245 008
+RX = 001 013 002 000 067 111 105 110 032 065 099 099 101 112 116 111 114 022
+
+Request product code = ‘SR5i’
+TX = 002 000 001 244 009
+RX = 001 004 002 000 083 082 053 105 182
+
+Request build code = ‘STD01 ’
+TX = 002 000 001 192 061
+RX = 001 008 002 000 083 084 068 048 049 032 032 032 073
+
+Request manufacturer id = ‘Money Controls’
+TX = 002 000 001 246 007
+RX = 001 014 002 000 077 111 110 101 121 032 067 111 110 116 114 111 108 115
+115
+
+Request serial number = ‘12345678’
+TX = 002 000 001 242 011
+RX = 001 003 002 000 078 097 188 143
+
+Request software revision = ‘CRS-F1-V1.09’
+TX = 002 000 001 241 012
+RX = 001 012 002 000 067 082 083 045 070 049 045 086 049 046 048 057 026
+
+Request comms revision = ‘1.4.2’
+TX = 002 000 001 004 249
+RX = 001 003 002 000 001 004 002 243
+
+cctalk Generic Specification -  Money Controls - Page 37 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+11.2 Pre-Acceptance
+Request coin id for coin 1 = ‘GB200A’
+TX = 002 001 001 184 001 067
+RX = 001 006 002 000 071 066 050 048 048 065 155
+
+Request coin id for coin 2 = ‘GB100A’
+TX = 002 001 001 184 002 066
+RX = 001 006 002 000 071 066 049 048 048 065 156
+
+Request coin id for coin 3 = ‘GB050B’
+TX = 002 001 001 184 003 065
+RX = 001 006 002 000 071 066 048 053 048 066 151
+
+Request coin id for coin 4 = ‘GB020A’
+TX = 002 001 001 184 004 064
+RX = 001 006 002 000 071 066 048 050 048 065 155
+
+Request coin id for coin 5 = ‘Token ’
+TX = 002 001 001 184 005 063
+RX = 001 006 002 000 084 111 107 101 110 032 214
+
+Request coin id for coin 6 = ‘GB010B’
+TX = 002 001 001 184 006 062
+RX = 001 006 002 000 071 066 048 049 048 066 155
+
+Request coin id for coin 7 = ‘……’
+TX = 002 001 001 184 007 061
+RX = 001 006 002 000 046 046 046 046 046 046 227
+
+Request coin id for coin 8 = ‘……’
+TX = 002 001 001 184 008 060
+RX = 001 006 002 000 046 046 046 046 046 046 227
+
+We could also read the coin identifiers for coins 9 to 16 if we wanted to.
+Modify inhibit status = ACK
+TX = 002 002 001 231 255 255 022
+RX = 001 000 002 000 253
+
+All coins are now enabled for acceptance.
+11.3 Credit Polling
+Poll every 200ms and don’t stop…
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 000 000 000 000 000 000 000 000 000 000 000 242
+
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 000 000 000 000 000 000 000 000 000 000 000 242
+
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 000 000 000 000 000 000 000 000 000 000 242
+
+cctalk Generic Specification -  Money Controls - Page 38 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 000 000 000 000 000 000 000 000 000 000 000 242
+
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 001 001 005 000 000 000 000 000 000 000 000 235
+Event code has changed from 0 to 1 : Credit, coin 1 to sorter route 5
+
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 002 001 005 001 005 000 000 000 000 000 000 228
+Event code has changed from 1 to 2 : Credit, coin 1 to sorter route 5
+
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 003 005 005 001 005 001 005 000 000 000 000 217
+Event code has changed from 2 to 3 : Credit, coin 5 ( = token ) to sorter
+route 5
+
+Read buffered credit or error codes
+TX = 002 000 001 229 024
+RX = 001 011 002 000 004 000 001 005 005 001 005 001 005 000 000 215
+Event code has changed from 3 to 4 : Error, Reject coin
+
+Remember that the event code wraps from 255 to 1 as 0 is a special start-up value
+indicating a power-up or reset has occurred.
+
+cctalk Generic Specification -  Money Controls - Page 39 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+12. Appendix 12 - Italian Flavour Specification Changes
+For Italian homologation 2003, the following proposals were put in place to guarantee
+product security. No cctalk commands were changed but a small subset of commands
+were ‘switched off’ to prevent changes to configuration data. It is recommended that
+peripheral devices implementing the Italian flavour of cctalk do not return any reply
+to these commands - not even a dummy ACK or a NAK.
+SR3 is representative here of a 3.5 inch coin acceptor. SR5 is representative of a 5
+inch coin acceptor.
+Header
+216
+215
+214
+202
+201
+185
+183
+182
+181
+180
+179
+178
+177
+
+Function
+Request data storage availability
+Read data block
+Write data block
+Teach mode control
+Request teach status
+Modify coin id
+Upload window data
+Download calibration info
+Modify security setting
+Request security setting
+Modify bank select
+Request bank select
+Handheld function
+
+SR3 Implementation
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+
+SR5 Implementation
+OK
+OK
+OK
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+No reply
+
+The following commands were seen as ‘core’ to the Italian amusement market and
+have to be implemented by all peripherals. All other commands are optional.
+Header
+254
+253
+252
+251
+250
+249
+246
+245
+244
+242
+231
+230
+229
+210
+209
+192
+184
+4
+1
+
+Function
+Simple poll
+Address poll
+Address clash
+Address change
+Address random
+Request polling priority
+Request manufacturer id
+Request equipment category id
+Request product code
+Request serial number
+Modify inhibit status
+Request inhibit status
+Read buffered credit or error codes
+Modify sorter paths
+Request sorter paths
+Request build code
+Request coin id
+Request comms revision
+Reset device
+
+cctalk Class Designation
+Core
+Multi-drop
+Multi-drop
+Multi-drop
+Multi-drop
+Core
+Core
+Core
+Core Plus
+
+Core
+Core Plus
+Core Plus
+
+Reference : Ed. 5. Implementation Table, manufacturers’ meeting in Bologna 16/07/2003
+
+cctalk Generic Specification -  Money Controls - Page 40 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+13. Appendix 13 - Minimum Acceptable Implementations
+From the wide range of cctalk commands to choose from in Appendix 1, it can be
+hard for peripheral manufacturers to know which ones outside the ‘Core Commands’
+need to be implemented. This then is the requirement for a minimum acceptable
+implementation. More commands may be needed and these are shown in separate
+sections. For instance, if the coin acceptor has a sorter then sorter commands should
+be added.
+13.1 Coin Acceptors
+Simple poll
+Perform self-check
+Calculate ROM checksum
+Request equipment category id
+Request product code
+Request build code
+Request manufacturer id
+Request serial number
+Request software revision
+Request comms revision
+Modify inhibit status
+Request inhibit status
+Modify master inhibit status
+Request master inhibit status
+Request coin id
+Read buffered credit or error codes
+Request data storage availability
+Reset device
+13.1.1. Add for Sorter / Diverter Support
+Modify sorter paths
+Request sorter paths
+Modify default sorter path
+Request default sorter path
+Modify sorter override status
+Request sorter override status
+13.1.2. Add for Date Support
+Request creation date
+Request last modification date
+Request base year
+13.1.3. Add for Encrypted Serial Communication
+Switch encryption code
+Store encryption code
+cctalk Generic Specification -  Money Controls - Page 41 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+13.2 Bill Validators
+Simple poll
+Perform self-check
+Calculate ROM checksum
+Request equipment category id
+Request product code
+Request build code
+Request manufacturer id
+Request serial number
+Request software revision
+Request comms revision
+Modify inhibit status
+Request inhibit status
+Modify master inhibit status
+Request master inhibit status
+Request bill id
+Request country scaling factor
+Read buffered bill events
+Route bill
+Switch encryption code
+Store encryption code
+Request variable set
+Request option flags
+Modify bill operating mode
+Request bill operating mode
+Request currency revision
+Request firmware upgrade capability
+Request data storage availability
+Reset device
+13.2.1. Add for Bank Switching Support
+Modify bank select
+Request bank select
+13.2.2. Add for Date Support
+Request creation date
+Request last modification date
+Request base year
+13.2.3. Add for Barcode Support
+Read barcode data
+
+cctalk Generic Specification -  Money Controls - Page 42 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+13.3 Payouts
+Simple poll
+Test hopper
+Request equipment category id
+Request product code
+Request build code
+Request manufacturer id
+Request serial number
+Request software revision
+Request comms revision
+Enable hopper
+Dispense hopper coins
+Request hopper status
+Emergency stop
+Request hopper coin
+Request hopper dispense count
+Request payout high / low status
+Request data storage availability
+Reset device
+13.3.1. Add for Encrypted Payout
+Pump RNG
+Request cipher key
+13.3.2. Add for Enhanced Security
+Enter new PIN number
+Enter PIN number
+Calculate ROM checksum
+13.3.3. Add for Date Support
+Request creation date
+Request last modification date
+Request base year
+13.3.4. Add for Parameter Support
+Modify variable set
+Request variable set
+13.3.5. Add for Accumulator Mode
+Dispense hopper value
+Request hopper polling value
+Emergency stop value
+Request hopper coin value
+Request indexed hopper dispense count
+cctalk Generic Specification -  Money Controls - Page 43 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+14. Appendix 14 - Large Packet Exchange
+The normal cctalk payload is anything from 1 to 252 bytes although it is possible to
+specify 255 bytes of data. Since the 2nd byte of a cctalk data packet is the data length
+then variable length messages can be sent very efficiently. A question often arises of
+how to send data blocks much larger than this. For instance, we may be trying to send
+new coin tables, bill tables or firmware into a device. Alternatively, we may be trying
+to read memory blocks or diagnostic reports from a device.
+The recommended procedure is as follows…
+14.1 Host to Device
+Send a Start packet
+Send multiple Data packets
+( the last data packet may be less than the standard size )
+Send a Finish packet
+As the device knows in advance about data arriving and what it is for, the host does
+not need to send packet addresses or sequence numbers, although it may of course do
+so. It is assumed all data packets will arrive in sequence. Transfer integrity can be
+guaranteed by using large packet checksums at the end of the data.
+As an example, refer to the bill table update procedure…
+Start = Header 143, Begin bill table upgrade
+Data
+= Header 144, Upload bill tables
+Finish = Header 142, Finish bill table upgrade
+
+This particular command transfers up to 128 bytes of data each time as shorter
+messages are better protected by the packet checksum and internal memory boundary
+calculations are often easier using powers of 2.
+An error in data transfer will usually be picked up at the end when a final checksum is
+calculated. If an ACK is not received for one of the data packets then this packet
+could be re-sent but in this case a sequence number would be essential to prevent
+multiple copies being received in error.
+14.2 Device to Host
+Host requests Memory Size packet
+Host polls Addressed Data packets
+Since the host is the bus master it must first find out how much data the peripheral
+device has to send through a memory size packet request. The host can then poll the
+individual data packets out of the device but must include a block address.
+
+cctalk Generic Specification -  Money Controls - Page 44 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+As an example, refer to the user data commands…
+Memory Size
+= Header 216, Request data storage availability
+Addressed Data = Header 215, Read data block
+
+The data storage in this case can be anything from 1 to 64,512 bytes.
+If an error occurs reading the data, then the request can be re-sent as each packet
+includes a block address.
+
+cctalk Generic Specification -  Money Controls - Page 45 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+15. Appendix 15 – Bill Types and Bill Values
+A 7 character identification code is used…
+[C][C][V][V][V][V][I]
+CC
+= Standard 2 letter country code e.g. GB for the U.K. ( Great Britain )
+VVVV = Bill value in terms of the country scaling factor
+I
+= Issue code. Starts at A and progresses B, C, D, E…
+Bill validators return a country-specific scaling factor and decimal places – see
+command header 156, ‘Request country scaling factor’.
+The value code x scaling factor should express the bill value in terms of the lowest
+value currency unit in active circulation e.g. pence or cents.
+Combined with the decimal places the result should be in terms of the bill currency
+unit e.g. pounds, euros or dollars.
+Examples
+
+= preferred settings
+Value Code
+0001
+0002
+0003
+0005
+0010
+0020
+0025
+0030
+0050
+0100
+0200
+0250
+0300
+0500
+1000
+2000
+2500
+3000
+5000
+0001
+0002
+0003
+0005
+0010
+0020
+0025
+0030
+0050
+0100
+
+Scaling Factor
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+100
+10
+10
+10
+10
+10
+10
+10
+10
+10
+10
+
+Decimal Places
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+
+Result
+1.00
+2.00
+3.00
+5.00
+10.00
+20.00
+25.00
+30.00
+50.00
+100.00
+200.00
+250.00
+300.00
+500.00
+1,000.00
+2,000.00
+2,500.00
+3,000.00
+5,000.00
+0.10
+0.20
+0.30
+0.50
+1.00
+2.00
+2.50
+3.00
+5.00
+10.00
+
+cctalk Generic Specification -  Money Controls - Page 46 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+0200
+0250
+0300
+0500
+1000
+2000
+2500
+3000
+5000
+0001
+0002
+0003
+0005
+0010
+0020
+0025
+0030
+0050
+0100
+0200
+0250
+0300
+0500
+1000
+2000
+2500
+3000
+5000
+0001
+0002
+0003
+0005
+0010
+0020
+0025
+0030
+0050
+0100
+0200
+0250
+0300
+0500
+1000
+2000
+2500
+3000
+5000
+
+10
+10
+10
+10
+10
+10
+10
+10
+10
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+1,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+10,000
+
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+
+20.00
+25.00
+30.00
+50.00
+100.00
+200.00
+250.00
+300.00
+500.00
+10
+20
+30
+50
+100
+200
+250
+300
+500
+1,000
+2,000
+2,500
+3,000
+5,000
+10,000
+20,000
+25,000
+30,000
+50,000
+100
+200
+300
+500
+1,000
+2,000
+2,500
+3,000
+5,000
+10,000
+20,000
+25,000
+30,000
+50,000
+100,000
+200,000
+250,000
+300,000
+500,000
+
+Problems can exits in concurrent new & old currencies where there is a massive
+change in scaling factor as cctalk only supports a common scaling factor for each
+country rather than a scaling factor for each note. For details of industry-wide
+solutions then contact Money Controls for more information.
+
+cctalk Generic Specification -  Money Controls - Page 47 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+16. Table 1 - cctalk Standard Category Strings & Default
+Addresses
+The following standard category strings have been defined, along with their typical
+default addresses. Extra addresses may be used where more than 1 type of device
+category exists on the same bus. Note that the cctalk protocol allows the addresses to
+be changed to arbitrary values in multi-drop applications.
+These standard category strings should be reported exactly as reproduced in the table
+below by the ‘Read equipment category id’ command. Observe any capitalisation
+rules - ‘Coin Acceptor’ is not the same as ‘COIN ACCEPTOR’, ‘coin acceptor’ or
+‘Coin acceptor’.
+
+Standard Category
+Coin Acceptor
+
+Address
+2
+
+Extra Addresses
+11 to 17
+
+Payout
+
+3
+
+4 to 10
+
+Reel
+
+30
+
+31 to 34
+
+Bill Validator
+
+40
+
+41 to 47
+
+Card Reader
+
+50
+
+T.B.D.
+
+Display
+
+60
+
+Keypad
+
+70
+
+e.g. LCD panels,
+alpha-numeric displays
+Remote keyboard
+
+Dongle
+
+80
+
+Meter
+
+90
+
+Power
+
+100
+
+Printer
+
+110
+
+RNG
+
+120
+
+85 to 89
+
+Comments…
+a.k.a Coin Validator
+a.k.a Hopper
+
+a.k.a Note Acceptor
+
+Security device or
+Interface box
+Electro- mechanical counter
+replacement
+Power switching hub
+Ticket printer including
+coupons and barcodes
+Random Number Generator
+
+cctalk Generic Specification -  Money Controls - Page 48 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+17. Table 2 - cctalk Coin Acceptor Error Code Table
+The following standard errors have been defined for a coin acceptor. Not all may be
+implemented so refer to the relevant product manual. A serial credit code indicates
+that a coin was definitely accepted. A serial error code may or may not indicate a coin
+was rejected due to most coin acceptors not having a specific reject sensor together
+with the wide range of possible error trigger conditions ( hardware faults, coins
+getting stuck, deliberate fraud attempts etc. ).
+Code
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+128
+…
+159
+253
+254
+
+Error
+Null event ( no error )
+Reject coin
+Inhibited coin
+Multiple window
+Wake-up timeout
+Validation timeout
+Credit sensor timeout
+Sorter opto timeout
+2nd close coin error
+Accept gate not ready
+Credit sensor not ready
+Sorter not ready
+Reject coin not cleared
+Validation sensor not ready
+Credit sensor blocked
+Sorter opto blocked
+Credit sequence error
+Coin going backwards
+Coin too fast ( over credit sensor )
+Coin too slow ( over credit sensor )
+C.O.S. mechanism activated
+( coin-on-string )
+DCE opto timeout
+DCE opto not seen
+Credit sensor reached too early
+Reject coin ( repeated sequential trip )
+Reject slug
+Reject sensor blocked
+Games overload
+Max. coin meter pulses exceeded
+Accept gate open not closed
+Accept gate closed not open
+Inhibited coin ( Type 1 )
+Inhibited coin ( Type n )
+Inhibited coin ( Type 32 )
+Data block request ( note α )
+Coin return mechanism activated
+( Flight deck open )
+
+Coin rejected ?
+No
+
+Yes - by definition
+Yes
+Yes
+Possible
+Possible
+Possible
+No
+
+Yes - 1 or more
+Yes
+Yes
+Yes
+Yes
+Yes
+Yes
+Yes
+No
+No
+No
+No
+No
+Possible
+
+Yes
+No
+
+Yes
+Yes
+No
+No
+No
+No
+
+Yes
+Yes
+Yes
+Yes
+No
+No
+
+cctalk Generic Specification -  Money Controls - Page 49 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+No
+255
+Unspecified alarm code
+Note α : Special signalling mechanism to support slave requests for data.
+
+cctalk Generic Specification -  Money Controls - Page 50 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+17.1 cctalk Coin Acceptor Error Code Descriptions
+These codes are specific to coin acceptors. Bill validators and payout devices use their own error code
+tables.
+A manufacturer of cctalk coin acceptors can implement any subset of the error codes below depending
+on the technology they are using and the ability to self-diagnose problems. These are all ‘event’ codes
+and can be reported at any time in a reply to a host credit poll.
+Code
+1
+
+Error
+Reject coin
+
+2
+
+Inhibited coin
+
+3
+
+Multiple window
+
+4
+
+Wake-up timeout
+
+5
+
+Validation timeout
+
+6
+
+Credit sensor timeout
+
+7
+
+Sorter opto timeout
+
+8
+
+2nd close coin error
+
+9
+
+Accept gate not ready
+
+10
+
+Credit sensor not ready
+
+11
+
+Sorter not ready
+
+12
+
+Reject coin not cleared
+
+13
+
+Validation sensor not ready
+
+14
+
+Credit sensor blocked
+
+15
+
+Sorter opto blocked
+
+16
+
+Credit sequence error
+
+17
+
+Coin going backwards
+
+18
+
+Coin too fast ( over credit sensor )
+
+19
+
+Coin too slow ( over credit sensor )
+
+Description
+A coin was inserted which did not match any of the
+programmed types. The coin is returned to the
+customer and no credit is given.
+A coin was inserted which did match a programmed
+window type but was prevented from accepting by the
+inhibit register. The inhibit register can be controlled
+serially but may also be linked to external DIL
+switches.
+A coin was inserted which matched more than one
+enabled window type. This coin was rejected as the
+credit code was indeterminate.
+A coin acceptor fitted with a wake-up sensor picked up
+a coin entering the acceptor but it was not seen
+subsequently in the validation area. Possible coin jam.
+A coin was detected entering the validation area but
+failed to leave it. Possible coin jam.
+A coin was validated as true but never made it to the
+post-gate credit sensor. Possible coin jam.
+A coin was sent into the sorter / diverter but was not
+seen coming out. Possible coin jam.
+A coin was inserted too close to the one in front. One or
+both coins will have rejected.
+A coin was inserted while the accept gate for the coin in
+front was still operating. Coins have been inserted too
+quickly.
+A coin was still over the credit sensor when another
+coin was ready to accept. Coins have been inserted too
+quickly.
+A coin was inserted while the sorter flaps for the coin
+in front were still operating. Coins have been inserted
+too quickly.
+A coin was inserted before a previously rejected coin
+had time to clear the coin acceptor. Coins have been
+inserted too quickly.
+The validator inductive sensors were not ready for coin
+validation. Possible fault developing.
+There is a permanent blockage at the credit sensor.
+The coin acceptor will not accept any more coins.
+There is a permanent blockage at the sorter exit sensor.
+The coin acceptor will not accept any more coins.
+A coin or object was detected going backwards through
+a directional credit sensor. Possible fraud attempt.
+A coin was detected going backwards through the coin
+acceptor. Possible fraud attempt.
+A coin was timed going through the credit sensor and
+was too fast. Possible fraud attempt.
+A coin was timed going through the credit sensor and
+was too slow. Possible fraud attempt.
+
+cctalk Generic Specification -  Money Controls - Page 51 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+20
+21
+
+C.O.S. mechanism activated
+( coin-on-string )
+DCE opto timeout
+
+22
+
+DCE opto not seen
+
+23
+
+Credit sensor reached too early
+
+24
+
+Reject coin ( repeated sequential trip )
+
+25
+
+Reject slug
+
+26
+
+Reject sensor blocked
+
+27
+
+Games overload
+
+28
+
+Max. coin meter pulses exceeded
+
+29
+
+Accept gate open not closed
+
+30
+
+Accept gate closed not open
+
+128
+
+Inhibited coin ( Type 1 )
+
+…
+
+Inhibited coin ( Type n )
+
+159
+
+Inhibited coin ( Type 32 )
+
+253
+
+Data block request ( note α )
+
+254
+
+Coin return mechanism activated
+( Flight deck open )
+
+255
+
+Unspecified alarm code
+
+A specific sensor for detecting a ‘coin on string’ was
+activated. Possible fraud attempt.
+A coin acceptor fitted with a Dual Coin Entry chute
+saw a coin or token which was not seen subsequently in
+the validation area. Possible coin jam.
+A coin acceptor fitted with a Dual Coin Entry chute
+saw a coin which was not seen previously by the chute
+sensor. Possible fraud attempt.
+A coin was timed from the end of the validation area to
+the post-gate credit sensor. It arrived too early.
+Possible fraud attempt.
+A coin was rejected N times in succession with no
+intervening true coins. Statistically unlikely if N
+greater than or equal to 5. Possible fraud attempt.
+A coin was rejected but was identified as a known slug
+type - this may be a pre-programmed fraud coin or a
+known fraud material.
+There is a permanent blockage at the reject sensor. The
+coin acceptor will not accept any more coins. Not all
+coin acceptors have a reject sensor.
+Totaliser mode : A game value was set too low possibly zero. This is a product configuration error.
+Totaliser mode : A meter value was set too low possibly zero. This is a product configuration error.
+The accept gate was forced open when it should have
+been closed.
+The accept gate did not open when the solenoid was
+driven.
+A true coin ( type 1, coin in position 1 ) was inserted
+but was prevented from accepting by the inhibit
+register.
+A true coin ( type n, coin in position n ) was inserted
+but was prevented from accepting by the inhibit
+register.
+A true coin ( type 32, coin in position 32 ) was inserted
+but was prevented from accepting by the inhibit
+register.
+A ‘not yet used’ mechanism for a coin acceptor to
+request attention from the host machine. Perhaps it
+needs some data from the host machine or another
+peripheral.
+An attempt to clear a coin jam by opening the flight
+deck was detected. The coin acceptor cannot operate
+until the flight deck is closed.
+Any alarm code which does not fit into the above
+categories.
+
+cctalk Generic Specification -  Money Controls - Page 52 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+18. Table 3 - cctalk Fault Code Table
+Code
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+
+Fault
+OK ( no fault detected )
+EEPROM checksum corrupted
+Fault on inductive coils
+Fault on credit sensor
+Fault on piezo sensor
+Fault on reflective sensor
+Fault on diameter sensor
+Fault on wake-up sensor
+Fault on sorter exit sensors
+NVRAM checksum corrupted
+Coin dispensing error
+Low level sensor error
+High level sensor error
+Coin counting error
+Keypad error
+Button error
+Display error
+Coin auditing error
+Fault on reject sensor
+Fault on coin return mechanism
+Fault on C.O.S. mechanism
+Fault on rim sensor
+Fault on thermistor
+Payout motor fault
+Payout timeout
+Payout jammed
+Payout sensor fault
+Level sensor error
+Personality module not fitted
+Personality checksum corrupted
+ROM checksum mismatch
+Missing slave device
+Internal comms bad
+Supply voltage outside
+operating limits
+Temperature outside
+operating limits
+D.C.E. fault
+Fault on bill validation sensor
+Fault on bill transport motor
+Fault on stacker
+Bill jammed
+RAM test fail
+Fault on string sensor
+Accept gate failed open
+
+Optional Extra Info
+Coil number
+Sensor number
+Hopper or tube number
+Hopper or tube number
+Key number
+Hopper number
+Hopper or tube number
+Hopper or tube number
+Hopper or tube number
+Hopper or tube number
+Slave address
+Slave address
+1 = coin, 2 = token
+Sensor number
+-
+
+cctalk Generic Specification -  Money Controls - Page 53 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+43
+255
+
+Accept gate failed closed
+Unspecified fault code
+
+Further information
+
+cctalk Generic Specification -  Money Controls - Page 54 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+18.1 cctalk Fault Code Descriptions
+This is a generic fault code table for all cctalk devices.
+A manufacturer of cctalk equipment can implement any subset of the fault codes below depending on
+the technology they are using and the ability to self-diagnose problems. These are all status codes
+which can be returned in response to a ‘Perform self-check’ command. They are all ‘fatal’ errors in that
+any non-zero reply prevents normal operation of the device and is an implicit request to the host
+machine for a service callout. The host does not need to ‘inhibit’ or prevent the device from operating
+if a non-zero fault code is returned as this will be done automatically.
+Note that all fault code conditions relating to payout devices were incorporated into the ‘Test hopper’
+command in a past revision of the protocol and are therefore marked as obsolete.
+Code
+0
+1
+
+Fault
+OK ( no fault detected )
+EEPROM checksum corrupted
+
+2
+3
+
+Fault on inductive coils
+Fault on credit sensor
+
+4
+5
+
+Fault on piezo sensor
+Fault on reflective sensor
+
+6
+
+Fault on diameter sensor
+
+7
+
+Fault on wake-up sensor
+
+8
+
+Fault on sorter exit sensors
+
+9
+
+NVRAM checksum corrupted
+
+10
+
+Coin dispensing error
+
+11
+12
+13
+
+Low level sensor error
+High level sensor error
+Coin counting error
+
+14
+15
+16
+17
+
+Keypad error
+Button error
+Display error
+Coin auditing error
+
+18
+
+Fault on reject sensor
+
+19
+
+Fault on coin return mechanism
+
+20
+21
+22
+
+Fault on C.O.S. mechanism
+Fault on rim sensor
+Fault on thermistor
+
+23
+24
+
+Payout motor fault
+Payout timeout
+
+25
+
+Payout jammed
+
+Description
+The usual response. Everything is working.
+The coin acceptor has found a mismatch between the checksum
+calculated from a coin data area and a stored checksum.
+Possible EEPROM corruption. This checksum is not intende d
+for use with program code / firmware.
+A fault was detected with the coils for inductive coin validation.
+A fault was detected with the post-gate credit sensor. A serial
+credit can only be generated if the coin passes this sensor.
+A fault was detected on the piezo sensor used for slug rejection.
+A fault was detected on an opto-reflective sensor for coin
+validation.
+A faul t was detected on a validation sensor specifically reserved
+for diameter resolution.
+A fault was detected on the sensor used to wake-up a coin
+acceptor from a sleeping or power-down state.
+A fault was detected on the sorter exit sensors. These sensors
+confirm that a coin has cleared the sorter flaps and perhaps to
+verify the path taken.
+If battery-backed RAM is used then a corrupted checksum was
+discovered.
+Obsolete : A fault was found during a hopper coin dispense
+operation.
+Obsolete : A fault was found on a hopper low level sensor.
+Obsolete : A fault was found on a hopper high level sensor.
+Obsolete : A fault was detected in the hopper ‘dead reckoning’
+system. It probably ran out of coins.
+A fault was found on a keypad.
+A fault was found on a button.
+A fault was found on a display device.
+A fault was detected in the memory block used to record the
+number of inserted and accepted coins on a coin acceptor.
+A fault was detected with the reject sensor. This is the sensor
+used to confirm a coin has left the reject path and has been
+returned to the customer.
+A fault was detected in the flight deck mechanism used by the
+customer to clear coin jams in the entry or validation area.
+A fault was found on the ‘Coin on String’ sensor.
+A fault was found on a coin rim validation sensor.
+A fault was found on a thermistor used to measure ambient
+temperature.
+Obsolete : A fault was found on a hopper motor.
+Obsolete : A coin was dispensed from a hopper but was not
+seen on the payout verification sensor.
+Obsolete : A jam was detected in a hopper.
+
+cctalk Generic Specification -  Money Controls - Page 55 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+26
+
+Payout sensor fault
+
+27
+28
+
+Level sensor error
+Personality module not fitted
+
+29
+
+Personality checksum corrupted
+
+30
+
+ROM checksum mismatch
+
+31
+
+Missing slave device
+
+32
+33
+
+Internal comms bad
+Supply voltage outside operating limits
+
+34
+35
+36
+37
+
+Temperature outside
+operating limits
+D.C.E. fault
+Fault on bill validation sensor
+Fault on bill transport motor
+
+38
+39
+40
+
+Fault on stacker
+Bill jammed
+RAM test fail
+
+41
+
+Fault on string sensor
+
+42
+
+Accept gate failed open
+
+43
+
+Accept gate failed closed
+
+255
+
+Unspecified fault code
+
+Obsolete : A fault was found on a hopper payout verification
+sensor.
+Obsolete : A fault was found on a hopper level sensor.
+A personality or configuration module needed with some cctalk
+peripherals was not fitted.
+A data checksum on a personality or configuration module was
+corrupted.
+The device has found a mismatch between the checksum
+calculated from a program code area and a stored checksum.
+Possible flash memory / ROM corruption.
+Obsolete : A cctalk peripheral did not find an attached slave
+device. Only of use in multi-master systems.
+A cctalk peripheral could not access an internal serial de vice.
+The cctalk device is operating outside supply voltage limits
+defined in the product specification.
+The cctalk device is operating outside temperature limits
+defined in the product specification.
+A fault was found on the Dual Coin Entry chute.
+A fault was found on one of the bill validator validation sensors.
+A fault was found on the motor used to drive a bill through the
+bill validator.
+A fault was found on the stacker attached to a bill validator.
+A bill is stuck in the bill validator.
+A read / write test cycle of the bill validator RAM has indicated
+a fault.
+A fault was found on a sensor used for detecting bills on a
+string.
+The coin accept gate is stuck open due to a jam or fraud
+attempt.
+The coin accept gate is stuck closed. Possible open-circuit fault
+on the solenoid driver.
+Any fault code which does not fall into the above categories.
+Some manufacturers may wish to use the optional byte to
+specify a manufacturer-s pecific fault code.
+
+cctalk Generic Specification -  Money Controls - Page 56 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+19. Table 4 - cctalk Coin Acceptor Status Codes
+Code
+0
+1
+2
+
+Status
+OK
+Coin return mechanism activated ( flight deck open )
+C.O.S. mechanism activated ( coin-on-string )
+
+cctalk Generic Specification -  Money Controls - Page 57 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+20. Table 5 - cctalk Coin Calibration Reply Codes
+Code
+1
+2
+3
+4
+250
+251
+252
+253
+254
+255
+
+Error
+calibration denied
+calibration recharge required
+calibration failed ( product name mismatch )
+calibration failed ( database number mismatch )
+calibration error ( key not supported )
+calibration error ( internal bin failure )
+calibration error ( op-code not supported )
+calibration error ( illegal parameter )
+calibration error ( database corrupt )
+calibration error ( unspecified )
+
+cctalk Generic Specification -  Money Controls - Page 58 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+21. Table 6 - cctalk Standard Manufacturer Strings
+The following standard manufacturer strings have been registered by the cctalk User
+Group. They are returned by the ‘Request manufacturer id’ command and can be used
+to help identify a specific product.
+BNV’s are expected to reply with abbreviated names. Other peripherals may return a
+full name.
+21.1 Manufacturer Names
+Full Name
+Aardvark Embedded Solutions Ltd
+Alberici
+AstroSystems Ltd
+Azkoyen
+Encopim SL
+Comestero Group
+Gaming Technology Distribution
+Himecs
+Innovative Technology Ltd
+Intergrated(sic) Technology Ltd
+International Currency Technologies
+Japan Cash Machine
+Mars Electronics International
+Microsystem Controls Pty. Ltd. (Microcoin)
+Money Controls (International)
+National Rejectors Inc
+Starpoint Electrics Ltd
+
+Abbreviated Name
+AES
+ALB
+AST
+AZK
+ECP
+CMG
+GTD
+HIM
+ITL
+INT
+ICT
+JCM
+MEI
+MSC
+MCI
+NRI
+SEL
+
+If you are a manufacturer of cctalk peripherals then you may submit your company
+identification string for inclusion in this table.
+
+cctalk Generic Specification -  Money Controls - Page 59 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+22. Table 7 - cctalk Bill Event Codes
+Result A
+1 to 255
+
+Result B
+0
+
+1 to 255
+
+1
+
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+
+Event
+Bill type 1 to 255 validated correctly and
+sent to cashbox / stacker
+Bill type 1 to 255 validated correctly and
+held in escrow
+Master inhibit active
+Bill returned from escrow
+Invalid bill ( due to validation fail )
+Invalid bill ( due to transport problem )
+Inhibited bill ( on serial )
+Inhibited bill ( on DIP switches )
+Bill jammed in transport ( unsafe mode )
+Bill jammed in stacker
+Bill pulled backwards
+Bill tamper
+Stacker OK
+Stacker removed
+Stacker inserted
+Stacker faulty
+Stacker full
+Stacker jammed
+Bill jammed in transport ( safe mode )
+Opto fraud detected
+String fraud detected
+Anti-string mechanism faulty
+Barcode detected
+
+Type
+Credit
+Pending Credit
+Status
+Status
+Reject
+Reject
+Status
+Status
+Fatal Error
+Fatal Error
+Fraud Attempt
+Fraud Attempt
+Status
+Status
+Status
+Fatal Error
+Status
+Fatal Error
+Fatal Error
+Fraud Attempt
+Fraud Attempt
+Fatal Error
+Status
+
+There are two types of ‘Bill jammed in transport’ errors - safe mode and unsafe mode.
+The safe mode assumes that the note is jammed in a position which cannot be
+retrieved by the customer and so if validated as true a credit can be given. The unsafe
+mode assumes that the customer can retrieve the note and so no credit should be
+given.
+Event Types
+Credit
+Pending Credit
+Reject
+Fraud Attempt
+Fatal Error
+Status
+
+Bill accepted - credit the customer
+Bill held in escrow - decide whether to accept it
+Bill rejected and returned to customer
+Fraud detected. Possible machine alarm.
+Service callout
+Informational only
+
+cctalk Generic Specification -  Money Controls - Page 60 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+23. Circuit 1 - cctalk Standard Interface
+Note that the original design using a PNP receive transistor has been abandoned due
+to the data line voltage on some products falling to nearer +4V than +5V. The PNP
+design did not give enough safety margin.
+
+This circuit uses an open-collector transistor to drive the data line and a diode
+protected straight-through receiver.
+
+Typical Components
+Diode
+NPN
+PNP
+
+BAT54
+BC846B
+BCW68
+
+Schottky Diode, low forward voltage drop
+High gain, medium signal, NPN transistor
+High gain, medium signal, PNP transistor
+
+cctalk Generic Specification -  Money Controls - Page 61 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+24. Circuit 2 - cctalk Low Cost Interface
+Assuming that the transmitting device is capable of sinking a reasonable amount of
+current, a direct diode interface can be used rather than a full transistor interface.
+Although cheaper to implement, this circuit does not have the drive capability or the
+robustness of other designs.
+
+cctalk Generic Specification -  Money Controls - Page 62 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+25. Circuit 3 - cctalk Direct Interface
+A very low cost solution is to interface a single pin on a microcontroller directly onto
+the cctalk data line. The pin can be switched between active-low for transmitting and
+high- impedance tri-state for receiving.
+
+cctalk Generic Specification -  Money Controls - Page 63 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+26. Circuit 4 - PC Interface
+The circuit below shows how to connect the 9-pin serial port of a PC to the cctalk data
+bus. The only integrated circuit required is a Maxim level-shifter which operates off a
+single +5V supply. Any small-signal diodes and transistors can be used.
+
+If you want non-smt then…
+A direct equivalent to BCW68 ( PNP ) is BC327 in a TO-92 package.
+A direct equivalent to BC846 ( NPN ) is BC546 in a TO-92 package.
+Transistors are any small signal, general-purpose types with a dc current gain of at
+least 100.
+
+cctalk Generic Specification -  Money Controls - Page 64 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+
+27. Glossary
+Presented below is an arbitrary selection of terms relating to serial communications
+and the money transaction industry which may prove helpful to people unfamiliar
+with this field.
+Accumulator
+
+ACK
+API
+ASCII
+Asynchronous
+AWP
+BACTA
+Bit
+Bit stuffing
+BNV
+Broadcast
+Bus
+Byte
+Calibration
+CAN
+CCITT
+Checksum
+CRC
+CSMA/CD
+CVF
+Discriminator
+
+EEPROM
+EMS
+EIA
+Ethernet
+Full-duplex
+Half-duplex
+IEEE
+ISO
+Isochronous
+ITU
+MDCES
+Mech
+MPU
+
+As in ‘accumulator hopper’. The hopper can dispense multiple coin types to reach
+a requested coin value but can only determine which coin has been paid after it
+leaves the hopper. To prevent overpaying the hopper must sometimes stop before
+the requested coin value is met and inform the host machine so that a second
+single-coin hopper can dispense the remaining coin value or ‘change’. This
+method can be substantially faster than a discriminator hopper which rejects
+unwanted coin types before they leave the hopper.
+Acknowledge message. Affirmative outcome, it worked.
+Application Program Interface. The use of a common software library through
+standardised ‘hooks’.
+American Standard Code for Information Interchange. A universal way of
+representing letters with numbers
+Data is transferred at seemingly random intervals, i.e. not synchronised with a
+master clock.
+Amusement With Prize - a type of amusement machine. Typically reels.
+British Amusement Catering Trade Association ( founded 1974 ). Represents the
+pay-to-play leisure industry in Great Britain.
+(Binary Digit). The smallest unit of digital information - a 0 or 1.
+The process of adding extra bits into a transmitted packet to ensure continuous
+data transfer
+Bank Note Validator
+Sending a message to all bus peripherals regardless of address
+The electrical connection along which data flows between devices
+(Binary Term). A storage location for 8 bits
+The Money Controls method of remote coin programming
+Controller Area Network - an automotive serial protocol
+Comité Consultatif International Téléphonique et Télégraphique
+A method of detecting errors in transmitted data
+Cyclic Redundancy Check - a secure type of checksum based on polynomial
+division
+Carrier Sense Multiple Access / Collision Detection. A method of handling
+collisions on a multi-master network.
+Coin Value Format as used by cctalk
+As in ‘discriminator hopper’. The hopper can dispense multiple coin types. The
+hopper determines each coin type prior to payout and if it does not match the
+required type it is ‘rejected’. Can suffer from ‘hunting’ whereby the hopper
+cannot find a particular coin if the frequency of occurrence is low.
+Electrically Erasable Read Only Memory. Non-volatile storage.
+Early Morning Start-up. Software executed when power is first applied to a
+machine. Traditionally assumed to be first thing in the morning.
+Electronic Industries Association
+A common networking protocol employing CSMA/CD on a bus or star topology
+Data can be transmitted and received simultaneously
+Data can be transmitted and received, but not simultaneously
+Institution of Electrical and Electronic Engineers
+International Standards Organisation
+Data is transferred subject to some time constraints. Applications such as multimedia must have a guaranteed data throughput.
+International Telecommunication Union
+Multi-Drop Command Extension Set as used by cctalk
+Industry-standard abbreviation for a coin (mech)anism
+Micro-processing Unit. Old-fashioned word for a PCB with a microprocessor
+on it. A system block with processing capability.
+
+cctalk Generic Specification -  Money Controls - Page 65 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+Public Domain Document
+Multi-Drop
+NAK
+Nibble
+Non-volatile
+NRZ
+
+Open-collector
+OSI
+Parity
+Protocol
+RAM
+RNG
+ROM
+RS232C
+RS485
+RTBY
+Start bit
+Stop bit
+String
+SWP
+Synchronous
+Topology
+UART
+USB
+Validation
+
+More than one slave device on a common bus
+No Acknowledge message. Negative outcome, it failed.
+Alternatively nybble. 4 bits of information or half a byte.
+Data retained after power is removed
+Non return to zero. Some protocols allow continuous streams of 0’s and 1’s to be
+sent out - the NRZ method. Other protocols require forced bit transitions to
+recover the clock signal.
+A method of driving a signal between ground and high impedance. Ideal for
+multi-drop networks.
+Open System Interconnection. An ISO standard for networking.
+A method of testing for a single bit error in a data packet by counting the number
+of set bits. Can be an odd or even parity check depending on the calculation.
+A set of common rules to allow devices to communicate
+Random Access Memory. Read / write memory for data storage.
+Random Number Generator
+Read Only Memory. Fixed memory, usually for the program code itself.
+Recommended Standard 232C - the original serial standard for data
+communications
+Similar to RS232 but multi-drop and long distance
+Relative To Base Year. A Money Controls date format.
+Used to signal the start of a data packet and initiate any timing control. Essential
+in asynchronous communications
+Used to signal the end of a data packet
+A sequence of printable characters
+Skill With Prize - a type of amusement machine. Typically a quiz.
+Data is transferred at regular intervals in time according to a master clock
+The shape of a network - how the devices are physically distributed and connected
+together.
+Universal Asynchronous Receiver Transmitter. The portion of hardware which
+transfers data to and from a bit stream.
+Universal Serial Bus - a PC peripheral protocol
+The process of recognising a coin or bill as the genuine article
+
+cctalk Generic Specification -  Money Controls - Page 66 of 66 - cctalk Part 3 v4.4
+While every effort has been made to ensure the accuracy of this document no liability of any kind is
+accepted or implied for any errors or omissions that are contained herein.
+
+

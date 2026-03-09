@@ -265,7 +265,8 @@ static void sd_init_worker_task(void *pv)
  */
 esp_err_t api_test_handler(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST %s", req->uri);
+    extern bool enable_api_log;
+    if (enable_api_log) ESP_LOGI(TAG, "[C] POST %s", req->uri);
     const char *test_name = req->uri + strlen("/api/test/");
     char response[256] = {0};
 
@@ -295,7 +296,7 @@ esp_err_t api_test_handler(httpd_req_t *req)
         }
     }
     else if (strcmp(test_name, "scanner_on") == 0) {
-        ESP_LOGI(TAG, "[C] POST /api/test/scanner_on");
+        if (enable_api_log) ESP_LOGI(TAG, "[C] POST /api/test/scanner_on");
         web_ui_add_log("INFO", "SCANNER", "API scanner_on called");
         esp_err_t err = usb_cdc_scanner_send_on_command();
         if (err == ESP_OK) {
@@ -321,7 +322,7 @@ esp_err_t api_test_handler(httpd_req_t *req)
         }
     }
     else if (strcmp(test_name, "scanner_off") == 0) {
-        ESP_LOGI(TAG, "[C] POST /api/test/scanner_off");
+        if (enable_api_log) ESP_LOGI(TAG, "[C] POST /api/test/scanner_off");
         web_ui_add_log("INFO", "SCANNER", "API scanner_off called");
         esp_err_t err = usb_cdc_scanner_send_off_command();
         if (err == ESP_OK) {
@@ -1107,18 +1108,18 @@ modbus_read_end:
                          "{\"error\":\"Init CCtalk fallita: %s\"}",
                          esp_err_to_name(cctalk_err));
             } else {
-                bool inhibit_ok = cctalk_modify_master_inhibit(cctalk_addr,
-                                                               accept_enabled,
-                                                               CCTALK_WEB_CMD_TIMEOUT_MS);
+                bool inhibit_std_ok = cctalk_modify_master_inhibit_std(cctalk_addr,
+                                                                       accept_enabled,
+                                                                       CCTALK_WEB_CMD_TIMEOUT_MS);
                 bool mask_ok = true;
-                if (inhibit_ok && !retention_on) {
+                if (!retention_on) {
                     mask_ok = cctalk_modify_inhibit_status(cctalk_addr,
                                                            0xFFU,
                                                            0xFFU,
                                                            CCTALK_WEB_CMD_TIMEOUT_MS);
                 }
 
-                if (!inhibit_ok || !mask_ok) {
+                if (!inhibit_std_ok || !mask_ok) {
                     serial_test_push_monitor_action("CCTALK", accept_enabled ? "Master Inhibit=1 (abilitato) FAIL" : "Master Inhibit=0 (inibito) FAIL");
                     snprintf(response, sizeof(response),
                              "{\"error\":\"Comando ritenzione/abilitazione formati fallito\"}");
@@ -1148,15 +1149,15 @@ modbus_read_end:
                 }
             }
         }
-    } else if (strcmp(test_name, "cctalk_retention_ch1_4") == 0) {
-        const uint8_t mask_low = 0xF0U;
-        const uint8_t mask_high = 0xFFU;
+    } else if (strcmp(test_name, "cctalk_retention_ch1_2") == 0) {
+        const uint8_t mask_low = 0x03U;
+        const uint8_t mask_high = 0x00U;
         uint8_t req_addr = 0;
         if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
             (void)set_cctalk_address_configured(req_addr);
         }
         uint8_t cctalk_addr = get_cctalk_address_configured();
-        serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH4 richiesta");
+        serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 richiesta");
 
         esp_err_t rs232_err = rs232_init();
         if (rs232_err != ESP_OK) {
@@ -1170,21 +1171,21 @@ modbus_read_end:
                          "{\"error\":\"Init CCtalk fallita: %s\"}",
                          esp_err_to_name(cctalk_err));
             } else {
-                bool master_ok = cctalk_modify_master_inhibit(cctalk_addr,
-                                                              true,
-                                                              CCTALK_WEB_CMD_TIMEOUT_MS);
+                bool master_std_ok = cctalk_modify_master_inhibit_std(cctalk_addr,
+                                                                      true,
+                                                                      CCTALK_WEB_CMD_TIMEOUT_MS);
                 bool mask_ok = false;
-                if (master_ok) {
+                if (master_std_ok) {
                     mask_ok = cctalk_modify_inhibit_status(cctalk_addr,
                                                            mask_low,
                                                            mask_high,
                                                            CCTALK_WEB_CMD_TIMEOUT_MS);
                 }
 
-                if (!master_ok || !mask_ok) {
-                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH4 FAIL");
+                if (!master_std_ok || !mask_ok) {
+                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 FAIL");
                     snprintf(response, sizeof(response),
-                             "{\"error\":\"Comando abilita CH1-CH4 fallito\"}");
+                             "{\"error\":\"Comando abilita CH1-CH2 fallito\"}");
                 } else {
                     uint8_t read_low = 0;
                     uint8_t read_high = 0;
@@ -1193,15 +1194,15 @@ modbus_read_end:
                                                                    &read_high,
                                                                    CCTALK_WEB_CMD_TIMEOUT_MS);
 
-                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH4 ok");
+                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 ok");
                     if (status_ok) {
                         snprintf(response, sizeof(response),
-                                 "{\"message\":\"Abilitazione CH1-CH4 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
+                                 "{\"message\":\"Abilitazione CH1-CH2 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
                                  (unsigned)read_low,
                                  (unsigned)read_high);
                     } else {
                         snprintf(response, sizeof(response),
-                                 "{\"message\":\"Abilitazione CH1-CH4 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
+                                 "{\"message\":\"Abilitazione CH1-CH2 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
                                  (unsigned)mask_low,
                                  (unsigned)mask_high);
                     }

@@ -2491,7 +2491,8 @@ esp_err_t api_runtime_enable_api_log_post(httpd_req_t *req)
     }
     /* Mirror to legacy flag so existing logging checks work */
     send_http_log = enable_api_log;
-    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/runtime/enable_api_log -> true");
+    /* Always log the state change, regardless of enable_api_log status */
+    ESP_LOGI(TAG, "[C] POST /api/runtime/enable_api_log -> %s", enable_api_log ? "true" : "false");
     char resp[64];
     snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"enabled\":%s}", enable_api_log ? "true" : "false");
     httpd_resp_set_type(req, "application/json");

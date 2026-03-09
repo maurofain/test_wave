@@ -775,6 +775,28 @@ bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool accept_enabled, uint32
 
 
 /**
+ * @brief Modifica il master inhibit utilizzando il comando standard CCTalk 228.
+ * 
+ * Comando standard CCTalk (spec ufficiale) per il controllo globale di accettazione.
+ * Semantica: 1 = accetta, 0 = rifiuta.
+ *
+ * @param [in] dest_addr Indirizzo del dispositivo destinatario.
+ * @param [in] accept_enabled true = abilita accettazione, false = disabilita.
+ * @param [in] timeout_ms Timeout in millisecondi per l'operazione.
+ * @return true se il comando è stato accettato, false altrimenti.
+ */
+bool cctalk_modify_master_inhibit_std(uint8_t dest_addr, bool accept_enabled, uint32_t timeout_ms)
+{
+    uint8_t data = accept_enabled ? 0x01U : 0x00U;
+    cctalk_frame_t response = {0};
+    if (!cctalk_command(dest_addr, CCTALK_MASTER_ADDRESS, 228U, &data, 1U, &response, timeout_ms)) {
+        return false;
+    }
+    return cctalk_expect_ack(&response);
+}
+
+
+/**
  * @brief Imposta la maschera di inibizione canali della gettoniera.
  *
  * @param [in] dest_addr Indirizzo del dispositivo destinatario.
@@ -1202,6 +1224,21 @@ bool cctalk_request_build_code(uint8_t dest_addr, char *out, size_t out_len, uin
  * @return true se l'operazione è stata completata con successo, false altrimenti.
  */
 bool cctalk_modify_master_inhibit(uint8_t dest_addr, bool accept_enabled, uint32_t timeout_ms)
+{
+    (void)dest_addr; (void)accept_enabled; (void)timeout_ms;
+    return true;
+}
+
+
+/**
+ * @brief Modifica il master inhibit utilizzando il comando standard CCTalk 228 (mockup).
+ *
+ * @param [in] dest_addr L'indirizzo destinatario del comando.
+ * @param [in] accept_enabled true => invia valore 1 (abilitato), false => invia valore 0 (inibito).
+ * @param [in] timeout_ms Il timeout in millisecondi per l'operazione.
+ * @return true se l'operazione è stata completata con successo, false altrimenti.
+ */
+bool cctalk_modify_master_inhibit_std(uint8_t dest_addr, bool accept_enabled, uint32_t timeout_ms)
 {
     (void)dest_addr; (void)accept_enabled; (void)timeout_ms;
     return true;

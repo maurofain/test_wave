@@ -5,6 +5,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
+#include "fsm.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -132,6 +133,36 @@ static const char *cctalk_error_to_text(uint8_t code)
         case 254: return "errore_hw";
         default:  return "errore";
     }
+}
+
+/**
+ * @brief Converte il label della moneta al valore in centesimi.
+ * 
+ * @param label [in] Label della moneta ricevuto dal comando 184 (es. "EU200A").
+ * @param out_cents [out] Puntatore al valore in centesimi.
+ * 
+ * @return true se la conversione è riuscita, false altrimenti.
+ */
+static bool cctalk_coin_label_to_value(const char *label, int32_t *out_cents)
+{
+    if (!label || !out_cents) {
+        return false;
+    }
+
+    /* Parse label format: "EU<value><letter>" where value is 3 digits
+       Examples: EU050 = 50 cents, EU100 = 1 euro, EU200A = 2 euros */
+    if (strlen(label) >= 5 && label[0] == 'E' && label[1] == 'U') {
+        int val = atoi(&label[2]);
+        if (val > 0) {
+            *out_cents = val;
+            return true;
+        }
+    }
+
+    /* Fallback: unrecognized format defaults to 100 cents (1 euro) */
+    ESP_LOGW(TAG, "[C] Moneta con label non riconosciuto: %s, defaulting a 1 euro", label);
+    *out_cents = 100;
+    return true;
 }
 
 static uint8_t cctalk_event_counter_delta(uint8_t previous_counter, uint8_t current_counter)
@@ -348,6 +379,21 @@ static void cctalk_log_powerup_info(void)
 * e mantiene in memoria eventiali centesimi rimasti. Al momento dell'utilizzo dell'ultimo ecd
 * azzera il credito rimasto (< 1.00 euro)
 */
+
+/**
+ * @brief Elabora i crediti bufferizzati ricevuti dal comando 229.
+ * 
+ * Questa funzione gestisce gli eventi di inserimento monete e i relativi errori.
+ * 
+ * 📌 IMPORTANTE - Monitor CCTalk:
+ *    I messaggi di moneta/evento vengono SEMPRE pushati al monitor della sezione /test,
+ *    indipendentemente dal valore di dump_cctalk_log:
+ *    - dump_cctalk_log = true:  Mostra frame HEX completi (TX/RX) + messaggi monete
+ *    - dump_cctalk_log = false: Mostra SOLO messaggi monete senza frame HEX
+ *    
+ *    Questo permette di seguire il flusso di inserimento monete anche in modalità
+ *    "senza commenti" (cioè senza visualizzare i dettagli tecnici dei frame).
+ */
 static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
 {
     if (!buffer) {
@@ -379,11 +425,14 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
     }
 
     cctalk_state_give();
+    
+    // Log tecnico su seriale (solo se dump_cctalk_log = true)
     cctalk_log_buffered_credit_dump(buffer, previous_counter_valid, previous_counter);
 
     if (baseline) {
         char msg[64] = {0};
         snprintf(msg, sizeof(msg), "BUFFER baseline ev=%u", (unsigned)buffer->event_counter);
+        // Push al monitor: baseline iniziale
         serial_test_push_monitor_action("CCTALK", msg);
         return;
     }
@@ -400,9 +449,12 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
                  (unsigned)previous_counter,
                  (unsigned)buffer->event_counter,
                  (unsigned)new_event_count);
+        // Push al monitor: contatore eventi cambiato
         serial_test_push_monitor_action("CCTALK", msg);
     }
 
+    // Mostra il payload HEX ricevuto dal comando 229
+    // (questo è un messaggio di "RX229 HEX ..." che è sempre pushato)
     cctalk_push_buffered_credit_hex_action(buffer);
 
     if (new_event_count > 5U) {
@@ -416,31 +468,58 @@ static void cctalk_handle_buffered_credit(const cctalk_buffer_t *buffer)
         new_event_count = 5U;
     }
 
+    // Elabora ogni evento di moneta/errore
+    // ✅ NB: I messaggi di moneta vengono SEMPRE pushati al monitor
+    //    anche quando dump_cctalk_log = false
+    //    Indipendentemente dalla modalità di debug
     for (size_t i = 0; i < (size_t)new_event_count; ++i) {
         uint8_t channel = buffer->events[i].coin_id;
-        uint8_t error = buffer->events[i].error_code;
+        uint8_t event_data2 = buffer->events[i].error_code; // Se channel != 0 è il sorter path, se channel == 0 è l'error code
 
-        if (channel == 0U && error == 0U) {
+        if (channel == 0U && event_data2 == 0U) {
             continue;
         }
 
         char msg[96] = {0};
-        if (error == 0U) {
+        if (channel > 0U) {
+            // Moneta inserita correttamente
             char coin_label[16] = {0};
             if (cctalk_fetch_coin_label(channel, coin_label, sizeof(coin_label)) && coin_label[0] != '\0') {
                 snprintf(msg, sizeof(msg), "MONETA CH%u %s", (unsigned)channel, coin_label);
+                
+                /* Converte label a valore e pubblica evento FSM per credito */
+                int32_t coin_cents = 0;
+                if (cctalk_coin_label_to_value(coin_label, &coin_cents)) {
+                    fsm_input_event_t ev = {
+                        .from = AGN_ID_CCTALK,
+                        .to = {AGN_ID_FSM},
+                        .action = ACTION_ID_PAYMENT_ACCEPTED,
+                        .type = FSM_INPUT_EVENT_TOKEN,
+                        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+                        .value_i32 = coin_cents,
+                        .value_u32 = 0,
+                        .aux_u32 = 0,
+                        .text = {0},
+                    };
+                    snprintf(ev.text, sizeof(ev.text), "cctalk_coin_%s", coin_label);
+                    if (!fsm_event_publish(&ev, pdMS_TO_TICKS(50))) {
+                        ESP_LOGW(TAG, "[C] Coda FSM piena per moneta %s", coin_label);
+                    }
+                }
             } else {
                 snprintf(msg, sizeof(msg), "MONETA CH%u", (unsigned)channel);
             }
         } else {
+            // Errore (channel == 0)
             snprintf(msg,
                      sizeof(msg),
-                     "EVENTO CH%u ERR%u %s",
-                     (unsigned)channel,
-                     (unsigned)error,
-                     cctalk_error_to_text(error));
+                     "EVENTO ERR%u %s",
+                     (unsigned)event_data2,
+                     cctalk_error_to_text(event_data2));
         }
 
+        // Push al monitor: questo messaggio appare nel monitor /test
+        // indipendentemente da dump_cctalk_log
         serial_test_push_monitor_action("CCTALK", msg);
     }
 }
@@ -475,6 +554,12 @@ static void cctalk_poll_once(void)
  * @brief Esegue il task CCTalk.
  *
  * Questa funzione gestisce il task principale per la comunicazione CCTalk.
+ * Implementa il Passo 4 della sequenza di inizializzazione:
+ * 
+ *   Passo 4: Read Credit (229) - Ciclo infinito di lettura incasso
+ *   ├─ Poll ogni 250 ms il buffer crediti (comando 229)
+ *   ├─ Se nuovo evento → elabora moneta rilevata (coin_id, error_code)
+ *   └─ Log monete e relativi stati di errore
  *
  * @param arg Puntatore a dati di input utilizzati dal task.
  * @return Nessun valore di ritorno.
@@ -484,8 +569,9 @@ void cctalk_task_run(void *arg)
     (void)arg;
     while (1) {
         if (cctalk_driver_is_acceptor_enabled()) {
+            // Passo 4: Ciclo di lettura crediti (comando 229 - Read Buffered Credit)
             cctalk_poll_once();
-            vTaskDelay(pdMS_TO_TICKS(CCTALK_POLL_INTERVAL_MS));
+            vTaskDelay(pdMS_TO_TICKS(CCTALK_POLL_INTERVAL_MS));  // 250 ms tra letture
         } else {
             vTaskDelay(pdMS_TO_TICKS(200));
         }
@@ -569,77 +655,32 @@ esp_err_t cctalk_driver_start_acceptor(void)
         snprintf(msg, sizeof(msg), "Address Poll OK (addr 0x%02X)", (unsigned)acceptor_addr);
         serial_test_push_monitor_action("CCTALK", msg);
     }
-    cctalk_log_powerup_info();
 
-    // Delay 50ms tra comandi per stabilità comunicazione
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    // Passo 2: Richiesta Status - Ottiene lo stato corrente della gettoniera
-    // Comando 248 (0xF8), riceve 1 byte di stato
-    // Utile per verificare che la gettoniera sia pronta
-    // 02 00 01 F8 05 → Status
-    {
-        uint8_t status = 0;
-        if (cctalk_request_status(acceptor_addr, &status, CCTALK_CMD_TIMEOUT_MS)) {
-            char msg[64] = {0};
-            snprintf(msg, sizeof(msg), "Status OK: 0x%02X", (unsigned)status);
-            serial_test_push_monitor_action("CCTALK", msg);
-        } else {
-            serial_test_push_monitor_action("CCTALK", "Status FAIL");
-            return ESP_FAIL;
-        }
-    }
-
-    // Delay 50ms
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    // Passo 3: Master Inhibit = 0 (inibito)
-    // Comando 231 (0xE7) con dato 0x00
-    // Questo permette di controllare i canali individualmente
-    if (!cctalk_modify_master_inhibit(acceptor_addr, false, CCTALK_CMD_TIMEOUT_MS)) {
-        serial_test_push_monitor_action("CCTALK", "Master Inhibit=0 (inibito) FAIL");
-        return ESP_FAIL;
-    }
-
-    // Delay 100ms per permettere alla gettoniera di processare
+    // Delay 100ms tra comandi per stabilità comunicazione
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    // Passo 4: Modify Inhibit Status - Imposta maschera canali
-    // Comando 231 (0xE7) con 2 byte: mask_low, mask_high
-    // Bit 0 = canale attivo, Bit 1 = canale inibito
-    // 00 00 = tutti i 16 canali attivi/abilitati
-    // 02 02 01 86 00 00 76 → Tutti 16 canali ABILITATI
-    if (!cctalk_modify_inhibit_status(acceptor_addr, 0x00U, 0x00U, CCTALK_CMD_TIMEOUT_MS)) {
-        serial_test_push_monitor_action("CCTALK", "Inhibit mask 00 00 FAIL");
+    // Passo 2: Modify Inhibit Status - Abilita tutti i 16 canali
+    // Comando 231 (0xE7) con 2 byte: 0xFF 0xFF
+    // Apre tutti i canali per le monete
+    // 02 02 01 E7 FF FF XX → Tutti 16 canali ABILITATI
+    if (!cctalk_modify_inhibit_status(acceptor_addr, 0xFFU, 0xFFU, CCTALK_CMD_TIMEOUT_MS)) {
+        serial_test_push_monitor_action("CCTALK", "Inhibit mask FF FF FAIL");
         return ESP_FAIL;
     }
 
     // Delay 100ms
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    // Passo 5: Master Inhibit = 1 (abilitato)
-    // Comando 231 (0xE7) con dato 0x01
-    // Ora la gettoniera accetta monete normalmente
-    if (!cctalk_modify_master_inhibit(acceptor_addr, true, CCTALK_CMD_TIMEOUT_MS)) {
-        serial_test_push_monitor_action("CCTALK", "Master Inhibit=1 (abilitato) FAIL");
+    // Passo 3: Master Inhibit standard (comando 228)
+    // Comando 228 secondo CCTalk spec ufficiale
+    // 02 01 01 E4 01 XX → Master Inhibit standard
+    if (!cctalk_modify_master_inhibit_std(acceptor_addr, true, CCTALK_CMD_TIMEOUT_MS)) {
+        serial_test_push_monitor_action("CCTALK", "Master Inhibit STD (228) FAIL");
         return ESP_FAIL;
     }
 
     // Delay 100ms
     vTaskDelay(pdMS_TO_TICKS(100));
-
-    // Passo 6: Request Inhibit Status - Verifica la maschera impostata
-    // Comando 230 (0xE6), riceve 2 byte: mask_low, mask_high
-    // Dovrebbe restituire 00 00 (tutti canali attivi)
-    {
-        uint8_t mask_low = 0;
-        uint8_t mask_high = 0;
-        if (cctalk_request_inhibit_status(acceptor_addr, &mask_low, &mask_high, CCTALK_CMD_TIMEOUT_MS)) {
-            char msg[64] = {0};
-            snprintf(msg, sizeof(msg), "Inhibit mask %02X %02X", mask_low, mask_high);
-            serial_test_push_monitor_action("CCTALK", msg);
-        }
-    }
 
     cctalk_clear_coin_id_cache();
     if (cctalk_state_take(20)) {

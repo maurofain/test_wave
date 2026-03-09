@@ -19,9 +19,9 @@ la pagina deve avere : a sx una colonna con 8 tasti - In attesa di eventi estern
 3. Stato 2: running. Alla selezione del programma parte il countdown
    - viene visualizzato sullo schermo il credito residuo e rappresentato visivamente tramite la stripe LED. 
    - durante il running l'utente può inserire ulteriori monete o gettoni
-   - timeout e programma sono allineati durante il running
+   - Per terminare l'erogaziome c'è un tasto STOP che inibisce il riavvio automatico del programma. Eventuali crediti in monete non vengono restituiti. 
    - L'esecuzione del programma può essere sospesa dal touchscreen o dalla tastiera (con lo stesso tasto usato per selezionare il programma) per un tempo massimo definito nei parametri
-   - in sospensione timeout e programma restano allineati per tutto il tempo massimo di sospensione; scaduto tale tempo il countdown riprende ma la macchina resta in attesa della pressione del tasto programma per far ripartire il programma
+   - al terrmine del programma se c'è ECD sufficiente il programma riprende . Il ciclo si ripete fino a che il credito è disponibile po iene premuto STOP
    - Il programma termina su azione sul tasto o touchscreen o alla fine del credito e ritorna in stato 1
    - al termine la macchina addebita l'importo del programma trattenendo le monete o scalando l'importo tramite comunicazione con il server
    - tutte le operazioni vanno loggate
