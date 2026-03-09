@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "sevensegments_300.c"
+    SRCS "lvgl_page_ads.c" "sevensegments_300.c"
          "arial96.c"
          "DroidSansBold32.c"
          "DroidSansMono18.c"

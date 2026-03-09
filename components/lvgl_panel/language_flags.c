@@ -1,5 +1,7 @@
 #include "language_flags.h"
 
+#include <string.h>
+
 #define FLAG_W 24
 #define FLAG_H 16
 #define FLAG_STRIDE (FLAG_W * 2)
@@ -112,3 +114,23 @@ DECLARE_FLAG_DSC(g_flag_en_24x16, s_flag_en_map);
 DECLARE_FLAG_DSC(g_flag_de_24x16, s_flag_de_map);
 DECLARE_FLAG_DSC(g_flag_fr_24x16, s_flag_fr_map);
 DECLARE_FLAG_DSC(g_flag_es_24x16, s_flag_es_map);
+const lv_image_dsc_t *get_flag_for_language(const char *lang_code)
+{
+    if (!lang_code) {
+        return &g_flag_it_24x16;
+    }
+
+    if (strcmp(lang_code, "it") == 0) {
+        return &g_flag_it_24x16;
+    } else if (strcmp(lang_code, "en") == 0) {
+        return &g_flag_en_24x16;
+    } else if (strcmp(lang_code, "de") == 0) {
+        return &g_flag_de_24x16;
+    } else if (strcmp(lang_code, "fr") == 0) {
+        return &g_flag_fr_24x16;
+    } else if (strcmp(lang_code, "es") == 0) {
+        return &g_flag_es_24x16;
+    }
+
+    return &g_flag_it_24x16;  /* Default to Italian */
+}

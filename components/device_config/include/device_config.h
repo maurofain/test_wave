@@ -78,7 +78,10 @@ typedef struct {
  * @brief Struttura timeout applicativi
  */
 typedef struct {
-    uint32_t language_return_ms; ///< Timeout inattività per ritorno a pagina lingua
+    uint32_t language_return_ms;     ///< Timeout inattività per ritorno a pagina lingua
+    uint32_t idle_before_ads_ms;     ///< Timeout inattività prima di mostrare ads (default 60000ms=60s)
+    uint32_t ad_rotation_ms;         ///< Intervallo rotazione immagini ads (default 30000ms=30s)
+    uint32_t credit_reset_timeout_ms; ///< Timeout per reset crediti CVD/ECD (default 300000ms=5min)
 } device_timeouts_config_t;
 
 /**

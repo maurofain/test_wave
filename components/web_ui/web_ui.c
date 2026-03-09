@@ -2001,6 +2001,99 @@ esp_err_t api_config_reset(httpd_req_t *req)
     return ESP_OK;
 }
 
+// Handler API GET /api/config/timeouts
+/**
+ * @brief Restituisce la configurazione dei timeout applicativi.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
+esp_err_t api_config_timeouts_get(httpd_req_t *req)
+{
+    if (send_http_log) ESP_LOGD(TAG, "[C] GET /api/config/timeouts");
+    device_config_t *cfg = device_config_get();
+    cJSON *root = cJSON_CreateObject();
+    
+    cJSON_AddNumberToObject(root, "language_return_ms", cfg->timeouts.language_return_ms);
+    cJSON_AddNumberToObject(root, "idle_before_ads_ms", cfg->timeouts.idle_before_ads_ms);
+    cJSON_AddNumberToObject(root, "ad_rotation_ms", cfg->timeouts.ad_rotation_ms);
+    cJSON_AddNumberToObject(root, "credit_reset_timeout_ms", cfg->timeouts.credit_reset_timeout_ms);
+    
+    char *json_str = cJSON_Print(root);
+    cJSON_Delete(root);
+    
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json_str, strlen(json_str));
+    free(json_str);
+    return ESP_OK;
+}
+
+// Handler API POST /api/config/timeouts
+/**
+ * @brief Aggiorna la configurazione dei timeout applicativi.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Codice di errore.
+ */
+esp_err_t api_config_timeouts_post(httpd_req_t *req)
+{
+    if (!web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        return httpd_resp_send(req, "Configurazione in sola lettura in modalità APP", -1);
+    }
+
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/config/timeouts");
+    
+    /* Leggi il body della richiesta */
+    char buf[1024] = {0};
+    int bytes_read = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    
+    if (bytes_read < 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "Errore lettura payload", -1);
+    }
+    
+    /* Parse JSON */
+    cJSON *json = cJSON_Parse(buf);
+    if (!json) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "JSON non valido", -1);
+    }
+    
+    device_config_t *cfg = device_config_get();
+    
+    /* Aggiorna i timeout se presenti nel JSON */
+    cJSON *item;
+    if ((item = cJSON_GetObjectItem(json, "language_return_ms")) != NULL && item->type == cJSON_Number) {
+        cfg->timeouts.language_return_ms = (uint32_t)item->valueint;
+    }
+    if ((item = cJSON_GetObjectItem(json, "idle_before_ads_ms")) != NULL && item->type == cJSON_Number) {
+        cfg->timeouts.idle_before_ads_ms = (uint32_t)item->valueint;
+    }
+    if ((item = cJSON_GetObjectItem(json, "ad_rotation_ms")) != NULL && item->type == cJSON_Number) {
+        cfg->timeouts.ad_rotation_ms = (uint32_t)item->valueint;
+    }
+    if ((item = cJSON_GetObjectItem(json, "credit_reset_timeout_ms")) != NULL && item->type == cJSON_Number) {
+        cfg->timeouts.credit_reset_timeout_ms = (uint32_t)item->valueint;
+    }
+    
+    cJSON_Delete(json);
+    
+    /* Salva la configurazione */
+    cfg->updated = true;
+    esp_err_t err = device_config_save(cfg);
+    
+    httpd_resp_set_type(req, "application/json");
+    const char *response;
+    if (err == ESP_OK) {
+        response = "{\"status\":\"ok\",\"message\":\"Timeout configurati correttamente\"}";
+    } else {
+        response = "{\"status\":\"error\",\"message\":\"Errore salvataggio configurazione\"}";
+    }
+    httpd_resp_send(req, response, strlen(response));
+    return ESP_OK;
+}
+
 // Handler API POST /api/ntp/sync
 
 /**
@@ -2616,6 +2709,12 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     
     httpd_uri_t uri_api_reset = {.uri = "/api/config/reset", .method = HTTP_POST, .handler = api_config_reset};
     httpd_register_uri_handler(server, &uri_api_reset);
+
+    httpd_uri_t uri_api_timeouts_get = {.uri = "/api/config/timeouts", .method = HTTP_GET, .handler = api_config_timeouts_get};
+    httpd_register_uri_handler(server, &uri_api_timeouts_get);
+
+    httpd_uri_t uri_api_timeouts_post = {.uri = "/api/config/timeouts", .method = HTTP_POST, .handler = api_config_timeouts_post};
+    httpd_register_uri_handler(server, &uri_api_timeouts_post);
 
     httpd_uri_t uri_api_ntp_sync = {.uri = "/api/ntp/sync", .method = HTTP_POST, .handler = api_ntp_sync};
     httpd_register_uri_handler(server, &uri_api_ntp_sync);

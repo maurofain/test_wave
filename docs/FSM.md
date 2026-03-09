@@ -34,6 +34,3 @@ la pagina deve avere : a sx una colonna con 8 tasti - In attesa di eventi estern
 
 
 
-
-
-

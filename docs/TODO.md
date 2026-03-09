@@ -127,6 +127,7 @@ Primo MVP:
 43. File manager SD/SPIFFS: upload, download e cancellazione file su root; accessibile da tasto Home in App e Factory
 44. Scanner USB integrato nella coda messaggi; lettura QR → login automatico + `api_payment_post` via `http_services`
 45. Chiamate server remoto: header `Date` runtime, relogin automatico su 401/403, HTTPS con validazione certificato, coda offline persistente con retry/backoff, task periodico keepalive, metriche esposte via API/UI
+46. Sequenza di inizializzazione CCTalk: verificazione abilitazione interfaccia, invio 4 comandi di configurazione al boot (dopo ethernet) e prima di ogni caricamento pagina programmi; logging dettagliato di ogni comando (v1.5.3)
 
 ---
 

@@ -6,6 +6,7 @@
 #include "init.h"
 #include "tasks.h"
 #include "lvgl_panel.h"
+#include "lvgl_panel_pages.h"
 #include "cctalk.h"
 #include "app_version.h"
 #include "device_config.h"
@@ -144,6 +145,71 @@ static void maybe_force_crash_at_boot(void)
 
 
 /**
+ * @brief Invia la sequenza di inizializzazione CCTalk al dispositivo gettoniera.
+ * 
+ * Verifica che l'interfaccia CCTalk sia abilitata nella configurazione e invia
+ * una sequenza di 4 comandi di inizializzazione al dispositivo (indirizzo 0x02):
+ * 1. Address Poll (verifica presenza dispositivo)
+ * 2. Modify Inhibit Status (abilita tutti i 16 canali)
+ * 3. Modify Master Inhibit std (abilita accettazione globale)
+ * 4. Request Inhibit Status (verifica stato inibizioni)
+ * 
+ * @return void Non restituisce alcun valore.
+ */
+void main_cctalk_send_initialization_sequence(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] Sequenza init CCTalk skip (disabilitato da config)");
+        return;
+    }
+
+    const uint8_t dest_addr = 0x02;
+    const uint32_t timeout_ms = 1000;
+    
+    ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Inizio sequenza di inizializzazione CCTalk...");
+    
+    // Comando 1: Address Poll (header 254 / 0xFE)
+    // Verifica che la gettoniera sia presente e risponda
+    if (cctalk_address_poll(dest_addr, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd1 - Address Poll: OK");
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd1 - Address Poll: FAIL");
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // Comando 2: Modify Inhibit Status (header 231 / 0xE7)
+    // Abilita tutti i 16 canali (mask 0xFF 0xFF)
+    if (cctalk_modify_inhibit_status(dest_addr, 0xFF, 0xFF, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd2 - Modify Inhibit Status (all channels): OK");
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd2 - Modify Inhibit Status: FAIL");
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // Comando 3: Modify Master Inhibit std (header 228 / 0xE4)
+    // Abilita accettazione globale delle monete
+    if (cctalk_modify_master_inhibit_std(dest_addr, true, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd3 - Modify Master Inhibit (accept enabled): OK");
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd3 - Modify Master Inhibit: FAIL");
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    // Comando 4: Request Inhibit Status (header 230 / 0xE6)
+    // Legge e verifica lo stato corrente delle inibizioni
+    uint8_t mask_low = 0, mask_high = 0;
+    if (cctalk_request_inhibit_status(dest_addr, &mask_low, &mask_high, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd4 - Request Inhibit Status: OK (mask=0x%02X%02X)", mask_high, mask_low);
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd4 - Request Inhibit Status: FAIL");
+    }
+
+    ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Sequenza CCTalk completata");
+}
+
+
+/**
  * @brief Funzione principale dell'applicazione.
  * 
  * Questa funzione è l'entry point dell'applicazione e viene chiamata automaticamente
@@ -261,10 +327,12 @@ void app_main(void)
     }
 
     if (cfg && cfg->display.enabled) {
-        lvgl_panel_show_language_select();
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: pagina selezione lingua attivata");
+        /* [M] Show ads slideshow at boot, then transition to main by touch or timeout */
+        main_cctalk_send_initialization_sequence();
+        lvgl_page_ads_show();
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: slideshow pubblicitario attivato");
     } else {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto pagina selezione lingua");
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto slideshow");
     }
 
     esp_err_t boot_done_ret = init_mark_boot_completed();

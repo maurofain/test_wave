@@ -320,17 +320,19 @@ esp_err_t webpages_send_external_or_error(httpd_req_t *req, const char *relative
 
 
 /**
- * @brief Assicura che un determinato percorso sia una directory.
+ * @brief Verifica che un determinato percorso sia una directory già esistente.
  * 
  * @param [in] path Il percorso della directory da verificare.
- * @return esp_err_t Errore se il percorso non è una directory o se si verifica un errore.
+ * @return esp_err_t ESP_OK se la directory esiste, ESP_FAIL altrimenti.
  */
 static esp_err_t ensure_dir(const char *path)
 {
     if (!path) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (mkdir(path, 0755) == 0 || errno == EEXIST) {
+    
+    struct stat st;
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
         return ESP_OK;
     }
     return ESP_FAIL;

@@ -9,8 +9,6 @@
 
 #include <string.h>
 
-extern const lv_font_t DroidSansBold32;
-
 static const char *TAG = "lvgl_page_lang";
 
 #define COL_BG        lv_color_make(0x1a, 0x1a, 0x2e)
@@ -18,8 +16,8 @@ static const char *TAG = "lvgl_page_lang";
 #define COL_PROG_ACT  lv_color_make(0x1e, 0x8b, 0x45)
 #define COL_WHITE     lv_color_make(0xEE, 0xEE, 0xEE)
 
-#define FONT_TITLE    (&DroidSansBold32)
-#define FONT_LANG     (&DroidSansBold32)
+#define FONT_TITLE    (&lv_font_montserrat_32)
+#define FONT_LANG     (&lv_font_montserrat_32)
 
 typedef struct {
     const char *code;

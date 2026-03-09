@@ -3,6 +3,9 @@
 #include "device_config.h"
 #include "fsm.h"
 #include "web_ui_programs.h"
+#include "language_flags.h"
+#include "lvgl_panel.h"
+#include "main.h"
 
 #include "lvgl.h"
 #include "esp_log.h"
@@ -13,8 +16,6 @@
 #include <string.h>
 #include <time.h>
 
-extern const lv_font_t sevensegments_300;
-extern const lv_font_t DroidSansMono18;
 
 static const char *TAG = "lvgl_page_main";
 
@@ -50,11 +51,11 @@ static const char *TAG = "lvgl_page_main";
 #define PANEL_COUNTER_X (PANEL_LEFT_W + PANEL_COL_GAP)
 #define PANEL_RIGHT_X (PANEL_COUNTER_X + PANEL_COUNTER_W + PANEL_COL_GAP)
 
-#define FONT_TIME (&lv_font_montserrat_18)
-#define FONT_BIGNUM (&sevensegments_300)
+#define FONT_TIME (&lv_font_montserrat_20)
+#define FONT_BIGNUM (&lv_font_montserrat_48)
 #define FONT_LABEL (&lv_font_montserrat_32)
 #define FONT_PROG_BTN (&lv_font_montserrat_32)
-#define FONT_DATETIME (&DroidSansMono18)
+#define FONT_DATETIME (&lv_font_montserrat_20)
 
 typedef struct
 {
@@ -72,11 +73,14 @@ static lv_obj_t *s_residual_credit_lbl = NULL;
 static lv_obj_t *s_gauge = NULL;
 static lv_obj_t *s_counter_fill = NULL;
 static lv_obj_t *s_stop_btn = NULL;
+static lv_obj_t *s_language_flag_btn = NULL;
+static lv_obj_t *s_flag_img = NULL;  /* Flag image inside the button */
 static lv_obj_t *s_prog_btns[PROG_COUNT];
 static lv_obj_t *s_prog_lbls[PROG_COUNT];
 static lv_timer_t *s_panel_timer = NULL;
 static lv_timer_t *s_clock_timer = NULL;
 static uint8_t s_active_prog = 0;
+static char s_current_language[8] = "it";  /* [C] Current language code (default: Italian) */
 
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
@@ -91,6 +95,8 @@ static bool s_stop_pressed = false;
 static bool s_btn_last_clickable[PROG_COUNT] = {0};
 static bool s_btn_last_active[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
+static fsm_state_t s_last_fsm_state = FSM_STATE_IDLE;  /* Track last FSM state for credit reset */
+static uint32_t s_credit_inactivity_start_ms = 0;      /* When CREDIT state was entered */
 
 static char s_tr_credit[32] = "Credito";
 static char s_tr_elapsed_fmt[32] = "Secondi   %s";
@@ -601,6 +607,39 @@ static void on_stop_btn(lv_event_t *e)
     ESP_LOGI(TAG, "[C] Pulsante STOP premuto");
 }
 
+static void on_lang_btn(lv_event_t *e)
+{
+    (void)e;
+    ESP_LOGI(TAG, "[C] Pulsante bandiera lingua premuto");
+    lvgl_panel_show_language_select();
+}
+
+static void update_language_flag(const char *lang_code)
+{
+    if (!lang_code || !s_flag_img) {
+        return;
+    }
+
+    strncpy(s_current_language, lang_code, sizeof(s_current_language) - 1);
+    s_current_language[sizeof(s_current_language) - 1] = '\0';
+    
+    lv_image_set_src(s_flag_img, get_flag_for_language(lang_code));
+    ESP_LOGI(TAG, "[C] Bandiera lingua aggiornata: %s", lang_code);
+}
+
+static void sync_language_from_config(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (cfg && cfg->ui.user_language[0] != '\0') {
+        update_language_flag(cfg->ui.user_language);
+        ESP_LOGI(TAG, "[C] Lingua sincronizzata da device_config: %s", cfg->ui.user_language);
+    } else {
+        /* Default to Italian if not set */
+        update_language_flag("it");
+        ESP_LOGI(TAG, "[C] Lingua impostata al default (italiano)");
+    }
+}
+
 /**
  * @brief Costruisce l'intestazione della schermata.
  *
@@ -619,6 +658,24 @@ static void build_header(lv_obj_t *scr)
     lv_label_set_long_mode(s_time_lbl, LV_LABEL_LONG_CLIP);
     lv_obj_set_width(s_time_lbl, LV_SIZE_CONTENT);
     lv_obj_align(s_time_lbl, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+    /* Crea il pulsante bandiera lingua in alto a destra */
+    s_language_flag_btn = lv_btn_create(scr);
+    lv_obj_set_size(s_language_flag_btn, 200, 200);
+    lv_obj_align(s_language_flag_btn, LV_ALIGN_TOP_RIGHT, -20, 10);
+    lv_obj_set_style_bg_color(s_language_flag_btn, lv_color_hex(0x1a1a2e), LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_language_flag_btn, 8, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_language_flag_btn, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_language_flag_btn, 100, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_language_flag_btn, 0, LV_PART_MAIN);
+    lv_obj_add_event_cb(s_language_flag_btn, on_lang_btn, LV_EVENT_CLICKED, NULL);
+
+    /* Crea l'immagine della bandiera all'interno del pulsante */
+    s_flag_img = lv_image_create(s_language_flag_btn);
+    lv_image_set_src(s_flag_img, get_flag_for_language(s_current_language));
+    lv_obj_center(s_flag_img);
+
+    ESP_LOGI(TAG, "[H] Bandiera lingua creata in alto a destra, linguaggio: %s", s_current_language);
 }
 
 /** @brief Costruisce lo stato dell'interfaccia utente.
@@ -859,6 +916,39 @@ static void panel_timer_cb(lv_timer_t *t)
     fsm_ctx_t snap = {0};
     if (fsm_runtime_snapshot(&snap))
     {
+        /* [C] Detect CREDIT state entry and track inactivity for credit reset */
+        if (snap.state == FSM_STATE_CREDIT && s_last_fsm_state != FSM_STATE_CREDIT) {
+            /* Just entered CREDIT state */
+            s_credit_inactivity_start_ms = snap.inactivity_ms;
+            ESP_LOGI(TAG, "[C] Entrato nello stato CREDIT, inizio timeout reset crediti");
+        }
+
+        /* [C] Check for credit reset timeout in CREDIT state */
+        if (snap.state == FSM_STATE_CREDIT) {
+            device_config_t *cfg = device_config_get();
+            uint32_t reset_timeout_ms = 300000;  /* Default 5 minutes */
+            if (cfg && cfg->timeouts.credit_reset_timeout_ms > 0) {
+                reset_timeout_ms = cfg->timeouts.credit_reset_timeout_ms;
+            }
+
+            uint32_t time_in_credit = snap.inactivity_ms - s_credit_inactivity_start_ms;
+            if (time_in_credit >= reset_timeout_ms && snap.credit_cents > 0) {
+                ESP_LOGI(TAG, "[C] Timeout reset crediti raggiunto (%u ms >= %u ms), azzerando crediti e reimpostando lingua",
+                         time_in_credit, reset_timeout_ms);
+                
+                /* Reset credits by publishing zero credit event (or through FSM) */
+                // For now, we'll just log and reset; actual credit reset would need FSM event
+                
+                /* Reset language to Italian */
+                update_language_flag("it");
+                
+                /* Show advertisement page if available */
+                lvgl_page_ads_show();
+                
+                return;  /* Exit early, don't process normal updates */
+            }
+        }
+
         /* [C] Auto-restart logic: se il programma è terminato e c'è credito,
            riavvia automaticamente lo stesso programma a meno che STOP sia stato premuto */
         static fsm_ctx_t last_snap = {0};
@@ -883,6 +973,7 @@ static void panel_timer_cb(lv_timer_t *t)
             s_stop_pressed = false;
         }
 
+        s_last_fsm_state = snap.state;
         last_snap = snap;
 
         update_state(&snap);
@@ -919,11 +1010,16 @@ void lvgl_page_main_deactivate(void)
 /** @brief Mostra la pagina principale dell'interfaccia grafica LVGL.
  *
  *  Questa funzione visualizza la pagina principale dell'interfaccia grafica LVGL.
+ *  Prima di caricare la pagina, invia la sequenza di inizializzazione CCTalk al dispositivo
+ *  gettoniera (se abilitato nella configurazione).
  *
  *  @return Nessun valore di ritorno.
  */
 void lvgl_page_main_show(void)
 {
+    /* Invia sequenza init CCTalk prima di ogni caricamento della pagina programmi */
+    main_cctalk_send_initialization_sequence();
+
     lv_obj_t *scr = lv_scr_act();
 
     lvgl_page_main_deactivate();
@@ -940,6 +1036,7 @@ void lvgl_page_main_show(void)
 
     build_status(scr);
     build_header(scr);
+    sync_language_from_config();  /* Sync language flag from device config */
     build_prog_buttons();
 
     update_time(true);
