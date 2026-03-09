@@ -40,10 +40,11 @@ static const char *TAG = "lvgl_page_main";
 #define PANEL_LEFT_W 120
 #define PANEL_RIGHT_W 120
 #define PANEL_CONTENT_H (PANEL_H - (PANEL_PAD_Y * 2))
-#define PANEL_BUTTONS_TOP_FREE_PCT 30
+#define PANEL_BUTTONS_TOP_FREE_PCT 24
+#define PANEL_STOP_BTN_H 80
 #define PANEL_FULL_W (PANEL_W - (PANEL_PAD_X * 2))
 #define PANEL_CREDIT_H ((PANEL_CONTENT_H * PANEL_BUTTONS_TOP_FREE_PCT) / 100)
-#define PANEL_WORK_H (PANEL_CONTENT_H - PANEL_CREDIT_H)
+#define PANEL_WORK_H (PANEL_CONTENT_H - PANEL_CREDIT_H - PANEL_STOP_BTN_H - 10)
 #define PANEL_COUNTER_W (PANEL_FULL_W - PANEL_LEFT_W - PANEL_RIGHT_W - (PANEL_COL_GAP * 2))
 #define PANEL_LEFT_X 0
 #define PANEL_COUNTER_X (PANEL_LEFT_W + PANEL_COL_GAP)
@@ -67,8 +68,10 @@ static lv_obj_t *s_center_box = NULL;
 static lv_obj_t *s_credit_lbl = NULL;
 static lv_obj_t *s_elapsed_lbl = NULL;
 static lv_obj_t *s_pause_lbl = NULL;
+static lv_obj_t *s_residual_credit_lbl = NULL;
 static lv_obj_t *s_gauge = NULL;
 static lv_obj_t *s_counter_fill = NULL;
+static lv_obj_t *s_stop_btn = NULL;
 static lv_obj_t *s_prog_btns[PROG_COUNT];
 static lv_obj_t *s_prog_lbls[PROG_COUNT];
 static lv_timer_t *s_panel_timer = NULL;
@@ -81,8 +84,10 @@ static char s_last_time_text[40] = "";
 static char s_last_credit_text[16] = "";
 static char s_last_elapsed_text[32] = "";
 static char s_last_pause_text[32] = "";
+static char s_last_residual_credit_text[16] = "";
 static int32_t s_last_gauge_pct = -1;
 static time_t s_last_minute_epoch = (time_t)-1;
+static bool s_stop_pressed = false;
 static bool s_btn_last_clickable[PROG_COUNT] = {0};
 static bool s_btn_last_active[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
@@ -210,6 +215,23 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
         }
 
         s_btn_state_valid[i] = true;
+    }
+
+    /* [C] Gestisci lo stato del pulsante STOP: abilitato solo durante RUNNING/PAUSED */
+    if (s_stop_btn)
+    {
+        bool stop_enabled = running_or_paused;
+
+        if (stop_enabled)
+        {
+            lv_obj_add_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_opa(s_stop_btn, LV_OPA_COVER, LV_PART_MAIN);
+        }
+        else
+        {
+            lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_opa(s_stop_btn, LV_OPA_50, LV_PART_MAIN);
+        }
     }
 }
 
@@ -388,6 +410,30 @@ static void update_state(const fsm_ctx_t *snap)
         }
     }
 
+    /* [C] Aggiorna il credito residuo mostrato sotto il countdown */
+    if (s_residual_credit_lbl)
+    {
+        char buf[16] = {0};
+
+        if (running || paused)
+        {
+            /* Durante il programma, mostra il credito residuo (totale disponibile) */
+            snprintf(buf, sizeof(buf), "%ld €", (long)snap->credit_cents / 100);
+        }
+        else
+        {
+            /* A riposo, mostra il credito disponibile per il prossimo programma */
+            snprintf(buf, sizeof(buf), "%ld €", (long)snap->credit_cents / 100);
+        }
+
+        if (strcmp(s_last_residual_credit_text, buf) != 0)
+        {
+            lv_label_set_text(s_residual_credit_lbl, buf);
+            strncpy(s_last_residual_credit_text, buf, sizeof(s_last_residual_credit_text) - 1);
+            s_last_residual_credit_text[sizeof(s_last_residual_credit_text) - 1] = '\0';
+        }
+    }
+
     int32_t pct = 0;
     if (snap->running_target_ms > 0 && (running || paused))
     {
@@ -539,6 +585,23 @@ static void on_prog_btn(lv_event_t *e)
 }
 
 /**
+ * @brief [C] Gestisce il click sul pulsante STOP.
+ *
+ * Questa funzione viene chiamata quando il pulsante STOP viene premuto.
+ * Imposta il flag s_stop_pressed per evitare il riavvio automatico del programma
+ * quando il programma corrente termina.
+ *
+ * @param e Puntatore all'evento generato.
+ * @return Nessun valore di ritorno.
+ */
+static void on_stop_btn(lv_event_t *e)
+{
+    (void)e;
+    s_stop_pressed = true;
+    ESP_LOGI(TAG, "[C] Pulsante STOP premuto");
+}
+
+/**
  * @brief Costruisce l'intestazione della schermata.
  *
  * @param scr Puntatore all'oggetto di schermata su cui costruire l'intestazione.
@@ -596,9 +659,11 @@ static void build_status(lv_obj_t *scr)
 
     s_counter_fill = NULL;
 
+    /* Crea il gauge (countdown bar) più piccolo per fare spazio al credito residuo sotto */
+    int32_t gauge_height = PANEL_WORK_H - 100;  /* Ridotto per fare spazio al label credito residuo */
     s_gauge = lv_bar_create(s_center_box);
-    lv_obj_set_size(s_gauge, PANEL_COUNTER_W, PANEL_WORK_H);
-    lv_obj_align(s_gauge, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_size(s_gauge, PANEL_COUNTER_W, gauge_height);
+    lv_obj_align(s_gauge, LV_ALIGN_TOP_MID, 0, 10);
     lv_bar_set_range(s_gauge, 0, 100);
     lv_bar_set_value(s_gauge, 100, LV_ANIM_OFF);
     lv_bar_set_orientation(s_gauge, LV_BAR_ORIENTATION_VERTICAL);
@@ -619,6 +684,13 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_INDICATOR);
     lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_MAIN);
 
+    /* [C] Credito residuo mostrato sotto il countdown */
+    s_residual_credit_lbl = lv_label_create(s_center_box);
+    lv_label_set_text(s_residual_credit_lbl, "0");
+    lv_obj_set_style_text_color(s_residual_credit_lbl, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_residual_credit_lbl, FONT_LABEL, LV_PART_MAIN);
+    lv_obj_align(s_residual_credit_lbl, LV_ALIGN_BOTTOM_MID, 0, -10);
+
     s_credit_lbl = lv_label_create(s_credit_box);
     lv_label_set_text(s_credit_lbl, "0");
     lv_obj_set_style_text_color(s_credit_lbl, COL_WHITE, LV_PART_MAIN);
@@ -636,6 +708,27 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_text_color(s_pause_lbl, COL_PROG_PAUSE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_pause_lbl, FONT_LABEL, LV_PART_MAIN);
     lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_MID, 0, -8);
+
+    /* [C] Pulsante STOP rosso in basso */
+    s_stop_btn = lv_button_create(scr);
+    lv_obj_set_pos(s_stop_btn, PANEL_PAD_X, PANEL_PAD_Y + PANEL_CREDIT_H + PANEL_WORK_H);
+    lv_obj_set_size(s_stop_btn, PANEL_FULL_W, PANEL_STOP_BTN_H);
+    lv_obj_set_style_bg_color(s_stop_btn, COL_PROG_LOW, LV_PART_MAIN);  /* Rosso */
+    lv_obj_set_style_bg_opa(s_stop_btn, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_stop_btn, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_stop_btn, lv_color_make(0xFF, 0x80, 0x80), LV_PART_MAIN);
+    lv_obj_set_style_radius(s_stop_btn, 8, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_stop_btn, 0, LV_PART_MAIN);
+
+    lv_obj_t *stop_lbl = lv_label_create(s_stop_btn);
+    lv_label_set_text(stop_lbl, "STOP");
+    lv_obj_set_style_text_color(stop_lbl, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_text_font(stop_lbl, FONT_PROG_BTN, LV_PART_MAIN);
+    lv_obj_center(stop_lbl);
+
+    lv_obj_add_event_cb(s_stop_btn, on_stop_btn, LV_EVENT_CLICKED, NULL);
+    lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_opa(s_stop_btn, LV_OPA_50, LV_PART_MAIN);
 }
 
 /**
@@ -729,8 +822,10 @@ static void clear_panel_handles(void)
     s_credit_lbl = NULL;
     s_elapsed_lbl = NULL;
     s_pause_lbl = NULL;
+    s_residual_credit_lbl = NULL;
     s_gauge = NULL;
     s_counter_fill = NULL;
+    s_stop_btn = NULL;
 
     for (int i = 0; i < PROG_COUNT; i++)
     {
@@ -745,8 +840,10 @@ static void clear_panel_handles(void)
     s_last_credit_text[0] = '\0';
     s_last_elapsed_text[0] = '\0';
     s_last_pause_text[0] = '\0';
+    s_last_residual_credit_text[0] = '\0';
     s_last_gauge_pct = -1;
     s_last_minute_epoch = (time_t)-1;
+    s_stop_pressed = false;
 }
 
 /**
@@ -762,6 +859,32 @@ static void panel_timer_cb(lv_timer_t *t)
     fsm_ctx_t snap = {0};
     if (fsm_runtime_snapshot(&snap))
     {
+        /* [C] Auto-restart logic: se il programma è terminato e c'è credito,
+           riavvia automaticamente lo stesso programma a meno che STOP sia stato premuto */
+        static fsm_ctx_t last_snap = {0};
+        bool was_running = (last_snap.state == FSM_STATE_RUNNING || last_snap.state == FSM_STATE_PAUSED);
+        bool is_now_idle = (snap.state == FSM_STATE_CREDIT);
+
+        if (was_running && is_now_idle && s_active_prog > 0 && !s_stop_pressed && snap.credit_cents > 0)
+        {
+            /* Condizioni per auto-restart soddisfatte */
+            const web_ui_program_entry_t *entry = find_program_entry(s_active_prog);
+            if (entry && entry->enabled && snap.credit_cents >= (int32_t)entry->price_units)
+            {
+                ESP_LOGI(TAG, "[C] Auto-restart del programma %u (credito residuo: %ld cents)", 
+                         s_active_prog, snap.credit_cents);
+                publish_program(s_active_prog, false, entry);
+            }
+        }
+
+        /* Reset s_stop_pressed quando torniamo a CREDIT (fine del programma) */
+        if (is_now_idle)
+        {
+            s_stop_pressed = false;
+        }
+
+        last_snap = snap;
+
         update_state(&snap);
         refresh_prog_buttons(&snap);
     }
