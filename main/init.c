@@ -1455,7 +1455,7 @@ esp_err_t init_run_display_only(void)
 }
 
 /* forward declarations */
-static void periph_i2c_diagnostic_scan(void);
+static void generic_i2c_diagnostic_scan(i2c_master_bus_handle_t bus, const char *bus_name, int timeout_ticks);
 
 /**
  * @brief Inizializza il sistema di produzione in modalità factory.
@@ -1480,19 +1480,26 @@ esp_err_t init_run_factory(void)
     log_partitions();
     ESP_ERROR_CHECK(init_event_loop());
 
-#if defined(CONFIG_BSP_I2C_NUM)
-    bsp_i2c_init();
-#endif
     periph_i2c_init();
 
-    // Inizializza I2C e EEPROM prima della configurazione (essenziale per il boot)
+    // Lascia assestare i livelli elettrici (pull-up hardware/software) per evitare
+    // che la FSM I2C si blocchi al primissimo start e dia "I2C software timeout".
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Scansione diagnostica bus periferiche (port 0, GPIO 26/27) - timeout ridotto a 20 ticks (il prolungato mascherava timeout fisici)
+    generic_i2c_diagnostic_scan(periph_i2c_get_handle(), "Periph I2C", 20);
+
 #if defined(CONFIG_BSP_I2C_NUM)
-    ESP_LOGI(TAG, "[M] BSP I2C attivo: inizializzo EEPROM 24LC16 su i2c_master");
-    ESP_ERROR_CHECK(eeprom_24lc16_init());
-#else
-    ESP_ERROR_CHECK(init_i2c_bus());
-    ESP_ERROR_CHECK(eeprom_24lc16_init());
+    bsp_i2c_init();
+    // Scansione diagnostica bus BSP (port 1, GPIO 7/8) - timeout breve (20 ticks = ~20ms)
+    generic_i2c_diagnostic_scan(bsp_i2c_get_handle(), "BSP I2C", 20);
 #endif
+
+    // Inizializza I2C e EEPROM prima della configurazione (essenziale per il boot)
+    // NOTA: EEPROM è sempre su periph_i2c (port 0, GPIO26/27), indipendentemente da BSP
+    ESP_LOGI(TAG, "[M] Inizializzo EEPROM 24LC16 su periph_i2c (port=%d, GPIO%d SCL, GPIO%d SDA)",
+             CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
+    ESP_ERROR_CHECK(eeprom_24lc16_init());
     init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NONE);
 
     // Inizializza configurazione device PRIMA degli altri moduli
@@ -1544,9 +1551,6 @@ esp_err_t init_run_factory(void)
     // Inizializza GPIO ausiliari
     aux_gpio_init();
     init_agent_status_set(AGN_ID_AUX_GPIO, 1, INIT_AGENT_ERR_NONE);
-
-    // Scansione diagnostica porta I2C periferica (prima di display init, come il bus BSP)
-    periph_i2c_diagnostic_scan();
 
     // Display + LVGL (minimal screen) - skip se headless
     device_config_t *cfg = device_config_get();
@@ -1836,24 +1840,39 @@ esp_err_t init_run_factory(void)
 
 
 /**
- * @brief Diagnostica I2C sulla porta periferica (GPIO 26/27).
+ * @brief Scansione diagnostica generica per qualsiasi bus I2C.
  *
- * Scandisce tutti gli indirizzi I2C sulla porta periferica e registra i dispositivi trovati.
+ * Scandisce tutti gli indirizzi I2C sul bus fornito e registra i dispositivi trovati.
+ * Esegue la scansione una sola volta per bus per evitare timeout ripetuti.
  *
+ * @param [in] bus Handle del bus I2C master da scansionare.
+ * @param [in] bus_name Nome descrittivo del bus (es. "BSP I2C", "Periph I2C").
+ * @param [in] timeout_ticks Timeout in ticks per ogni probe (20 ticks ~ 20ms).
  * @return Nessun valore di ritorno.
  */
-static void periph_i2c_diagnostic_scan(void)
+static void generic_i2c_diagnostic_scan(i2c_master_bus_handle_t bus, const char *bus_name, int timeout_ticks)
 {
-    i2c_master_bus_handle_t bus = periph_i2c_get_handle();
+    // Usa un flag statico per eseguire una sola volta (basato sul bus_name)
+    static bool s_bsp_scanned = false;
+    static bool s_periph_scanned = false;
+    
+    // Determina quale flag usare in base al bus_name
+    bool *scan_flag = (strstr(bus_name, "BSP") != NULL) ? &s_bsp_scanned : &s_periph_scanned;
+    
+    if (*scan_flag) {
+        return;  // Già scansionato una volta
+    }
+    *scan_flag = true;
+
     if (bus == NULL) {
-        ESP_LOGE(TAG, "[C][I2C-DIAG] bus periferica non disponibile");
+        ESP_LOGE(TAG, "[C][I2C-DIAG] bus %s non disponibile", bus_name);
         return;
     }
 
-    ESP_LOGE(TAG, "[C][I2C-DIAG] scan I2C su SDA=%d SCL=%d", CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
+    ESP_LOGE(TAG, "[C][I2C-DIAG] scan I2C %s (indirizzo 0x03-0x77)", bus_name);
     int found = 0;
     for (uint8_t addr = 0x03; addr < 0x78; addr++) {
-        esp_err_t probe_ret = i2c_master_probe(bus, addr, 20);  // Stesso timeout del BSP I2C
+        esp_err_t probe_ret = i2c_master_probe(bus, addr, timeout_ticks);
         if (probe_ret == ESP_OK) {
             ESP_LOGE(TAG, "[C][I2C-DIAG] trovato device @0x%02X", addr);
             found++;
@@ -1861,7 +1880,7 @@ static void periph_i2c_diagnostic_scan(void)
     }
 
     if (found == 0) {
-        ESP_LOGE(TAG, "[C][I2C-DIAG] nessun device trovato sul bus");
+        ESP_LOGE(TAG, "[C][I2C-DIAG] Nessun device trovato su %s", bus_name);
     } else {
         ESP_LOGE(TAG, "[C][I2C-DIAG] totale device trovati: %d", found);
     }

@@ -149,33 +149,27 @@ static esp_err_t start_locked(void)
     }
 
     mb_communication_info_t comm = {
-        .mode = MB_MODE_RTU,
-        .slave_addr = clamp_slave_id(cfg->modbus.slave_id),
-        .port = (uart_port_t)CONFIG_APP_RS485_UART_PORT,
-        .baudrate = (cfg->rs485.baud_rate > 0) ? (uint32_t)cfg->rs485.baud_rate : 9600U,
-        .parity = map_parity(cfg->rs485.parity),
+        .ser_opts = {
+            .mode = MB_RTU,
+            .uid = clamp_slave_id(cfg->modbus.slave_id),
+            .port = (uart_port_t)CONFIG_APP_RS485_UART_PORT,
+            .baudrate = (cfg->rs485.baud_rate > 0) ? (uint32_t)cfg->rs485.baud_rate : 9600U,
+            .parity = map_parity(cfg->rs485.parity),
+        }
     };
 
     void *handler = NULL;
-    esp_err_t err = mbc_master_init(MB_PORT_SERIAL_MASTER, &handler);
+    esp_err_t err = mbc_master_create_serial(&comm, &handler);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "[C] mbc_master_init fallita: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "[C] mbc_master_create_serial fallita: %s", esp_err_to_name(err));
         s_ctx.status.last_error = (int32_t)err;
         return err;
     }
 
-    err = mbc_master_setup((void *)&comm);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "[C] mbc_master_setup fallita: %s", esp_err_to_name(err));
-        (void)mbc_master_destroy();
-        s_ctx.status.last_error = (int32_t)err;
-        return err;
-    }
-
-    err = mbc_master_start();
+    err = mbc_master_start(handler);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "[C] mbc_master_start fallita: %s", esp_err_to_name(err));
-        (void)mbc_master_destroy();
+        (void)mbc_master_delete(handler);
         s_ctx.status.last_error = (int32_t)err;
         return err;
     }
@@ -197,8 +191,8 @@ static esp_err_t start_locked(void)
     ESP_LOGI(TAG,
              "[C] Modbus master avviato su UART%d (slave=%u, baud=%lu)",
              CONFIG_APP_RS485_UART_PORT,
-             (unsigned)comm.slave_addr,
-             (unsigned long)comm.baudrate);
+             (unsigned)comm.ser_opts.uid,
+             (unsigned long)comm.ser_opts.baudrate);
 
     return ESP_OK;
 }
@@ -217,7 +211,7 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
 
     esp_err_t last_err = ESP_FAIL;
     for (uint8_t attempt = 0; attempt <= retries; ++attempt) {
-        last_err = mbc_master_send_request(request, data_ptr);
+        last_err = mbc_master_send_request(s_ctx.handler, request, data_ptr);
         if (last_err == ESP_OK) {
             return ESP_OK;
         }
@@ -284,9 +278,9 @@ esp_err_t modbus_relay_deinit(void)
 
 #if DNA_RS485 == 0
     if (s_ctx.running || s_ctx.initialized) {
-        esp_err_t destroy_err = mbc_master_destroy();
+        esp_err_t destroy_err = mbc_master_delete(s_ctx.handler);
         if (destroy_err != ESP_OK && destroy_err != ESP_ERR_INVALID_STATE) {
-            ESP_LOGW(TAG, "[C] mbc_master_destroy: %s", esp_err_to_name(destroy_err));
+            ESP_LOGW(TAG, "[C] mbc_master_delete: %s", esp_err_to_name(destroy_err));
         }
     }
 #endif
