@@ -23,6 +23,8 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
     if (ret <= 0) return ESP_FAIL;
     buf[ret] = '\0';
 
+    ESP_LOGI(TAG, "EEPROM test request body: %s", buf);
+
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
@@ -35,6 +37,8 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'op'");
         return ESP_OK;
     }
+
+    ESP_LOGI(TAG, "EEPROM test operation: %s", op->valuestring);
 
     cJSON *resp = cJSON_CreateObject();
     
@@ -73,12 +77,12 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
 
         read_ret = eeprom_24lc16_read(addr, data, len);
         if (read_ret == ESP_OK) {
-            cJSON *arr = cJSON_CreateArray();
-            for (int i = 0; i < len; i++) {
-                cJSON_AddItemToArray(arr, cJSON_CreateNumber(data[i]));
-            }
-            cJSON_AddItemToObject(resp, "data", arr);
             cJSON_AddStringToObject(resp, "status", "ok");
+            cJSON *data_arr = cJSON_CreateArray();
+            for (int i = 0; i < len; i++) {
+                cJSON_AddItemToArray(data_arr, cJSON_CreateNumber(data[i]));
+            }
+            cJSON_AddItemToObject(resp, "data", data_arr);
         } else {
             cJSON_AddStringToObject(resp, "status", "error");
             cJSON_AddStringToObject(resp, "error", esp_err_to_name(read_ret));
@@ -86,8 +90,22 @@ esp_err_t eeprom_test_handler(httpd_req_t *req) {
             cJSON_AddNumberToObject(resp, "len", len);
         }
         free(data);
-    } 
-    else if (strcmp(op->valuestring, "read_json") == 0) {
+    } else if (strcmp(op->valuestring, "format") == 0) {
+        if (!eeprom_24lc16_is_available()) {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", "eeprom_not_available");
+            goto send_response;
+        }
+
+        esp_err_t format_ret = eeprom_24lc16_format();
+        if (format_ret == ESP_OK) {
+            cJSON_AddStringToObject(resp, "status", "ok");
+            cJSON_AddStringToObject(resp, "message", "EEPROM formatted successfully");
+        } else {
+            cJSON_AddStringToObject(resp, "status", "error");
+            cJSON_AddStringToObject(resp, "error", esp_err_to_name(format_ret));
+        }
+    } else if (strcmp(op->valuestring, "read_json") == 0) {
         char *json = device_config_read_json_from_eeprom();
         if (json) {
             cJSON_AddStringToObject(resp, "json", json);

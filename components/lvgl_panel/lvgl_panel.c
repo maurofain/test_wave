@@ -49,30 +49,52 @@ static bool panel_boot_logo_file_exists(void)
 static void panel_show_boot_logo_screen(void)
 {
     lv_obj_t *scr = lv_scr_act();
+    
+    ESP_LOGI(TAG, "[C] Showing boot logo screen...");
+    ESP_LOGI(TAG, "[C] Screen obj: %p, Active screen: %p", (void*)scr, (void*)lv_scr_act());
+
+    // Ensure backlight is on at maximum brightness for logo
+    bsp_display_brightness_init();
+    bsp_display_brightness_set(100);
+    ESP_LOGI(TAG, "[C] Backlight set to 100%%");
 
     lvgl_page_main_deactivate();
     lv_obj_clean(scr);
+    ESP_LOGI(TAG, "[C] Screen cleaned");
 
     lv_obj_set_style_bg_color(scr, COL_BOOT_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    ESP_LOGI(TAG, "[C] Screen configured");
 
     if (panel_boot_logo_file_exists()) {
+        ESP_LOGI(TAG, "[C] Logo file found at %s", BOOT_LOGO_SPIFFS_PATH);
         lv_obj_t *logo_img = lv_image_create(scr);
+        ESP_LOGI(TAG, "[C] Logo image object created: %p", (void*)logo_img);
         lv_image_set_src(logo_img, BOOT_LOGO_LVGL_PATH);
         lv_obj_align(logo_img, LV_ALIGN_CENTER, 0, 0);
-        ESP_LOGI(TAG, "[C] Pagina logo boot visualizzata da SPIFFS (%s)", BOOT_LOGO_SPIFFS_PATH);
-        return;
+        ESP_LOGI(TAG, "[C] Logo image configured and aligned");
+    } else {
+        ESP_LOGW(TAG, "[C] Logo file NOT found at %s, using fallback text", BOOT_LOGO_SPIFFS_PATH);
+        lv_obj_t *logo_lbl = lv_label_create(scr);
+        lv_label_set_text(logo_lbl, "MicroHard");
+        lv_obj_set_style_text_color(logo_lbl, COL_WHITE, LV_PART_MAIN);
+        lv_obj_set_style_text_font(logo_lbl, &arial96, LV_PART_MAIN);
+        lv_obj_align(logo_lbl, LV_ALIGN_CENTER, 0, 0);
+        ESP_LOGW(TAG, "[C] Logo SPIFFS non trovato (%s), uso fallback testuale", BOOT_LOGO_SPIFFS_PATH);
     }
-
-    lv_obj_t *logo_lbl = lv_label_create(scr);
-    lv_label_set_text(logo_lbl, "MicroHard");
-    lv_obj_set_style_text_color(logo_lbl, COL_WHITE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(logo_lbl, &arial96, LV_PART_MAIN);
-    lv_obj_align(logo_lbl, LV_ALIGN_CENTER, 0, 0);
-
-    ESP_LOGW(TAG, "[C] Logo SPIFFS non trovato (%s), uso fallback testuale", BOOT_LOGO_SPIFFS_PATH);
+    
+    // Force LVGL refresh to ensure logo is displayed
+    ESP_LOGI(TAG, "[C] Forcing screen refresh...");
+    lv_obj_invalidate(scr);
+    lv_refr_now(NULL);
+    ESP_LOGI(TAG, "[C] Screen refresh complete, waiting for display...");
+    
+    // Delay to allow display to update
+    vTaskDelay(pdMS_TO_TICKS(200));
+    
+    ESP_LOGI(TAG, "[C] Boot logo sequence complete");
 }
 
 

@@ -61,6 +61,7 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #include "sd_card.h"
 #include "sht40.h"
 #include "http_services.h"
+#include "keepalive_task.h"
 #include "device_activity.h"
 #include "error_log.h"
 #include "fsm.h"  // needed for fsm_event_queue_init()
@@ -1091,6 +1092,14 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
             if (hs_sync_err == ESP_OK && http_services_is_remote_online()) {
                 init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_NONE);
                 ESP_LOGI(TAG, "[M] [HTTP_SVC] Login iniziale token completato");
+                
+                // Start keepalive task after successful login
+                esp_err_t ka_err = keepalive_task_start();
+                if (ka_err == ESP_OK) {
+                    ESP_LOGI(TAG, "[M] [KEEPALIVE] Task keepalive avviato");
+                } else {
+                    ESP_LOGW(TAG, "[M] [KEEPALIVE] Impossibile avviare task keepalive: %s", esp_err_to_name(ka_err));
+                }
             } else {
                 init_agent_status_set(AGN_ID_HTTP_SERVICES, 0, INIT_AGENT_ERR_REMOTE_LOGIN_FAILED);
                 ESP_LOGW(TAG,
@@ -1494,7 +1503,7 @@ esp_err_t init_run_factory(void)
     // Scansione diagnostica bus BSP (port 1, GPIO 7/8) - timeout breve (20 ticks = ~20ms)
     generic_i2c_diagnostic_scan(bsp_i2c_get_handle(), "BSP I2C", 20);
 #endif
-
+    ESP_LOGI(TAG, "[M] -----------------------------------------------------------------------------");
     // Inizializza I2C e EEPROM prima della configurazione (essenziale per il boot)
     // NOTA: EEPROM è sempre su periph_i2c (port 0, GPIO26/27), indipendentemente da BSP
     ESP_LOGI(TAG, "[M] Inizializzo EEPROM 24LC16 su periph_i2c (port=%d, GPIO%d SCL, GPIO%d SDA)",
@@ -1523,7 +1532,7 @@ esp_err_t init_run_factory(void)
     ESP_LOGI(TAG, "[M] remote_logging: disabilitato (DNA_REMOTE_LOGGING=1)");
     init_agent_status_set(AGN_ID_REMOTE_LOGGING, 1, INIT_AGENT_ERR_NOT_AVAILABLE);
 #endif
-
+    ESP_LOGI(TAG, "[M] -----------------------------------------------------------------------------");
     /* prepare the FSM mailbox early so that any code executing during
      * initialization (event handlers, helper tasks, etc.) can publish
      * events without races or drops. the call is idempotent thanks to the

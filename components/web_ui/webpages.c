@@ -392,12 +392,12 @@ esp_err_t webpages_bootstrap(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    const char *base = webpages_base_path();
-    esp_err_t dir_err = ensure_dir(base);
-    if (dir_err != ESP_OK) {
-        ESP_LOGE(TAG, "[C] Impossibile creare directory web: %s", base ? base : "?");
-        return dir_err;
-    }
+    // const char *base = webpages_base_path();
+    // esp_err_t dir_err = ensure_dir(base);
+    // if (dir_err != ESP_OK) {
+    //     // ESP_LOGE(TAG, "[C] Impossibile creare directory web: %s", base ? base : "?");
+    //     return dir_err;
+    // }
 
 #if WEB_UI_EXPORT_ON_BOOT == 1
     for (size_t i = 0; i < sizeof(SEED_PAGES) / sizeof(SEED_PAGES[0]); ++i) {

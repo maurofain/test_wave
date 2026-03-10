@@ -949,6 +949,26 @@ static void panel_timer_cb(lv_timer_t *t)
             }
         }
 
+        /* [C] Show advertisement page when IDLE and inactive for some time */
+        if (snap.state == FSM_STATE_IDLE) {
+            device_config_t *cfg = device_config_get();
+            uint32_t ads_timeout_ms = 30000;  /* Default 30 seconds */
+            if (cfg && cfg->timeouts.idle_before_ads_ms > 0) {
+                ads_timeout_ms = cfg->timeouts.idle_before_ads_ms;
+            }
+
+            /* Show ads if inactive for specified time and no credit */
+            if (snap.inactivity_ms >= ads_timeout_ms && snap.credit_cents == 0) {
+                ESP_LOGI(TAG, "[C] Timeout ads raggiunto (%u ms >= %u ms), mostro slideshow (credit=%u)",
+                         snap.inactivity_ms, ads_timeout_ms, snap.credit_cents);
+                
+                /* Show advertisement page */
+                lvgl_page_ads_show();
+                
+                return;  /* Exit early, don't process normal updates */
+            }
+        }
+
         /* [C] Auto-restart logic: se il programma è terminato e c'è credito,
            riavvia automaticamente lo stesso programma a meno che STOP sia stato premuto */
         static fsm_ctx_t last_snap = {0};
@@ -1017,41 +1037,8 @@ void lvgl_page_main_deactivate(void)
  */
 void lvgl_page_main_show(void)
 {
-    /* Invia sequenza init CCTalk prima di ogni caricamento della pagina programmi */
-    main_cctalk_send_initialization_sequence();
-
-    lv_obj_t *scr = lv_scr_act();
-
-    lvgl_page_main_deactivate();
-    lv_obj_clean(scr);
-
-    lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-
-    s_active_prog = 0;
-
-    panel_load_translations();
-
-    build_status(scr);
-    build_header(scr);
-    sync_language_from_config();  /* Sync language flag from device config */
-    build_prog_buttons();
-
-    update_time(true);
-
-    fsm_ctx_t snap = {0};
-    if (fsm_runtime_snapshot(&snap))
-    {
-        update_state(&snap);
-        refresh_prog_buttons(&snap);
-    }
-
-    s_panel_timer = lv_timer_create(panel_timer_cb, PANEL_REFRESH_MS, NULL);
-    s_clock_timer = lv_timer_create(clock_timer_cb, 1000, NULL);
-
-    ESP_LOGI(TAG, "[C] Pagina principale LVGL visualizzata");
+    /* Use the new V2 programs page instead of the old one */
+    lvgl_page_programs_v2_show();
 }
 
 /**

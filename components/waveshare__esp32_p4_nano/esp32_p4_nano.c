@@ -478,7 +478,7 @@ esp_err_t bsp_display_brightness_init(void)
     esp_err_t ret = bsp_i2c_init();
     if (ret == ESP_OK)
     {
-        bsp_display_i2c_diagnostic_log_once();
+        // bsp_display_i2c_diagnostic_log_once();
     }
     return ret;
 }
@@ -526,7 +526,7 @@ esp_err_t bsp_display_brightness_set(int brightness_percent)
                  "[C] brightness add_device addr=0x%02X failed: %s",
                  chip_addr,
                  esp_err_to_name(add_ret));
-        bsp_display_i2c_diagnostic_log_once();
+        // bsp_display_i2c_diagnostic_log_once();
         return add_ret;
     }
 
@@ -562,7 +562,7 @@ esp_err_t bsp_display_brightness_set(int brightness_percent)
                  esp_err_to_name(ret));
         if (dev_handle)
             i2c_master_bus_rm_device(dev_handle);
-        bsp_display_i2c_diagnostic_log_once();
+        // bsp_display_i2c_diagnostic_log_once();
         return ret;
     }
 
@@ -903,7 +903,7 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
 {
     /* Initilize I2C */
     BSP_ERROR_CHECK_RETURN_ERR(bsp_i2c_init());
-    bsp_display_i2c_diagnostic_log_once();
+    // bsp_display_i2c_diagnostic_log_once();
 
     /* Initialize touch */
     const esp_lcd_touch_config_t tp_cfg = {
@@ -968,7 +968,7 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
                  BSP_LCD_TOUCH_INT,
                  BSP_LCD_TOUCH_RST,
                  esp_err_to_name(touch_ret));
-        bsp_display_i2c_diagnostic_log_once();
+        // bsp_display_i2c_diagnostic_log_once();
         /* Il fallimento GT911 può lasciare il bus I2C in stato invalido:
          * recupera il bus con un reset hardware prima di restituire l'errore. */
         if (i2c_handle != NULL)

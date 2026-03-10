@@ -8,7 +8,8 @@ idf_component_register(
          "lvgl_page_main.c"
          "lvgl_page_language.c"
          "lvgl_page_out_of_service.c"
+         "lvgl_page_programs_v2.c"
     INCLUDE_DIRS "include"
     REQUIRES waveshare__esp32_p4_nano web_ui device_config usb_cdc_scanner
-    PRIV_REQUIRES main
+    PRIV_REQUIRES main esp_driver_jpeg
 )

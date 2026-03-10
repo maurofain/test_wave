@@ -1481,6 +1481,7 @@ const char *WEBPAGE_TEST_BODY =
         "<button onclick=\"testEEPROM('dump_ascii')\" style='background:#e67e22'>🅰 Dump ASCII</button>"
         "<button onclick=\"testEEPROM('dump_hex')\" style='background:#2980b9'>🅷 Dump HEX</button>"
         "</div></div>"
+        "<div class='test-item'><div class='test-controls'><button onclick=\"if(confirm('Formattare EEPROM? Cancellerà tutti i dati!')) testEEPROM('format')\" style='background:#c0392b'>🧨 Formatta EEPROM</button></div></div>"
         "<div id='eeprom_status' class='status-box'>Pronto per test EEPROM</div></div>"
 
         "<div id='section_mdb' class='section collapsed'><h2>🎰 MDB (Multi-Drop Bus) <span style='font-size:14px; color:#bdc3c7'>(PIN 8, 11)</span><span class='section-toggle-icon'>▸</span></h2>"
@@ -1974,7 +1975,8 @@ const char *WEBPAGE_TEST_BODY =
         "    }"
         "    html += '</pre>';"
         "    statusBox.innerHTML='<div class=\"result\">🅷 HEX Dump:<br>'+html+'</div>';"
-        "  } else statusBox.innerHTML='<div class=\"result\">✅ Scritto '+val+' a '+addr+'</div>';"
+        "  } else if(op==='format') statusBox.innerHTML='<div class=\"result\">🧨 EEPROM formattata con successo</div>';"
+        "  else statusBox.innerHTML='<div class=\"result\">✅ Scritto '+val+' a '+addr+'</div>';"
         "  refreshEEPROMStatus();"
         "}else statusBox.innerHTML='<div class=\"result\">❌ Errore</div>';"
         "}catch(e){console.error(e);}}"
