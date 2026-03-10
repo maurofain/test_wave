@@ -13,7 +13,7 @@
 #include "usb/usb_host.h"
 #include "sd_pwr_ctrl_by_on_chip_ldo.h"
 
-#if CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH || CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH_A || CONFIG_BSP_LCD_TYPE_800_1280_8_INCH_A ||CONFIG_BSP_LCD_TYPE_720_1280_9_INCH_B || CONFIG_BSP_LCD_TYPE_720_1280_10_1_INCH_B
+#if CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH || CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH_A || CONFIG_BSP_LCD_TYPE_800_1280_8_INCH_A || CONFIG_BSP_LCD_TYPE_720_1280_9_INCH_B || CONFIG_BSP_LCD_TYPE_720_1280_10_1_INCH_B
 #include "esp_lcd_jd9365.h"
 #elif CONFIG_BSP_LCD_TYPE_720_1280_7_INCH_A
 #include "esp_lcd_ili9881c.h"
@@ -36,17 +36,17 @@ static const char *TAG = "ESP32_P4_EV";
 static lv_indev_t *disp_indev = NULL;
 #endif // (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
 
-sdmmc_card_t *bsp_sdcard = NULL;    // Global uSD card handler
+sdmmc_card_t *bsp_sdcard = NULL; // Global uSD card handler
 static bool i2c_initialized = false;
-static TaskHandle_t usb_host_task;  // USB Host Library task
+static TaskHandle_t usb_host_task; // USB Host Library task
 static bool s_usb_host_installed = false;
 static volatile bool s_usb_lib_task_running = false;
 #if (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 3, 0))
-static i2c_master_bus_handle_t i2c_handle = NULL;  // I2C Handle
+static i2c_master_bus_handle_t i2c_handle = NULL; // I2C Handle
 #endif
 static i2s_chan_handle_t i2s_tx_chan = NULL;
 static i2s_chan_handle_t i2s_rx_chan = NULL;
-static const audio_codec_data_if_t *i2s_data_if = NULL;  /* Codec data interface */
+static const audio_codec_data_if_t *i2s_data_if = NULL; /* Codec data interface */
 static bool s_display_i2c_diag_logged = false;
 /* Può essere usato per l'inizializzazione di `i2s_std_gpio_config_t` e/o `i2s_std_config_t` */
 #define BSP_I2S_GPIO_CFG       \
@@ -71,7 +71,6 @@ static bool s_display_i2c_diag_logged = false;
         .gpio_cfg = BSP_I2S_GPIO_CFG,                                                                 \
     }
 
-
 /**
  * @brief Esegue la registrazione di un log di diagnostica I2C una volta.
  *
@@ -83,13 +82,15 @@ static bool s_display_i2c_diag_logged = false;
  */
 static void bsp_display_i2c_diagnostic_log_once(void)
 {
-    if (s_display_i2c_diag_logged) {
+    if (s_display_i2c_diag_logged)
+    {
         return;
     }
     s_display_i2c_diag_logged = true;
 
     esp_err_t init_ret = bsp_i2c_init();
-    if (init_ret != ESP_OK || i2c_handle == NULL) {
+    if (init_ret != ESP_OK || i2c_handle == NULL)
+    {
         ESP_LOGE(TAG, "[C][I2C-DIAG] bus non disponibile (init=%s, handle=%p)",
                  esp_err_to_name(init_ret),
                  i2c_handle);
@@ -98,35 +99,43 @@ static void bsp_display_i2c_diagnostic_log_once(void)
 
     ESP_LOGE(TAG, "[C][I2C-DIAG] scan I2C su SDA=%d SCL=%d", BSP_I2C_SDA, BSP_I2C_SCL);
     int found = 0;
-    for (uint8_t addr = 0x03; addr < 0x78; addr++) {
+    for (uint8_t addr = 0x03; addr < 0x78; addr++)
+    {
         esp_err_t probe_ret = i2c_master_probe(i2c_handle, addr, 20);
-        if (probe_ret == ESP_OK) {
+        if (probe_ret == ESP_OK)
+        {
             ESP_LOGE(TAG, "[C][I2C-DIAG] trovato device @0x%02X", addr);
             found++;
         }
     }
 
-    if (found == 0) {
+    if (found == 0)
+    {
         ESP_LOGE(TAG, "[C][I2C-DIAG] nessun device trovato sul bus");
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "[C][I2C-DIAG] totale device trovati: %d", found);
     }
 }
 
-
 /**
  * @brief Inizializza il bus I2C.
- * 
+ *
  * Questa funzione inizializza il bus I2C se non è già stato inizializzato.
- * 
+ *
  * @return esp_err_t
  * @retval ESP_OK Se l'inizializzazione è stata completata con successo.
  * @retval ESP_FAIL Se l'inizializzazione ha fallito.
  */
 esp_err_t bsp_i2c_init(void)
 {
+    ESP_LOGI(TAG, "Bus I2C Monitor in avvio: port=%d SDA=GPIO%d SCL=GPIO%d @%dHz",
+             BSP_I2C_NUM, BSP_I2C_SDA, BSP_I2C_SCL, I2C_CLK_SRC_DEFAULT);
+
     /* I2C was initialized before */
-    if (i2c_initialized) {
+    if (i2c_initialized)
+    {
         return ESP_OK;
     }
 
@@ -137,12 +146,12 @@ esp_err_t bsp_i2c_init(void)
         .i2c_port = BSP_I2C_NUM,
     };
     BSP_ERROR_CHECK_RETURN_ERR(i2c_new_master_bus(&i2c_bus_conf, &i2c_handle));
-
+    ESP_LOGI(TAG, "Bus I2C Monitor inizializzato: port=%d SDA=GPIO%d SCL=GPIO%d @%dHz",
+             BSP_I2C_NUM, BSP_I2C_SDA, BSP_I2C_SCL, I2C_CLK_SRC_DEFAULT);
     i2c_initialized = true;
 
     return ESP_OK;
 }
-
 
 /**
  * @brief Desinizializza il driver I2C.
@@ -160,7 +169,6 @@ esp_err_t bsp_i2c_deinit(void)
     return ESP_OK;
 }
 
-
 /**
  * @brief Ottiene il handle del bus I2C master.
  *
@@ -172,7 +180,6 @@ i2c_master_bus_handle_t bsp_i2c_get_handle(void)
 {
     return i2c_handle;
 }
-
 
 /**
  * @brief Monta il dispositivo SD card.
@@ -192,8 +199,7 @@ esp_err_t bsp_sdcard_mount(void)
         .format_if_mount_failed = false,
 #endif
         .max_files = 5,
-        .allocation_unit_size = 64 * 1024
-    };
+        .allocation_unit_size = 64 * 1024};
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.slot = SDMMC_HOST_SLOT_0;
@@ -204,7 +210,8 @@ esp_err_t bsp_sdcard_mount(void)
     };
     sd_pwr_ctrl_handle_t pwr_ctrl_handle = NULL;
     esp_err_t ret = sd_pwr_ctrl_new_on_chip_ldo(&ldo_config, &pwr_ctrl_handle);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to create a new on-chip LDO power control driver");
         return ret;
     }
@@ -221,7 +228,6 @@ esp_err_t bsp_sdcard_mount(void)
     return esp_vfs_fat_sdmmc_mount(BSP_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &bsp_sdcard);
 }
 
-
 /**
  * @brief Desmonta il dispositivo SD card.
  *
@@ -235,7 +241,6 @@ esp_err_t bsp_sdcard_unmount(void)
 {
     return esp_vfs_fat_sdcard_unmount(BSP_SD_MOUNT_POINT, bsp_sdcard);
 }
-
 
 /**
  * @brief Monta il file system SPIFFS.
@@ -263,15 +268,17 @@ esp_err_t bsp_spiffs_mount(void)
 
     size_t total = 0, used = 0;
     ret_val = esp_spiffs_info(conf.partition_label, &total, &used);
-    if (ret_val != ESP_OK) {
+    if (ret_val != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s)", esp_err_to_name(ret_val));
-    } else {
+    }
+    else
+    {
         ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
     }
 
     return ret_val;
 }
-
 
 /**
  * @brief Desmonta il file system SPIFFS.
@@ -287,16 +294,16 @@ esp_err_t bsp_spiffs_unmount(void)
     return esp_vfs_spiffs_unregister(CONFIG_BSP_SPIFFS_PARTITION_LABEL);
 }
 
-
 /**
  * @brief Inizializza il sistema audio utilizzando la configurazione I2S fornita.
- * 
+ *
  * @param [in] i2s_config Puntatore alla configurazione I2S da utilizzare per l'inizializzazione.
  * @return esp_err_t Codice di errore che indica il successo o la causa dell'errore dell'operazione.
  */
 esp_err_t bsp_audio_init(const i2s_std_config_t *i2s_config)
 {
-    if (i2s_tx_chan && i2s_rx_chan) {
+    if (i2s_tx_chan && i2s_rx_chan)
+    {
         /* Audio was initialized before */
         return ESP_OK;
     }
@@ -309,16 +316,19 @@ esp_err_t bsp_audio_init(const i2s_std_config_t *i2s_config)
     /* Setup I2S channels */
     const i2s_std_config_t std_cfg_default = BSP_I2S_DUPLEX_MONO_CFG(22050);
     const i2s_std_config_t *p_i2s_cfg = &std_cfg_default;
-    if (i2s_config != NULL) {
+    if (i2s_config != NULL)
+    {
         p_i2s_cfg = i2s_config;
     }
 
-    if (i2s_tx_chan != NULL) {
+    if (i2s_tx_chan != NULL)
+    {
         ESP_ERROR_CHECK(i2s_channel_init_std_mode(i2s_tx_chan, p_i2s_cfg));
         ESP_ERROR_CHECK(i2s_channel_enable(i2s_tx_chan));
     }
 
-    if (i2s_rx_chan != NULL) {
+    if (i2s_rx_chan != NULL)
+    {
         ESP_ERROR_CHECK(i2s_channel_init_std_mode(i2s_rx_chan, p_i2s_cfg));
         ESP_ERROR_CHECK(i2s_channel_enable(i2s_rx_chan));
     }
@@ -333,18 +343,18 @@ esp_err_t bsp_audio_init(const i2s_std_config_t *i2s_config)
     return ESP_OK;
 }
 
-
 /**
  * @brief Inizializza il decodificatore audio del parlante.
- * 
+ *
  * Questa funzione inizializza il decodificatore audio del parlante utilizzando l'interfaccia I2S.
- * 
+ *
  * @param [in] Nessun parametro di input.
  * @return esp_codec_dev_handle_t Handle del decodificatore audio del parlante, NULL in caso di errore.
  */
 esp_codec_dev_handle_t bsp_audio_codec_speaker_init(void)
 {
-    if (i2s_data_if == NULL) {
+    if (i2s_data_if == NULL)
+    {
         /* Initilize I2C */
         ESP_ERROR_CHECK(bsp_i2c_init());
         /* Configure I2S peripheral and Power Amplifier */
@@ -391,18 +401,18 @@ esp_codec_dev_handle_t bsp_audio_codec_speaker_init(void)
     return esp_codec_dev_new(&codec_dev_cfg);
 }
 
-
 /**
  * @brief Inizializza il decodificatore audio del microfono.
- * 
+ *
  * Questa funzione inizializza il decodificatore audio del microfono utilizzando l'interfaccia I2S.
- * 
+ *
  * @param [in] Nessun parametro di input.
  * @return esp_codec_dev_handle_t Handle del decodificatore audio del microfono inizializzato, NULL in caso di errore.
  */
 esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 {
-    if (i2s_data_if == NULL) {
+    if (i2s_data_if == NULL)
+    {
         /* Initilize I2C */
         ESP_ERROR_CHECK(bsp_i2c_init());
         /* Configure I2S peripheral and Power Amplifier */
@@ -451,8 +461,7 @@ esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 }
 
 // Bit number used to represent command and parameter
-#define LCD_LEDC_CH            CONFIG_BSP_DISPLAY_BRIGHTNESS_LEDC_CH
-
+#define LCD_LEDC_CH CONFIG_BSP_DISPLAY_BRIGHTNESS_LEDC_CH
 
 /**
  * @brief Inizializza il sistema di controllo della luminosità del display.
@@ -467,25 +476,27 @@ esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 esp_err_t bsp_display_brightness_init(void)
 {
     esp_err_t ret = bsp_i2c_init();
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         bsp_display_i2c_diagnostic_log_once();
     }
     return ret;
 }
 
-
 /**
  * @brief Imposta la luminosità del display.
- * 
+ *
  * @param brightness_percent Percentuale di luminosità (0-100).
  * @return esp_err_t Errore se la percentuale non è valida, altrimenti ESP_OK.
  */
 esp_err_t bsp_display_brightness_set(int brightness_percent)
 {
-    if (brightness_percent > 100) {
+    if (brightness_percent > 100)
+    {
         brightness_percent = 100;
     }
-    if (brightness_percent < 0) {
+    if (brightness_percent < 0)
+    {
         brightness_percent = 0;
     }
 
@@ -519,20 +530,23 @@ esp_err_t bsp_display_brightness_set(int brightness_percent)
         return add_ret;
     }
 
-
     esp_err_t ret = i2c_master_transmit(dev_handle, data_to_send, sizeof(data_to_send), 50);
-    if (ret == ESP_ERR_INVALID_STATE && i2c_handle != NULL) {
+    if (ret == ESP_ERR_INVALID_STATE && i2c_handle != NULL)
+    {
         /* Bus potrebbe essere in stato invalido (es. dopo fallimento touch GT911):
          * recupera il bus e riprova una volta. */
         ESP_LOGW(TAG, "[C] brightness tx INVALID_STATE: reset bus e retry");
         i2c_master_bus_rm_device(dev_handle);
         dev_handle = NULL;
         esp_err_t reset_ret = i2c_master_bus_reset(i2c_handle);
-        if (reset_ret == ESP_OK) {
+        if (reset_ret == ESP_OK)
+        {
             /* Riaggiungi dispositivo e riprova */
-            if (i2c_master_bus_add_device(i2c_handle, &i2c_dev_conf, &dev_handle) == ESP_OK) {
+            if (i2c_master_bus_add_device(i2c_handle, &i2c_dev_conf, &dev_handle) == ESP_OK)
+            {
                 ret = i2c_master_transmit(dev_handle, data_to_send, sizeof(data_to_send), 50);
-                if (ret == ESP_OK) {
+                if (ret == ESP_OK)
+                {
                     ESP_LOGI(TAG, "[C] brightness tx OK dopo bus reset");
                 }
             }
@@ -546,16 +560,17 @@ esp_err_t bsp_display_brightness_set(int brightness_percent)
                  data_to_send[0],
                  data_to_send[1],
                  esp_err_to_name(ret));
-        if (dev_handle) i2c_master_bus_rm_device(dev_handle);
+        if (dev_handle)
+            i2c_master_bus_rm_device(dev_handle);
         bsp_display_i2c_diagnostic_log_once();
         return ret;
     }
 
-    if (dev_handle) i2c_master_bus_rm_device(dev_handle);
+    if (dev_handle)
+        i2c_master_bus_rm_device(dev_handle);
 
     return ESP_OK;
 }
-
 
 /**
  * @brief Spegni il retroilluminazione del display.
@@ -571,7 +586,6 @@ esp_err_t bsp_display_backlight_off(void)
     return bsp_display_brightness_set(0);
 }
 
-
 /**
  * @brief Accende lo schermo del display.
  *
@@ -585,7 +599,6 @@ esp_err_t bsp_display_backlight_on(void)
 {
     return bsp_display_brightness_set(100);
 }
-
 
 /**
  * @brief Abilita la potenza del PHY DSI.
@@ -612,7 +625,6 @@ static esp_err_t bsp_enable_dsi_phy_power(void)
     return ESP_OK;
 }
 
-
 /**
  * @brief Crea una nuova istanza di un display utilizzando la configurazione specificata.
  *
@@ -632,7 +644,6 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config, esp_lcd_panel_hand
 
     return ret;
 }
-
 
 /**
  * @brief Crea una nuova istanza di display utilizzando i gestori specificati.
@@ -669,7 +680,7 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
     ESP_GOTO_ON_ERROR(esp_lcd_new_panel_io_dbi(mipi_dsi_bus, &dbi_config, &io), err, TAG, "New panel IO failed");
 
     esp_lcd_panel_handle_t disp_panel = NULL;
-#if CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH || CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH_A || CONFIG_BSP_LCD_TYPE_800_1280_8_INCH_A ||CONFIG_BSP_LCD_TYPE_720_1280_9_INCH_B || CONFIG_BSP_LCD_TYPE_720_1280_10_1_INCH_B
+#if CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH || CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH_A || CONFIG_BSP_LCD_TYPE_800_1280_8_INCH_A || CONFIG_BSP_LCD_TYPE_720_1280_9_INCH_B || CONFIG_BSP_LCD_TYPE_720_1280_10_1_INCH_B
     ESP_LOGI(TAG, "Install Waveshare LCD control panel");
 #if CONFIG_BSP_LCD_TYPE_720_1280_9_INCH_B || CONFIG_BSP_LCD_TYPE_720_1280_10_1_INCH_B
 #if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
@@ -866,18 +877,20 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
     return ret;
 
 err:
-    if (disp_panel) {
+    if (disp_panel)
+    {
         esp_lcd_panel_del(disp_panel);
     }
-    if (io) {
+    if (io)
+    {
         esp_lcd_panel_io_del(io);
     }
-    if (mipi_dsi_bus) {
+    if (mipi_dsi_bus)
+    {
         esp_lcd_del_dsi_bus(mipi_dsi_bus);
     }
     return ret;
 }
-
 
 /**
  * @brief Crea una nuova istanza del driver del touch screen.
@@ -934,21 +947,21 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t tp_io_config = {
 #if CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH || CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH_A || CONFIG_BSP_LCD_TYPE_800_1280_8_INCH_A || CONFIG_BSP_LCD_TYPE_720_1280_7_INCH_A || CONFIG_BSP_LCD_TYPE_720_1280_5_INCH_A
-    .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
+        .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
 #else
-    .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP,
+        .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS_BACKUP,
 #endif
-    .control_phase_bytes = 1,
-    .dc_bit_offset = 0,
-    .lcd_cmd_bits = 16,
-    .flags = {
-        .disable_control_phase = 1,
-    }
-};
+        .control_phase_bytes = 1,
+        .dc_bit_offset = 0,
+        .lcd_cmd_bits = 16,
+        .flags = {
+            .disable_control_phase = 1,
+        }};
     tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle), TAG, "");
     esp_err_t touch_ret = esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch);
-    if (touch_ret != ESP_OK) {
+    if (touch_ret != ESP_OK)
+    {
         ESP_LOGE(TAG,
                  "[C] touch init GT911 failed addr=0x%02X int=%d rst=%d: %s",
                  tp_io_config.dev_addr,
@@ -958,11 +971,15 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
         bsp_display_i2c_diagnostic_log_once();
         /* Il fallimento GT911 può lasciare il bus I2C in stato invalido:
          * recupera il bus con un reset hardware prima di restituire l'errore. */
-        if (i2c_handle != NULL) {
+        if (i2c_handle != NULL)
+        {
             esp_err_t reset_ret = i2c_master_bus_reset(i2c_handle);
-            if (reset_ret != ESP_OK) {
+            if (reset_ret != ESP_OK)
+            {
                 ESP_LOGE(TAG, "[C] i2c_master_bus_reset dopo touch failure: %s", esp_err_to_name(reset_ret));
-            } else {
+            }
+            else
+            {
                 ESP_LOGI(TAG, "[C] bus I2C recuperato dopo fallimento touch");
             }
         }
@@ -1008,7 +1025,7 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
             .swap_bytes = (BSP_LCD_BIGENDIAN ? true : false),
 #endif
 #if CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR
-            .sw_rotate = false,                /* Avoid tearing is not supported for SW rotation */
+            .sw_rotate = false, /* Avoid tearing is not supported for SW rotation */
 #else
             .sw_rotate = cfg->flags.sw_rotate, /* Only SW rotation is supported for 90° and 270° */
 #endif
@@ -1017,8 +1034,7 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
 #elif CONFIG_BSP_DISPLAY_LVGL_DIRECT_MODE
             .direct_mode = true,
 #endif
-        }
-    };
+        }};
 
     const lvgl_port_display_dsi_cfg_t dpi_cfg = {
         .flags = {
@@ -1027,8 +1043,7 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
 #else
             .avoid_tearing = false,
 #endif
-        }
-    };
+        }};
 
     return lvgl_port_add_disp_dsi(&disp_cfg, &dpi_cfg);
 }
@@ -1037,7 +1052,8 @@ static lv_indev_t *bsp_display_indev_init(lv_display_t *disp)
 {
     esp_lcd_touch_handle_t tp;
     esp_err_t ret = bsp_touch_new(NULL, &tp);
-    if (ret != ESP_OK || tp == NULL) {
+    if (ret != ESP_OK || tp == NULL)
+    {
         ESP_LOGW(TAG, "[C] Touch init non disponibile (%s), proseguo senza input touch", esp_err_to_name(ret));
         return NULL;
     }
@@ -1065,8 +1081,7 @@ lv_display_t *bsp_display_start(void)
 #endif
             .buff_spiram = false,
             .sw_rotate = true,
-        }
-    };
+        }};
     return bsp_display_start_with_config(&cfg);
 }
 
@@ -1082,7 +1097,8 @@ lv_display_t *bsp_display_start_with_config(const bsp_display_cfg_t *cfg)
     BSP_NULL_CHECK(disp = bsp_display_lcd_init(cfg), NULL);
 
     disp_indev = bsp_display_indev_init(disp);
-    if (!disp_indev) {
+    if (!disp_indev)
+    {
         ESP_LOGW(TAG, "[C] Display avviato senza touch input");
     }
 
@@ -1094,19 +1110,17 @@ lv_indev_t *bsp_display_get_input_dev(void)
     return disp_indev;
 }
 
-
 /** @brief Rotola la visualizzazione di un display LVGL.
- *  
+ *
  *  @param disp Puntatore al display da ruotare.
  *  @param rotation Valore di rotazione del display.
- *  
+ *
  *  @return Nessun valore di ritorno.
  */
 void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
 {
     lv_disp_set_rotation(disp, rotation);
 }
-
 
 /**
  * @brief Acquisisce un blocco sulla visualizzazione del display.
@@ -1123,12 +1137,11 @@ bool bsp_display_lock(uint32_t timeout_ms)
     return lvgl_port_lock(timeout_ms);
 }
 
-
 /** @brief Sblocca la visualizzazione del display.
- *  
+ *
  *  Questa funzione sblocca la visualizzazione del display, consentendo
  *  l'aggiornamento e la visualizzazione dei contenuti.
- *  
+ *
  *  @return Nessun valore di ritorno.
  */
 void bsp_display_unlock(void)
@@ -1138,42 +1151,46 @@ void bsp_display_unlock(void)
 
 #endif // (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
 
-
 /**
  * @brief Gestisce il task per la libreria USB.
- * 
+ *
  * Questa funzione esegue un ciclo infinito che gestisce le operazioni della libreria USB.
- * 
+ *
  * @param arg Argomento passato alla funzione, non utilizzato in questo contesto.
  * @return void Nessun valore di ritorno.
  */
 static void usb_lib_task(void *arg)
 {
-    while (s_usb_lib_task_running) {
+    while (s_usb_lib_task_running)
+    {
         // Avvia la gestione degli eventi di sistema
         uint32_t event_flags;
         esp_err_t err = usb_host_lib_handle_events(pdMS_TO_TICKS(100), &event_flags);
-        if (err != ESP_OK) {
-            if (err != ESP_ERR_TIMEOUT && err != ESP_ERR_INVALID_STATE) {
+        if (err != ESP_OK)
+        {
+            if (err != ESP_ERR_TIMEOUT && err != ESP_ERR_INVALID_STATE)
+            {
                 ESP_LOGW(TAG, "USB: handle_events failed: %s", esp_err_to_name(err));
             }
             continue;
         }
-        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
+        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS)
+        {
             esp_err_t free_err = usb_host_device_free_all();
-            if (free_err != ESP_OK && free_err != ESP_ERR_INVALID_STATE) {
+            if (free_err != ESP_OK && free_err != ESP_ERR_INVALID_STATE)
+            {
                 ESP_LOGW(TAG, "USB: device_free_all failed: %s", esp_err_to_name(free_err));
             }
         }
-        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) {
+        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE)
+        {
             ESP_LOGI(TAG, "USB: All devices freed");
         }
     }
 
     ESP_LOGI(TAG, "USB: usb_lib task stopped");
     vTaskDelete(NULL);
-} 
-
+}
 
 /**
  * @brief Avvia il gestore USB host.
@@ -1187,11 +1204,14 @@ esp_err_t bsp_usb_host_start(bsp_usb_host_power_mode_t mode, bool limit_500mA)
     (void)mode;
     (void)limit_500mA;
 
-    if (s_usb_host_installed) {
+    if (s_usb_host_installed)
+    {
         ESP_LOGI(TAG, "USB Host already installed");
-        if (usb_host_task == NULL) {
+        if (usb_host_task == NULL)
+        {
             s_usb_lib_task_running = true;
-            if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE) {
+            if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE)
+            {
                 s_usb_lib_task_running = false;
                 ESP_LOGE(TAG, "Creating USB host lib task failed");
                 return ESP_ERR_NO_MEM;
@@ -1207,20 +1227,27 @@ esp_err_t bsp_usb_host_start(bsp_usb_host_power_mode_t mode, bool limit_500mA)
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
     esp_err_t err = usb_host_install(&host_config);
-    if (err == ESP_ERR_INVALID_STATE) {
+    if (err == ESP_ERR_INVALID_STATE)
+    {
         ESP_LOGW(TAG, "USB Host already installed by another caller");
         s_usb_host_installed = true;
-    } else if (err != ESP_OK) {
+    }
+    else if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "usb_host_install failed: %s", esp_err_to_name(err));
         return err;
-    } else {
+    }
+    else
+    {
         s_usb_host_installed = true;
     }
 
     // Crea un task che gestirà gli eventi della libreria USB
-    if (usb_host_task == NULL) {
+    if (usb_host_task == NULL)
+    {
         s_usb_lib_task_running = true;
-        if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE) {
+        if (xTaskCreate(usb_lib_task, "usb_lib", 4096, NULL, 10, &usb_host_task) != pdTRUE)
+        {
             s_usb_lib_task_running = false;
             ESP_LOGE(TAG, "Creating USB host lib task failed");
             (void)usb_host_uninstall();
@@ -1231,7 +1258,6 @@ esp_err_t bsp_usb_host_start(bsp_usb_host_power_mode_t mode, bool limit_500mA)
 
     return ESP_OK;
 }
-
 
 /**
  * @brief Arresta il gestore USB.
@@ -1246,20 +1272,23 @@ esp_err_t bsp_usb_host_stop(void)
 {
     s_usb_lib_task_running = false;
 
-    if (usb_host_task) {
+    if (usb_host_task)
+    {
         TaskHandle_t task_to_delete = usb_host_task;
         usb_host_task = NULL;
         vTaskDelete(task_to_delete);
     }
 
     esp_err_t err = usb_host_uninstall();
-    if (err == ESP_ERR_INVALID_STATE) {
+    if (err == ESP_ERR_INVALID_STATE)
+    {
         s_usb_host_installed = false;
         ESP_LOGI(TAG, "USB Host already uninstalled");
         return ESP_OK;
     }
 
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGW(TAG, "usb_host_uninstall failed: %s", esp_err_to_name(err));
         return err;
     }

@@ -1454,6 +1454,8 @@ esp_err_t init_run_display_only(void)
 #endif
 }
 
+/* forward declarations */
+static void periph_i2c_diagnostic_scan(void);
 
 /**
  * @brief Inizializza il sistema di produzione in modalità factory.
@@ -1542,6 +1544,9 @@ esp_err_t init_run_factory(void)
     // Inizializza GPIO ausiliari
     aux_gpio_init();
     init_agent_status_set(AGN_ID_AUX_GPIO, 1, INIT_AGENT_ERR_NONE);
+
+    // Scansione diagnostica porta I2C periferica (prima di display init, come il bus BSP)
+    periph_i2c_diagnostic_scan();
 
     // Display + LVGL (minimal screen) - skip se headless
     device_config_t *cfg = device_config_get();
@@ -1648,15 +1653,6 @@ esp_err_t init_run_factory(void)
         }
         if (exp_ret == ESP_OK) {
             init_agent_status_set(AGN_ID_IO_EXPANDER, 1, INIT_AGENT_ERR_NONE);
-            // Controllo GPIO3 solo se expander disponibile
-            while (true) {
-                int gpio3_value = io_get_pin(3) ? 1 : 0;
-                ESP_LOGI(TAG, "Valore GPIO3: %d", gpio3_value);
-                if (gpio3_value == 1) {
-                    break;
-                }
-                vTaskDelay(pdMS_TO_TICKS(1000));
-            }
         }
     }
     else
@@ -1840,6 +1836,39 @@ esp_err_t init_run_factory(void)
 
 
 /**
+ * @brief Diagnostica I2C sulla porta periferica (GPIO 26/27).
+ *
+ * Scandisce tutti gli indirizzi I2C sulla porta periferica e registra i dispositivi trovati.
+ *
+ * @return Nessun valore di ritorno.
+ */
+static void periph_i2c_diagnostic_scan(void)
+{
+    i2c_master_bus_handle_t bus = periph_i2c_get_handle();
+    if (bus == NULL) {
+        ESP_LOGE(TAG, "[C][I2C-DIAG] bus periferica non disponibile");
+        return;
+    }
+
+    ESP_LOGE(TAG, "[C][I2C-DIAG] scan I2C su SDA=%d SCL=%d", CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
+    int found = 0;
+    for (uint8_t addr = 0x03; addr < 0x78; addr++) {
+        esp_err_t probe_ret = i2c_master_probe(bus, addr, 20);  // Stesso timeout del BSP I2C
+        if (probe_ret == ESP_OK) {
+            ESP_LOGE(TAG, "[C][I2C-DIAG] trovato device @0x%02X", addr);
+            found++;
+        }
+    }
+
+    if (found == 0) {
+        ESP_LOGE(TAG, "[C][I2C-DIAG] nessun device trovato sul bus");
+    } else {
+        ESP_LOGE(TAG, "[C][I2C-DIAG] totale device trovati: %d", found);
+    }
+}
+
+
+/**
  * @brief Inizializza e restituisce un handle per la gestione di un LED strip WS2812.
  *
  * @return led_strip_handle_t Handle per la gestione del LED strip WS2812.
@@ -1883,7 +1912,7 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
  */
 void init_i2c_and_io_expander(void) {
 #if defined(CONFIG_BSP_I2C_NUM)
-    ESP_LOGI(TAG, "[M] [I2C] Avvio init bus I2C BSP (port=%d)", CONFIG_BSP_I2C_NUM);
+    ESP_LOGI(TAG, "[M] [I2C] Avvio init bus I2C BSP Monitor (port=%d SDA=%d SCL=%d)", BSP_I2C_NUM, BSP_I2C_SDA, BSP_I2C_SCL);
     esp_err_t i2c_ret = bsp_i2c_init();
     if (i2c_ret != ESP_OK) {
         ESP_LOGW(TAG, "[M] [I2C] Init bus I2C BSP fallita: %s", esp_err_to_name(i2c_ret));
@@ -1893,7 +1922,7 @@ void init_i2c_and_io_expander(void) {
 #else
     ESP_LOGW(TAG, "[M] [I2C] CONFIG_BSP_I2C_NUM non definito: init bus I2C BSP non disponibile");
 #endif
-    ESP_LOGI(TAG, "[M] [IOX] Avvio init I/O Expander su bus I2C");
+    ESP_LOGI(TAG, "[M] [IOX] Avvio init Periferiche su bus I2C (port=%d SDA=%d SCL=%d)", CONFIG_APP_I2C_PORT,CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
     periph_i2c_init();
     esp_err_t exp_ret = io_expander_init();
     if (exp_ret != ESP_OK) {
@@ -1901,15 +1930,6 @@ void init_i2c_and_io_expander(void) {
         return;
     }
     ESP_LOGI(TAG, "[M] [IOX] I/O Expander inizializzato correttamente");
-    // Controllo GPIO3 solo se expander disponibile
-    while (true) {
-        int gpio3_value = io_get_pin(3) ? 1 : 0;
-        ESP_LOGI(TAG, "[M] [IOX] Valore GPIO3: %d", gpio3_value);
-        if (gpio3_value == 1) {
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
 
     // Log riepilogativo sezioni DNA mock attive
     {

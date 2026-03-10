@@ -12,8 +12,8 @@ static const char *TAG = "EEPROM";
 #define EEPROM_PAGE_SIZE    16
 #define EEPROM_TOTAL_SIZE   2048
 #define EEPROM_WRITE_DELAY_MS 5
-#define EEPROM_WRITE_TIMEOUT_MS 10
-#define EEPROM_INIT_PROBE_TIMEOUT_MS 50  // Timeout più lungo per rilevazione iniziale
+#define EEPROM_WRITE_TIMEOUT_MS 50      // Aumentato per clock 100kHz
+#define EEPROM_INIT_PROBE_TIMEOUT_MS 500 // Molto più lungo per rilevazione iniziale a basso clock
 
 static i2c_master_dev_handle_t eeprom_dev_handle = NULL;
 static i2c_master_bus_handle_t eeprom_bus_handle = NULL;
@@ -26,7 +26,7 @@ static bool s_eeprom_available = false;
 static esp_err_t wait_until_ready(void) {
     for (int i = 0; i < EEPROM_WRITE_TIMEOUT_MS; i++) {
         // i2c_master_probe invia solo l'indirizzo per verificare ACK
-        esp_err_t ret = i2c_master_probe(eeprom_bus_handle, EEPROM_BASE_ADDR, pdMS_TO_TICKS(10));
+        esp_err_t ret = i2c_master_probe(eeprom_bus_handle, EEPROM_BASE_ADDR, pdMS_TO_TICKS(200));
         if (ret == ESP_OK) return ESP_OK;
         vTaskDelay(pdMS_TO_TICKS(1));
     }
@@ -58,8 +58,8 @@ esp_err_t eeprom_24lc16_init(void) {
         return ESP_OK; // Non bloccante
     }
 
-    // Verifichiamo se risponde con timeout allungato
-    ESP_LOGI(TAG, "[C] Scanning for EEPROM at 0x50 (timeout=%dms)...", EEPROM_INIT_PROBE_TIMEOUT_MS);
+    // Verifichiamo se risponde con timeout allungato per clock basso (100kHz)
+    ESP_LOGI(TAG, "[C] Scanning for EEPROM at 0x50 (timeout=%dms, clock=100kHz)...", EEPROM_INIT_PROBE_TIMEOUT_MS);
     ret = wait_until_ready();
     
     if (ret == ESP_OK) {

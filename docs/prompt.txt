@@ -1,0 +1,16 @@
+all'avvio della app, dopo la connessione alla rete ethernet , verificahiamo che l'interfaccia cctalk sia abilitata ed inviamo la sequenza di inizializzazione:
+.02.00.01.FE.FF/.01.00.02.00.FD
+.02.02.01.E7.FF.FF.16/.01.00.02.00.FD
+.02.01.01.E4.01.17/.01.00.02.00.FD
+.02.00.01.E6.17/.01.02.02.00.FF.FF.FD
+Ripetiamo la sequeza prima di ogni caricamento della pagina programmi
+
+
+
+saltiamo la schermata con le lingue e passiamo direttamente alla scelta programmi, mettiamo in alto a dx la bandiera della lingua corrente (default italiano)  e se premuta attiviamo la pagina scelta lingua. In base alla lingra scelta cambiamo la bandierina in alto a dx. dopo il periodo di inattività con la FSM in stato 2 azeriamno i crediti CVD e ECD (se monete/gettoni non utilizzati vengono egualmente azzerati) e ritorniamo alla lingua italiana. dopo un altro tempo di attesa in scelta programmi (defaulto 60sec ed editabile in /config/timeouts)usciamo ad una pagina pubblicità dove mostriamo delle immagini (di dimensione non predefinita e visualizzate centrate su sfondo nero) nominate img01.jpg, img02.jpg a rotazione con intervallo di 30 secondi (editabile in /config/timeouts) e che su tocco dello schermo passa alla schermata programmi
+
+ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
+All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
+
+La bandierina in se è troppo piccola, va raddoppita in x e y, il bordo va raddoppiato in orizzontale come schermata di timeout non appare lo slideshow ma la scelta lingue, che deve apparire solo alla pression della bandiera
+

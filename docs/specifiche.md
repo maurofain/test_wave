@@ -42,6 +42,32 @@
     - MDB,
     - PWM1,
     - PWM2
+# Device I2C su MH1001
+```
+I (1052) MAIN: [M] ===== Waveshare ESP32-P4 - I2C Test =====
+I (1062) MAIN: [M] Avvio applicazione minima con scansione I2C
+I (1062) MAIN: [M] I2C porta 0 inizializzato (SDA=27, SCL=26, clock=400000 Hz)
+I (1172) MAIN: [M] Scansione bus I2C 0...
+I (1172) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x43 (porta 0)
+I (1172) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x44 (porta 0)
+I (1172) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x45 (porta 0)
+I (1182) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x50 (porta 0)
+I (1182) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x51 (porta 0)
+I (1192) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x52 (porta 0)
+I (1202) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x53 (porta 0)
+I (1202) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x54 (porta 0)
+I (1212) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x55 (porta 0)
+I (1222) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x56 (porta 0)
+I (1222) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x57 (porta 0)
+I (1232) MAIN: [M] Scansione porta 0 completata: 11 dispositivi trovati
+I (1242) MAIN: [M] I2C porta 1 inizializzato (SDA=7, SCL=8, clock=400000 Hz)
+I (1342) MAIN: [M] Scansione bus I2C 1...
+I (1342) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x18 (porta 1)
+I (1342) MAIN: [M] Dispositivo I2C trovato all'indirizzo 0x45 (porta 1)
+I (1342) MAIN: [M] Scansione porta 1 completata: 2 dispositivi trovati
+I (1352) MAIN: [M] ===== Scansione I2C completata =====
+I (1352) MAIN: [M] Applicazione in esecuzione
+```
 
 ### Pagina statistiche
 
