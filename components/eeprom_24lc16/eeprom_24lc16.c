@@ -45,34 +45,30 @@ esp_err_t eeprom_24lc16_init(void) {
         return ESP_OK; // Non bloccante
     }
     
-    eeprom_bus_handle = bus;
-    
-    // Configura device I2C
+    eeprom_bus_handle = bus; // Salva bus handle per polling ACK
+    ESP_LOGI(TAG, "[C] Utilizzo bus I2C periferiche (GPIO26 SCL, GPIO27 SDA)");
+
     i2c_device_config_t dev_cfg = {
         .device_address = EEPROM_BASE_ADDR,
         .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
     };
-    
     esp_err_t ret = i2c_master_bus_add_device(bus, &dev_cfg, &eeprom_dev_handle);
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "[C] Failed to add EEPROM device: %s", esp_err_to_name(ret));
-        s_eeprom_available = false;
+        ESP_LOGW(TAG, "[C] Failed to add EEPROM device at 0x%02X: %s", EEPROM_BASE_ADDR, esp_err_to_name(ret));
         return ESP_OK; // Non bloccante
     }
-    
-    // Prova a leggere un byte per verificare se l'EEPROM risponde
-    uint8_t test_byte;
-    uint8_t mem_addr = 0;
-    ret = i2c_master_transmit_receive(eeprom_dev_handle, &mem_addr, 1, &test_byte, 1, pdMS_TO_TICKS(500));
+
+    // Verifichiamo se risponde con timeout allungato per clock basso (100kHz)
+    ESP_LOGI(TAG, "[C] Scanning for EEPROM at 0x50 (timeout=%dms, clock=100kHz)...", EEPROM_INIT_PROBE_TIMEOUT_MS);
+    ret = wait_until_ready();
     
     if (ret == ESP_OK) {
         s_eeprom_available = true;
         ESP_LOGI(TAG, "[C] EEPROM 24LC16BT trovata e pronta");
     } else {
         s_eeprom_available = false;
-        ESP_LOGW(TAG, "[C] EEPROM non risponde alla lettura test: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "[C] EEPROM 24LC16BT non presente su indirizzo 0x50 (timeout after %dms)", EEPROM_INIT_PROBE_TIMEOUT_MS);
     }
-    
     return ESP_OK; 
 }
 
@@ -154,33 +150,4 @@ esp_err_t eeprom_24lc16_read_byte(uint16_t address, uint8_t *val) {
 
 esp_err_t eeprom_24lc16_write_byte(uint16_t address, uint8_t val) {
     return eeprom_24lc16_write(address, &val, 1);
-}
-
-esp_err_t eeprom_24lc16_format(void) {
-    if (!s_eeprom_available) return ESP_ERR_INVALID_STATE;
-    
-    ESP_LOGI(TAG, "[C] Formattazione EEPROM in corso...");
-    
-    // Crea un buffer di zeri
-    uint8_t zero_buffer[64] = {0};
-    
-    // Scrivi zeri su tutta l'EEPROM (2048 byte)
-    for (uint16_t addr = 0; addr < EEPROM_TOTAL_SIZE; addr += sizeof(zero_buffer)) {
-        size_t write_size = sizeof(zero_buffer);
-        if (addr + write_size > EEPROM_TOTAL_SIZE) {
-            write_size = EEPROM_TOTAL_SIZE - addr;
-        }
-        
-        esp_err_t ret = eeprom_24lc16_write(addr, zero_buffer, write_size);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "[C] Errore formattazione EEPROM @0x%04X: %s", addr, esp_err_to_name(ret));
-            return ret;
-        }
-        
-        // Piccolo delay per evitare di stressare l'EEPROM
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
-    
-    ESP_LOGI(TAG, "[C] EEPROM formattata con successo");
-    return ESP_OK;
 }

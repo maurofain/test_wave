@@ -43,9 +43,3 @@ esp_err_t eeprom_24lc16_read_byte(uint16_t address, uint8_t *val);
  * @brief Scrive un singolo byte
  */
 esp_err_t eeprom_24lc16_write_byte(uint16_t address, uint8_t val);
-
-/**
- * @brief Formatta l'EEPROM scrivendo zero su tutti i byte
- * @return ESP_OK se riuscito
- */
-esp_err_t eeprom_24lc16_format(void);

@@ -16,7 +16,6 @@
 #include "sd_card.h"         // sd_card_init_monitor + sd_card_monitor_run
 #include "http_services.h"
 #include "modbus_relay.h"
-#include "keepalive_task.h"
 #include "freertos/idf_additions.h"
 #include <stdio.h>
 #include <string.h>
@@ -439,31 +438,10 @@ static void fsm_task(void *arg)
         alive_ms += elapsed_ms;
         if (alive_ms >= ALIVE_INTERVAL_MS) {
             alive_ms = 0;
-            
-            // Get keepalive statistics
-            keepalive_stats_t ka_stats;
-            bool ka_running = keepalive_task_is_running();
-            esp_err_t ka_err = ESP_OK;
-            if (ka_running) {
-                ka_err = keepalive_task_get_stats(&ka_stats);
-            }
-            
-            // Log alive with keepalive info
-            if (ka_running && ka_err == ESP_OK) {
-                ESP_LOGI(TAG, "[FSM] Alive: state=%s credit=%ldc heap=%lu ka=%u/%u/%u refresh=%u",
-                         fsm_state_to_string(fsm.state),
-                         (long)fsm.credit_cents,
-                         (unsigned long)esp_get_free_heap_size(),
-                         (unsigned)ka_stats.successful,
-                         (unsigned)ka_stats.total_sent,
-                         (unsigned)ka_stats.failed,
-                         (unsigned)ka_stats.token_refreshes);
-            } else {
-                ESP_LOGI(TAG, "[FSM] Alive: state=%s credit=%ldc heap=%lu ka=offline",
-                         fsm_state_to_string(fsm.state),
-                         (long)fsm.credit_cents,
-                         (unsigned long)esp_get_free_heap_size());
-            }
+            ESP_LOGI(TAG, "[FSM] Alive: state=%s credit=%ldc heap=%lu",
+                     fsm_state_to_string(fsm.state),
+                     (long)fsm.credit_cents,
+                     (unsigned long)esp_get_free_heap_size());
         }
 
         if ((state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) && fsm.state == FSM_STATE_CREDIT) {
@@ -476,10 +454,8 @@ static void fsm_task(void *arg)
         if (state_before == FSM_STATE_CREDIT && fsm.state == FSM_STATE_IDLE) {
             device_config_t *cfg = device_config_get();
             if (cfg && cfg->display.enabled) {
-                // Skip language page for better UX - go directly to programs
-                ESP_LOGI(TAG, "[M] Transition to idle: showing programs instead of language page");
-                // lvgl_panel_show_language_select();
-                // ESP_LOGI(TAG, "[M] Timeout inattività: ritorno alla scelta lingua");
+                lvgl_panel_show_language_select();
+                ESP_LOGI(TAG, "[M] Timeout inattività: ritorno alla scelta lingua");
             } else {
                 ESP_LOGI(TAG, "[M] Timeout inattività: display disabilitato, pagina lingua non mostrata");
             }
@@ -1353,7 +1329,7 @@ static task_param_t s_tasks[] = {
         .core_id = 0,
         .period_ticks = pdMS_TO_TICKS(16),
         .task_fn = lvgl_task,
-        .stack_words = 65536,                 /* RISC-V: 256KB; LVGL stack frame profondo - usa buffer statici per operazioni pesanti */
+        .stack_words = 65536,                 /* RISC-V: 256KB; LVGL stack frame profondo - aumentato per evitare overflow durante rendering */
         .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,

@@ -294,11 +294,21 @@ void app_main(void)
 
     tasks_load_config("/spiffs/tasks.json");
     tasks_start_all();
-    
-    // Reset boot counter immediately without stability window delay
     if (BOOT_COUNTER_RESET_DELAYED)
     {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " reset contatore reboot immediato (senza finestra stabilita')");
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " reset contatore reboot posticipato di %d ms", BOOT_COUNTER_STABLE_WINDOW_MS);
+        const uint32_t step_ms = 5000;
+        uint32_t remaining_ms = BOOT_COUNTER_STABLE_WINDOW_MS;
+        while (remaining_ms > 0) {
+            uint32_t this_step = (remaining_ms > step_ms) ? step_ms : remaining_ms;
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita': attendo ancora %lu ms (heap=%lu dram=%lu)",
+                     (unsigned long)remaining_ms,
+                     (unsigned long)esp_get_free_heap_size(),
+                     (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+            vTaskDelay(pdMS_TO_TICKS(this_step));
+            remaining_ms -= this_step;
+        }
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' completata (%d ms)", BOOT_COUNTER_STABLE_WINDOW_MS);
     }
 
     device_config_t *cfg = device_config_get();
@@ -317,14 +327,12 @@ void app_main(void)
     }
 
     if (cfg && cfg->display.enabled) {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Display abilitato, mostro lvgl_panel");
-        /* [M] Initialize UI to main panel. FSM will handle transition to ads on idle timeout */
+        /* [M] Show ads slideshow at boot, then transition to main by touch or timeout */
         main_cctalk_send_initialization_sequence();
-        lvgl_panel_show();
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] lvgl_panel attivato");
+        lvgl_page_ads_show();
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: slideshow pubblicitario attivato");
     } else {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato (cfg=%p, enabled=%d): salto lvgl_panel", 
-                 (void*)cfg, cfg ? cfg->display.enabled : -1);
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto slideshow");
     }
 
     esp_err_t boot_done_ret = init_mark_boot_completed();
