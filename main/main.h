@@ -11,3 +11,4 @@
  * @return void Non restituisce alcun valore.
  */
 void main_cctalk_send_initialization_sequence(void);
+void main_cctalk_send_initialization_sequence_async(void);

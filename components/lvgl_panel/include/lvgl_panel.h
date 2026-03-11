@@ -56,3 +56,22 @@ void lvgl_panel_refresh_texts(void);
  * @param reboots Numero di reboot consecutivi rilevati (mostrato a video).
  */
 void lvgl_panel_show_out_of_service(uint32_t reboots);
+
+/**
+ * @brief Mostra la schermata principale.
+ */
+void lvgl_panel_show_main_page(void);
+
+/**
+ * @brief Mostra la schermata degli annunci.
+ */
+void lvgl_panel_show_ads_page(void);
+
+/**
+ * @brief Aggiorna la label di stato init mostrata nella schermata boot logo.
+ *
+ * Se la schermata logo non è attiva, la chiamata viene ignorata.
+ *
+ * @param text Testo da mostrare nella label.
+ */
+void lvgl_panel_set_init_status(const char *text);

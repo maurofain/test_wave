@@ -114,7 +114,29 @@ DECLARE_FLAG_DSC(g_flag_en_24x16, s_flag_en_map);
 DECLARE_FLAG_DSC(g_flag_de_24x16, s_flag_de_map);
 DECLARE_FLAG_DSC(g_flag_fr_24x16, s_flag_fr_map);
 DECLARE_FLAG_DSC(g_flag_es_24x16, s_flag_es_map);
-const lv_image_dsc_t *get_flag_for_language(const char *lang_code)
+
+const char *get_flag_path_for_language(const char *lang_code)
+{
+    if (!lang_code) {
+        return "S:/spiffs/flag_IT.png";
+    }
+
+    if (strcmp(lang_code, "it") == 0) {
+        return "S:/spiffs/flag_IT.png";
+    } else if (strcmp(lang_code, "en") == 0) {
+        return "S:/spiffs/flag_GB.png";
+    } else if (strcmp(lang_code, "de") == 0) {
+        return "S:/spiffs/flag_DE.png";
+    } else if (strcmp(lang_code, "fr") == 0) {
+        return "S:/spiffs/flag_FR.png";
+    } else if (strcmp(lang_code, "es") == 0) {
+        return "S:/spiffs/flag_ES.png";
+    }
+
+    return "S:/spiffs/flag_IT.png";
+}
+
+const lv_image_dsc_t *get_flag_bitmap_for_language(const char *lang_code)
 {
     if (!lang_code) {
         return &g_flag_it_24x16;
@@ -132,5 +154,10 @@ const lv_image_dsc_t *get_flag_for_language(const char *lang_code)
         return &g_flag_es_24x16;
     }
 
-    return &g_flag_it_24x16;  /* Default to Italian */
+    return &g_flag_it_24x16;
+}
+
+const void *get_flag_src_for_language(const char *lang_code)
+{
+    return (const void *)get_flag_path_for_language(lang_code);
 }

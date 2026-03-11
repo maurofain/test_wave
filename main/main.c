@@ -208,6 +208,29 @@ void main_cctalk_send_initialization_sequence(void)
     ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Sequenza CCTalk completata");
 }
 
+/* Background task used to perform the blocking initialization sequence so
+ * UI code can continue without waiting for the CCTalk timeouts. */
+static void main_cctalk_init_task(void *pv)
+{
+    (void)pv;
+    main_cctalk_send_initialization_sequence();
+    vTaskDelete(NULL);
+}
+
+void main_cctalk_send_initialization_sequence_async(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] Sequenza init CCTalk async skip (disabilitato da config)");
+        return;
+    }
+
+    BaseType_t r = xTaskCreate(main_cctalk_init_task, "cctalk_init", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
+    if (r != pdPASS) {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Creazione task sequenza CCTalk fallita");
+    }
+}
+
 
 /**
  * @brief Funzione principale dell'applicazione.

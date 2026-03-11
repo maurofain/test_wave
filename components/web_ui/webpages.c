@@ -1,7 +1,6 @@
 #include "web_ui_internal.h"
 #include "sd_card.h"
 #include "esp_log.h"
-#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -320,22 +319,24 @@ esp_err_t webpages_send_external_or_error(httpd_req_t *req, const char *relative
 
 
 /**
- * @brief Verifica che un determinato percorso sia una directory già esistente.
- * 
+ * @brief Verifica se una directory esiste già.
+ *
+ * Non tenta mai di crearla: la directory deve essere pre-caricata in fase di flash.
+ *
  * @param [in] path Il percorso della directory da verificare.
- * @return esp_err_t ESP_OK se la directory esiste, ESP_FAIL altrimenti.
+ * @return true se la directory esiste, false altrimenti.
  */
-static esp_err_t ensure_dir(const char *path)
+static bool is_existing_dir(const char *path)
 {
     if (!path) {
-        return ESP_ERR_INVALID_ARG;
+        return false;
     }
-    
+
     struct stat st;
     if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
-        return ESP_OK;
+        return true;
     }
-    return ESP_FAIL;
+    return false;
 }
 
 #if WEB_UI_EXPORT_ON_BOOT == 1
@@ -393,10 +394,9 @@ esp_err_t webpages_bootstrap(void)
     }
 
     const char *base = webpages_base_path();
-    esp_err_t dir_err = ensure_dir(base);
-    if (dir_err != ESP_OK) {
-        ESP_LOGE(TAG, "[C] Impossibile creare directory web: %s", base ? base : "?");
-        return dir_err;
+    if (!is_existing_dir(base)) {
+        ESP_LOGW(TAG, "[C] Directory web non trovata: %s (deve essere presente da flash)", base ? base : "?");
+        return ESP_ERR_NOT_FOUND;
     }
 
 #if WEB_UI_EXPORT_ON_BOOT == 1

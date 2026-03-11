@@ -7,8 +7,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_heap_caps.h"
-#include "esp_event.h"
 #include "esp_log.h"
+#include "esp_event.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_netif_net_stack.h"
@@ -71,7 +71,8 @@ extern esp_err_t cctalk_driver_init(void); /* forward decl - header in component
 #endif
 
 static const char *TAG = "INIT";
-
+#define LOG_CTX_PREFIX "[M]"
+#define LVGL_TASK_STACK_SAFE_BYTES 16384
 /* Debug: inibisce i POST verso server cloud durante il bootstrap */
 #ifndef DNA_SERVER_POST
 #define DNA_SERVER_POST 0
@@ -506,8 +507,12 @@ static esp_err_t try_send_pending_crash_record(void)
         return ret;
     }
 
-    ESP_LOGW(TAG, "[M] [C] preboot crash send fallito (err=%s status=%d), pending mantenuto",
-             esp_err_to_name(http_ret), status);
+    if (http_ret == ESP_ERR_HTTP_CONNECT) {
+        ESP_LOGD(TAG, "[M] [C] preboot crash send fallito per rete non pronta, riprovo dopo (pending mantenuto)");
+    } else {
+        ESP_LOGW(TAG, "[M] [C] preboot crash send fallito (err=%s status=%d), pending mantenuto",
+                 esp_err_to_name(http_ret), status);
+    }
     return ESP_OK;
 #endif
 }
@@ -1347,7 +1352,7 @@ static esp_err_t init_display_lvgl_minimal(void)
 
     bsp_display_cfg_t cfg = {
         .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
-        .buffer_size = BSP_LCD_DRAW_BUFF_SIZE,
+        .buffer_size = BSP_LCD_DRAW_BUFF_SIZE / 2,
         .double_buffer = false,
         .flags = {
             .buff_dma = true,
@@ -1355,6 +1360,8 @@ static esp_err_t init_display_lvgl_minimal(void)
             .sw_rotate = false,
         },
     };
+    /* Compromesso stabilità/memoria: evitare pressione eccessiva su DRAM interna (USB host). */
+    cfg.lvgl_port_cfg.task_stack = 32768;
 
 
     lv_display_t *disp = bsp_display_start_with_config(&cfg);
@@ -1436,10 +1443,12 @@ esp_err_t init_run_display_only(void)
     }
     bsp_display_cfg_t cfg_disp = {
         .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
-        .buffer_size = BSP_LCD_DRAW_BUFF_SIZE,
+        .buffer_size = BSP_LCD_DRAW_BUFF_SIZE / 2,
         .double_buffer = false,
         .flags = { .buff_dma = true, .buff_spiram = false, .sw_rotate = false },
     };
+    /* Allineato alla init principale: evita consumo DRAM eccessivo che impatta USB host. */
+    cfg_disp.lvgl_port_cfg.task_stack = 32768;
     lv_display_t *disp = bsp_display_start_with_config(&cfg_disp);
     if (!disp) {
         ESP_LOGE(TAG, "[M] init_run_display_only: bsp_display_start_with_config fallito");
@@ -1485,6 +1494,9 @@ esp_err_t init_run_factory(void)
     // Lascia assestare i livelli elettrici (pull-up hardware/software) per evitare
     // che la FSM I2C si blocchi al primissimo start e dia "I2C software timeout".
     vTaskDelay(pdMS_TO_TICKS(100));
+
+    // Suppress I2C probe timeout logs to WARN level
+    esp_log_level_set("i2c.master", ESP_LOG_WARN);
 
     // Scansione diagnostica bus periferiche (port 0, GPIO 26/27) - timeout ridotto a 20 ticks (il prolungato mascherava timeout fisici)
     generic_i2c_diagnostic_scan(periph_i2c_get_handle(), "Periph I2C", 20);
@@ -1593,6 +1605,7 @@ esp_err_t init_run_factory(void)
             } else {
                 init_agent_status_set(AGN_ID_TOUCH, 0, INIT_AGENT_ERR_INIT_FAILED);
             }
+            lvgl_panel_set_init_status("Init: display e touch pronti");
         }
     } else {
         ESP_LOGI(TAG, "[M] Display disabilitato da config: salto init LVGL/display (modalità headless)");
@@ -1608,6 +1621,7 @@ esp_err_t init_run_factory(void)
     }
 
     // Ethernet - continua anche se fallisce
+    lvgl_panel_set_init_status("Init: inizializzazione rete");
     if (cfg->eth.enabled)
     {
         esp_err_t eth_ret = start_ethernet(); // TODO: aggiornare start_ethernet per usare cfg
@@ -1623,8 +1637,10 @@ esp_err_t init_run_factory(void)
 
     // Inizializza monitoraggio seriale per i test
     serial_test_init();
+    lvgl_panel_set_init_status("Init: monitor seriale pronto");
 
     // Inizializza e avvia Web UI (Server + Handler)
+    lvgl_panel_set_init_status("Init: avvio Web UI");
     esp_err_t web_ret = web_ui_init();
     if (web_ret != ESP_OK)
     {
@@ -1634,9 +1650,11 @@ esp_err_t init_run_factory(void)
     }
     init_agent_status_set(AGN_ID_WEB_UI, 1, INIT_AGENT_ERR_NONE);
     ESP_LOGI(TAG, "[M] Web UI avviata correttamente");
+    lvgl_panel_set_init_status("Init: Web UI avviata");
 
 #if COMPILE_APP
     // Carica la tabella activity da SPIFFS (solo build APP)
+    lvgl_panel_set_init_status("Init: caricamento activity");
     esp_err_t activity_ret = device_activity_init();
     if (activity_ret != ESP_OK) {
         init_agent_status_set(AGN_ID_DEVICE_ACTIVITY, 0, INIT_AGENT_ERR_INIT_FAILED);
@@ -1646,6 +1664,7 @@ esp_err_t init_run_factory(void)
 #endif
 
     // Inizializzazioni condizionali basate su NVS
+    lvgl_panel_set_init_status("Init: periferiche hardware");
     if (cfg->sensors.io_expander_enabled)
     {
         // La porta I2C è già inizializzata sopra (BSP o legacy), io_expander_init la riutilizzerà

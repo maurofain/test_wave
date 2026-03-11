@@ -1,4 +1,4 @@
-all'avvio della app, dopo la connessione alla rete ethernet , verificahiamo che l'interfaccia cctalk sia abilitata ed inviamo la sequenza di inizializzazione:
+[X]all'avvio della app, dopo la connessione alla rete ethernet , verificahiamo che l'interfaccia cctalk sia abilitata ed inviamo la sequenza di inizializzazione:
 .02.00.01.FE.FF/.01.00.02.00.FD
 .02.02.01.E7.FF.FF.16/.01.00.02.00.FD
 .02.01.01.E4.01.17/.01.00.02.00.FD
@@ -7,10 +7,33 @@ Ripetiamo la sequeza prima di ogni caricamento della pagina programmi
 
 
 
-saltiamo la schermata con le lingue e passiamo direttamente alla scelta programmi, mettiamo in alto a dx la bandiera della lingua corrente (default italiano)  e se premuta attiviamo la pagina scelta lingua. In base alla lingra scelta cambiamo la bandierina in alto a dx. dopo il periodo di inattività con la FSM in stato 2 azeriamno i crediti CVD e ECD (se monete/gettoni non utilizzati vengono egualmente azzerati) e ritorniamo alla lingua italiana. dopo un altro tempo di attesa in scelta programmi (defaulto 60sec ed editabile in /config/timeouts)usciamo ad una pagina pubblicità dove mostriamo delle immagini (di dimensione non predefinita e visualizzate centrate su sfondo nero) nominate img01.jpg, img02.jpg a rotazione con intervallo di 30 secondi (editabile in /config/timeouts) e che su tocco dello schermo passa alla schermata programmi
+[X]saltiamo la schermata con le lingue e passiamo direttamente alla scelta programmi, mettiamo in alto a dx la bandiera della lingua corrente (default italiano)  e se premuta attiviamo la pagina scelta lingua. In base alla lingra scelta cambiamo la bandierina in alto a dx. dopo il periodo di inattività con la FSM in stato 2 azeriamno i crediti CVD e ECD (se monete/gettoni non utilizzati vengono egualmente azzerati) e ritorniamo alla lingua italiana. dopo un altro tempo di attesa in scelta programmi (defaulto 60sec ed editabile in /config/timeouts)usciamo ad una pagina pubblicità dove mostriamo delle immagini (di dimensione non predefinita e visualizzate centrate su sfondo nero) nominate img01.jpg, img02.jpg a rotazione con intervallo di 30 secondi (editabile in /config/timeouts) e che su tocco dello schermo passa alla schermata programmi
 
-ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
+[ ]ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
 All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
 
-La bandierina in se è troppo piccola, va raddoppita in x e y, il bordo va raddoppiato in orizzontale come schermata di timeout non appare lo slideshow ma la scelta lingue, che deve apparire solo alla pression della bandiera
+[ ]La bandierina in se è troppo piccola, va raddoppita in x e y, il bordo va raddoppiato in orizzontale come schermata di timeout non appare lo slideshow ma la scelta lingue, che deve apparire solo alla pression della bandiera
+
+[ ]Controlla lo logica della FSM : 
+- all'avvio deve inizializzare tutto l'hardware e sincronizzarsi con il server remoto e NTP : va introdotto un nuovo stato FSM_STATE_INIT
+- poi deve passare in attesa di presenza cliente (tramite tocco del touch) mostrando lo slideshow nel riquadro centrale della pagina con il tasto con il tasto Selezione Lavaggio e il messaggio di errore opzionale in basso : va introdotto un nuovo stato FSM_STATE_SLIDESHOW
+- alla pressione di selezione lavaggio deve andare alla pagina programmi
+
+[X]Crea uno stato nella FSM chiamato LVGL_PAGES_TEST per permettere la visualizzazione delle grafiche delle varie pagine senza l'operatività di pulsanti o altri elementi grafici. Entrando in questo stato vanno fermati i task delle periferiche ws2812 io_expander sht40 rs232 rs485 mdb pwm usb_scanner cctalk 
+poi crea in /config sez. Display una serie di tasti per forzare la visualizzazione do ogni pagina lvgl implementata e un tasto REBOOT per resettare la App. alla pressione di un tasto relativo ad una pagina metti la FSM in stato LVGL_PAGES_TEST permettendo di passare ad altre pagine grafiche fino alla richiesta del RESET
+
+[X]nel log indica con evidenza il cambio di stato della PSM racchiudendo il messaggio tra due righe con *
+
+[V]all'attivazione della pagina programmi inviamo una sequenza CCTALK come quella inviata dal tasto /test/cctalk -> Abilita (Start CCTALK)
+[ ] La bandierina della lingua selezionata (in alto a dx) va inclusa assieme a ora e cerchietti e va abbassata di 30px
+[ ] Ti carico l'immagine della nuova scheda scelta programmi da creare in un file lvgl_page_programmi.c : non c'è più la barra che scende con il passare del tempo in zona centrale ma sopra la zona che mostra i crediti, e cambia colore quando mancano 15 secondi alla fine del programma
+[ ] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2, 4, 6, 8, 10 .Nel caso di 1 programma occuperà tutto lo spazio previsto per i pulsanti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità
+
+------------------
+I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
+I (19254) APP: [F] [M] Cmd1 - Address Poll: OK
+I (19334) APP: [F] [M] Cmd2 - Modify Inhibit Status (all channels): OK
+I (19404) APP: [F] [M] Cmd3 - Modify Master Inhibit (accept enabled): OK
+I (19474) APP: [F] [M] Cmd4 - Request Inhibit Status: OK (mask=0xFFFF)
+I (19474) APP: [F] [M] Sequenza CCTalk completata
 

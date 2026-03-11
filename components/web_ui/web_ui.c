@@ -5,6 +5,8 @@
 #include "esp_check.h"
 #include "device_config.h"
 #include "cJSON.h"
+#include "fsm.h"
+#include "esp_system.h"
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
 #include "esp_http_client.h"
@@ -14,6 +16,7 @@
 #include "bsp/esp32_p4_nano.h"
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <dirent.h>
 #include <time.h>
 #include <stdint.h>
@@ -111,6 +114,134 @@ static const device_serial_config_t s_web_ui_serial_default_mdb = {
     .rx_buf_size = 1024,
     .tx_buf_size = 1024,
 };
+
+typedef void (*lvgl_test_page_fn_t)(void);
+
+static void lvgl_panel_show_out_of_service_test(void)
+{
+    lvgl_panel_show_out_of_service(0);
+}
+
+static const struct {
+    const char *name;
+    lvgl_test_page_fn_t fn;
+} s_lvgl_test_pages[] = {
+    {"boot_logo", lvgl_panel_show_boot_logo},
+    {"main", lvgl_panel_show_main_page},
+    {"ads", lvgl_panel_show_ads_page},
+    {"language", lvgl_panel_show_language_select},
+    {"out_of_service", lvgl_panel_show_out_of_service_test},
+};
+
+static lvgl_test_page_fn_t find_lvgl_test_page(const char *name)
+{
+    if (!name) {
+        return NULL;
+    }
+    for (size_t i = 0; i < sizeof(s_lvgl_test_pages) / sizeof(s_lvgl_test_pages[0]); ++i) {
+        if (strcmp(s_lvgl_test_pages[i].name, name) == 0) {
+            return s_lvgl_test_pages[i].fn;
+        }
+    }
+    return NULL;
+}
+
+static bool wait_for_fsm_state(fsm_state_t desired, TickType_t timeout_ticks)
+{
+    TickType_t start = xTaskGetTickCount();
+    while ((xTaskGetTickCount() - start) < timeout_ticks) {
+        fsm_ctx_t snap = {0};
+        if (fsm_runtime_snapshot(&snap) && snap.state == desired) {
+            return true;
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    return false;
+}
+
+static esp_err_t lvgl_test_show_page(const char *page)
+{
+    lvgl_test_page_fn_t fn = find_lvgl_test_page(page);
+    if (!fn) {
+        ESP_LOGW(TAG, "[C] LVGL test: page '%s' non trovata", page ? page : "NULL");
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    ESP_LOGI(TAG, "[C] LVGL test: richiesta page=%s", page);
+
+    if (!fsm_enter_lvgl_pages_test()) {
+        ESP_LOGE(TAG, "[C] LVGL test: impossibile pubblicare evento ENTER");
+        return ESP_FAIL;
+    }
+
+    if (!wait_for_fsm_state(FSM_STATE_LVGL_PAGES_TEST, pdMS_TO_TICKS(500))) {
+        ESP_LOGE(TAG, "[C] LVGL test: timeout in attesa di stato TEST");
+        return ESP_ERR_TIMEOUT;
+    }
+
+    ESP_LOGI(TAG, "[C] LVGL test: stato TEST attivo, mostro pagina %s", page);
+    fn();
+    ESP_LOGI(TAG, "[C] LVGL test: pagina %s mostrata", page);
+    return ESP_OK;
+}
+
+esp_err_t api_display_lvgl_test(httpd_req_t *req)
+{
+    char buf[256] = {0};
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"Body required\"}", -1);
+    }
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"Invalid JSON\"}", -1);
+    }
+
+    const cJSON *action = cJSON_GetObjectItem(root, "action");
+    const cJSON *page = cJSON_GetObjectItem(root, "page");
+    char page_name[32] = {0};
+    if (page && cJSON_IsString(page) && page->valuestring) {
+        snprintf(page_name, sizeof(page_name), "%s", page->valuestring);
+    }
+    esp_err_t err = ESP_OK;
+
+    if (action && cJSON_IsString(action) && strcasecmp(action->valuestring, "reboot") == 0) {
+        ESP_LOGI(TAG, "[C] LVGL test: richiesta reboot dal web UI");
+        fsm_exit_lvgl_pages_test();
+        cJSON_Delete(root);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"status\":\"rebooting\"}", -1);
+        vTaskDelay(pdMS_TO_TICKS(250));
+        esp_restart();
+        return ESP_OK;
+    }
+
+    if (page_name[0] == '\0') {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"Missing page\"}", -1);
+    }
+
+    err = lvgl_test_show_page(page_name);
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "[C] LVGL test: comando page=%s completato", page_name);
+        httpd_resp_send(req, "{\"status\":\"ok\"}", -1);
+    } else if (err == ESP_ERR_NOT_FOUND) {
+        httpd_resp_set_status(req, "404 Not Found");
+        httpd_resp_send(req, "{\"error\":\"Page not found\"}", -1);
+    } else {
+        ESP_LOGE(TAG, "[C] LVGL test: comando page=%s fallito (err=%d)", page_name, (int)err);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, "{\"error\":\"Failed\"}", -1);
+    }
+    return ESP_OK;
+}
 
 
 /**
@@ -2700,7 +2831,10 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 
     httpd_uri_t uri_api_ui_languages = {.uri = "/api/ui/languages", .method = HTTP_GET, .handler = api_ui_languages_get};
     httpd_register_uri_handler(server, &uri_api_ui_languages);
-    
+
+    httpd_uri_t uri_api_lvgl_test = {.uri = "/api/display/lvgl_test", .method = HTTP_POST, .handler = api_display_lvgl_test};
+    httpd_register_uri_handler(server, &uri_api_lvgl_test);
+
     httpd_uri_t uri_api_save = {.uri = "/api/config/save", .method = HTTP_POST, .handler = api_config_save};
     httpd_register_uri_handler(server, &uri_api_save);
 

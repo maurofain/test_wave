@@ -1,4 +1,5 @@
 #include "lvgl_panel_pages.h"
+#include "lvgl_page_chrome.h"
 
 #include "lvgl.h"
 #include "esp_log.h"
@@ -26,6 +27,7 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
 
     lv_obj_set_style_bg_color(scr, lv_color_make(0x6b, 0x00, 0x00), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+    lvgl_page_chrome_add(scr);
 
     lv_obj_t *ico = lv_label_create(scr);
     lv_label_set_text(ico, LV_SYMBOL_WARNING);

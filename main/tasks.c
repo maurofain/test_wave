@@ -469,7 +469,9 @@ static void fsm_task(void *arg)
         }
 
         if (changed) {
+            ESP_LOGI(TAG, "****************************************");
             ESP_LOGI(TAG, "[FSM] State=%s credit=%ldc", fsm_state_to_string(fsm.state), (long)fsm.credit_cents);
+            ESP_LOGI(TAG, "****************************************");
         }
 
         fsm_runtime_publish(&fsm);
@@ -1416,6 +1418,57 @@ static task_param_t *find_task_by_name(const char *name)
         }
     }
     return NULL;
+}
+
+static const char *s_lvgl_test_task_names[] = {
+    "ws2812",
+    "io_expander",
+    "sht40",
+    "rs232",
+    "rs485",
+    "mdb",
+    "pwm",
+    "usb_scanner",
+    "cctalk_task",
+    "mdb_engine",
+};
+
+static bool s_lvgl_test_tasks_suspended = false;
+
+void tasks_suspend_peripherals_for_lvgl_test(void)
+{
+    if (s_lvgl_test_tasks_suspended) {
+        return;
+    }
+
+    for (size_t i = 0; i < sizeof(s_lvgl_test_task_names) / sizeof(s_lvgl_test_task_names[0]); ++i) {
+        task_param_t *t = find_task_by_name(s_lvgl_test_task_names[i]);
+        if (!t || !t->handle) {
+            continue;
+        }
+        vTaskSuspend(t->handle);
+        ESP_LOGI(TAG, "[M] LVGL test: sospesa task %s", t->name);
+    }
+
+    s_lvgl_test_tasks_suspended = true;
+}
+
+void tasks_resume_peripherals_after_lvgl_test(void)
+{
+    if (!s_lvgl_test_tasks_suspended) {
+        return;
+    }
+
+    for (size_t i = 0; i < sizeof(s_lvgl_test_task_names) / sizeof(s_lvgl_test_task_names[0]); ++i) {
+        task_param_t *t = find_task_by_name(s_lvgl_test_task_names[i]);
+        if (!t || !t->handle) {
+            continue;
+        }
+        vTaskResume(t->handle);
+        ESP_LOGI(TAG, "[M] LVGL test: ripresa task %s", t->name);
+    }
+
+    s_lvgl_test_tasks_suspended = false;
 }
 
 

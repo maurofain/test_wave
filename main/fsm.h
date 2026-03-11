@@ -12,6 +12,7 @@ typedef enum {
     FSM_STATE_CREDIT,
     FSM_STATE_RUNNING,
     FSM_STATE_PAUSED,
+    FSM_STATE_LVGL_PAGES_TEST,
 } fsm_state_t;
 
 typedef enum {
@@ -24,6 +25,8 @@ typedef enum {
     FSM_EVENT_PROGRAM_RESUME,
     FSM_EVENT_TIMEOUT,
     FSM_EVENT_CREDIT_ENDED,
+    FSM_EVENT_ENTER_LVGL_TEST,
+    FSM_EVENT_EXIT_LVGL_TEST,
 } fsm_event_t;
 
 /* --------------------------------------------------------------------------
@@ -83,6 +86,8 @@ typedef enum {
     ACTION_ID_SYSTEM_IDLE,       /* new event requested */
     ACTION_ID_SYSTEM_RUN,        /* added per request */
     ACTION_ID_SYSTEM_ERROR,      /* added per request */
+    ACTION_ID_LVGL_TEST_ENTER,
+    ACTION_ID_LVGL_TEST_EXIT,
 
     /* GPIO peripheral actions */
     ACTION_ID_GPIO_READ_PORT,     /* read a single GPIO port */
@@ -217,6 +222,8 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event);
 bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event);
 bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms);
 const char *fsm_state_to_string(fsm_state_t state);
+bool fsm_enter_lvgl_pages_test(void);
+bool fsm_exit_lvgl_pages_test(void);
 
 bool fsm_event_queue_init(size_t queue_len);
 bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks);

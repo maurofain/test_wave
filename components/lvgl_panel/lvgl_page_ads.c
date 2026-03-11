@@ -1,13 +1,12 @@
 #include "lvgl_panel_pages.h"
-
-#include "device_config.h"
+#include "lvgl_page_chrome.h"
 #include "lvgl.h"
 #include "esp_log.h"
-#include "esp_spiffs.h"
-
+#include "device_config.h"
 #include <dirent.h>
 #include <string.h>
 #include <stdlib.h>
+#include "bsp/esp32_p4_nano.h"
 
 static const char *TAG = "lvgl_page_ads";
 
@@ -22,8 +21,10 @@ static char **s_ad_images = NULL;
 static uint32_t s_ad_image_count = 0;
 static uint32_t s_ad_current_image = 0;
 static uint32_t s_ad_rotation_ms = 30000;  /* Default 30 seconds */
+static bool s_ad_exit_pending = false;
 
 #define COL_BG lv_color_make(0x00, 0x00, 0x00)
+#define ADS_LVGL_PREFIX "S:/spiffs/"
 
 /**
  * @brief Load list of advertisement images from SPIFFS.
@@ -88,9 +89,9 @@ static void load_ad_images(void)
             if (strncmp(entry->d_name, "img", 3) == 0 && 
                 strlen(entry->d_name) >= strlen("img01.jpg")) {
                 if (strcmp(entry->d_name + strlen(entry->d_name) - 4, ".jpg") == 0) {
-                    s_ad_images[idx] = malloc(strlen("/spiffs/") + strlen(entry->d_name) + 1);
+                    s_ad_images[idx] = malloc(strlen(ADS_LVGL_PREFIX) + strlen(entry->d_name) + 1);
                     if (s_ad_images[idx]) {
-                        sprintf(s_ad_images[idx], "/spiffs/%s", entry->d_name);
+                        sprintf(s_ad_images[idx], ADS_LVGL_PREFIX "%s", entry->d_name);
                         idx++;
                     }
                 }
@@ -112,7 +113,7 @@ static void display_current_ad_image(void)
         return;
     }
 
-    if (s_ad_img) {
+    if (s_ad_img && lv_obj_is_valid(s_ad_img)) {
         lv_image_set_src(s_ad_img, s_ad_images[s_ad_current_image]);
         ESP_LOGI(TAG, "[D] Immagine visualizzata: %s (numero %u di %u)",
                  s_ad_images[s_ad_current_image],
@@ -128,12 +129,25 @@ static void ad_carousel_timer_cb(lv_timer_t *timer)
 {
     (void)timer;
 
+    if (!bsp_display_lock(0)) {
+        return;
+    }
+
     if (s_ad_image_count == 0) {
+        bsp_display_unlock();
         return;
     }
 
     s_ad_current_image = (s_ad_current_image + 1) % s_ad_image_count;
     display_current_ad_image();
+
+    bsp_display_unlock();
+}
+
+static void switch_from_ads_async(void *arg)
+{
+    (void)arg;
+    lvgl_page_language_2_show();
 }
 
 /**
@@ -141,7 +155,16 @@ static void ad_carousel_timer_cb(lv_timer_t *timer)
  */
 static void on_ad_touch(lv_event_t *e)
 {
-    (void)e;
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_PRESSED) {
+        return;
+    }
+
+    if (s_ad_exit_pending) {
+        return;
+    }
+    s_ad_exit_pending = true;
+
     ESP_LOGI(TAG, "[C] Schermata pubblicitaria toccata, ritorno ai programmi");
     
     if (s_ad_carousel_timer) {
@@ -149,8 +172,7 @@ static void on_ad_touch(lv_event_t *e)
         s_ad_carousel_timer = NULL;
     }
 
-    /* Return to main program selection page */
-    lvgl_page_main_show();
+    lv_async_call(switch_from_ads_async, NULL);
 }
 
 /**
@@ -163,6 +185,8 @@ static void on_ad_touch(lv_event_t *e)
 void lvgl_page_ads_show(void)
 {
     lv_obj_t *scr = lv_scr_act();
+
+    lvgl_page_main_deactivate();
 
     /* Load configuration for rotation interval */
     device_config_t *cfg = device_config_get();
@@ -188,6 +212,7 @@ void lvgl_page_ads_show(void)
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lvgl_page_chrome_add(scr);
 
     /* Create image container */
     s_img_container = lv_obj_create(scr);
@@ -201,11 +226,15 @@ void lvgl_page_ads_show(void)
     s_ad_img = lv_image_create(s_img_container);
     lv_obj_center(s_ad_img);
 
-    /* Add touch event to entire screen */
-    lv_obj_add_event_cb(scr, on_ad_touch, LV_EVENT_CLICKED, NULL);
+    /* Add immediate touch event to entire screen + image container */
+    lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(scr, on_ad_touch, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_flag(s_img_container, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s_img_container, on_ad_touch, LV_EVENT_PRESSED, NULL);
 
     /* Reset carousel state */
     s_ad_current_image = 0;
+    s_ad_exit_pending = false;
     display_current_ad_image();
 
     /* Create carousel timer */
@@ -228,11 +257,11 @@ void lvgl_page_ads_deactivate(void)
         lv_timer_delete(s_ad_carousel_timer);
         s_ad_carousel_timer = NULL;
     }
-
     s_ad_img = NULL;
     s_img_container = NULL;
     s_ad_scr = NULL;
     s_ad_current_image = 0;
+    s_ad_exit_pending = false;
 
     /* Note: image list is kept loaded for next time */
 }

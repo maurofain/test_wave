@@ -27,13 +27,30 @@ static const char *TAG = "HTTP_SERVICES";
 #define DNA_SERVER_POST 0
 #endif
 
+#ifndef CONFIG_HTTP_PENDING_BUFFER_MAX
+#define CONFIG_HTTP_PENDING_BUFFER_MAX 4096
+#endif
+
+#ifndef CONFIG_HTTP_PENDING_ENDPOINT
+#define CONFIG_HTTP_PENDING_ENDPOINT "/api/device/logs"
+#endif
+
 #define HTTP_SERVICES_AUTH_TOKEN_MAX_LEN 2048
 
 // Global variable to store the token
 char g_auth_token[HTTP_SERVICES_AUTH_TOKEN_MAX_LEN] = {0};
 static bool s_remote_online = false;
+static bool s_http_services_initial_token_done = false;
+static bool s_http_buffering_enabled = false;
+static bool s_http_buffer_flushed = false;
+static char *s_http_pending_json = NULL;
+static size_t s_http_pending_len = 0;
+static size_t s_http_pending_cap = 0;
 
 static esp_err_t http_services_login_if_needed(bool force_refresh);
+static bool http_services_cfg_remote_enabled(const device_config_t *cfg);
+static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header,
+                             char **out_resp, int *out_status, size_t *out_len);
 
 // Temporary implementation of validate_token
 
@@ -53,6 +70,75 @@ bool validate_token(const char *token) {
 /**
  * @brief Verifica se il server remoto è abilitato e configurato.
  */
+static void http_services_buffer_append(const char *json_payload)
+{
+    if (!s_http_buffering_enabled || !json_payload || json_payload[0] == '\0') {
+        return;
+    }
+
+    size_t add_len = strlen(json_payload);
+    size_t needed = s_http_pending_len + add_len + 1;
+    if (needed > CONFIG_HTTP_PENDING_BUFFER_MAX) {
+        /* drop oldest data by resetting */
+        s_http_pending_len = 0;
+        needed = add_len + 1;
+    }
+    if (needed > s_http_pending_cap) {
+        size_t new_cap = s_http_pending_cap ? s_http_pending_cap : 512;
+        while (new_cap < needed) {
+            new_cap *= 2;
+            if (new_cap > CONFIG_HTTP_PENDING_BUFFER_MAX) {
+                new_cap = CONFIG_HTTP_PENDING_BUFFER_MAX;
+                break;
+            }
+        }
+        char *tmp = realloc(s_http_pending_json, new_cap);
+        if (!tmp) {
+            s_http_pending_len = 0;
+            return;
+        }
+        s_http_pending_json = tmp;
+        s_http_pending_cap = new_cap;
+    }
+    memcpy(s_http_pending_json + s_http_pending_len, json_payload, add_len);
+    s_http_pending_len += add_len;
+    s_http_pending_json[s_http_pending_len] = '\0';
+}
+
+static esp_err_t http_services_buffer_flush(void)
+{
+    if (!s_http_pending_json || s_http_pending_len == 0) {
+        s_http_buffer_flushed = true;
+        return ESP_OK;
+    }
+
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !http_services_cfg_remote_enabled(cfg)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    char *body = malloc(s_http_pending_len + 32);
+    if (!body) {
+        return ESP_ERR_NO_MEM;
+    }
+    memcpy(body, s_http_pending_json, s_http_pending_len);
+    body[s_http_pending_len] = '\0';
+
+    char *resp = NULL;
+    int status = 0;
+    size_t resp_len = 0;
+    esp_err_t err = remote_post(CONFIG_HTTP_PENDING_ENDPOINT, body, NULL, &resp, &status, &resp_len);
+    free(body);
+    if (resp) {
+        free(resp);
+    }
+    if (err == ESP_OK) {
+        s_http_pending_len = 0;
+        s_http_buffer_flushed = true;
+    }
+    return err;
+}
+
 static bool http_services_cfg_remote_enabled(const device_config_t *cfg)
 {
     return (cfg != NULL) && cfg->server.enabled && (cfg->server.url[0] != '\0');
@@ -85,7 +171,6 @@ static void http_services_clear_token(const char *reason)
     ESP_LOGI(TAG, "[C] Token remoto azzerato (%s)", reason ? reason : "n/a");
 }
 
-
 /**
  * @brief Controlla se i servizi HTTP sono abilitati per l'accesso remoto.
  *
@@ -99,7 +184,6 @@ bool http_services_is_remote_enabled(void)
     const device_config_t *cfg = device_config_get();
     return http_services_cfg_remote_enabled(cfg);
 }
-
 
 /**
  * @brief Controlla se il servizio remoto HTTP è online.
@@ -115,7 +199,6 @@ bool http_services_is_remote_online(void)
     return s_remote_online;
 }
 
-
 /**
  * @brief Controlla se il servizio HTTP ha un token di autenticazione.
  *
@@ -125,7 +208,6 @@ bool http_services_has_auth_token(void)
 {
     return validate_token(g_auth_token);
 }
-
 
 /**
  * @brief Sincronizza lo stato di runtime dei servizi HTTP.
@@ -316,20 +398,15 @@ static void log_httpd_request(httpd_req_t *req, const char *body)
     if (body && body[0] != '\0') {
         size_t blen = strlen(body);
         const size_t MAX_LOG = 1024;
-        if (blen <= MAX_LOG) {
-            ESP_LOGI(TAG, "Body: %s", body);
-#ifdef HTTP_SERVICES_LOG_TO_UI
-            web_ui_add_log("INFO", TAG, body);
-#endif
-        } else {
+        if (blen <= MAX_LOG) ESP_LOGI(TAG, "Body: %s", body);
+        else {
             char *tmp = strndup(body, MAX_LOG);
             ESP_LOGI(TAG, "Body (truncated %u/%u): %s ...", (unsigned)MAX_LOG, (unsigned)blen, tmp);
-#ifdef HTTP_SERVICES_LOG_TO_UI
-            web_ui_add_log("INFO", TAG, tmp);
-            web_ui_add_log("INFO", TAG, "<body truncated in UI log>");
-#endif
             free(tmp);
         }
+#ifdef HTTP_SERVICES_LOG_TO_UI
+        webui_log_chunked("INFO", TAG, "Body", body);
+#endif
     } else {
         ESP_LOGI(TAG, "Body: <empty>");
 #ifdef HTTP_SERVICES_LOG_TO_UI
@@ -338,8 +415,15 @@ static void log_httpd_request(httpd_req_t *req, const char *body)
     }
 }
 
-
-
+static esp_err_t remote_post_pending(const char *remote_path, const char *body)
+{
+    (void)remote_path;
+    if (!body) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    http_services_buffer_append(body);
+    return ESP_OK;
+}
 
 /* --- Proxy implementations forwarding to remote server (uses device_config.server.url + credentials) --- */
 
@@ -726,7 +810,6 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 #endif
 }
 
-
 /**
  * @brief Invia una richiesta HTTPD remota disabilitata.
  *
@@ -890,7 +973,6 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
     return ESP_OK;
 }
 
-
 /**
  * @brief Gestisce la richiesta POST per l'autenticazione.
  *
@@ -902,7 +984,6 @@ static esp_err_t api_login_post(httpd_req_t *req)
     if (send_http_log) ESP_LOGI(TAG, "POST /api/login -> proxy to remote server");
     return forward_post(req, "/api/login", NULL, true);
 }
-
 
 /**
  * @brief Gestisce la richiesta POST per mantenere attiva la connessione.
@@ -1034,7 +1115,6 @@ static esp_err_t api_keepalive_post(httpd_req_t *req)
     return ESP_OK;
 }
 
-
 /**
  * @brief Gestisce la richiesta POST per ottenere immagini.
  *
@@ -1046,7 +1126,6 @@ static esp_err_t api_getimages_post(httpd_req_t *req)
     if (send_http_log) ESP_LOGI(TAG, "POST /api/getimages -> proxy to remote server");
     return forward_post(req, "/api/getimages", NULL, false);
 }
-
 
 /**
  * @brief Gestisce la richiesta POST per ottenere la configurazione.
@@ -1060,7 +1139,6 @@ static esp_err_t api_getconfig_post(httpd_req_t *req)
     return forward_post(req, "/api/getconfig", NULL, false);
 }
 
-
 /**
  * @brief Gestisce la richiesta POST per ottenere le traduzioni.
  *
@@ -1072,7 +1150,6 @@ static esp_err_t api_gettranslations_post(httpd_req_t *req)
     if (send_http_log) ESP_LOGI(TAG, "POST /api/gettranslations -> proxy to remote server");
     return forward_post(req, "/api/gettranslations", NULL, false);
 }
-
 
 /**
  * @brief Gestisce la richiesta POST per ottenere il firmware.
@@ -1086,7 +1163,6 @@ static esp_err_t api_getfirmware_post(httpd_req_t *req)
     return forward_post(req, "/api/getfirmware", NULL, false);
 }
 
-
 /**
  * @brief Gestisce la richiesta POST per l'API di pagamento.
  *
@@ -1098,7 +1174,6 @@ static esp_err_t api_payment_post(httpd_req_t *req)
     if (send_http_log) ESP_LOGI(TAG, "POST /api/payment -> proxy to remote server");
     return forward_post(req, "/api/payment", NULL, false);
 }
-
 
 /**
  * @brief Gestisce la richiesta POST per l'API serviceused.
@@ -1112,7 +1187,6 @@ static esp_err_t api_serviceused_post(httpd_req_t *req)
     return forward_post(req, "/api/serviceused", NULL, false);
 }
 
-
 /**
  * @brief Gestisce la richiesta POST per il pagamento offline.
  *
@@ -1124,7 +1198,6 @@ static esp_err_t api_paymentoffline_post(httpd_req_t *req)
     if (send_http_log) ESP_LOGI(TAG, "POST /api/paymentoffline -> proxy to remote server");
     return forward_post(req, "/api/paymentoffline", NULL, false);
 }
-
 
 /**
  * @brief Verifica se è necessario eseguire il login HTTP e, in caso, esegue l'operazione.

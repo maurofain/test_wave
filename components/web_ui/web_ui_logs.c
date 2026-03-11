@@ -17,7 +17,7 @@
 #define TAG "WEB_UI"
 #define LOG_INITIAL_CAPACITY 300
 #define LOG_CIRCULAR_CAPACITY 300
-#define MAX_ALLOWED_LOG_LEVEL ESP_LOG_INFO  // non mostrare/applicare livelli > INFO
+#define MAX_ALLOWED_LOG_LEVEL ESP_LOG_VERBOSE  // permetti DEBUG/VERBOSE (rimosso clamp su INFO)
 
 /**
  * @brief Converte una stringa livello log nel corrispondente valore numerico ESP-IDF.

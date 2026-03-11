@@ -44,6 +44,7 @@
 #endif
 
 #define BARCODE_BUF_SIZE 128
+#define USB_SCANNER_EXPERIMENTAL_DIAG 0
 
 /* Default scanner identifiers (auto-aligned / authoritative defaults) */
 #define SCANNER_DEFAULT_VID  0x1EAB  /* VID: 1EAB */
@@ -143,6 +144,7 @@ static void cdc_new_device_cb(usb_device_handle_t usb_dev)
  */
 static usb_host_client_handle_t s_usb_client = NULL;
 
+#if USB_SCANNER_EXPERIMENTAL_DIAG
 /* Sperimentali: evento client host - dump più dettagliato e invio log alla Web UI */
 static void usb_host_event_cb(const usb_host_client_event_msg_t *event_msg, void *arg)
 {
@@ -197,6 +199,7 @@ static void usb_host_event_cb(const usb_host_client_event_msg_t *event_msg, void
         break;
     }
 }
+#endif
 
 /* Sperimentali: task che monitora periodicamente la lista dispositivi e notifica cambiamenti */
 static TaskHandle_t s_usb_monitor_task = NULL;
@@ -526,7 +529,8 @@ void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
     esp_log_level_set("usb_host", ESP_LOG_WARN);
     esp_log_level_set("usb", ESP_LOG_WARN);
 
-    /* Register a diagnostic USB Host client to receive attach/detach events and dump descriptors (Sperimentali) */
+    /* Client diagnostico opzionale (disabilitato di default per ridurre uso RAM USB). */
+#if USB_SCANNER_EXPERIMENTAL_DIAG
     const usb_host_client_config_t client_config = {
         .is_synchronous = false,
         .max_num_event_msg = 5,
@@ -540,15 +544,20 @@ void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
     } else {
         ESP_LOGW(TAG, "Failed to register USB host diagnostic client (Sperimentali)");
     }
+#else
+    s_usb_client = NULL;
+#endif
 
     /* Il loop usb_host_lib è già gestito dal BSP (bsp_usb_host_start). */
 
-    /* Sperimentali: start monitor task that periodically polls device list */
+    /* Monitor USB diagnostico opzionale (disabilitato di default). */
+#if USB_SCANNER_EXPERIMENTAL_DIAG
     if (s_usb_monitor_task == NULL) {
         if (xTaskCreate(usb_host_monitor_task, "usb_monitor", 4096, NULL, 16, &s_usb_monitor_task) != pdTRUE) {
             ESP_LOGW(TAG, "Failed to create usb_monitor task (Sperimentali)");
         }
     }
+#endif
 
     // Create background task to try opening the configured device
     if (xTaskCreate(usb_cdc_scanner_open_task, "usb_cdc_open", 4096, NULL, 18, &s_usb_open_task) != pdTRUE) {

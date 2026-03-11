@@ -18,7 +18,7 @@
 #include <time.h>
 
 
-static const char *TAG = "lvgl_page_main";
+static const char *TAG = "lvgl_page_programmi";
 
 #define PANEL_REFRESH_MS 200
 
@@ -27,6 +27,8 @@ static const char *TAG = "lvgl_page_main";
 #define COL_PROG_ACT lv_color_make(0x1e, 0x8b, 0x45)
 #define COL_PROG_LOW lv_color_make(0xc0, 0x39, 0x2b)
 #define COL_PROG_PAUSE lv_color_make(0xe6, 0x7e, 0x22)
+#define COL_TIMER_NORMAL lv_color_make(0x27, 0xd7, 0xb2)
+#define COL_TIMER_WARN lv_color_make(0xb0, 0x0f, 0x6b)
 #define COL_WHITE lv_color_make(0xEE, 0xEE, 0xEE)
 #define COL_GREY lv_color_make(0x88, 0x88, 0x99)
 #define COL_STATE_IDL lv_color_make(0x20, 0x20, 0x48)
@@ -445,17 +447,18 @@ static void update_state(const fsm_ctx_t *snap)
     }
 
     int32_t pct = 0;
+    uint32_t rem_ms = 0;
     if (snap->running_target_ms > 0 && (running || paused))
     {
-        uint32_t rem = (snap->running_target_ms > snap->running_elapsed_ms)
-                           ? (snap->running_target_ms - snap->running_elapsed_ms)
-                           : 0;
-        pct = (int32_t)((rem * 100U) / snap->running_target_ms);
+        rem_ms = (snap->running_target_ms > snap->running_elapsed_ms)
+                     ? (snap->running_target_ms - snap->running_elapsed_ms)
+                     : 0;
+        pct = (int32_t)((rem_ms * 100U) / snap->running_target_ms);
     }
 
     if (s_gauge && pct != s_last_gauge_pct)
     {
-        lv_color_t gauge_col = (pct > 30) ? COL_PROG_ACT : COL_PROG_LOW;
+        lv_color_t gauge_col = ((running || paused) && rem_ms <= 15000U) ? COL_TIMER_WARN : COL_TIMER_NORMAL;
         lv_obj_set_style_bg_color(s_gauge, gauge_col, LV_PART_INDICATOR);
         lv_obj_set_style_bg_grad_color(s_gauge, gauge_col, LV_PART_INDICATOR);
         lv_obj_set_style_bg_grad_dir(s_gauge, LV_GRAD_DIR_NONE, LV_PART_INDICATOR);
@@ -694,90 +697,82 @@ static void build_header(lv_obj_t *scr)
  */
 static void build_status(lv_obj_t *scr)
 {
-    s_credit_box = lv_obj_create(scr);
-    lv_obj_set_pos(s_credit_box, PANEL_PAD_X, PANEL_PAD_Y);
-    lv_obj_set_size(s_credit_box, PANEL_FULL_W, PANEL_CREDIT_H);
-    lv_obj_set_style_bg_color(s_credit_box, COL_STATE_IDL, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_credit_box, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_credit_box, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_credit_box, 8, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(s_credit_box, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(s_credit_box, LV_OBJ_FLAG_SCROLLABLE);
+    const int32_t timer_y = PANEL_PAD_Y + 120;
+    const int32_t timer_h = 56;
+    const int32_t timer_to_credit_gap = 14;
+    const int32_t credit_y = timer_y + timer_h + timer_to_credit_gap;
+    const int32_t credit_h = 320;
+    const int32_t status_y = credit_y + credit_h + 12;
+    const int32_t stop_y = PANEL_H - PANEL_PAD_Y - PANEL_STOP_BTN_H;
+    const int32_t status_h = stop_y - status_y - 8;
 
-    s_status_box = lv_obj_create(scr);
-    lv_obj_set_pos(s_status_box, PANEL_PAD_X, PANEL_PAD_Y + PANEL_CREDIT_H);
-    lv_obj_set_size(s_status_box, PANEL_FULL_W, PANEL_WORK_H);
-    lv_obj_set_style_bg_color(s_status_box, COL_STATE_IDL, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_status_box, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_status_box, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_status_box, 8, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(s_status_box, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(s_status_box, LV_OBJ_FLAG_SCROLLABLE);
-
-    s_center_box = lv_obj_create(s_status_box);
-    lv_obj_set_pos(s_center_box, PANEL_COUNTER_X, 0);
-    lv_obj_set_size(s_center_box, PANEL_COUNTER_W, PANEL_WORK_H);
-    lv_obj_set_style_bg_opa(s_center_box, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_center_box, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_center_box, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(s_center_box, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(s_center_box, LV_OBJ_FLAG_SCROLLABLE);
-
-    s_counter_fill = NULL;
-
-    /* Crea il gauge (countdown bar) più piccolo per fare spazio al credito residuo sotto */
-    int32_t gauge_height = PANEL_WORK_H - 100;  /* Ridotto per fare spazio al label credito residuo */
-    s_gauge = lv_bar_create(s_center_box);
-    lv_obj_set_size(s_gauge, PANEL_COUNTER_W, gauge_height);
-    lv_obj_align(s_gauge, LV_ALIGN_TOP_MID, 0, 10);
+    s_gauge = lv_bar_create(scr);
+    lv_obj_set_pos(s_gauge, PANEL_PAD_X, timer_y);
+    lv_obj_set_size(s_gauge, PANEL_FULL_W, timer_h);
     lv_bar_set_range(s_gauge, 0, 100);
     lv_bar_set_value(s_gauge, 100, LV_ANIM_OFF);
-    lv_bar_set_orientation(s_gauge, LV_BAR_ORIENTATION_VERTICAL);
-    lv_obj_set_style_bg_color(s_gauge, lv_color_make(0x40, 0x40, 0x70), LV_PART_MAIN);
+    lv_bar_set_orientation(s_gauge, LV_BAR_ORIENTATION_HORIZONTAL);
+    lv_obj_set_style_bg_color(s_gauge, lv_color_make(0x08, 0x08, 0x16), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_gauge, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(s_gauge, 0, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_gauge, 10, LV_PART_MAIN);
-    lv_obj_set_style_border_color(s_gauge, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_gauge, 4, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_gauge, 4, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_gauge, COL_TIMER_NORMAL, LV_PART_MAIN);
     lv_obj_set_style_border_opa(s_gauge, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_gauge, 8, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s_gauge, COL_PROG_ACT, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_grad_color(s_gauge, COL_PROG_ACT, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(s_gauge, 30, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_gauge, COL_TIMER_NORMAL, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_color(s_gauge, COL_TIMER_NORMAL, LV_PART_INDICATOR);
     lv_obj_set_style_bg_grad_dir(s_gauge, LV_GRAD_DIR_NONE, LV_PART_INDICATOR);
     lv_obj_set_style_bg_opa(s_gauge, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_pad_all(s_gauge, 0, LV_PART_INDICATOR);
     lv_obj_set_style_border_width(s_gauge, 0, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(s_gauge, 8, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(s_gauge, 30, LV_PART_INDICATOR);
     lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_INDICATOR);
     lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_MAIN);
 
-    /* [C] Credito residuo mostrato sotto il countdown */
-    s_residual_credit_lbl = lv_label_create(s_center_box);
-    lv_label_set_text(s_residual_credit_lbl, "0");
-    lv_obj_set_style_text_color(s_residual_credit_lbl, COL_WHITE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_residual_credit_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_obj_align(s_residual_credit_lbl, LV_ALIGN_BOTTOM_MID, 0, -10);
+    s_credit_box = lv_obj_create(scr);
+    lv_obj_set_pos(s_credit_box, PANEL_PAD_X, credit_y);
+    lv_obj_set_size(s_credit_box, PANEL_FULL_W, credit_h);
+    lv_obj_set_style_bg_opa(s_credit_box, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_credit_box, 4, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_credit_box, COL_TIMER_NORMAL, LV_PART_MAIN);
+    lv_obj_set_style_border_opa(s_credit_box, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_credit_box, 40, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_credit_box, 24, LV_PART_MAIN);
+    lv_obj_remove_flag(s_credit_box, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_status_box = lv_obj_create(scr);
+    lv_obj_set_pos(s_status_box, PANEL_PAD_X, status_y);
+    lv_obj_set_size(s_status_box, PANEL_FULL_W, status_h);
+    lv_obj_set_style_bg_opa(s_status_box, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_status_box, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_status_box, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_status_box, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(s_status_box, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_center_box = NULL;
+    s_counter_fill = NULL;
+    s_residual_credit_lbl = NULL;
 
     s_credit_lbl = lv_label_create(s_credit_box);
     lv_label_set_text(s_credit_lbl, "0");
     lv_obj_set_style_text_color(s_credit_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_credit_lbl, FONT_BIGNUM, LV_PART_MAIN);
-    lv_obj_align(s_credit_lbl, LV_ALIGN_TOP_MID, 0, -5);
+    lv_obj_align(s_credit_lbl, LV_ALIGN_TOP_RIGHT, -36, 8);
 
     s_elapsed_lbl = lv_label_create(s_credit_box);
     lv_label_set_text(s_elapsed_lbl, "Credito");
     lv_obj_set_style_text_color(s_elapsed_lbl, COL_GREY, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_elapsed_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_obj_align(s_elapsed_lbl, LV_ALIGN_BOTTOM_MID, 0, -46);
+    lv_obj_align(s_elapsed_lbl, LV_ALIGN_TOP_LEFT, 20, 16);
 
     s_pause_lbl = lv_label_create(s_credit_box);
     lv_label_set_text(s_pause_lbl, "");
     lv_obj_set_style_text_color(s_pause_lbl, COL_PROG_PAUSE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_pause_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_MID, 0, -8);
+    lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_LEFT, 20, -12);
 
     /* [C] Pulsante STOP rosso in basso */
     s_stop_btn = lv_button_create(scr);
-    lv_obj_set_pos(s_stop_btn, PANEL_PAD_X, PANEL_PAD_Y + PANEL_CREDIT_H + PANEL_WORK_H);
+    lv_obj_set_pos(s_stop_btn, PANEL_PAD_X, stop_y);
     lv_obj_set_size(s_stop_btn, PANEL_FULL_W, PANEL_STOP_BTN_H);
     lv_obj_set_style_bg_color(s_stop_btn, COL_PROG_LOW, LV_PART_MAIN);  /* Rosso */
     lv_obj_set_style_bg_opa(s_stop_btn, LV_OPA_COVER, LV_PART_MAIN);
@@ -853,7 +848,8 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
 static void build_prog_buttons(void)
 {
     const int32_t btn_gap = 10;
-    const int32_t btn_h = (PANEL_WORK_H - (btn_gap * (PROG_ROWS - 1))) / PROG_ROWS;
+    const int32_t status_h = lv_obj_get_height(s_status_box);
+    const int32_t btn_h = (status_h - (btn_gap * (PROG_ROWS - 1))) / PROG_ROWS;
     const int32_t left_btn_w = (PANEL_LEFT_W * 75) / 100;
     const int32_t right_btn_w = (PANEL_RIGHT_W * 75) / 100;
     const int32_t left_btn_x = PANEL_LEFT_X + ((PANEL_LEFT_W - left_btn_w) / 2);

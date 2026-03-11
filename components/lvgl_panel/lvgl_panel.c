@@ -1,5 +1,6 @@
 #include "lvgl_panel.h"
 #include "lvgl_panel_pages.h"
+#include "lvgl_page_chrome.h"
 #include "init.h"
 
 #include "lvgl.h"
@@ -13,12 +14,13 @@
 extern const lv_font_t arial96;
 
 static const char *TAG = "lvgl_panel";
+static lv_obj_t *s_init_status_label = NULL;
 
 #define COL_BG    lv_color_make(0x1a, 0x1a, 0x2e)
 #define COL_BOOT_BG lv_color_make(0x00, 0x00, 0x00)
 #define COL_WHITE lv_color_make(0xEE, 0xEE, 0xEE)
 #define BOOT_LOGO_SPIFFS_PATH "/spiffs/logo.jpg"
-#define BOOT_LOGO_LVGL_PATH   "S:/spiffs/logo.jpg"
+#define BOOT_LOGO_LVGL_ALT_PATH "S:/spiffs/logo.jpg"
 
 
 /**
@@ -36,6 +38,20 @@ static bool panel_boot_logo_file_exists(void)
     }
     fclose(f);
     return true;
+}
+
+static bool panel_try_set_logo_src(lv_obj_t *img, const char *src)
+{
+    if (!img || !src || src[0] == '\0') {
+        return false;
+    }
+    lv_image_set_src(img, src);
+    lv_obj_update_layout(img);
+    if (lv_obj_get_width(img) > 0 && lv_obj_get_height(img) > 0) {
+        return true;
+    }
+    ESP_LOGW(TAG, "[C] Caricamento logo fallito o dimensioni nulle (src=%s)", src);
+    return false;
 }
 
 
@@ -57,22 +73,42 @@ static void panel_show_boot_logo_screen(void)
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    s_init_status_label = NULL;
+    lvgl_page_chrome_add(scr);
 
+    bool logo_drawn = false;
     if (panel_boot_logo_file_exists()) {
         lv_obj_t *logo_img = lv_image_create(scr);
-        lv_image_set_src(logo_img, BOOT_LOGO_LVGL_PATH);
-        lv_obj_align(logo_img, LV_ALIGN_CENTER, 0, 0);
-        ESP_LOGI(TAG, "[C] Pagina logo boot visualizzata da SPIFFS (%s)", BOOT_LOGO_SPIFFS_PATH);
-        return;
+        logo_drawn = panel_try_set_logo_src(logo_img, BOOT_LOGO_LVGL_ALT_PATH);
+        if (!logo_drawn) {
+            logo_drawn = panel_try_set_logo_src(logo_img, BOOT_LOGO_SPIFFS_PATH);
+        }
+        if (logo_drawn) {
+            lv_obj_align(logo_img, LV_ALIGN_CENTER, 0, 0);
+            ESP_LOGI(TAG, "[C] Pagina logo boot visualizzata (src=%s)",
+                     lv_obj_get_width(logo_img) > 0 ? (const char *)lv_image_get_src(logo_img) : BOOT_LOGO_SPIFFS_PATH);
+        } else {
+            lv_obj_del(logo_img);
+        }
     }
 
-    lv_obj_t *logo_lbl = lv_label_create(scr);
-    lv_label_set_text(logo_lbl, "MicroHard");
-    lv_obj_set_style_text_color(logo_lbl, COL_WHITE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(logo_lbl, &arial96, LV_PART_MAIN);
-    lv_obj_align(logo_lbl, LV_ALIGN_CENTER, 0, 0);
+    if (!logo_drawn) {
+        ESP_LOGW(TAG, "[C] Logo non visualizzato, uso fallback testuale");
+        lv_obj_t *logo_lbl = lv_label_create(scr);
+        lv_label_set_text(logo_lbl, "MicroHard");
+        lv_obj_set_style_text_color(logo_lbl, COL_WHITE, LV_PART_MAIN);
+        lv_obj_set_style_text_font(logo_lbl, &arial96, LV_PART_MAIN);
+        lv_obj_align(logo_lbl, LV_ALIGN_CENTER, 0, 0);
+    }
 
-    ESP_LOGW(TAG, "[C] Logo SPIFFS non trovato (%s), uso fallback testuale", BOOT_LOGO_SPIFFS_PATH);
+    s_init_status_label = lv_label_create(scr);
+    lv_label_set_long_mode(s_init_status_label, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(s_init_status_label, "Init: avvio...");
+    lv_obj_set_width(s_init_status_label, LV_PCT(100));
+    lv_obj_set_style_text_align(s_init_status_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_init_status_label, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_color(s_init_status_label, COL_WHITE, LV_PART_MAIN);
+    lv_obj_align(s_init_status_label, LV_ALIGN_BOTTOM_MID, 0, -10);
 }
 
 
@@ -96,9 +132,16 @@ void lvgl_panel_show(void)
  */
 void lvgl_panel_show_boot_logo(void)
 {
-    if (!bsp_display_lock(0)) {
-        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_boot_logo");
-        return;
+    if (!bsp_display_lock(pdMS_TO_TICKS(500))) {
+        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_boot_logo, provo re-init display");
+        if (init_run_display_only() != ESP_OK) {
+            ESP_LOGE(TAG, "[C] Re-init display fallita in lvgl_panel_show_boot_logo");
+            return;
+        }
+        if (!bsp_display_lock(pdMS_TO_TICKS(500))) {
+            ESP_LOGE(TAG, "[C] LVGL lock ancora indisponibile dopo re-init in lvgl_panel_show_boot_logo");
+            return;
+        }
     }
 
     panel_show_boot_logo_screen();
@@ -129,7 +172,7 @@ void lvgl_panel_show_language_select(void)
         }
     }
 
-    lvgl_page_language_show();
+    lvgl_page_language_2_show();
 
     bsp_display_unlock();
 
@@ -184,5 +227,43 @@ void lvgl_panel_show_out_of_service(uint32_t reboots)
 
     lvgl_page_out_of_service_show(reboots);
 
+    bsp_display_unlock();
+}
+
+void lvgl_panel_show_main_page(void)
+{
+    if (!bsp_display_lock(0)) {
+        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_main_page");
+        return;
+    }
+
+    lvgl_page_main_show();
+
+    bsp_display_unlock();
+}
+
+void lvgl_panel_show_ads_page(void)
+{
+    if (!bsp_display_lock(0)) {
+        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_ads_page");
+        return;
+    }
+
+    lvgl_page_ads_show();
+
+    bsp_display_unlock();
+}
+
+void lvgl_panel_set_init_status(const char *text)
+{
+    if (!text || text[0] == '\0') {
+        return;
+    }
+    if (!bsp_display_lock(pdMS_TO_TICKS(30))) {
+        return;
+    }
+    if (s_init_status_label && lv_obj_is_valid(s_init_status_label)) {
+        lv_label_set_text(s_init_status_label, text);
+    }
     bsp_display_unlock();
 }

@@ -8,6 +8,7 @@ void lvgl_page_main_refresh_texts(void);
 void lvgl_page_main_deactivate(void);
 
 void lvgl_page_language_show(void);
+void lvgl_page_language_2_show(void);
 void lvgl_page_out_of_service_show(uint32_t reboots);
 void lvgl_page_ads_show(void);
 void lvgl_page_ads_deactivate(void);

@@ -476,10 +476,6 @@ esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 esp_err_t bsp_display_brightness_init(void)
 {
     esp_err_t ret = bsp_i2c_init();
-    if (ret == ESP_OK)
-    {
-        bsp_display_i2c_diagnostic_log_once();
-    }
     return ret;
 }
 
@@ -903,7 +899,6 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
 {
     /* Initilize I2C */
     BSP_ERROR_CHECK_RETURN_ERR(bsp_i2c_init());
-    bsp_display_i2c_diagnostic_log_once();
 
     /* Initialize touch */
     const esp_lcd_touch_config_t tp_cfg = {

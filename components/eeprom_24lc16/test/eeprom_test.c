@@ -260,3 +260,47 @@ send_response:
     cJSON_Delete(root);
     return ESP_OK;
 }
+
+/**
+ * @brief Modifica la funzione di scrittura per accettare una stringa e scriverla in EEPROM.
+ *
+ * @param addr Indirizzo di partenza in EEPROM.
+ * @param data Stringa da scrivere.
+ * @param len Lunghezza della stringa.
+ * @return esp_err_t Codice di errore.
+ */
+esp_err_t eeprom_write_string(int addr, const char *data, int len) {
+    if (addr < 0 || len <= 0 || (addr + len) > EEPROM_TOTAL_SIZE) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!eeprom_24lc16_is_available()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    return eeprom_24lc16_write(addr, (const uint8_t *)data, len);
+}
+
+/**
+ * @brief Modifica la funzione di lettura per leggere una stringa dall'EEPROM.
+ *
+ * @param addr Indirizzo di partenza in EEPROM.
+ * @param buffer Buffer per memorizzare la stringa letta.
+ * @param len Lunghezza da leggere.
+ * @return esp_err_t Codice di errore.
+ */
+esp_err_t eeprom_read_string(int addr, char *buffer, int len) {
+    if (addr < 0 || len <= 0 || (addr + len) > EEPROM_TOTAL_SIZE) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!eeprom_24lc16_is_available()) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t ret = eeprom_24lc16_read(addr, (uint8_t *)buffer, len);
+    if (ret == ESP_OK) {
+        buffer[len] = '\0'; // Assicurarsi che la stringa sia terminata da null
+    }
+    return ret;
+}

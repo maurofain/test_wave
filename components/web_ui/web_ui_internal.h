@@ -117,6 +117,7 @@ esp_err_t api_debug_usb_restart(httpd_req_t *req);
 esp_err_t api_debug_crash(httpd_req_t *req);
 esp_err_t api_debug_restore(httpd_req_t *req);
 esp_err_t api_debug_promote_factory(httpd_req_t *req);
+esp_err_t api_display_lvgl_test(httpd_req_t *req);
 
 // Reboot handlers
 esp_err_t reboot_factory_handler(httpd_req_t *req);

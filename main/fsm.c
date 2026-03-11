@@ -1,4 +1,5 @@
 #include "fsm.h"
+#include "tasks.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
@@ -69,6 +70,32 @@ static uint32_t to_mask_from_event(const fsm_input_event_t *e)
         mask = (1u << AGN_ID_FSM);
     }
     return mask;
+}
+
+static bool fsm_publish_control_event(fsm_event_t ev)
+{
+    fsm_input_event_t event = {
+        .from = AGN_ID_WEB_UI,
+        .to = {AGN_ID_FSM},
+        .action = (ev == FSM_EVENT_ENTER_LVGL_TEST) ? ACTION_ID_LVGL_TEST_ENTER : ACTION_ID_LVGL_TEST_EXIT,
+        .type = FSM_INPUT_EVENT_NONE,
+    };
+    event.value_i32 = (int32_t)ev;
+    return fsm_event_publish(&event, pdMS_TO_TICKS(20));
+}
+
+bool fsm_enter_lvgl_pages_test(void)
+{
+    fsm_ctx_t snap = {0};
+    if (fsm_runtime_snapshot(&snap) && snap.state == FSM_STATE_LVGL_PAGES_TEST) {
+        return true;
+    }
+    return fsm_publish_control_event(FSM_EVENT_ENTER_LVGL_TEST);
+}
+
+bool fsm_exit_lvgl_pages_test(void)
+{
+    return fsm_publish_control_event(FSM_EVENT_EXIT_LVGL_TEST);
 }
 
 static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type)
@@ -195,6 +222,23 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
 
     fsm_state_t prev = ctx->state;
 
+    if (event == FSM_EVENT_ENTER_LVGL_TEST) {
+        if (ctx->state != FSM_STATE_LVGL_PAGES_TEST) {
+            tasks_suspend_peripherals_for_lvgl_test();
+            ctx->state = FSM_STATE_LVGL_PAGES_TEST;
+            ctx->program_running = false;
+        }
+        return prev != ctx->state;
+    }
+
+    if (event == FSM_EVENT_EXIT_LVGL_TEST) {
+        if (ctx->state == FSM_STATE_LVGL_PAGES_TEST) {
+            tasks_resume_peripherals_after_lvgl_test();
+            ctx->state = FSM_STATE_IDLE;
+        }
+        return prev != ctx->state;
+    }
+
     switch (ctx->state) {
         case FSM_STATE_IDLE:
             if (event == FSM_EVENT_USER_ACTIVITY || event == FSM_EVENT_PAYMENT_ACCEPTED) {
@@ -266,6 +310,11 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
             }
             break;
 
+        case FSM_STATE_LVGL_PAGES_TEST:
+            /* In modalità test ignoriamo gli eventi normali; le transizioni
+             * sono gestite da ENTER/EXIT sopra. */
+            break;
+
         default:
             break;
     }
@@ -302,6 +351,8 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             case ACTION_ID_PROGRAM_STOP:           etype = FSM_INPUT_EVENT_PROGRAM_STOP;         break;
             case ACTION_ID_PROGRAM_PAUSE_TOGGLE:   etype = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE; break;
             case ACTION_ID_CREDIT_ENDED:           etype = FSM_INPUT_EVENT_CREDIT_ENDED;         break;
+            case ACTION_ID_LVGL_TEST_ENTER:        return fsm_handle_event(ctx, FSM_EVENT_ENTER_LVGL_TEST);
+            case ACTION_ID_LVGL_TEST_EXIT:         return fsm_handle_event(ctx, FSM_EVENT_EXIT_LVGL_TEST);
             default: break;
         }
     }
