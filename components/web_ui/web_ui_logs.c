@@ -445,7 +445,7 @@ esp_err_t api_logs_network_get(httpd_req_t *req)
     }
 
     cJSON_AddBoolToObject(root, "enabled", cfg->remote_log.use_broadcast);
-    cJSON_AddNumberToObject(root, "server_port", cfg->remote_log.server_port);
+    cJSON_AddNumberToObject(root, "port", cfg->remote_log.server_port);
 
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -532,7 +532,7 @@ esp_err_t api_logs_network_set(httpd_req_t *req)
     }
     cJSON_AddStringToObject(resp, "status", "ok");
     cJSON_AddBoolToObject(resp, "enabled", cfg->remote_log.use_broadcast);
-    cJSON_AddNumberToObject(resp, "server_port", cfg->remote_log.server_port);
+    cJSON_AddNumberToObject(resp, "port", cfg->remote_log.server_port);
 
     char *json = cJSON_PrintUnformatted(resp);
     cJSON_Delete(resp);

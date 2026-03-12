@@ -12,13 +12,15 @@
 
 static const char *TAG = "lvgl_page_lang";
 
+extern const lv_font_t GoogleSans35;
+
 #define COL_BG        lv_color_make(0x1a, 0x1a, 0x2e)
 #define COL_PROG      lv_color_make(0x6c, 0x34, 0x83)
 #define COL_PROG_ACT  lv_color_make(0x1e, 0x8b, 0x45)
 #define COL_WHITE     lv_color_make(0xEE, 0xEE, 0xEE)
 
-#define FONT_TITLE    (&lv_font_montserrat_32)
-#define FONT_LANG     (&lv_font_montserrat_32)
+#define FONT_TITLE    (&GoogleSans35)
+#define FONT_LANG     (&GoogleSans35)
 
 typedef struct {
     const char *code;

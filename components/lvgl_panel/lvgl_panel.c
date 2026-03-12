@@ -11,7 +11,8 @@
 
 #include <stdio.h>
 
-extern const lv_font_t arial96;
+extern const lv_font_t GoogleSans70;
+extern const lv_font_t GoogleSans35;
 
 static const char *TAG = "lvgl_panel";
 static lv_obj_t *s_init_status_label = NULL;
@@ -104,7 +105,7 @@ static void panel_show_boot_logo_screen(void)
         lv_obj_t *logo_lbl = lv_label_create(scr);
         lv_label_set_text(logo_lbl, "MicroHard");
         lv_obj_set_style_text_color(logo_lbl, COL_WHITE, LV_PART_MAIN);
-        lv_obj_set_style_text_font(logo_lbl, &arial96, LV_PART_MAIN);
+        lv_obj_set_style_text_font(logo_lbl, &GoogleSans70, LV_PART_MAIN);
         lv_obj_align(logo_lbl, LV_ALIGN_CENTER, 0, 0);
     }
 
@@ -113,7 +114,7 @@ static void panel_show_boot_logo_screen(void)
     lv_label_set_text(s_init_status_label, "Init: avvio...");
     lv_obj_set_width(s_init_status_label, LV_PCT(100));
     lv_obj_set_style_text_align(s_init_status_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_init_status_label, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_init_status_label, &GoogleSans35, LV_PART_MAIN);
     lv_obj_set_style_text_color(s_init_status_label, COL_WHITE, LV_PART_MAIN);
     lv_obj_align(s_init_status_label, LV_ALIGN_BOTTOM_MID, 0, -10);
 }

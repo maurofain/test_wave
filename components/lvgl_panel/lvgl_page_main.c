@@ -52,11 +52,13 @@ static const char *TAG = "lvgl_page_main";
 #define PANEL_COUNTER_X (PANEL_LEFT_W + PANEL_COL_GAP)
 #define PANEL_RIGHT_X (PANEL_COUNTER_X + PANEL_COUNTER_W + PANEL_COL_GAP)
 
-#define FONT_TIME (&lv_font_montserrat_20)
-#define FONT_BIGNUM (&lv_font_montserrat_48)
-#define FONT_LABEL (&lv_font_montserrat_32)
-#define FONT_PROG_BTN (&lv_font_montserrat_32)
-#define FONT_DATETIME (&lv_font_montserrat_20)
+extern const lv_font_t GoogleSans35;
+extern const lv_font_t GoogleSans50;
+#define FONT_TIME (&GoogleSans35)
+#define FONT_BIGNUM (&GoogleSans50)
+#define FONT_LABEL (&GoogleSans35)
+#define FONT_PROG_BTN (&GoogleSans35)
+#define FONT_DATETIME (&GoogleSans35)
 
 typedef struct
 {

@@ -64,8 +64,8 @@ static uint32_t fsm_get_language_return_timeout_ms(void)
 {
     uint32_t timeout_ms = FSM_LANGUAGE_RETURN_DEFAULT_MS;
     device_config_t *cfg = device_config_get();
-    if (cfg && cfg->timeouts.language_return_ms > 0U) {
-        timeout_ms = cfg->timeouts.language_return_ms;
+    if (cfg && cfg->timeouts.exit_programs_ms > 0U) {
+        timeout_ms = cfg->timeouts.exit_programs_ms;
     }
 
     if (timeout_ms < FSM_LANGUAGE_RETURN_MIN_MS) {

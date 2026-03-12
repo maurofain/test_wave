@@ -76,6 +76,7 @@ esp_err_t api_files_list_get(httpd_req_t *req);
 esp_err_t api_files_upload_post(httpd_req_t *req);
 esp_err_t api_files_delete_post(httpd_req_t *req);
 esp_err_t api_files_download_get(httpd_req_t *req);
+esp_err_t api_files_copy_post(httpd_req_t *req);
 
 // Password UI protection helpers (web_ui_auth_emulator.c)
 bool web_ui_has_valid_password(httpd_req_t *req);

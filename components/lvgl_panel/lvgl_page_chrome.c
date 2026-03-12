@@ -4,6 +4,8 @@
 
 #include <time.h>
 
+extern const lv_font_t GoogleSans35;
+
 static lv_obj_t      *s_chrome_time_lbl   = NULL;
 static lv_timer_t    *s_chrome_time_timer  = NULL;
 static lv_event_cb_t  s_flag_cb            = NULL;  /* callback per click bandiera */
@@ -47,7 +49,7 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
 
     s_chrome_time_lbl = lv_label_create(scr);
     lv_obj_set_style_text_color(s_chrome_time_lbl, lv_color_hex(0xEEEEEE), LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_chrome_time_lbl, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_chrome_time_lbl, &GoogleSans35, LV_PART_MAIN);
     lv_obj_align(s_chrome_time_lbl, LV_ALIGN_TOP_LEFT, 18, 14);
     chrome_update_time_label();
     s_chrome_time_timer = lv_timer_create(chrome_time_timer_cb, 1000, NULL);

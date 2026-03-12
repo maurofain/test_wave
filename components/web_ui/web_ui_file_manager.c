@@ -390,3 +390,110 @@ esp_err_t api_files_download_get(httpd_req_t *req)
 
     return httpd_resp_send_chunk(req, NULL, 0);
 }
+
+/* -----------------------------------------------------------------------
+ * POST /api/files/copy
+ * Body JSON: {"from":"spiffs","to":"sdcard"}   (o viceversa)
+ * Copia tutti i file img*.jpg dalla sorgente alla destinazione.
+ * ----------------------------------------------------------------------- */
+esp_err_t api_files_copy_post(httpd_req_t *req)
+{
+    char buf[256];
+    int recv = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (recv <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_sendstr(req, "empty_body");
+    }
+    buf[recv] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_sendstr(req, "invalid_json");
+    }
+
+    cJSON *from_j = cJSON_GetObjectItem(root, "from");
+    cJSON *to_j   = cJSON_GetObjectItem(root, "to");
+    if (!from_j || !to_j || !from_j->valuestring || !to_j->valuestring) {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_sendstr(req, "missing_fields");
+    }
+
+    const char *src_path = NULL;
+    const char *dst_path = NULL;
+    if (!storage_to_base_path(from_j->valuestring, &src_path) ||
+        !storage_to_base_path(to_j->valuestring,   &dst_path)) {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_sendstr(req, "unknown_storage");
+    }
+
+    bool src_is_sd = (strcmp(src_path, "/sdcard") == 0);
+    bool dst_is_sd = (strcmp(dst_path, "/sdcard") == 0);
+    cJSON_Delete(root);
+
+    /* Apri directory sorgente */
+    DIR *dir = src_is_sd ? sd_card_opendir(src_path) : opendir(src_path);
+    if (!dir) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        return httpd_resp_sendstr(req, "opendir_failed");
+    }
+
+    int copied = 0, failed = 0;
+    struct dirent *ent;
+    char ibuf[2048];
+
+    while ((ent = readdir(dir)) != NULL) {
+        /* Filtra img*.jpg */
+        const char *n = ent->d_name;
+        size_t nlen = strlen(n);
+        if (ent->d_type != DT_REG ||
+            strncmp(n, "img", 3) != 0 ||
+            nlen < 8 ||
+            strcmp(n + nlen - 4, ".jpg") != 0) {
+            continue;
+        }
+
+        char src_fp[320], dst_fp[320];
+        snprintf(src_fp, sizeof(src_fp), "%s/%s", src_path, n);
+        snprintf(dst_fp, sizeof(dst_fp), "%s/%s", dst_path, n);
+
+        FILE *fsrc = src_is_sd ? sd_card_fopen(src_fp, "rb") : fopen(src_fp, "rb");
+        if (!fsrc) { failed++; continue; }
+
+        FILE *fdst = dst_is_sd ? sd_card_fopen(dst_fp, "wb") : fopen(dst_fp, "wb");
+        if (!fdst) {
+            if (src_is_sd) sd_card_fclose(fsrc); else fclose(fsrc);
+            failed++;
+            continue;
+        }
+
+        size_t nr;
+        bool ok = true;
+        while ((nr = (src_is_sd ? sd_card_fread(fsrc, ibuf, sizeof(ibuf))
+                                 : fread(ibuf, 1, sizeof(ibuf), fsrc))) > 0) {
+            size_t nw = dst_is_sd ? sd_card_fwrite(fdst, ibuf, nr)
+                                  : fwrite(ibuf, 1, nr, fdst);
+            if (nw != nr) { ok = false; break; }
+        }
+
+        if (src_is_sd) sd_card_fclose(fsrc); else fclose(fsrc);
+        if (dst_is_sd) sd_card_fclose(fdst); else fclose(fdst);
+
+        if (!dst_is_sd && !ok) { remove(dst_fp); }
+        if (ok) copied++; else failed++;
+    }
+
+    if (src_is_sd) sd_card_closedir(dir); else closedir(dir);
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddNumberToObject(resp, "copied", copied);
+    cJSON_AddNumberToObject(resp, "failed", failed);
+    char *out = cJSON_PrintUnformatted(resp);
+    cJSON_Delete(resp);
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_sendstr(req, out ? out : "{\"copied\":0,\"failed\":0}");
+    if (out) free(out);
+    return ret;
+}

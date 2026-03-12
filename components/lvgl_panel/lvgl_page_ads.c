@@ -3,12 +3,19 @@
 #include "lvgl.h"
 #include "esp_log.h"
 #include "device_config.h"
+#include "sd_card.h"
 #include <dirent.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "bsp/esp32_p4_nano.h"
 #include "esp_heap_caps.h"
+#include "tjpgd.h"    /* header privato LVGL: managed_components/lvgl__lvgl/src/libs/tjpgd/ */
+
+/* Font GoogleSans per pagina ads */
+extern const lv_font_t GoogleSans70;
+extern const lv_font_t GoogleSans50;
+extern const lv_font_t GoogleSans40;
 
 static const char *TAG = "lvgl_page_ads";
 
@@ -56,31 +63,119 @@ static const char *TAG = "lvgl_page_ads";
 #define COL_SEL_BTN     lv_color_make(0x2A, 0x9D, 0x8F)   /* Verde acqua */
 #define COL_ERR_BG      lv_color_make(0x7B, 0x1F, 0x52)   /* Berry scuro */
 
-#define ADS_SPIFFS_DIR   "/spiffs"
-#define ADS_SPIFFS_PATH  "/spiffs/"   /* percorso POSIX per fopen */
-#define ADS_MEM_PREFIX   "M:/"        /* driver LVGL in-memory (lettera 'M') */
-
 /* -----------------------------------------------------------------------
- * PSRAM image buffer + custom LVGL FS driver lettera 'M'
+ * PRE-DECODIFICA JPEG → RGB565 IN PSRAM
  *
- * Tutte le immagini img*.jpg vengono lette da SPIFFS in PSRAM una-volta
- * sola durante il preload (fuori dal lock LVGL).
- * Lo slideshow legge poi direttamente dalla PSRAM: zero accessi SPIFFS.
+ * Al boot (fuori dal lock LVGL) ogni img*.jpg viene letta da SPIFFS e
+ * decodificata interamente con TJPGD in un buffer PSRAM separato.
+ * Il buffer contiene pixel raw RGB565, già pronti per il blit.
+ *
+ * Al cambio slide: lv_image_set_src(img, &s_images[idx].dsc)
+ *   → LVGL vede LV_IMAGE_SRC_VARIABLE con cf=RGB565 → blit diretto
+ *   → ZERO decode JPEG a run-time → transizione < 10 ms
+ *
+ * Memoria: ~692 × 904 × 2 B ≈ 1.2 MB per immagine (PSRAM 200 MHz)
  * ----------------------------------------------------------------------- */
 
-/** Buffer PSRAM per una singola immagine JPEG. */
-typedef struct {
-    uint8_t *data;   /**< byte JPEG in PSRAM (liberare con heap_caps_free) */
-    size_t   size;   /**< dimensione in byte */
-} ad_psram_buf_t;
+#define TJPGD_WORK_SZ   4096
+#define AD_IMG_MAX      16
 
-/** Contesto di un file aperto tramite il driver MemDrv 'M'. */
 typedef struct {
-    uint32_t img_idx; /**< indice in s_ad_psram[] */
-    uint32_t pos;     /**< posizione di lettura corrente */
-} memdrv_file_t;
+    lv_image_dsc_t  dsc;        /**< Descrittore LVGL (punta a pixels) */
+    uint8_t        *pixels;     /**< Buffer RGB565 PSRAM (heap_caps_malloc) */
+    char            name[256];  /**< Nome file originale (per log) */
+} ad_image_t;
 
-/* ----------------------------------------------------------------------- */
+/* Contesto di output decodifica (accesso statico: single-threaded init) */
+static struct {
+    uint16_t *buf;
+    uint32_t  stride;   /* pixel per riga */
+} s_dec_out;
+
+/* Input function TJPGD: legge dal FILE* passato come jd->device */
+static size_t tjpg_infunc(JDEC *jd, uint8_t *buf, size_t n)
+{
+    FILE *fp = jd->device;
+    if (buf) return fread(buf, 1, n, fp);
+    return (fseek(fp, (long)n, SEEK_CUR) == 0) ? n : 0;
+}
+
+/* Output function TJPGD: converte MCU (RGB888) → RGB565 in PSRAM */
+static int tjpg_outfunc(JDEC *jd, void *bitmap, JRECT *rect)
+{
+    (void)jd;
+    const uint8_t *src = bitmap;
+    uint32_t w = (uint32_t)(rect->right  - rect->left + 1);
+    uint32_t h = (uint32_t)(rect->bottom - rect->top  + 1);
+    for (uint32_t row = 0; row < h; row++) {
+        uint16_t *dst = s_dec_out.buf
+                        + (rect->top + row) * s_dec_out.stride
+                        + rect->left;
+        for (uint32_t col = 0; col < w; col++) {
+            uint8_t r = *src++, g = *src++, b = *src++;
+            // Correzione: LVGL usa formato RGB565 little-endian (BGR565)
+            *dst++ = (uint16_t)(((uint16_t)(b & 0xF8) << 8)
+                              | ((uint16_t)(g & 0xFC) << 3)
+                              | (r >> 3));
+        }
+    }
+    return 1;  /* continua decodifica */
+}
+
+/**
+ * @brief Decodifica un JPEG da SPIFFS/SD in un buffer RGB565 allocato in PSRAM.
+ * @param use_sd  true = apre con sd_card_fopen, false = fopen standard
+ * @return true se successo, false in caso di errore
+ */
+static bool decode_jpeg_to_psram(const char *fpath, ad_image_t *img, bool use_sd)
+{
+    FILE *fp = use_sd ? sd_card_fopen(fpath, "rb") : fopen(fpath, "rb");
+    if (!fp) { ESP_LOGW(TAG, "[L] fopen: %s", fpath); return false; }
+
+    uint8_t *work = malloc(TJPGD_WORK_SZ);
+    if (!work) { fclose(fp); return false; }
+
+    JDEC jd;
+    JRESULT rc = jd_prepare(&jd, tjpg_infunc, work, TJPGD_WORK_SZ, fp);
+    if (rc != JDR_OK) {
+        ESP_LOGW(TAG, "[L] jd_prepare %d: %s", rc, fpath);
+        free(work); fclose(fp); return false;
+    }
+
+    uint32_t w = jd.width, h = jd.height;
+    size_t bytes = (size_t)w * h * sizeof(uint16_t);
+    img->pixels = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!img->pixels) {
+        ESP_LOGE(TAG, "[L] OOM PSRAM %u B: %s", (unsigned)bytes, fpath);
+        free(work); fclose(fp); return false;
+    }
+
+    s_dec_out.buf    = (uint16_t *)img->pixels;
+    s_dec_out.stride = w;
+    rc = jd_decomp(&jd, tjpg_outfunc, 0 /* scala 1:1 */);
+    free(work);
+    fclose(fp);
+
+    if (rc != JDR_OK) {
+        ESP_LOGW(TAG, "[L] jd_decomp %d: %s", rc, fpath);
+        heap_caps_free(img->pixels);
+        img->pixels = NULL;
+        return false;
+    }
+
+    img->dsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
+    img->dsc.header.cf     = LV_COLOR_FORMAT_RGB565;
+    img->dsc.header.flags  = 0;
+    img->dsc.header.w      = (uint32_t)w;
+    img->dsc.header.h      = (uint32_t)h;
+    img->dsc.header.stride = (uint32_t)(w * sizeof(uint16_t));
+    img->dsc.data_size     = bytes;
+    img->dsc.data          = img->pixels;
+
+    ESP_LOGI(TAG, "[L] Decoded %s → %ux%u RGB565 (%u B PSRAM)",
+             fpath, w, h, (unsigned)bytes);
+    return true;
+}
 
 /* Stato pagina */
 static lv_obj_t      *s_ad_scr           = NULL;
@@ -90,252 +185,141 @@ static lv_obj_t      *s_error_lbl        = NULL;
 static lv_timer_t    *s_ad_carousel_timer = NULL;
 static bool           s_ad_exit_pending  = false;
 
-/* Gestione immagini */
-static char         **s_ad_images        = NULL;   /**< nomi file originali (solo per log) */
-static ad_psram_buf_t *s_ad_psram        = NULL;   /**< buffer JPEG in PSRAM */
-static uint32_t       s_ad_image_count   = 0;
-static uint32_t       s_ad_current_image = 0;
-static uint32_t       s_ad_rotation_ms   = 30000;  /* Default 30 secondi */
+/* Immagini pre-decodificate in PSRAM */
+static ad_image_t     s_images[AD_IMG_MAX];
+static uint32_t       s_image_count      = 0;
+static uint32_t       s_current_image    = 0;
+static uint32_t       s_ad_rotation_ms   = 30000;
 
-/* Driver FS in-memory (lettera 'M') */
-static lv_fs_drv_t    s_memdrv;
-static bool           s_memdrv_registered = false;
-
-/* Messaggio errore corrente (aggiornabile dall'esterno) */
+/* Messaggio errore corrente */
 static char           s_error_msg[128]   = "";
 
 /* ----------------------------------------------------------------------- */
 
-/* -----------------------------------------------------------------------
- * Driver FS in-memory  –  lettera 'M'
- *
- * Il driver mappa i path "M:/N.jpg" (N = indice decimale 0…count-1)
- * sui buffer PSRAM in s_ad_psram[].
- * Viene registrato una volta sola (s_memdrv_registered) e deve essere
- * chiamato col lock LVGL acquisito.
- * ----------------------------------------------------------------------- */
-
-static void *memdrv_open(lv_fs_drv_t *drv, const char *path, lv_fs_mode_t mode)
-{
-    (void)drv; (void)mode;
-    /* path = "/N.jpg"  (LVGL toglie la lettera e ':') */
-    int idx = atoi(path + 1);   /* "/0.jpg" → 0 */
-    if (idx < 0 || (uint32_t)idx >= s_ad_image_count) return NULL;
-    if (!s_ad_psram || !s_ad_psram[idx].data)         return NULL;
-
-    memdrv_file_t *f = malloc(sizeof(memdrv_file_t));
-    if (!f) return NULL;
-    f->img_idx = (uint32_t)idx;
-    f->pos     = 0;
-    return f;
-}
-
-static lv_fs_res_t memdrv_close(lv_fs_drv_t *drv, void *file_p)
-{
-    (void)drv;
-    free(file_p);
-    return LV_FS_RES_OK;
-}
-
-static lv_fs_res_t memdrv_read(lv_fs_drv_t *drv, void *file_p,
-                                void *buf, uint32_t btr, uint32_t *br)
-{
-    (void)drv;
-    memdrv_file_t       *f   = file_p;
-    const ad_psram_buf_t *pb = &s_ad_psram[f->img_idx];
-    size_t avail = (f->pos < pb->size) ? (pb->size - f->pos) : 0;
-    *br = (uint32_t)((btr < avail) ? btr : avail);
-    if (*br) {
-        memcpy(buf, pb->data + f->pos, *br);
-        f->pos += *br;
-    }
-    return LV_FS_RES_OK;
-}
-
-static lv_fs_res_t memdrv_seek(lv_fs_drv_t *drv, void *file_p,
-                                uint32_t pos, lv_fs_whence_t whence)
-{
-    (void)drv;
-    memdrv_file_t       *f   = file_p;
-    const ad_psram_buf_t *pb = &s_ad_psram[f->img_idx];
-    switch (whence) {
-        case LV_FS_SEEK_SET: f->pos = pos; break;
-        case LV_FS_SEEK_CUR: f->pos += pos; break;
-        case LV_FS_SEEK_END:
-            f->pos = (pos <= pb->size) ? (uint32_t)(pb->size - pos) : 0;
-            break;
-        default: break;
-    }
-    if (f->pos > (uint32_t)pb->size) f->pos = (uint32_t)pb->size;
-    return LV_FS_RES_OK;
-}
-
-static lv_fs_res_t memdrv_tell(lv_fs_drv_t *drv, void *file_p, uint32_t *pos_p)
-{
-    (void)drv;
-    *pos_p = ((memdrv_file_t *)file_p)->pos;
-    return LV_FS_RES_OK;
-}
-
 /**
- * @brief Registra il driver FS 'M' in LVGL. Idempotente.
- *        Deve essere chiamato con il lock LVGL acquisito.
- */
-static void register_psram_fs(void)
-{
-    if (s_memdrv_registered) return;
-    lv_fs_drv_init(&s_memdrv);
-    s_memdrv.letter   = 'M';
-    s_memdrv.open_cb  = memdrv_open;
-    s_memdrv.close_cb = memdrv_close;
-    s_memdrv.read_cb  = memdrv_read;
-    s_memdrv.seek_cb  = memdrv_seek;
-    s_memdrv.tell_cb  = memdrv_tell;
-    lv_fs_drv_register(&s_memdrv);
-    s_memdrv_registered = true;
-    ESP_LOGI(TAG, "[M] Driver FS PSRAM 'M' registrato");
-}
-
-/* ----------------------------------------------------------------------- */
-
-/**
- * @brief Carica dall'SPIFFS la lista di immagini img01.jpg … img99.jpg
- *        e le copia interamente in buffer PSRAM.
- *
- * Deve essere chiamata SENZA il lock LVGL (operazioni I/O bloccanti).
+ * @brief Legge tutti i img*.jpg da SPIFFS e SDCARD (priorità SPIFFS) e li decodifica RGB565 in PSRAM.
+ *        Priorità: 1) SPIFFS, 2) SDCARD, 3) nessuna immagine → skip pagina ads.
+ *        Chiamare SENZA lock LVGL (operazioni I/O e CPU intensive).
  */
 static void load_ad_images(void)
 {
-    /* --- Cleanup eventuale caricamento precedente --- */
-    if (s_ad_images) {
-        for (uint32_t i = 0; i < s_ad_image_count; i++) free(s_ad_images[i]);
-        free(s_ad_images);
-        s_ad_images = NULL;
-    }
-    if (s_ad_psram) {
-        for (uint32_t i = 0; i < s_ad_image_count; i++) {
-            heap_caps_free(s_ad_psram[i].data);
+    /* Cleanup caricamento precedente */
+    for (uint32_t i = 0; i < s_image_count; i++) {
+        if (s_images[i].pixels) {
+            heap_caps_free(s_images[i].pixels);
+            s_images[i].pixels = NULL;
         }
-        free(s_ad_psram);
-        s_ad_psram = NULL;
     }
-    s_ad_image_count   = 0;
-    s_ad_current_image = 0;
+    s_image_count   = 0;
+    s_current_image = 0;
 
-    /* --- Prima passata: conta img*.jpg --- */
-    DIR *dir = opendir(ADS_SPIFFS_DIR);
-    if (!dir) {
-        ESP_LOGW(TAG, "[L] Impossibile aprire " ADS_SPIFFS_DIR);
-        return;
-    }
-    struct dirent *ent;
-    uint32_t count = 0;
-    while ((ent = readdir(dir)) != NULL) {
-        if (ent->d_type == DT_REG &&
-            strncmp(ent->d_name, "img", 3) == 0 &&
-            strlen(ent->d_name) >= strlen("img01.jpg") &&
-            strcmp(ent->d_name + strlen(ent->d_name) - 4, ".jpg") == 0) {
-            count++;
+    ESP_LOGI(TAG, "[L] ===== load_ad_images START =====");
+    
+    /* 1) Prima prova a caricare da SPIFFS */
+    ESP_LOGI(TAG, "[L] Tentativo caricamento immagini da SPIFFS...");
+    
+    DIR *dir = opendir("/spiffs");
+    if (dir) {
+        struct dirent *ent;
+        uint32_t idx = 0;
+        while ((ent = readdir(dir)) != NULL && idx < AD_IMG_MAX) {
+            if (ent->d_type != DT_REG ||
+                strncmp(ent->d_name, "img", 3) != 0 ||
+                strlen(ent->d_name) < strlen("img01.jpg") ||
+                strcmp(ent->d_name + strlen(ent->d_name) - 4, ".jpg") != 0) {
+                continue;
+            }
+            char fpath[280];
+            snprintf(fpath, sizeof(fpath), "/spiffs/%s", ent->d_name);
+            strncpy(s_images[idx].name, ent->d_name, sizeof(s_images[idx].name) - 1);
+            s_images[idx].name[sizeof(s_images[idx].name) - 1] = '\0';
+            memset(&s_images[idx].dsc, 0, sizeof(lv_image_dsc_t));
+            s_images[idx].pixels = NULL;
+            ESP_LOGI(TAG, "[L] SPIFFS: tentativo decode %s", ent->d_name);
+            if (decode_jpeg_to_psram(fpath, &s_images[idx], false)) {
+                ESP_LOGI(TAG, "[L] SPIFFS: %s decodificato con successo", ent->d_name);
+                idx++;
+            } else {
+                ESP_LOGW(TAG, "[L] SPIFFS: fallito decode %s", ent->d_name);
+            }
         }
-    }
-    if (count == 0) {
-        ESP_LOGW(TAG, "[L] Nessuna immagine img*.jpg in " ADS_SPIFFS_DIR);
         closedir(dir);
-        return;
+        s_image_count = idx;
+        
+        if (s_image_count > 0) {
+            ESP_LOGI(TAG, "[L] Caricate %u immagini da SPIFFS", s_image_count);
+        } else {
+            ESP_LOGW(TAG, "[L] Nessuna immagine trovata in SPIFFS");
+        }
+    } else {
+        ESP_LOGW(TAG, "[L] Impossibile aprire directory SPIFFS");
     }
 
-    /* --- Alloca array indice (nomi file + buffer PSRAM) --- */
-    s_ad_images = malloc(count * sizeof(char *));
-    s_ad_psram  = malloc(count * sizeof(ad_psram_buf_t));
-    if (!s_ad_images || !s_ad_psram) {
-        ESP_LOGE(TAG, "[L] OOM per array immagini");
-        free(s_ad_images); s_ad_images = NULL;
-        free(s_ad_psram);  s_ad_psram  = NULL;
-        closedir(dir);
-        return;
+    /* 2) Se non ci sono immagini in SPIFFS, prova da SDCARD */
+    if (s_image_count == 0) {
+        ESP_LOGI(TAG, "[L] Tentativo caricamento immagini da SDCARD...");
+        
+        if (sd_card_is_mounted()) {
+            DIR *sd_dir = sd_card_opendir("/sdcard");
+            if (sd_dir) {
+                struct dirent *ent;
+                uint32_t idx = 0;
+                while ((ent = readdir(sd_dir)) != NULL && idx < AD_IMG_MAX) {
+                    if (ent->d_type != DT_REG ||
+                        strncmp(ent->d_name, "img", 3) != 0 ||
+                        strlen(ent->d_name) < strlen("img01.jpg") ||
+                        strcmp(ent->d_name + strlen(ent->d_name) - 4, ".jpg") != 0) {
+                        continue;
+                    }
+                    char fpath[280];
+                    snprintf(fpath, sizeof(fpath), "/sdcard/%s", ent->d_name);
+                    strncpy(s_images[idx].name, ent->d_name, sizeof(s_images[idx].name) - 1);
+                    s_images[idx].name[sizeof(s_images[idx].name) - 1] = '\0';
+                    memset(&s_images[idx].dsc, 0, sizeof(lv_image_dsc_t));
+                    s_images[idx].pixels = NULL;
+                    ESP_LOGI(TAG, "[L] SDCARD: tentativo decode %s", ent->d_name);
+                    if (decode_jpeg_to_psram(fpath, &s_images[idx], true)) {
+                        ESP_LOGI(TAG, "[L] SDCARD: %s decodificato con successo", ent->d_name);
+                        idx++;
+                    } else {
+                        ESP_LOGW(TAG, "[L] SDCARD: fallito decode %s", ent->d_name);
+                    }
+                }
+                sd_card_closedir(sd_dir);
+                s_image_count = idx;
+                
+                if (s_image_count > 0) {
+                    ESP_LOGI(TAG, "[L] Caricate %u immagini da SDCARD", s_image_count);
+                } else {
+                    ESP_LOGW(TAG, "[L] Nessuna immagine trovata in SDCARD");
+                }
+            } else {
+                ESP_LOGW(TAG, "[L] Impossibile aprire directory SDCARD");
+            }
+        } else {
+            ESP_LOGW(TAG, "[L] SDCARD non montata");
+        }
     }
-    memset(s_ad_psram, 0, count * sizeof(ad_psram_buf_t));
 
-    /* --- Seconda passata: carica ogni file in PSRAM --- */
-    rewinddir(dir);
-    uint32_t idx = 0;
-    while ((ent = readdir(dir)) != NULL && idx < count) {
-        if (ent->d_type != DT_REG ||
-            strncmp(ent->d_name, "img", 3) != 0 ||
-            strlen(ent->d_name) < strlen("img01.jpg") ||
-            strcmp(ent->d_name + strlen(ent->d_name) - 4, ".jpg") != 0) {
-            continue;
-        }
-
-        /* Salva nome file per log */
-        s_ad_images[idx] = strdup(ent->d_name);
-
-        /* Apri file, determina dimensione, leggi in PSRAM */
-        char fpath[64];
-        snprintf(fpath, sizeof(fpath), ADS_SPIFFS_PATH "%s", ent->d_name);
-        FILE *fp = fopen(fpath, "rb");
-        if (!fp) {
-            ESP_LOGW(TAG, "[L] fopen fallito: %s", fpath);
-            idx++; continue;
-        }
-        fseek(fp, 0, SEEK_END);
-        long fsize = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        if (fsize <= 0) {
-            ESP_LOGW(TAG, "[L] File vuoto: %s", fpath);
-            fclose(fp); idx++; continue;
-        }
-
-        uint8_t *buf = heap_caps_malloc((size_t)fsize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!buf) {
-            ESP_LOGE(TAG, "[L] OOM PSRAM per %s (%ld B)", ent->d_name, fsize);
-            fclose(fp); idx++; continue;
-        }
-        size_t rd = fread(buf, 1, (size_t)fsize, fp);
-        fclose(fp);
-        if (rd != (size_t)fsize) {
-            ESP_LOGW(TAG, "[L] Lettura parziale %s: %u/%ld B", ent->d_name, (unsigned)rd, fsize);
-            heap_caps_free(buf);
-            idx++; continue;
-        }
-
-        s_ad_psram[idx].data = buf;
-        s_ad_psram[idx].size = (size_t)fsize;
-        ESP_LOGI(TAG, "[L] Caricata in PSRAM: %s (%ld B)", ent->d_name, fsize);
-        idx++;
-    }
-    closedir(dir);
-    s_ad_image_count = idx;
-
-    ESP_LOGI(TAG, "[L] %u immagini caricate in PSRAM", s_ad_image_count);
+    ESP_LOGI(TAG, "[L] ===== load_ad_images END: %u immagini caricate =====", s_image_count);
 }
 
 /* ----------------------------------------------------------------------- */
 
 /**
- * @brief Mostra l'immagine corrente nel container dal buffer PSRAM.
- *        Usa il path "M:/N.jpg" servito dal driver FS in-memory.
+ * @brief Mostra l'immagine corrente: blit diretto dal buffer PSRAM pre-decodificato.
+ *        Nessun decode JPEG a run-time — transizione <10 ms.
  */
 static void display_current_ad_image(void)
 {
-    if (s_ad_image_count == 0 || s_ad_current_image >= s_ad_image_count) {
-        return;
-    }
+    if (s_image_count == 0 || s_current_image >= s_image_count) return;
+    if (!s_images[s_current_image].pixels) return;
     if (!(s_ad_img && lv_obj_is_valid(s_ad_img))) return;
-    if (!(s_ad_psram && s_ad_psram[s_ad_current_image].data)) {
-        ESP_LOGW(TAG, "[D] PSRAM buf NULL per img %u", s_ad_current_image);
-        return;
-    }
 
-    /* Path numerico: LVGL chiama open_cb con "/N.jpg" → driver PSRAM */
-    char path[20];
-    snprintf(path, sizeof(path), ADS_MEM_PREFIX "%u.jpg", s_ad_current_image);
-    lv_image_set_src(s_ad_img, path);
-
-    const char *name = s_ad_images ? s_ad_images[s_ad_current_image] : "?";
-    ESP_LOGI(TAG, "[D] Img %u/%u: %s (PSRAM %u B)",
-             s_ad_current_image + 1, s_ad_image_count,
-             name, (unsigned)s_ad_psram[s_ad_current_image].size);
+    lv_image_set_src(s_ad_img, &s_images[s_current_image].dsc);
+    ESP_LOGI(TAG, "[D] Img %u/%u: %s (blit PSRAM RGB565)",
+             s_current_image + 1, s_image_count,
+             s_images[s_current_image].name);
 }
 
 /**
@@ -344,11 +328,9 @@ static void display_current_ad_image(void)
 static void ad_carousel_timer_cb(lv_timer_t *timer)
 {
     (void)timer;
-    if (!bsp_display_lock(0)) {
-        return;
-    }
-    if (s_ad_image_count > 0) {
-        s_ad_current_image = (s_ad_current_image + 1) % s_ad_image_count;
+    if (!bsp_display_lock(0)) return;
+    if (s_image_count > 0) {
+        s_current_image = (s_current_image + 1) % s_image_count;
         display_current_ad_image();
     }
     bsp_display_unlock();
@@ -425,12 +407,12 @@ void lvgl_page_ads_show(void)
         s_ad_rotation_ms = cfg->timeouts.ad_rotation_ms;
     }
 
-    /* Carica immagini in PSRAM se non già caricate */
-    if (s_ad_psram == NULL) {
+    /* Carica e decodifica immagini in PSRAM se non già pronte */
+    if (s_image_count == 0) {
         load_ad_images();
     }
 
-    if (s_ad_image_count == 0) {
+    if (s_image_count == 0) {
         ESP_LOGW(TAG, "[C] Nessuna immagine disponibile, ritorno alla pagina principale");
         lvgl_page_main_show();
         return;
@@ -451,9 +433,6 @@ void lvgl_page_ads_show(void)
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-    /* Registra driver FS PSRAM (idempotente, richiede lock LVGL già acquisito) */
-    register_psram_fs();
-
     /* Chrome (ora + dots + bandiera cliccabile → selezione lingua) */
     lvgl_page_chrome_set_flag_callback(on_ads_flag_btn, NULL);
     lvgl_page_chrome_add(scr);
@@ -465,7 +444,7 @@ void lvgl_page_ads_show(void)
                                : "MicroHard";
     lv_label_set_text(title_lbl, location_name);
     lv_obj_set_style_text_color(title_lbl, COL_WHITE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(title_lbl, &lv_font_montserrat_32, LV_PART_MAIN);
+    lv_obj_set_style_text_font(title_lbl, &GoogleSans70, LV_PART_MAIN);
     lv_obj_align(title_lbl, LV_ALIGN_TOP_LEFT, PANEL_PAD_X, 88);
 
     /* ── Container slideshow con angoli arrotondati ─────────────────────── */
@@ -505,7 +484,7 @@ void lvgl_page_ads_show(void)
     lv_obj_t *sel_lbl = lv_label_create(sel_btn);
     lv_label_set_text(sel_lbl, "Seleziona lavaggio");
     lv_obj_set_style_text_color(sel_lbl, COL_WHITE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(sel_lbl, &lv_font_montserrat_32, LV_PART_MAIN);
+    lv_obj_set_style_text_font(sel_lbl, &GoogleSans50, LV_PART_MAIN);
     lv_obj_center(sel_lbl);
 
     /* ── Barra messaggio errore ─────────────────────────────────────────── */
@@ -522,13 +501,13 @@ void lvgl_page_ads_show(void)
     s_error_lbl = lv_label_create(err_box);
     lv_label_set_text(s_error_lbl, s_error_msg[0] ? s_error_msg : "Nessun errore");
     lv_obj_set_style_text_color(s_error_lbl, COL_WHITE, LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_error_lbl, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_error_lbl, &GoogleSans40, LV_PART_MAIN);
     lv_label_set_long_mode(s_error_lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_width(s_error_lbl, ERR_W - 16);
     lv_obj_center(s_error_lbl);
 
     /* Avvio carousel */
-    s_ad_current_image = 0;
+    s_current_image    = 0;
     s_ad_exit_pending  = false;
     display_current_ad_image();
 
@@ -538,7 +517,7 @@ void lvgl_page_ads_show(void)
     s_ad_carousel_timer = lv_timer_create(ad_carousel_timer_cb, s_ad_rotation_ms, NULL);
 
     s_ad_scr = scr;
-    ESP_LOGI(TAG, "[C] Schermata ads visualizzata (%u img, rot=%u ms)", s_ad_image_count, s_ad_rotation_ms);
+    ESP_LOGI(TAG, "[C] Schermata ads visualizzata (%u img, rot=%u ms)", s_image_count, s_ad_rotation_ms);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -574,43 +553,31 @@ void lvgl_page_ads_deactivate(void)
     s_img_container = NULL;
     s_error_lbl     = NULL;
     s_ad_scr        = NULL;
-    s_ad_current_image = 0;
+    s_current_image    = 0;
     s_ad_exit_pending  = false;
 }
 
 /**
  * @brief Libera la lista immagini dalla RAM (da chiamare se si vuole ricaricare).
  */
-/**
- * @brief Libera la lista immagini dalla RAM (da chiamare se si vuole ricaricare).
- */
 void lvgl_page_ads_preload_images(void)
 {
-    /* [C] Pre-carica le immagini da SPIFFS in PSRAM SENZA tenere il lock LVGL.
-       Sicuro da chiamare più volte: se già caricati non fa nulla.
-       Il driver FS 'M' viene registrato in ads_show() (dentro il lock). */
-    if (s_ad_psram == NULL) {
+    /* [C] Pre-carica e decodifica le immagini in PSRAM SENZA lock LVGL.
+       Sicuro da chiamare più volte: idempotente se già caricate. */
+    if (s_image_count == 0) {
         load_ad_images();
     }
 }
 
 void lvgl_page_ads_unload_images(void)
 {
-    /* Libera nomi file */
-    if (s_ad_images) {
-        for (uint32_t i = 0; i < s_ad_image_count; i++) free(s_ad_images[i]);
-        free(s_ad_images);
-        s_ad_images = NULL;
-    }
-    /* Libera buffer PSRAM */
-    if (s_ad_psram) {
-        for (uint32_t i = 0; i < s_ad_image_count; i++) {
-            heap_caps_free(s_ad_psram[i].data);
+    for (uint32_t i = 0; i < s_image_count; i++) {
+        if (s_images[i].pixels) {
+            heap_caps_free(s_images[i].pixels);
+            s_images[i].pixels = NULL;
         }
-        free(s_ad_psram);
-        s_ad_psram = NULL;
     }
-    s_ad_image_count   = 0;
-    s_ad_current_image = 0;
-    ESP_LOGI(TAG, "[U] Immagini pubblicitarie scaricate (PSRAM + indice)");
+    s_image_count   = 0;
+    s_current_image = 0;
+    ESP_LOGI(TAG, "[U] Immagini pubblicitarie liberate dalla PSRAM");
 }

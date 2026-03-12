@@ -80,7 +80,8 @@ typedef struct {
  * @brief Struttura timeout applicativi
  */
 typedef struct {
-    uint32_t language_return_ms;     ///< Timeout inattività per ritorno a pagina lingua
+    uint32_t exit_programs_ms;       ///< Timeout inattività in scelta programmi → ritorno slideshow (default 60s)
+    uint32_t exit_language_ms;       ///< Timeout inattività in scelta lingua → ritorno automatico (default 60s)
     uint32_t idle_before_ads_ms;     ///< Timeout inattività prima di mostrare ads (default 60000ms=60s)
     uint32_t ad_rotation_ms;         ///< Intervallo rotazione immagini ads (default 30000ms=30s)
     uint32_t credit_reset_timeout_ms; ///< Timeout per reset crediti CVD/ECD (default 300000ms=5min)
@@ -181,6 +182,14 @@ typedef struct {
 } device_ui_texts_config_t;
 
 /**
+ * @brief Seleziona la sorgente immagini pubblicitarie (SPIFFS o SD Card).
+ */
+typedef enum {
+    IMAGE_SOURCE_SPIFFS  = 0,   ///< Immagini caricate da SPIFFS (default)
+    IMAGE_SOURCE_SDCARD  = 1,   ///< Immagini caricate da SD Card
+} device_image_source_t;
+
+/**
  * @brief Struttura di configurazione generale device
  */
 typedef struct {
@@ -208,6 +217,7 @@ typedef struct {
     device_serial_config_t mdb_serial;  ///< Configurazione Seriale MDB
     device_gpios_config_t gpios;        ///< Configurazione GPIO extra
     device_ui_texts_config_t ui;        ///< Configurazione testi UI multilingua
+    device_image_source_t image_source; ///< Sorgente immagini pubblicitarie (SPIFFS / SD)
 } device_config_t;
 
 /**

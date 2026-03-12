@@ -30,10 +30,16 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [V] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2, 4, 6, 8, 10 .Nel caso di 1 programma occuperà tutto lo spazio previsto per i pulsanti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità. In questa sezione mettiamo anche due input per le coordinate geografiche della posizione dell'impianto
 [X] nella pagina logo non deve apparire lo header con ora  e bandierina. Nella scelta lingue c'e una bandiera che si sovrappone a quella nello header
 [X] Rigenera le immagini delle bandierine con la trasparenza con LV_IMG_CF_TRUE_COLOR_ALPHA
-
-[ ] la sequenza delle pagine è : Init con logo > pubblicità con tasto per scelta programmi e bandierina per passare a scelta lingua - dopo scelta lingua (o timeour 60 secondi) si ritorna alla pagina su cui si è premuta la bandierina - da scelta programmi si ritorna a pubblicità dopo timeout inayyività 60 secondi
+[X} implementiamo la possibilità di scegliere  posizione ca cui caricare le immagini pubblilcitarie su SPIFFS  e su SDCARD tramite uno switch che mettiamo in Identità. In Identità impostiamo i campi su 2 colonne, mettiamo lo switch 'Images on' nell'ultima riga. Nel file manager mettiamo un button primadi [Scarica tutto] con nome [copia su X] dove X è la destinazione non attulamente visualizzata
+[X] la sequenza delle pagine è : Init con logo > pubblicità con tasto per scelta programmi e bandierina per passare a scelta lingua - dopo scelta lingua (o timeour 60 secondi) si ritorna alla pagina su cui si è premuta la bandierina - da scelta programmi si ritorna a pubblicità dopo timeout inayyività 60 secondi
 [V] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => 30% i tutti i pulsanti e la basrra diventanono porpora 
 [ ] La gestione della striscia LED deve prevedere che ci sono 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione)
+[ ] Il tasto Stop deve apparire solo a programma avviato
+[ ] il caricamento delle immagini per lo slideshow segue questo ordine: se ci sono file imgxx.jpg in SPIFFS vanno caricate da SPIFFS, se non ci sono in SPIFFS le cerchiamo in SDCARD. se non ci sono in SDCARD saltiamo la pagina pubblicità e passiamo direttamente a scelta programmi
+[ ] Font da utilizzare : pagina ads : testo nome impianto GoogleSans70, Selezione lavaggio GoogleSans50, messaggio errore GoogleSans40
+Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
+Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
+
 ------------------
 I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
 I (19254) APP: [F] [M] Cmd1 - Address Poll: OK
@@ -41,6 +47,7 @@ I (19334) APP: [F] [M] Cmd2 - Modify Inhibit Status (all channels): OK
 I (19404) APP: [F] [M] Cmd3 - Modify Master Inhibit (accept enabled): OK
 I (19474) APP: [F] [M] Cmd4 - Request Inhibit Status: OK (mask=0xFFFF)
 I (19474) APP: [F] [M] Sequenza CCTalk completata
+
 
 [ ] gestione brightness:
 L'utilizzo dell'**ESP32-P4** per controllare questo monitor tramite MIPI-DSI e I2C è un'ottima scelta, data la potenza del chip nel gestire flussi video. Per la luminosità, Waveshare espone un'interfaccia I2C specifica che funge da "ponte" verso il driver della retroilluminazione.

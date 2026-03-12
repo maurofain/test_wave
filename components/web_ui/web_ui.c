@@ -318,19 +318,19 @@ static void web_ui_apply_serial_cfg_from_json(cJSON *serial_obj,
                                                         WEB_UI_SERIAL_BAUD_MAX,
                                                         defaults->baud_rate);
     }
-    if (web_ui_json_read_int(serial_obj, "data_bits", NULL, &value)) {
+    if (web_ui_json_read_int(serial_obj, "data", "data_bits", &value)) {
         target->data_bits = web_ui_clamp_int_or_default(value,
                                                         WEB_UI_SERIAL_DATA_BITS_MIN,
                                                         WEB_UI_SERIAL_DATA_BITS_MAX,
                                                         defaults->data_bits);
     }
-    if (web_ui_json_read_int(serial_obj, "parity", NULL, &value)) {
+    if (web_ui_json_read_int(serial_obj, "par", "parity", &value)) {
         target->parity = web_ui_clamp_int_or_default(value,
                                                      WEB_UI_SERIAL_PARITY_MIN,
                                                      WEB_UI_SERIAL_PARITY_MAX,
                                                      defaults->parity);
     }
-    if (web_ui_json_read_int(serial_obj, "stop_bits", NULL, &value)) {
+    if (web_ui_json_read_int(serial_obj, "stop", "stop_bits", &value)) {
         target->stop_bits = web_ui_clamp_int_or_default(value,
                                                         WEB_UI_SERIAL_STOP_BITS_MIN,
                                                         WEB_UI_SERIAL_STOP_BITS_MAX,
@@ -1031,72 +1031,74 @@ esp_err_t api_config_get(httpd_req_t *req)
     if (send_http_log) ESP_LOGD(TAG, "[C] GET /api/config");
     device_config_t *cfg = device_config_get();
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "device_name", cfg->device_name);
-    cJSON_AddStringToObject(root, "location_name", cfg->location_name);
-    cJSON_AddNumberToObject(root, "num_programs", cfg->num_programs ? cfg->num_programs : 10);
-    cJSON_AddNumberToObject(root, "latitude",  cfg->latitude);
-    cJSON_AddNumberToObject(root, "longitude", cfg->longitude);
+    cJSON_AddStringToObject(root, "dname", cfg->device_name);
+    cJSON_AddStringToObject(root, "loc", cfg->location_name);
+    cJSON_AddStringToObject(root, "image_source", cfg->image_source == IMAGE_SOURCE_SDCARD ? "sdcard" : "spiffs");
+    cJSON_AddNumberToObject(root, "n_prg", cfg->num_programs ? cfg->num_programs : 10);
+    cJSON_AddNumberToObject(root, "lat",  cfg->latitude);
+    cJSON_AddNumberToObject(root, "lon", cfg->longitude);
     
     cJSON *eth = cJSON_CreateObject();
-    cJSON_AddBoolToObject(eth, "enabled", cfg->eth.enabled);
-    cJSON_AddBoolToObject(eth, "dhcp_enabled", cfg->eth.dhcp_enabled);
+    cJSON_AddBoolToObject(eth, "en", cfg->eth.enabled);
+    cJSON_AddBoolToObject(eth, "dhcp", cfg->eth.dhcp_enabled);
     cJSON_AddStringToObject(eth, "ip", cfg->eth.ip);
-    cJSON_AddStringToObject(eth, "subnet", cfg->eth.subnet);
-    cJSON_AddStringToObject(eth, "gateway", cfg->eth.gateway);
+    cJSON_AddStringToObject(eth, "sub", cfg->eth.subnet);
+    cJSON_AddStringToObject(eth, "gw", cfg->eth.gateway);
     cJSON_AddItemToObject(root, "eth", eth);
     
     cJSON *wifi = cJSON_CreateObject();
-    cJSON_AddBoolToObject(wifi, "sta_enabled", cfg->wifi.sta_enabled);
-    cJSON_AddBoolToObject(wifi, "dhcp_enabled", cfg->wifi.dhcp_enabled);
+    cJSON_AddBoolToObject(wifi, "sta", cfg->wifi.sta_enabled);
+    cJSON_AddBoolToObject(wifi, "dhcp", cfg->wifi.dhcp_enabled);
     cJSON_AddStringToObject(wifi, "ssid", cfg->wifi.ssid);
-    cJSON_AddStringToObject(wifi, "password", cfg->wifi.password);
+    cJSON_AddStringToObject(wifi, "pwd", cfg->wifi.password);
     cJSON_AddStringToObject(wifi, "ip", cfg->wifi.ip);
-    cJSON_AddStringToObject(wifi, "subnet", cfg->wifi.subnet);
-    cJSON_AddStringToObject(wifi, "gateway", cfg->wifi.gateway);
+    cJSON_AddStringToObject(wifi, "sub", cfg->wifi.subnet);
+    cJSON_AddStringToObject(wifi, "gw", cfg->wifi.gateway);
     cJSON_AddItemToObject(root, "wifi", wifi);
     
-    cJSON_AddBoolToObject(root, "ntp_enabled", cfg->ntp_enabled);
+    cJSON_AddBoolToObject(root, "ntp_en", cfg->ntp_enabled);
     
     // NTP configuration
     cJSON *ntp = cJSON_CreateObject();
-    cJSON_AddStringToObject(ntp, "server1", cfg->ntp.server1);
-    cJSON_AddStringToObject(ntp, "server2", cfg->ntp.server2);
-    cJSON_AddNumberToObject(ntp, "timezone_offset", cfg->ntp.timezone_offset);
+    cJSON_AddStringToObject(ntp, "s1", cfg->ntp.server1);
+    cJSON_AddStringToObject(ntp, "s2", cfg->ntp.server2);
+    cJSON_AddNumberToObject(ntp, "tz", cfg->ntp.timezone_offset);
     cJSON_AddItemToObject(root, "ntp", ntp);
 
     // Server/Cloud configuration
     cJSON *server = cJSON_CreateObject();
-    cJSON_AddBoolToObject(server, "enabled", cfg->server.enabled);
+    cJSON_AddBoolToObject(server, "en", cfg->server.enabled);
     cJSON_AddStringToObject(server, "url", cfg->server.url);
-    cJSON_AddStringToObject(server, "serial", cfg->server.serial);
-    cJSON_AddStringToObject(server, "password", cfg->server.password);
+    cJSON_AddStringToObject(server, "ser", cfg->server.serial);
+    cJSON_AddStringToObject(server, "pwd", cfg->server.password);
     cJSON_AddItemToObject(root, "server", server);
     
     cJSON *sensors = cJSON_CreateObject();
-    cJSON_AddBoolToObject(sensors, "io_expander_enabled", cfg->sensors.io_expander_enabled);
-    cJSON_AddBoolToObject(sensors, "temperature_enabled", cfg->sensors.temperature_enabled);
-    cJSON_AddBoolToObject(sensors, "led_enabled", cfg->sensors.led_enabled);
-    cJSON_AddNumberToObject(sensors, "led_count", cfg->sensors.led_count);
-    cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
-    cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
-    cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
-    cJSON_AddBoolToObject(sensors, "cctalk_enabled", cfg->sensors.cctalk_enabled);
-    cJSON_AddBoolToObject(sensors, "eeprom_enabled", cfg->sensors.eeprom_enabled);
-    cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
-    cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
-    cJSON_AddBoolToObject(sensors, "pwm2_enabled", cfg->sensors.pwm2_enabled);
+    cJSON_AddBoolToObject(sensors, "io_exp", cfg->sensors.io_expander_enabled);
+    cJSON_AddBoolToObject(sensors, "temp", cfg->sensors.temperature_enabled);
+    cJSON_AddBoolToObject(sensors, "led", cfg->sensors.led_enabled);
+    cJSON_AddNumberToObject(sensors, "led_n", cfg->sensors.led_count);
+    cJSON_AddBoolToObject(sensors, "rs232", cfg->sensors.rs232_enabled);
+    cJSON_AddBoolToObject(sensors, "rs485", cfg->sensors.rs485_enabled);
+    cJSON_AddBoolToObject(sensors, "mdb", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "cctalk", cfg->sensors.cctalk_enabled);
+    cJSON_AddBoolToObject(sensors, "eeprom", cfg->sensors.eeprom_enabled);
+    cJSON_AddBoolToObject(sensors, "sd", cfg->sensors.sd_card_enabled);
+    cJSON_AddBoolToObject(sensors, "pwm1", cfg->sensors.pwm1_enabled);
+    cJSON_AddBoolToObject(sensors, "pwm2", cfg->sensors.pwm2_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors);
 
     cJSON *display = cJSON_CreateObject();
-    cJSON_AddNumberToObject(display, "lcd_brightness", cfg->display.lcd_brightness);
+    cJSON_AddBoolToObject(display, "en", cfg->display.enabled);
+    cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
     cJSON_AddItemToObject(root, "display", display);
 
     // RS232
     cJSON *rs232 = cJSON_CreateObject();
     cJSON_AddNumberToObject(rs232, "baud", cfg->rs232.baud_rate);
-    cJSON_AddNumberToObject(rs232, "data_bits", cfg->rs232.data_bits);
-    cJSON_AddNumberToObject(rs232, "parity", cfg->rs232.parity);
-    cJSON_AddNumberToObject(rs232, "stop_bits", cfg->rs232.stop_bits);
+    cJSON_AddNumberToObject(rs232, "data", cfg->rs232.data_bits);
+    cJSON_AddNumberToObject(rs232, "par", cfg->rs232.parity);
+    cJSON_AddNumberToObject(rs232, "stop", cfg->rs232.stop_bits);
     cJSON_AddNumberToObject(rs232, "rx_buf", cfg->rs232.rx_buf_size);
     cJSON_AddNumberToObject(rs232, "tx_buf", cfg->rs232.tx_buf_size);
     cJSON_AddItemToObject(root, "rs232", rs232);
@@ -1104,9 +1106,9 @@ esp_err_t api_config_get(httpd_req_t *req)
     // RS485
     cJSON *rs485 = cJSON_CreateObject();
     cJSON_AddNumberToObject(rs485, "baud", cfg->rs485.baud_rate);
-    cJSON_AddNumberToObject(rs485, "data_bits", cfg->rs485.data_bits);
-    cJSON_AddNumberToObject(rs485, "parity", cfg->rs485.parity);
-    cJSON_AddNumberToObject(rs485, "stop_bits", cfg->rs485.stop_bits);
+    cJSON_AddNumberToObject(rs485, "data", cfg->rs485.data_bits);
+    cJSON_AddNumberToObject(rs485, "par", cfg->rs485.parity);
+    cJSON_AddNumberToObject(rs485, "stop", cfg->rs485.stop_bits);
     cJSON_AddNumberToObject(rs485, "rx_buf", cfg->rs485.rx_buf_size);
     cJSON_AddNumberToObject(rs485, "tx_buf", cfg->rs485.tx_buf_size);
     cJSON_AddItemToObject(root, "rs485", rs485);
@@ -1127,12 +1129,12 @@ esp_err_t api_config_get(httpd_req_t *req)
     // MDB Serial
     cJSON *mdb_s = cJSON_CreateObject();
     cJSON_AddNumberToObject(mdb_s, "baud", cfg->mdb_serial.baud_rate);
-    cJSON_AddNumberToObject(mdb_s, "data_bits", cfg->mdb_serial.data_bits);
-    cJSON_AddNumberToObject(mdb_s, "parity", cfg->mdb_serial.parity);
-    cJSON_AddNumberToObject(mdb_s, "stop_bits", cfg->mdb_serial.stop_bits);
+    cJSON_AddNumberToObject(mdb_s, "data", cfg->mdb_serial.data_bits);
+    cJSON_AddNumberToObject(mdb_s, "par", cfg->mdb_serial.parity);
+    cJSON_AddNumberToObject(mdb_s, "stop", cfg->mdb_serial.stop_bits);
     cJSON_AddNumberToObject(mdb_s, "rx_buf", cfg->mdb_serial.rx_buf_size);
     cJSON_AddNumberToObject(mdb_s, "tx_buf", cfg->mdb_serial.tx_buf_size);
-    cJSON_AddItemToObject(root, "mdb_serial", mdb_s);
+    cJSON_AddItemToObject(root, "mdb_ser", mdb_s);
 
     // CCTalk Serial (configurazione fissa attuale)
     cJSON *cctalk_s = cJSON_CreateObject();
@@ -1153,36 +1155,37 @@ esp_err_t api_config_get(httpd_req_t *req)
     // GPIOs
     cJSON *gpios = cJSON_CreateObject();
     cJSON *g33 = cJSON_CreateObject();
-    cJSON_AddNumberToObject(g33, "mode", cfg->gpios.gpio33.mode);
-    cJSON_AddBoolToObject(g33, "state", cfg->gpios.gpio33.initial_state);
+    cJSON_AddNumberToObject(g33, "m", cfg->gpios.gpio33.mode);
+    cJSON_AddBoolToObject(g33, "st", cfg->gpios.gpio33.initial_state);
     cJSON_AddItemToObject(gpios, "gpio33", g33);
     cJSON_AddItemToObject(root, "gpios", gpios);
 
     // Remote logging configuration
     cJSON *remote_log = cJSON_CreateObject();
-    cJSON_AddNumberToObject(remote_log, "server_port", cfg->remote_log.server_port);
-    cJSON_AddBoolToObject(remote_log, "use_broadcast", cfg->remote_log.use_broadcast);
-    cJSON_AddBoolToObject(remote_log, "write_to_sd", cfg->remote_log.write_to_sd);
-    cJSON_AddItemToObject(root, "remote_log", remote_log);
+    cJSON_AddNumberToObject(remote_log, "port", cfg->remote_log.server_port);
+    cJSON_AddBoolToObject(remote_log, "bcast", cfg->remote_log.use_broadcast);
+    cJSON_AddBoolToObject(remote_log, "to_sd", cfg->remote_log.write_to_sd);
+    cJSON_AddItemToObject(root, "rlog", remote_log);
 
     // Scanner configuration
     cJSON *scanner = cJSON_CreateObject();
-    cJSON_AddBoolToObject(scanner, "enabled", cfg->scanner.enabled);
+    cJSON_AddBoolToObject(scanner, "en", cfg->scanner.enabled);
     cJSON_AddNumberToObject(scanner, "vid", cfg->scanner.vid);
     cJSON_AddNumberToObject(scanner, "pid", cfg->scanner.pid);
-    cJSON_AddNumberToObject(scanner, "dual_pid", cfg->scanner.dual_pid);
-    cJSON_AddNumberToObject(scanner, "cooldown_ms", cfg->scanner.cooldown_ms);
+    cJSON_AddNumberToObject(scanner, "dpid", cfg->scanner.dual_pid);
+    cJSON_AddNumberToObject(scanner, "cool", cfg->scanner.cooldown_ms);
     cJSON_AddItemToObject(root, "scanner", scanner);
 
     // Timeout applicativi
     cJSON *timeouts = cJSON_CreateObject();
-    cJSON_AddNumberToObject(timeouts, "language_return_ms", cfg->timeouts.language_return_ms);
+    cJSON_AddNumberToObject(timeouts, "t_prg", cfg->timeouts.exit_programs_ms);
+    cJSON_AddNumberToObject(timeouts, "t_lang", cfg->timeouts.exit_language_ms);
     cJSON_AddItemToObject(root, "timeouts", timeouts);
 
     // UI multilingua
     cJSON *ui = cJSON_CreateObject();
-    cJSON_AddStringToObject(ui, "user_language", cfg->ui.user_language);
-    cJSON_AddStringToObject(ui, "backend_language", cfg->ui.backend_language);
+    cJSON_AddStringToObject(ui, "ulang", cfg->ui.user_language);
+    cJSON_AddStringToObject(ui, "blang", cfg->ui.backend_language);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
     cJSON_AddStringToObject(root, "ui_language", cfg->ui.user_language);
@@ -1362,52 +1365,54 @@ esp_err_t api_config_backup(httpd_req_t *req)
 
     device_config_t *cfg = device_config_get();
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "device_name", cfg->device_name);
-    cJSON_AddStringToObject(root, "location_name", cfg->location_name);
+    cJSON_AddStringToObject(root, "dname", cfg->device_name);
+    cJSON_AddStringToObject(root, "loc", cfg->location_name);
+    cJSON_AddStringToObject(root, "image_source", cfg->image_source == IMAGE_SOURCE_SDCARD ? "sdcard" : "spiffs");
 
     cJSON *eth = cJSON_CreateObject();
-    cJSON_AddBoolToObject(eth, "enabled", cfg->eth.enabled);
-    cJSON_AddBoolToObject(eth, "dhcp_enabled", cfg->eth.dhcp_enabled);
+    cJSON_AddBoolToObject(eth, "en", cfg->eth.enabled);
+    cJSON_AddBoolToObject(eth, "dhcp", cfg->eth.dhcp_enabled);
     cJSON_AddStringToObject(eth, "ip", cfg->eth.ip);
-    cJSON_AddStringToObject(eth, "subnet", cfg->eth.subnet);
-    cJSON_AddStringToObject(eth, "gateway", cfg->eth.gateway);
+    cJSON_AddStringToObject(eth, "sub", cfg->eth.subnet);
+    cJSON_AddStringToObject(eth, "gw", cfg->eth.gateway);
     cJSON_AddItemToObject(root, "eth", eth);
     
     cJSON *wifi = cJSON_CreateObject();
-    cJSON_AddBoolToObject(wifi, "sta_enabled", cfg->wifi.sta_enabled);
-    cJSON_AddBoolToObject(wifi, "dhcp_enabled", cfg->wifi.dhcp_enabled);
+    cJSON_AddBoolToObject(wifi, "sta", cfg->wifi.sta_enabled);
+    cJSON_AddBoolToObject(wifi, "dhcp", cfg->wifi.dhcp_enabled);
     cJSON_AddStringToObject(wifi, "ssid", cfg->wifi.ssid);
-    cJSON_AddStringToObject(wifi, "password", cfg->wifi.password);
+    cJSON_AddStringToObject(wifi, "pwd", cfg->wifi.password);
     cJSON_AddStringToObject(wifi, "ip", cfg->wifi.ip);
-    cJSON_AddStringToObject(wifi, "subnet", cfg->wifi.subnet);
-    cJSON_AddStringToObject(wifi, "gateway", cfg->wifi.gateway);
+    cJSON_AddStringToObject(wifi, "sub", cfg->wifi.subnet);
+    cJSON_AddStringToObject(wifi, "gw", cfg->wifi.gateway);
     cJSON_AddItemToObject(root, "wifi", wifi);
     
     cJSON *sensors = cJSON_CreateObject();
-    cJSON_AddBoolToObject(sensors, "io_expander_enabled", cfg->sensors.io_expander_enabled);
-    cJSON_AddBoolToObject(sensors, "temperature_enabled", cfg->sensors.temperature_enabled);
-    cJSON_AddBoolToObject(sensors, "led_enabled", cfg->sensors.led_enabled);
-    cJSON_AddNumberToObject(sensors, "led_count", cfg->sensors.led_count);
-    cJSON_AddBoolToObject(sensors, "rs232_enabled", cfg->sensors.rs232_enabled);
-    cJSON_AddBoolToObject(sensors, "rs485_enabled", cfg->sensors.rs485_enabled);
-    cJSON_AddBoolToObject(sensors, "mdb_enabled", cfg->sensors.mdb_enabled);
-    cJSON_AddBoolToObject(sensors, "cctalk_enabled", cfg->sensors.cctalk_enabled);
-    cJSON_AddBoolToObject(sensors, "eeprom_enabled", cfg->sensors.eeprom_enabled);
-    cJSON_AddBoolToObject(sensors, "sd_card_enabled", cfg->sensors.sd_card_enabled);
-    cJSON_AddBoolToObject(sensors, "pwm1_enabled", cfg->sensors.pwm1_enabled);
-    cJSON_AddBoolToObject(sensors, "pwm2_enabled", cfg->sensors.pwm2_enabled);
+    cJSON_AddBoolToObject(sensors, "io_exp", cfg->sensors.io_expander_enabled);
+    cJSON_AddBoolToObject(sensors, "temp", cfg->sensors.temperature_enabled);
+    cJSON_AddBoolToObject(sensors, "led", cfg->sensors.led_enabled);
+    cJSON_AddNumberToObject(sensors, "led_n", cfg->sensors.led_count);
+    cJSON_AddBoolToObject(sensors, "rs232", cfg->sensors.rs232_enabled);
+    cJSON_AddBoolToObject(sensors, "rs485", cfg->sensors.rs485_enabled);
+    cJSON_AddBoolToObject(sensors, "mdb", cfg->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors, "cctalk", cfg->sensors.cctalk_enabled);
+    cJSON_AddBoolToObject(sensors, "eeprom", cfg->sensors.eeprom_enabled);
+    cJSON_AddBoolToObject(sensors, "sd", cfg->sensors.sd_card_enabled);
+    cJSON_AddBoolToObject(sensors, "pwm1", cfg->sensors.pwm1_enabled);
+    cJSON_AddBoolToObject(sensors, "pwm2", cfg->sensors.pwm2_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors);
 
     cJSON *display = cJSON_CreateObject();
-    cJSON_AddNumberToObject(display, "lcd_brightness", cfg->display.lcd_brightness);
+    cJSON_AddBoolToObject(display, "en", cfg->display.enabled);
+    cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
     cJSON_AddItemToObject(root, "display", display);
 
     // RS232
     cJSON *rs232 = cJSON_CreateObject();
     cJSON_AddNumberToObject(rs232, "baud", cfg->rs232.baud_rate);
-    cJSON_AddNumberToObject(rs232, "data_bits", cfg->rs232.data_bits);
-    cJSON_AddNumberToObject(rs232, "parity", cfg->rs232.parity);
-    cJSON_AddNumberToObject(rs232, "stop_bits", cfg->rs232.stop_bits);
+    cJSON_AddNumberToObject(rs232, "data", cfg->rs232.data_bits);
+    cJSON_AddNumberToObject(rs232, "par", cfg->rs232.parity);
+    cJSON_AddNumberToObject(rs232, "stop", cfg->rs232.stop_bits);
     cJSON_AddNumberToObject(rs232, "rx_buf", cfg->rs232.rx_buf_size);
     cJSON_AddNumberToObject(rs232, "tx_buf", cfg->rs232.tx_buf_size);
     cJSON_AddItemToObject(root, "rs232", rs232);
@@ -1415,9 +1420,9 @@ esp_err_t api_config_backup(httpd_req_t *req)
     // RS485
     cJSON *rs485 = cJSON_CreateObject();
     cJSON_AddNumberToObject(rs485, "baud", cfg->rs485.baud_rate);
-    cJSON_AddNumberToObject(rs485, "data_bits", cfg->rs485.data_bits);
-    cJSON_AddNumberToObject(rs485, "parity", cfg->rs485.parity);
-    cJSON_AddNumberToObject(rs485, "stop_bits", cfg->rs485.stop_bits);
+    cJSON_AddNumberToObject(rs485, "data", cfg->rs485.data_bits);
+    cJSON_AddNumberToObject(rs485, "par", cfg->rs485.parity);
+    cJSON_AddNumberToObject(rs485, "stop", cfg->rs485.stop_bits);
     cJSON_AddNumberToObject(rs485, "rx_buf", cfg->rs485.rx_buf_size);
     cJSON_AddNumberToObject(rs485, "tx_buf", cfg->rs485.tx_buf_size);
     cJSON_AddItemToObject(root, "rs485", rs485);
@@ -1438,12 +1443,12 @@ esp_err_t api_config_backup(httpd_req_t *req)
     // MDB Serial
     cJSON *mdb_s = cJSON_CreateObject();
     cJSON_AddNumberToObject(mdb_s, "baud", cfg->mdb_serial.baud_rate);
-    cJSON_AddNumberToObject(mdb_s, "data_bits", cfg->mdb_serial.data_bits);
-    cJSON_AddNumberToObject(mdb_s, "parity", cfg->mdb_serial.parity);
-    cJSON_AddNumberToObject(mdb_s, "stop_bits", cfg->mdb_serial.stop_bits);
+    cJSON_AddNumberToObject(mdb_s, "data", cfg->mdb_serial.data_bits);
+    cJSON_AddNumberToObject(mdb_s, "par", cfg->mdb_serial.parity);
+    cJSON_AddNumberToObject(mdb_s, "stop", cfg->mdb_serial.stop_bits);
     cJSON_AddNumberToObject(mdb_s, "rx_buf", cfg->mdb_serial.rx_buf_size);
     cJSON_AddNumberToObject(mdb_s, "tx_buf", cfg->mdb_serial.tx_buf_size);
-    cJSON_AddItemToObject(root, "mdb_serial", mdb_s);
+    cJSON_AddItemToObject(root, "mdb_ser", mdb_s);
 
     // CCTalk Serial (configurazione fissa attuale)
     cJSON *cctalk_s = cJSON_CreateObject();
@@ -1463,8 +1468,8 @@ esp_err_t api_config_backup(httpd_req_t *req)
 
     // UI multilingua
     cJSON *ui = cJSON_CreateObject();
-    cJSON_AddStringToObject(ui, "user_language", cfg->ui.user_language);
-    cJSON_AddStringToObject(ui, "backend_language", cfg->ui.backend_language);
+    cJSON_AddStringToObject(ui, "ulang", cfg->ui.user_language);
+    cJSON_AddStringToObject(ui, "blang", cfg->ui.backend_language);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
     cJSON_AddStringToObject(root, "ui_language", cfg->ui.user_language);
@@ -1528,13 +1533,21 @@ esp_err_t api_config_save(httpd_req_t *req)
     strncpy(prev_server_serial, cfg->server.serial, sizeof(prev_server_serial) - 1);
     strncpy(prev_server_password, cfg->server.password, sizeof(prev_server_password) - 1);
 
-    cJSON *name_obj = cJSON_GetObjectItem(root, "device_name");
+    cJSON *name_obj = cJSON_GetObjectItem(root, "dname");
+    if (!name_obj) name_obj = cJSON_GetObjectItem(root, "device_name"); /* compat */
     if (name_obj && name_obj->valuestring) strncpy(cfg->device_name, name_obj->valuestring, sizeof(cfg->device_name)-1);
-    cJSON *loc_obj = cJSON_GetObjectItem(root, "location_name");
+    cJSON *loc_obj = cJSON_GetObjectItem(root, "loc");
+    if (!loc_obj) loc_obj = cJSON_GetObjectItem(root, "location_name"); /* compat */
     if (loc_obj && loc_obj->valuestring) strncpy(cfg->location_name, loc_obj->valuestring, sizeof(cfg->location_name)-1);
+    cJSON *img_src_obj = cJSON_GetObjectItem(root, "image_source");
+    if (img_src_obj && img_src_obj->valuestring) {
+        cfg->image_source = (strcmp(img_src_obj->valuestring, "sdcard") == 0)
+            ? IMAGE_SOURCE_SDCARD : IMAGE_SOURCE_SPIFFS;
+    }
 
     /* [C] Numero pulsanti programma (valori ammessi: 1,2,4,6,8,10) */
-    cJSON *num_prog_obj = cJSON_GetObjectItem(root, "num_programs");
+    cJSON *num_prog_obj = cJSON_GetObjectItem(root, "n_prg");
+    if (!num_prog_obj) num_prog_obj = cJSON_GetObjectItem(root, "num_programs"); /* compat */
     if (num_prog_obj && cJSON_IsNumber(num_prog_obj)) {
         static const uint8_t s_valid_np[] = {1, 2, 4, 6, 8, 10};
         uint8_t np = (uint8_t)num_prog_obj->valueint;
@@ -1546,80 +1559,108 @@ esp_err_t api_config_save(httpd_req_t *req)
     }
 
     /* [C] Coordinate geografiche impianto */
-    cJSON *lat_obj = cJSON_GetObjectItem(root, "latitude");
+    cJSON *lat_obj = cJSON_GetObjectItem(root, "lat");
+    if (!lat_obj) lat_obj = cJSON_GetObjectItem(root, "latitude"); /* compat */
     if (lat_obj && cJSON_IsNumber(lat_obj)) cfg->latitude  = lat_obj->valuedouble;
-    cJSON *lon_obj = cJSON_GetObjectItem(root, "longitude");
+    cJSON *lon_obj = cJSON_GetObjectItem(root, "lon");
+    if (!lon_obj) lon_obj = cJSON_GetObjectItem(root, "longitude"); /* compat */
     if (lon_obj && cJSON_IsNumber(lon_obj)) cfg->longitude = lon_obj->valuedouble;
     
     cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
     if (eth_obj) {
-        cfg->eth.enabled = cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "enabled"));
-        cfg->eth.dhcp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "dhcp_enabled"));
+        cfg->eth.enabled = cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "en")) ||
+                           cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "enabled")); /* compat */
+        cfg->eth.dhcp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "dhcp")) ||
+                                cJSON_IsTrue(cJSON_GetObjectItem(eth_obj, "dhcp_enabled")); /* compat */
         cJSON *ip = cJSON_GetObjectItem(eth_obj, "ip");
         if (ip && ip->valuestring) strncpy(cfg->eth.ip, ip->valuestring, sizeof(cfg->eth.ip)-1);
-        cJSON *subnet = cJSON_GetObjectItem(eth_obj, "subnet");
+        cJSON *subnet = cJSON_GetObjectItem(eth_obj, "sub");
+        if (!subnet) subnet = cJSON_GetObjectItem(eth_obj, "subnet"); /* compat */
         if (subnet && subnet->valuestring) strncpy(cfg->eth.subnet, subnet->valuestring, sizeof(cfg->eth.subnet)-1);
-        cJSON *gateway = cJSON_GetObjectItem(eth_obj, "gateway");
+        cJSON *gateway = cJSON_GetObjectItem(eth_obj, "gw");
+        if (!gateway) gateway = cJSON_GetObjectItem(eth_obj, "gateway"); /* compat */
         if (gateway && gateway->valuestring) strncpy(cfg->eth.gateway, gateway->valuestring, sizeof(cfg->eth.gateway)-1);
     }
     
     cJSON *wifi_obj = cJSON_GetObjectItem(root, "wifi");
     if (wifi_obj) {
-        cfg->wifi.sta_enabled = cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "sta_enabled"));
-        cfg->wifi.dhcp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "dhcp_enabled"));
+        cfg->wifi.sta_enabled = cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "sta")) ||
+                                cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "sta_enabled")); /* compat */
+        cfg->wifi.dhcp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "dhcp")) ||
+                                 cJSON_IsTrue(cJSON_GetObjectItem(wifi_obj, "dhcp_enabled")); /* compat */
         cJSON *ssid = cJSON_GetObjectItem(wifi_obj, "ssid");
         if (ssid && ssid->valuestring) strncpy(cfg->wifi.ssid, ssid->valuestring, sizeof(cfg->wifi.ssid)-1);
-        cJSON *password = cJSON_GetObjectItem(wifi_obj, "password");
+        cJSON *password = cJSON_GetObjectItem(wifi_obj, "pwd");
+        if (!password) password = cJSON_GetObjectItem(wifi_obj, "password"); /* compat */
         if (password && password->valuestring) strncpy(cfg->wifi.password, password->valuestring, sizeof(cfg->wifi.password)-1);
     }
     
     // NTP configuration
-    cfg->ntp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(root, "ntp_enabled"));
+    cfg->ntp_enabled = cJSON_IsTrue(cJSON_GetObjectItem(root, "ntp_en")) ||
+                       cJSON_IsTrue(cJSON_GetObjectItem(root, "ntp_enabled")); /* compat */
     cJSON *ntp_obj = cJSON_GetObjectItem(root, "ntp");
     if (ntp_obj) {
-        cJSON *server1 = cJSON_GetObjectItem(ntp_obj, "server1");
+        cJSON *server1 = cJSON_GetObjectItem(ntp_obj, "s1");
+        if (!server1) server1 = cJSON_GetObjectItem(ntp_obj, "server1"); /* compat */
         if (server1 && server1->valuestring) strncpy(cfg->ntp.server1, server1->valuestring, sizeof(cfg->ntp.server1)-1);
-        cJSON *server2 = cJSON_GetObjectItem(ntp_obj, "server2");
+        cJSON *server2 = cJSON_GetObjectItem(ntp_obj, "s2");
+        if (!server2) server2 = cJSON_GetObjectItem(ntp_obj, "server2"); /* compat */
         if (server2 && server2->valuestring) strncpy(cfg->ntp.server2, server2->valuestring, sizeof(cfg->ntp.server2)-1);
-        cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset");
+        cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "tz");
+        if (!tz_offset) tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset"); /* compat */
         if (tz_offset && cJSON_IsNumber(tz_offset)) cfg->ntp.timezone_offset = tz_offset->valueint;
     }
 
     // Server/Cloud configuration
     cJSON *server_obj = cJSON_GetObjectItem(root, "server");
     if (server_obj) {
-        cfg->server.enabled = cJSON_IsTrue(cJSON_GetObjectItem(server_obj, "enabled"));
+        cfg->server.enabled = cJSON_IsTrue(cJSON_GetObjectItem(server_obj, "en")) ||
+                              cJSON_IsTrue(cJSON_GetObjectItem(server_obj, "enabled")); /* compat */
         cJSON *url = cJSON_GetObjectItem(server_obj, "url");
         if (url && url->valuestring) strncpy(cfg->server.url, url->valuestring, sizeof(cfg->server.url)-1);
-        cJSON *serial = cJSON_GetObjectItem(server_obj, "serial");
+        cJSON *serial = cJSON_GetObjectItem(server_obj, "ser");
+        if (!serial) serial = cJSON_GetObjectItem(server_obj, "serial"); /* compat */
         if (serial && serial->valuestring) strncpy(cfg->server.serial, serial->valuestring, sizeof(cfg->server.serial)-1);
-        cJSON *password = cJSON_GetObjectItem(server_obj, "password");
+        cJSON *password = cJSON_GetObjectItem(server_obj, "pwd");
+        if (!password) password = cJSON_GetObjectItem(server_obj, "password"); /* compat */
         if (password && password->valuestring) strncpy(cfg->server.password, password->valuestring, sizeof(cfg->server.password)-1);
     }
     
     cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
     if (sensors_obj) {
-        cfg->sensors.io_expander_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "io_expander_enabled"));
-        cfg->sensors.temperature_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "temperature_enabled"));
+        cfg->sensors.io_expander_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "io_exp")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "io_expander_enabled")); /* compat */
+        cfg->sensors.temperature_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "temp")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "temperature_enabled")); /* compat */
         
         bool old_led_enabled = cfg->sensors.led_enabled;
         uint32_t old_led_count = cfg->sensors.led_count;
         
-        cfg->sensors.led_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "led_enabled"));
-        cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_count");
+        cfg->sensors.led_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "led")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "led_enabled")); /* compat */
+        cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_n");
+        if (!lc) lc = cJSON_GetObjectItem(sensors_obj, "led_count"); /* compat */
         if (lc) cfg->sensors.led_count = (uint32_t)lc->valueint;
         
-        cfg->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled"));
-        cfg->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled"));
-        cfg->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled"));
-        cfg->sensors.cctalk_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "cctalk_enabled"));
-        cJSON *eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom_enabled");
+        cfg->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled")); /* compat */
+        cfg->sensors.rs485_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs485_enabled")); /* compat */
+        cfg->sensors.mdb_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "mdb_enabled")); /* compat */
+        cfg->sensors.cctalk_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "cctalk")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "cctalk_enabled")); /* compat */
+        cJSON *eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom");
+        if (!eeprom_enabled) eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom_enabled"); /* compat */
         if (eeprom_enabled) {
             cfg->sensors.eeprom_enabled = cJSON_IsTrue(eeprom_enabled);
         }
-        cfg->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled"));
-        cfg->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled"));
-        cfg->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled"));
+        cfg->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled")); /* compat */
+        cfg->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled")); /* compat */
+        cfg->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled")); /* compat */
 
         // Se i LED sono abilitati e il numero è cambiato, re-inizializziamo la stripe
         if (cfg->sensors.led_enabled && (cfg->sensors.led_count != old_led_count || !old_led_enabled)) {
@@ -1641,7 +1682,8 @@ esp_err_t api_config_save(httpd_req_t *req)
             ESP_LOGI(TAG, "[C] Display enabled set to %d", cfg->display.enabled);
 #endif
         }
-        cJSON *bright = cJSON_GetObjectItem(display_obj, "lcd_brightness");
+        cJSON *bright = cJSON_GetObjectItem(display_obj, "brt");
+        if (!bright) bright = cJSON_GetObjectItem(display_obj, "lcd_brightness"); /* compat */
         if (bright) {
             cfg->display.lcd_brightness = (uint8_t)bright->valueint;
             // Applica immediatamente la luminosità del display SOLO se display abilitato
@@ -1661,8 +1703,10 @@ esp_err_t api_config_save(httpd_req_t *req)
     if (gpios_obj) {
         cJSON *g33 = cJSON_GetObjectItem(gpios_obj, "gpio33");
         if (g33) {
-            cfg->gpios.gpio33.mode = (device_gpio_cfg_mode_t)cJSON_GetNumberValue(cJSON_GetObjectItem(g33, "mode"));
-            cfg->gpios.gpio33.initial_state = cJSON_IsTrue(cJSON_GetObjectItem(g33, "state"));
+            cfg->gpios.gpio33.mode = (device_gpio_cfg_mode_t)cJSON_GetNumberValue(
+                cJSON_GetObjectItem(g33, "m") ? cJSON_GetObjectItem(g33, "m") : cJSON_GetObjectItem(g33, "mode"));
+            cfg->gpios.gpio33.initial_state = cJSON_IsTrue(
+                cJSON_GetObjectItem(g33, "st") ? cJSON_GetObjectItem(g33, "st") : cJSON_GetObjectItem(g33, "state"));
         }
     }
 
@@ -1772,7 +1816,8 @@ esp_err_t api_config_save(httpd_req_t *req)
     }
 
     // MDB cfg
-    cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial");
+    cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_ser");
+    if (!mdb_s_obj) mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial"); /* compat */
     if (mdb_s_obj) {
         web_ui_apply_serial_cfg_from_json(mdb_s_obj,
                                           &cfg->mdb_serial,
@@ -1780,14 +1825,18 @@ esp_err_t api_config_save(httpd_req_t *req)
     }
 
     // Remote logging configuration
-    cJSON *remote_log_obj = cJSON_GetObjectItem(root, "remote_log");
+    cJSON *remote_log_obj = cJSON_GetObjectItem(root, "rlog");
+    if (!remote_log_obj) remote_log_obj = cJSON_GetObjectItem(root, "remote_log"); /* compat */
     if (remote_log_obj) {
-        cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
+        cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "port");
+        if (!server_port) server_port = cJSON_GetObjectItem(remote_log_obj, "server_port"); /* compat */
         if (server_port) {
             cfg->remote_log.server_port = (uint16_t)server_port->valueint;
         }
-        cfg->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast"));
-        cfg->remote_log.write_to_sd = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "write_to_sd"));
+        cfg->remote_log.use_broadcast = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "bcast")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "use_broadcast")); /* compat */
+        cfg->remote_log.write_to_sd = cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "to_sd")) ||
+            cJSON_IsTrue(cJSON_GetObjectItem(remote_log_obj, "write_to_sd")); /* compat */
         ESP_LOGI(TAG, "[C] Remote logging config: port=%d, broadcast=%d, sd=%d",
                 cfg->remote_log.server_port, cfg->remote_log.use_broadcast, cfg->remote_log.write_to_sd);
     }
@@ -1806,12 +1855,14 @@ esp_err_t api_config_save(httpd_req_t *req)
             if (cJSON_IsNumber(sp)) cfg->scanner.pid = (uint16_t)sp->valueint;
             else if (cJSON_IsString(sp) && sp->valuestring) cfg->scanner.pid = (uint16_t)strtoul(sp->valuestring, NULL, 0);
         }
-        cJSON *sdual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
+        cJSON *sdual = cJSON_GetObjectItem(scanner_obj, "dpid");
+        if (!sdual) sdual = cJSON_GetObjectItem(scanner_obj, "dual_pid"); /* compat */
         if (sdual) {
             if (cJSON_IsNumber(sdual)) cfg->scanner.dual_pid = (uint16_t)sdual->valueint;
             else if (cJSON_IsString(sdual) && sdual->valuestring) cfg->scanner.dual_pid = (uint16_t)strtoul(sdual->valuestring, NULL, 0);
         }
-        cJSON *scool = cJSON_GetObjectItem(scanner_obj, "cooldown_ms");
+        cJSON *scool = cJSON_GetObjectItem(scanner_obj, "cool");
+        if (!scool) scool = cJSON_GetObjectItem(scanner_obj, "cooldown_ms"); /* compat */
         if (scool) {
             if (cJSON_IsNumber(scool) && scool->valueint > 0) {
                 cfg->scanner.cooldown_ms = (uint32_t)scool->valueint;
@@ -1826,28 +1877,41 @@ esp_err_t api_config_save(httpd_req_t *req)
     // Timeout applicativi
     cJSON *timeouts_obj = cJSON_GetObjectItem(root, "timeouts");
     if (timeouts_obj) {
-        cJSON *language_return = cJSON_GetObjectItem(timeouts_obj, "language_return_ms");
-        if (language_return) {
-            if (cJSON_IsNumber(language_return) && language_return->valueint > 0) {
-                cfg->timeouts.language_return_ms = (uint32_t)language_return->valueint;
-            } else if (cJSON_IsString(language_return) && language_return->valuestring) {
-                cfg->timeouts.language_return_ms = (uint32_t)strtoul(language_return->valuestring, NULL, 0);
+        cJSON *t_prg = cJSON_GetObjectItem(timeouts_obj, "t_prg");
+        if (!t_prg) t_prg = cJSON_GetObjectItem(timeouts_obj, "language_return_ms"); /* compat */
+        if (t_prg) {
+            if (cJSON_IsNumber(t_prg) && t_prg->valueint > 0) {
+                cfg->timeouts.exit_programs_ms = (uint32_t)t_prg->valueint;
+            } else if (cJSON_IsString(t_prg) && t_prg->valuestring) {
+                cfg->timeouts.exit_programs_ms = (uint32_t)strtoul(t_prg->valuestring, NULL, 0);
+            }
+        }
+        cJSON *t_lang = cJSON_GetObjectItem(timeouts_obj, "t_lang");
+        if (t_lang) {
+            if (cJSON_IsNumber(t_lang) && t_lang->valueint > 0) {
+                cfg->timeouts.exit_language_ms = (uint32_t)t_lang->valueint;
+            } else if (cJSON_IsString(t_lang) && t_lang->valuestring) {
+                cfg->timeouts.exit_language_ms = (uint32_t)strtoul(t_lang->valuestring, NULL, 0);
             }
         }
     }
-    if (cfg->timeouts.language_return_ms < 1000U) cfg->timeouts.language_return_ms = 1000U;
-    if (cfg->timeouts.language_return_ms > 600000U) cfg->timeouts.language_return_ms = 600000U;
+    if (cfg->timeouts.exit_programs_ms < 1000U)  cfg->timeouts.exit_programs_ms = 1000U;
+    if (cfg->timeouts.exit_programs_ms > 600000U) cfg->timeouts.exit_programs_ms = 600000U;
+    if (cfg->timeouts.exit_language_ms < 1000U)  cfg->timeouts.exit_language_ms = 1000U;
+    if (cfg->timeouts.exit_language_ms > 600000U) cfg->timeouts.exit_language_ms = 600000U;
 
     // UI multilingua
     cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
     if (ui_obj) {
-        cJSON *user_lang = cJSON_GetObjectItem(ui_obj, "user_language");
+        cJSON *user_lang = cJSON_GetObjectItem(ui_obj, "ulang");
+        if (!user_lang) user_lang = cJSON_GetObjectItem(ui_obj, "user_language"); /* compat */
         if (!user_lang) user_lang = cJSON_GetObjectItem(ui_obj, "language"); /* compat */
         if (user_lang && cJSON_IsString(user_lang) && user_lang->valuestring) {
             strncpy(cfg->ui.user_language, user_lang->valuestring, sizeof(cfg->ui.user_language) - 1);
         }
 
-        cJSON *backend_lang = cJSON_GetObjectItem(ui_obj, "backend_language");
+        cJSON *backend_lang = cJSON_GetObjectItem(ui_obj, "blang");
+        if (!backend_lang) backend_lang = cJSON_GetObjectItem(ui_obj, "backend_language"); /* compat */
         if (backend_lang && cJSON_IsString(backend_lang) && backend_lang->valuestring) {
             strncpy(cfg->ui.backend_language, backend_lang->valuestring, sizeof(cfg->ui.backend_language) - 1);
         }
@@ -2170,7 +2234,8 @@ esp_err_t api_config_timeouts_get(httpd_req_t *req)
     device_config_t *cfg = device_config_get();
     cJSON *root = cJSON_CreateObject();
     
-    cJSON_AddNumberToObject(root, "language_return_ms", cfg->timeouts.language_return_ms);
+    cJSON_AddNumberToObject(root, "t_prg", cfg->timeouts.exit_programs_ms);
+    cJSON_AddNumberToObject(root, "t_lang", cfg->timeouts.exit_language_ms);
     cJSON_AddNumberToObject(root, "idle_before_ads_ms", cfg->timeouts.idle_before_ads_ms);
     cJSON_AddNumberToObject(root, "ad_rotation_ms", cfg->timeouts.ad_rotation_ms);
     cJSON_AddNumberToObject(root, "credit_reset_timeout_ms", cfg->timeouts.credit_reset_timeout_ms);
@@ -2220,8 +2285,15 @@ esp_err_t api_config_timeouts_post(httpd_req_t *req)
     
     /* Aggiorna i timeout se presenti nel JSON */
     cJSON *item;
+    if ((item = cJSON_GetObjectItem(json, "t_prg")) != NULL && item->type == cJSON_Number) {
+        cfg->timeouts.exit_programs_ms = (uint32_t)item->valueint;
+    }
+    /* compat: accetta il vecchio nome */
     if ((item = cJSON_GetObjectItem(json, "language_return_ms")) != NULL && item->type == cJSON_Number) {
-        cfg->timeouts.language_return_ms = (uint32_t)item->valueint;
+        cfg->timeouts.exit_programs_ms = (uint32_t)item->valueint;
+    }
+    if ((item = cJSON_GetObjectItem(json, "t_lang")) != NULL && item->type == cJSON_Number) {
+        cfg->timeouts.exit_language_ms = (uint32_t)item->valueint;
     }
     if ((item = cJSON_GetObjectItem(json, "idle_before_ads_ms")) != NULL && item->type == cJSON_Number) {
         cfg->timeouts.idle_before_ads_ms = (uint32_t)item->valueint;
@@ -2889,6 +2961,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 
     httpd_uri_t uri_api_files_download = {.uri = "/api/files/download", .method = HTTP_GET, .handler = api_files_download_get};
     httpd_register_uri_handler(server, &uri_api_files_download);
+
+    httpd_uri_t uri_api_files_copy = {.uri = "/api/files/copy", .method = HTTP_POST, .handler = api_files_copy_post};
+    httpd_register_uri_handler(server, &uri_api_files_copy);
 
     httpd_uri_t uri_api_remote_files_list = {.uri = "/api/remote/files/list", .method = HTTP_GET, .handler = api_files_list_get};
     httpd_register_uri_handler(server, &uri_api_remote_files_list);

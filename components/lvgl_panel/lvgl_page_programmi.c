@@ -17,8 +17,12 @@
 #include <string.h>
 #include <time.h>
 
+/* Font GoogleSans per pagina programmi */
+extern const lv_font_t GoogleSans140;
+extern const lv_font_t GoogleSans35;
+extern const lv_font_t GoogleSans40;
 
-static const char *TAG = "lvgl_page_programmi";
+static const char *TAG = "lvgl_panel";
 
 #define PANEL_REFRESH_MS 200
 
@@ -55,11 +59,11 @@ static const char *TAG = "lvgl_page_programmi";
 #define PANEL_COUNTER_X (PANEL_LEFT_W + PANEL_COL_GAP)
 #define PANEL_RIGHT_X (PANEL_COUNTER_X + PANEL_COUNTER_W + PANEL_COL_GAP)
 
-#define FONT_TIME (&lv_font_montserrat_20)
-#define FONT_BIGNUM (&lv_font_montserrat_48)
-#define FONT_LABEL (&lv_font_montserrat_32)
-#define FONT_PROG_BTN (&lv_font_montserrat_32)
-#define FONT_DATETIME (&lv_font_montserrat_20)
+#define FONT_TIME (&GoogleSans40)
+#define FONT_BIGNUM (&GoogleSans140)
+#define FONT_LABEL (&GoogleSans35)
+#define FONT_PROG_BTN (&GoogleSans35)
+#define FONT_DATETIME (&GoogleSans40)
 
 typedef struct
 {
@@ -777,25 +781,50 @@ static void build_status(lv_obj_t *scr)
  */
 static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t y, int32_t w, int32_t h)
 {
+    ESP_LOGI(TAG, "[C] === create_prog_button START: pid=%u ===", (unsigned)pid);
+    
     if (pid == 0 || pid > PROG_COUNT)
     {
+        ESP_LOGE(TAG, "[C] create_prog_button: ERRORE - pid=%u non valido (range: 1-%d)", 
+                 (unsigned)pid, PROG_COUNT);
         return;
     }
 
-    ESP_LOGI(TAG, "[C] create_prog_button: pid=%u, x=%d, y=%d, w=%d, h=%d", (unsigned)pid, (int)x, (int)y, (int)w, (int)h);
+    ESP_LOGI(TAG, "[C] create_prog_button: pid=%u, parent=%p, pos=(%d,%d), size=(%d,%d)", 
+             (unsigned)pid, (void*)parent, (int)x, (int)y, (int)w, (int)h);
+
+    if (!parent) {
+        ESP_LOGE(TAG, "[C] create_prog_button: ERRORE - parent è NULL per pid=%u", (unsigned)pid);
+        return;
+    }
 
     lv_obj_t *btn = lv_button_create(parent);
+    if (!btn) {
+        ESP_LOGE(TAG, "[C] create_prog_button: ERRORE - lv_button_create fallito per pid=%u", (unsigned)pid);
+        return;
+    }
+    
     lv_obj_set_pos(btn, x, y);
     lv_obj_set_size(btn, w, h);
     btn_style(btn, COL_PROG);
+    
+    ESP_LOGI(TAG, "[C] create_prog_button: btn=%p created and positioned for pid=%u", (void*)btn, (unsigned)pid);
 
     lv_obj_t *lbl = lv_label_create(btn);
+    if (!lbl) {
+        ESP_LOGE(TAG, "[C] create_prog_button: ERRORE - lv_label_create fallito per pid=%u", (unsigned)pid);
+        return;
+    }
+    
     char txt[8] = {0};
     snprintf(txt, sizeof(txt), "%u", (unsigned)pid);
     lv_label_set_text(lbl, txt);
     lv_obj_set_style_text_color(lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, FONT_PROG_BTN, LV_PART_MAIN);
     lv_obj_center(lbl);
+    
+    ESP_LOGI(TAG, "[C] create_prog_button: label=%p created with text='%s' for pid=%u", 
+             (void*)lbl, txt, (unsigned)pid);
 
     int idx = (int)pid - 1;
     s_prog_ud[idx].prog_id = pid;
@@ -804,11 +833,17 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
 
     s_prog_btns[idx] = btn;
     s_prog_lbls[idx] = lbl;
+    
+    ESP_LOGI(TAG, "[C] create_prog_button: STORED - s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
+             idx, (void*)s_prog_btns[idx], idx, (void*)s_prog_lbls[idx]);
 
     /* [C] Inizialmente non selezionabile: colore scuro, opacità piena (refresh_prog_buttons aggiornerà) */
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
     btn_style(btn, COL_PROG_DIS);
     lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+    
+    ESP_LOGI(TAG, "[C] === create_prog_button END: pid=%u, btn=%p, lbl=%p ===", 
+             (unsigned)pid, (void*)btn, (void*)lbl);
 }
 
 /** @brief Costruisce i pulsanti del programma.
@@ -822,17 +857,29 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
  */
 static void build_prog_buttons(void)
 {
+    ESP_LOGI(TAG, "[C] ===== build_prog_buttons START =====");
+    
     const int32_t side_pad = 14;   /* margine orizzontale dal bordo di s_status_box */
     const int32_t row_pad  = 8;    /* margine verticale (superiore e inferiore) */
     const int32_t col_gap  = 10;   /* spazio tra le due colonne */
     const int32_t row_gap  = 8;    /* spazio tra le righe */
 
+    ESP_LOGI(TAG, "[C] build_prog_buttons: s_status_box=%p", (void*)s_status_box);
+    
+    if (!s_status_box) {
+        ESP_LOGE(TAG, "[C] build_prog_buttons: ERRORE - s_status_box è NULL!");
+        return;
+    }
+    
     const int32_t status_h = lv_obj_get_height(s_status_box);
-    ESP_LOGI(TAG, "[C] build_prog_buttons: status_h=%d", (int)status_h);
+    const int32_t status_w = lv_obj_get_width(s_status_box);
+    ESP_LOGI(TAG, "[C] build_prog_buttons: status_box dimensions: w=%d, h=%d", (int)status_w, (int)status_h);
 
     /* Legge numero programmi dalla configurazione */
     device_config_t *cfg = device_config_get();
     uint8_t num_progs = (cfg && cfg->num_programs) ? cfg->num_programs : 10;
+    ESP_LOGI(TAG, "[C] build_prog_buttons: cfg=%p, cfg->num_programs=%u, num_progs=%u", 
+             (void*)cfg, cfg ? cfg->num_programs : 0, (unsigned)num_progs);
 
     /* Validazione: solo valori ammessi; default 10 */
     static const uint8_t s_valid[] = {1, 2, 4, 6, 8, 10};
@@ -840,15 +887,19 @@ static void build_prog_buttons(void)
     for (int vi = 0; vi < (int)(sizeof(s_valid) / sizeof(s_valid[0])); vi++) {
         if (s_valid[vi] == num_progs) { np_valid = true; break; }
     }
-    if (!np_valid) num_progs = 10;
+    if (!np_valid) {
+        ESP_LOGW(TAG, "[C] build_prog_buttons: num_progs %u non valido, uso default 10", (unsigned)num_progs);
+        num_progs = 10;
+    }
 
     s_num_programs = num_progs;
-    ESP_LOGI(TAG, "[C] build_prog_buttons: num_progs=%u", (unsigned)num_progs);
+    ESP_LOGI(TAG, "[C] build_prog_buttons: FINAL num_progs=%u", (unsigned)num_progs);
 
     if (num_progs == 1) {
         /* Caso speciale: unico pulsante largo quanto tutta l'area */
         int32_t btn_w = PANEL_FULL_W - 2 * side_pad;
         int32_t btn_h = status_h - 2 * row_pad;
+        ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE BUTTON - w=%d, h=%d", (int)btn_w, (int)btn_h);
         create_prog_button(s_status_box, 1, side_pad, row_pad, btn_w, btn_h);
     } else {
         /* Due colonne, num_progs/2 righe (tutti i valori validi >1 sono pari) */
@@ -858,17 +909,34 @@ static void build_prog_buttons(void)
         int32_t btn_h  = usable_h / n_rows;
         int32_t x_left  = side_pad;
         int32_t x_right = side_pad + col_w + col_gap;
+        
+        ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - n_rows=%d, col_w=%d, btn_h=%d", 
+                 (int)n_rows, (int)col_w, (int)btn_h);
+        ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - x_left=%d, x_right=%d", 
+                 (int)x_left, (int)x_right);
 
+        int buttons_created = 0;
         for (int32_t row = 0; row < n_rows; row++) {
             int32_t y      = row_pad + row * (btn_h + row_gap);
             uint8_t p_left  = (uint8_t)(row * 2 + 1);
             uint8_t p_right = (uint8_t)(row * 2 + 2);
+            
+            ESP_LOGI(TAG, "[C] build_prog_buttons: ROW %d - y=%d, left_prog=%d, right_prog=%d", 
+                     (int)row, (int)y, (int)p_left, (int)p_right);
+            
             create_prog_button(s_status_box, p_left,  x_left,  y, col_w, btn_h);
+            buttons_created++;
+            
             if (p_right <= num_progs) {
                 create_prog_button(s_status_box, p_right, x_right, y, col_w, btn_h);
+                buttons_created++;
             }
         }
+        
+        ESP_LOGI(TAG, "[C] build_prog_buttons: GRID COMPLETE - buttons_created=%d", buttons_created);
     }
+    
+    ESP_LOGI(TAG, "[C] ===== build_prog_buttons END =====");
 }
 
 /**
@@ -923,10 +991,13 @@ static void panel_timer_cb(lv_timer_t *t)
     if (fsm_runtime_snapshot(&snap))
     {
         uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+        device_config_t *cfg = device_config_get();
 
         if (snap.state == FSM_STATE_CREDIT && s_last_user_interaction_ms > 0) {
             uint32_t idle_ms = now_ms - s_last_user_interaction_ms;
-            if (idle_ms >= MAIN_PAGE_IDLE_TO_ADS_MS) {
+            uint32_t idle_to_ads_ms = (cfg && cfg->timeouts.exit_programs_ms > 0)
+                ? cfg->timeouts.exit_programs_ms : MAIN_PAGE_IDLE_TO_ADS_MS;
+            if (idle_ms >= idle_to_ads_ms) {
                 ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms), ritorno a slideshow",
                          (unsigned long)idle_ms);
                 lvgl_page_ads_show();
@@ -943,7 +1014,6 @@ static void panel_timer_cb(lv_timer_t *t)
 
         /* [C] Check for credit reset timeout in CREDIT state */
         if (snap.state == FSM_STATE_CREDIT) {
-            device_config_t *cfg = device_config_get();
             uint32_t reset_timeout_ms = 300000;  /* Default 5 minutes */
             if (cfg && cfg->timeouts.credit_reset_timeout_ms > 0) {
                 reset_timeout_ms = cfg->timeouts.credit_reset_timeout_ms;
@@ -1035,10 +1105,13 @@ void lvgl_page_main_deactivate(void)
  */
 void lvgl_page_main_show(void)
 {
+    ESP_LOGI(TAG, "[C] ===== lvgl_page_main_show START =====");
+    
     /* Invia sequenza init CCTalk prima di ogni caricamento della pagina programmi */
     main_cctalk_send_initialization_sequence_async();
 
     lv_obj_t *scr = lv_scr_act();
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: scr=%p", (void*)scr);
 
     lvgl_page_ads_deactivate();
     lvgl_page_main_deactivate();
@@ -1055,6 +1128,7 @@ void lvgl_page_main_show(void)
     }
 
     lv_obj_clean(scr);
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: screen cleaned");
 
     lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
@@ -1065,12 +1139,23 @@ void lvgl_page_main_show(void)
     s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
 
     panel_load_translations();
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: translations loaded");
 
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: building UI components...");
     build_status(scr);
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_status completed");
+    
     build_header(scr);
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_header completed");
+    
     sync_language_from_config();  /* Sync language flag from device config */
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: language synced");
+    
     build_prog_buttons();
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_prog_buttons completed");
+    
     lvgl_page_chrome_add(scr);
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added");
 
     update_time(true);
 
@@ -1080,6 +1165,15 @@ void lvgl_page_main_show(void)
         update_state(&snap);
         refresh_prog_buttons(&snap);
     }
+
+    /* Log finale con riepilogo dei pulsanti creati */
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: BUTTONS SUMMARY - s_num_programs=%u", (unsigned)s_num_programs);
+    for (int i = 0; i < PROG_COUNT && i < (int)s_num_programs; i++) {
+        ESP_LOGI(TAG, "[C] lvgl_page_main_show: s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
+                 i, (void*)s_prog_btns[i], i, (void*)s_prog_lbls[i]);
+    }
+    
+    ESP_LOGI(TAG, "[C] ===== lvgl_page_main_show END =====");
 
     s_panel_timer = lv_timer_create(panel_timer_cb, PANEL_REFRESH_MS, NULL);
     s_clock_timer = lv_timer_create(clock_timer_cb, 1000, NULL);

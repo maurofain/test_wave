@@ -13,15 +13,16 @@
 
 static const char *TAG = "lvgl_page_lang2";
 
+/* Font GoogleSans per pagina selezione lingua */
+extern const lv_font_t GoogleSans70;
 extern const lv_font_t GoogleSans35;
-extern const lv_font_t GoogleSans40;
 
 #define COL_BG            lv_color_make(0x00, 0x00, 0x00)
 #define COL_WHITE         lv_color_make(0xEE, 0xEE, 0xEE)
 #define COL_ACCENT        lv_color_make(0x56, 0xE6, 0xBD)
 #define COL_TEXT_DARK     lv_color_make(0x08, 0x10, 0x0F)
 
-#define FONT_TITLE        (&GoogleSans40)
+#define FONT_TITLE        (&GoogleSans70)
 #define FONT_LANG         (&GoogleSans35)
 
 typedef struct {
@@ -39,12 +40,13 @@ static const panel_language_option_t s_panel_lang_opts[] = {
 
 static char s_selected_user_lang[8] = "it";
 static void (*s_return_cb)(void)       = NULL;  /* [C] Pagina da cui tornare dopo la selezione */
-static lv_timer_t *s_lang_timeout_timer = NULL; /* [C] Timer 60s: ritorno automatico */
+static lv_timer_t *s_lang_timeout_timer = NULL; /* [C] Timer: ritorno automatico */
 static lv_timer_t *s_lang_tick_timer    = NULL; /* [C] Ticker 1s per countdown */
 static lv_obj_t   *s_timeout_lbl        = NULL; /* [C] Label contatore */
 static uint32_t    s_lang_ticks_left    = 60;
+static uint32_t    s_lang_timeout_s     = 60;   /* [C] Secondi timeout, letto da config all'apertura */
 
-#define LANG_TIMEOUT_S  60
+#define LANG_TIMEOUT_S_DEFAULT  60U
 #define LANG_TICK_MS    1000U
 
 static void panel_reenable_scanner(const char *context);
@@ -79,7 +81,7 @@ static void lang_do_return(void)
 static void lang_timeout_cb(lv_timer_t *t)
 {
     (void)t;
-    ESP_LOGI(TAG, "[C] Timeout selezione lingua (%d s), ritorno automatico", LANG_TIMEOUT_S);
+    ESP_LOGI(TAG, "[C] Timeout selezione lingua (%u s), ritorno automatico", (unsigned)s_lang_timeout_s);
     lang_do_return();
 }
 
@@ -184,6 +186,11 @@ static void style_lang_btn(lv_obj_t *btn, bool selected)
 
 void lvgl_page_language_2_show(void (*return_cb)(void))
 {
+    /* [C] Leggi timeout da config, fallback 60 s */
+    device_config_t *lang_cfg = device_config_get();
+    s_lang_timeout_s = (lang_cfg && lang_cfg->timeouts.exit_language_ms >= 1000U)
+        ? (lang_cfg->timeouts.exit_language_ms / 1000U) : LANG_TIMEOUT_S_DEFAULT;
+
     s_return_cb = return_cb ? return_cb : lvgl_page_main_show;
     lv_obj_t *scr = lv_scr_act();
 
@@ -263,18 +270,18 @@ void lvgl_page_language_2_show(void (*return_cb)(void))
     ESP_LOGI(TAG, "[C] Pagina selezione lingua v2 visualizzata");
     lv_async_call(panel_reenable_scanner_async, NULL);
 
-    /* [C] Timer timeout 60 s: torna automaticamente alla pagina chiamante */
-    s_lang_ticks_left    = LANG_TIMEOUT_S;
-    s_lang_timeout_timer = lv_timer_create(lang_timeout_cb, (uint32_t)LANG_TIMEOUT_S * 1000U, NULL);
+    /* [C] Timer timeout: torna automaticamente alla pagina chiamante */
+    s_lang_ticks_left    = s_lang_timeout_s;
+    s_lang_timeout_timer = lv_timer_create(lang_timeout_cb, s_lang_timeout_s * 1000U, NULL);
     lv_timer_set_repeat_count(s_lang_timeout_timer, 1);
     s_lang_tick_timer    = lv_timer_create(lang_tick_cb, LANG_TICK_MS, NULL);
 
     /* [C] Label con conto alla rovescia in basso a destra */
     s_timeout_lbl = lv_label_create(scr);
     char ticks_buf[24] = {0};
-    snprintf(ticks_buf, sizeof(ticks_buf), "(%d s)", LANG_TIMEOUT_S);
+    snprintf(ticks_buf, sizeof(ticks_buf), "(%u s)", (unsigned)s_lang_timeout_s);
     lv_label_set_text(s_timeout_lbl, ticks_buf);
     lv_obj_set_style_text_color(s_timeout_lbl, lv_color_make(0x80, 0x80, 0x80), LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_timeout_lbl, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_timeout_lbl, &GoogleSans35, LV_PART_MAIN);
     lv_obj_align(s_timeout_lbl, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
 }

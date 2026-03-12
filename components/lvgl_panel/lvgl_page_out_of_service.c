@@ -8,6 +8,9 @@
 
 static const char *TAG = "lvgl_page_oos";
 
+extern const lv_font_t GoogleSans35;
+extern const lv_font_t GoogleSans50;
+
 
 /**
  * @brief Mostra la pagina di servizio non disponibile.
@@ -40,13 +43,13 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
 
     lv_obj_t *ico = lv_label_create(scr);
     lv_label_set_text(ico, LV_SYMBOL_WARNING);
-    lv_obj_set_style_text_font(ico, &lv_font_montserrat_48, LV_PART_MAIN);
+    lv_obj_set_style_text_font(ico, &GoogleSans50, LV_PART_MAIN);
     lv_obj_set_style_text_color(ico, lv_color_make(0xFF, 0xCC, 0x00), LV_PART_MAIN);
     lv_obj_align(ico, LV_ALIGN_CENTER, 0, -120);
 
     lv_obj_t *lbl = lv_label_create(scr);
     lv_label_set_text(lbl, "Fuori servizio");
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_48, LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl, &GoogleSans50, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl, lv_color_make(0xFF, 0xFF, 0xFF), LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -40);
@@ -56,7 +59,7 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
 
     lv_obj_t *sub_lbl = lv_label_create(scr);
     lv_label_set_text(sub_lbl, sub);
-    lv_obj_set_style_text_font(sub_lbl, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_set_style_text_font(sub_lbl, &GoogleSans35, LV_PART_MAIN);
     lv_obj_set_style_text_color(sub_lbl, lv_color_make(0xFF, 0xAA, 0xAA), LV_PART_MAIN);
     lv_obj_set_style_text_align(sub_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_label_set_long_mode(sub_lbl, LV_LABEL_LONG_WRAP);
