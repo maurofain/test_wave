@@ -329,6 +329,7 @@ def main(argv: Iterable[str]) -> int:
         selected_langs = requested
 
     data_dir.mkdir(parents=True, exist_ok=True)
+    (root / "docs" / "i18n").mkdir(parents=True, exist_ok=True)
 
     common_map = _build_map(entries)
 
@@ -338,10 +339,10 @@ def main(argv: Iterable[str]) -> int:
         records = _build_lang_records(entries, lang)
 
         out_json = data_dir / f"i18n_{lang}.json"
-        out_map = data_dir / f"i18n_{lang}.map.json"
+        out_map = root / "docs" / "i18n" / f"i18n_{lang}.map.json"
 
-        json_content = json.dumps(records, ensure_ascii=False, indent=2) + "\n"
-        map_content = json.dumps(common_map, ensure_ascii=False, indent=2) + "\n"
+        json_content = json.dumps(records, ensure_ascii=False, separators=(',', ':')) + "\n"
+        map_content = json.dumps(common_map, ensure_ascii=False, separators=(',', ':')) + "\n"
 
         json_status = _write_or_check_file(out_json, json_content, check=bool(args.check))
         map_status = _write_or_check_file(out_map, map_content, check=bool(args.check))

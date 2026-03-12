@@ -1094,11 +1094,11 @@ esp_err_t device_config_load(device_config_t *config)
                     ? IMAGE_SOURCE_SDCARD : IMAGE_SOURCE_SPIFFS;
             }
 
-                // Numero pulsanti programma (valori ammessi: 1,2,4,6,8,10)
+                // Numero pulsanti programma (valori ammessi: 1,2,3,4,5,6,8,10)
                 cJSON *num_prog_j = cJSON_GetObjectItem(root, "n_prg");
                 if (!num_prog_j) num_prog_j = cJSON_GetObjectItem(root, "num_programs"); /* compat */
                 if (num_prog_j && cJSON_IsNumber(num_prog_j)) {
-                    static const uint8_t valid_np[] = {1, 2, 4, 6, 8, 10};
+                    static const uint8_t valid_np[] = {1, 2, 3, 4, 5, 6, 8, 10};
                     uint8_t np = (uint8_t)num_prog_j->valueint;
                     bool ok = false;
                     for (int _i = 0; _i < (int)(sizeof(valid_np)/sizeof(valid_np[0])); _i++) {

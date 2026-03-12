@@ -196,7 +196,7 @@ typedef struct {
     char device_name[32];       ///< Nome del dispositivo
     char location_name[64];     ///< Nome dell'impianto / locale commerciale
     bool updated;               ///< Indica se la configurazione è stata aggiornata
-    uint8_t  num_programs;      ///< Numero pulsanti programma sul pannello (valori ammessi: 1,2,4,6,8,10)
+    uint8_t  num_programs;      ///< Numero pulsanti programma sul pannello (valori ammessi: 1,2,3,4,5,6,8,10)
     double   latitude;          ///< Latitudine geografica impianto (gradi decimali, -90..+90)
     double   longitude;         ///< Longitudine geografica impianto (gradi decimali, -180..+180)
     device_eth_config_t eth;

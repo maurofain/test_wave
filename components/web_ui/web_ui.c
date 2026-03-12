@@ -1529,9 +1529,13 @@ esp_err_t api_config_save(httpd_req_t *req)
     char prev_server_url[sizeof(cfg->server.url)] = {0};
     char prev_server_serial[sizeof(cfg->server.serial)] = {0};
     char prev_server_password[sizeof(cfg->server.password)] = {0};
+    char prev_user_lang[sizeof(cfg->ui.user_language)] = {0};
+    char prev_backend_lang[sizeof(cfg->ui.backend_language)] = {0};
     strncpy(prev_server_url, cfg->server.url, sizeof(prev_server_url) - 1);
     strncpy(prev_server_serial, cfg->server.serial, sizeof(prev_server_serial) - 1);
     strncpy(prev_server_password, cfg->server.password, sizeof(prev_server_password) - 1);
+    strncpy(prev_user_lang, cfg->ui.user_language, sizeof(prev_user_lang) - 1);
+    strncpy(prev_backend_lang, cfg->ui.backend_language, sizeof(prev_backend_lang) - 1);
 
     cJSON *name_obj = cJSON_GetObjectItem(root, "dname");
     if (!name_obj) name_obj = cJSON_GetObjectItem(root, "device_name"); /* compat */
@@ -1545,11 +1549,11 @@ esp_err_t api_config_save(httpd_req_t *req)
             ? IMAGE_SOURCE_SDCARD : IMAGE_SOURCE_SPIFFS;
     }
 
-    /* [C] Numero pulsanti programma (valori ammessi: 1,2,4,6,8,10) */
+    /* [C] Numero pulsanti programma (valori ammessi: 1,2,3,4,5,6,8,10) */
     cJSON *num_prog_obj = cJSON_GetObjectItem(root, "n_prg");
     if (!num_prog_obj) num_prog_obj = cJSON_GetObjectItem(root, "num_programs"); /* compat */
     if (num_prog_obj && cJSON_IsNumber(num_prog_obj)) {
-        static const uint8_t s_valid_np[] = {1, 2, 4, 6, 8, 10};
+        static const uint8_t s_valid_np[] = {1, 2, 3, 4, 5, 6, 8, 10};
         uint8_t np = (uint8_t)num_prog_obj->valueint;
         bool np_ok = false;
         for (int _i = 0; _i < (int)(sizeof(s_valid_np)/sizeof(s_valid_np[0])); _i++) {
@@ -1958,16 +1962,9 @@ esp_err_t api_config_save(httpd_req_t *req)
     /* Se la lingua è cambiata: carica la nuova tabella in PSRAM, invalida cache e
      * aggiorna i testi LVGL in runtime. Il client web si ricaricherà da sola. */
     {
-        char prev_user[8] = {0};
-        char prev_backend[8] = {0};
-        const char *cfg_user_before = device_config_get_ui_user_language();
-        const char *cfg_backend_before = device_config_get_ui_backend_language();
-        if (cfg_user_before) strncpy(prev_user, cfg_user_before, sizeof(prev_user)-1);
-        if (cfg_backend_before) strncpy(prev_backend, cfg_backend_before, sizeof(prev_backend)-1);
-
         /* Backend language changed -> invalidate web i18n cache and load PSRAM for backend */
-        if (strncmp(prev_backend, cfg->ui.backend_language, sizeof(prev_backend)) != 0) {
-            ESP_LOGI(TAG, "[C] Backend lingua cambiata: '%s' -> '%s'", prev_backend, cfg->ui.backend_language);
+        if (strncmp(prev_backend_lang, cfg->ui.backend_language, sizeof(prev_backend_lang)) != 0) {
+            ESP_LOGI(TAG, "[C] Backend lingua cambiata: '%s' -> '%s'", prev_backend_lang, cfg->ui.backend_language);
             web_ui_i18n_cache_invalidate();
             if (web_ui_i18n_load_language_psram(cfg->ui.backend_language) != ESP_OK) {
                 ESP_LOGW(TAG, "[C] Impossibile caricare tabella lingua backend '%s' in PSRAM", cfg->ui.backend_language);
@@ -1976,8 +1973,8 @@ esp_err_t api_config_save(httpd_req_t *req)
 
         /* User panel language changed -> refresh LVGL texts (uses device_config_get_ui_text_scoped)
          * and invalidate lookup cache so subsequent lookups use new language. */
-        if (strncmp(prev_user, cfg->ui.user_language, sizeof(prev_user)) != 0) {
-            ESP_LOGI(TAG, "[C] Pannello lingua cambiata: '%s' -> '%s'", prev_user, cfg->ui.user_language);
+        if (strncmp(prev_user_lang, cfg->ui.user_language, sizeof(prev_user_lang)) != 0) {
+            ESP_LOGI(TAG, "[C] Pannello lingua cambiata: '%s' -> '%s'", prev_user_lang, cfg->ui.user_language);
             web_ui_i18n_cache_invalidate();
             lvgl_panel_refresh_texts();
         }

@@ -987,11 +987,6 @@ modbus_read_end:
         }
     }
     else if (strcmp(test_name, "cctalk_start") == 0) {
-        uint8_t req_addr = 0;
-        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
-            (void)set_cctalk_address_configured(req_addr);
-        }
-
         uint8_t cctalk_addr = get_cctalk_address_configured();
         serial_test_clear_cctalk_monitor();
         serial_test_push_monitor_action("CCTALK", "START richiesta");
@@ -1055,11 +1050,6 @@ modbus_read_end:
             }
         }
     } else if (strcmp(test_name, "cctalk_stop") == 0) {
-        uint8_t req_addr = 0;
-        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
-            (void)set_cctalk_address_configured(req_addr);
-        }
-
         serial_test_push_monitor_action("CCTALK", "STOP richiesta");
 
         esp_err_t stop_err = cctalk_driver_stop_acceptor();
@@ -1089,10 +1079,6 @@ modbus_read_end:
                strcmp(test_name, "cctalk_retention_off") == 0) {
         bool retention_on = (strcmp(test_name, "cctalk_retention_on") == 0);
         bool accept_enabled = !retention_on;
-        uint8_t req_addr = 0;
-        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
-            (void)set_cctalk_address_configured(req_addr);
-        }
         uint8_t cctalk_addr = get_cctalk_address_configured();
         serial_test_push_monitor_action("CCTALK", accept_enabled ? "Master Inhibit=1 (abilitato) richiesta" : "Master Inhibit=0 (inibito) richiesta");
 
@@ -1152,10 +1138,6 @@ modbus_read_end:
     } else if (strcmp(test_name, "cctalk_retention_ch1_2") == 0) {
         const uint8_t mask_low = 0x03U;
         const uint8_t mask_high = 0x00U;
-        uint8_t req_addr = 0;
-        if (parse_cctalk_addr_from_request(req, &req_addr) == ESP_OK) {
-            (void)set_cctalk_address_configured(req_addr);
-        }
         uint8_t cctalk_addr = get_cctalk_address_configured();
         serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 richiesta");
 

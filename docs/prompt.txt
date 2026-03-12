@@ -27,7 +27,7 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [V]all'attivazione della pagina programmi inviamo una sequenza CCTALK come quella inviata dal tasto /test/cctalk -> Abilita (Start CCTALK)
 [X] La bandierina della lingua selezionata (in alto a dx) va inclusa assieme a ora e cerchietti e va abbassata di 30px
 [X] Ti carico l'immagine della nuova scheda scelta programmi da creare in un file lvgl_page_programmi.c : non c'è più la barra che scende con il passare del tempo in zona centrale ma sopra la zona che mostra i crediti, e cambia colore quando mancano 15 secondi alla fine del programma
-[V] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2, 4, 6, 8, 10 .Nel caso di 1 programma occuperà tutto lo spazio previsto per i pulsanti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità. In questa sezione mettiamo anche due input per le coordinate geografiche della posizione dell'impianto
+[V] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2,3,4,5, 6, 8, 10 .Nel caso da 1 a 5 i button saranno a piena largezza dividendo lo spazio verticale contenuti in un object che usa tutto lo spazio orizzontale e verticale sotto il contatore crediti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità. In questa sezione mettiamo anche due input per le coordinate geografiche della posizione dell'impianto
 [X] nella pagina logo non deve apparire lo header con ora  e bandierina. Nella scelta lingue c'e una bandiera che si sovrappone a quella nello header
 [X] Rigenera le immagini delle bandierine con la trasparenza con LV_IMG_CF_TRUE_COLOR_ALPHA
 [X} implementiamo la possibilità di scegliere  posizione ca cui caricare le immagini pubblilcitarie su SPIFFS  e su SDCARD tramite uno switch che mettiamo in Identità. In Identità impostiamo i campi su 2 colonne, mettiamo lo switch 'Images on' nell'ultima riga. Nel file manager mettiamo un button primadi [Scarica tutto] con nome [copia su X] dove X è la destinazione non attulamente visualizzata
@@ -39,7 +39,10 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [ ] Font da utilizzare : pagina ads : testo nome impianto GoogleSans70, Selezione lavaggio GoogleSans50, messaggio errore GoogleSans40
 Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
 Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
+------------------
 
+Crea webuna app python da far girare su un pc windows o linux che permetta di editare i file delle lingue:
+- si sceglie lo scope ed appaiono tutte le stringhe di quello scope incolonnate per lingua, la prima colonna è l'ID. la prima lingua è ITALIANO, Ogni voce è editabile e di fianco alla textbox ha un button per la traduzione automatica da fare interrogando un servizio web definito in un file di configurazione. In alto a sx abbiamo la scelta dello scope e a destra i tasti SALVA e ESCI. Il salvataggio crea automaticamente un json con tutti i dati di tutte le lingue con nome 'i18n_{tiomestamp}.json'
 ------------------
 I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
 I (19254) APP: [F] [M] Cmd1 - Address Poll: OK
