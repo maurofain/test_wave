@@ -23,11 +23,20 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
     lv_obj_t *scr = lv_scr_act();
 
     lvgl_page_main_deactivate();
+
+    /* [C] Ferma il timer chrome e resetta indev prima di distruggere gli oggetti */
+    lvgl_page_chrome_remove();
+    lv_indev_t *indev_o = lv_indev_get_next(NULL);
+    while (indev_o) {
+        lv_indev_reset(indev_o, NULL);
+        indev_o = lv_indev_get_next(indev_o);
+    }
+
     lv_obj_clean(scr);
 
     lv_obj_set_style_bg_color(scr, lv_color_make(0x6b, 0x00, 0x00), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
-    lvgl_page_chrome_add(scr);
+    // lvgl_page_chrome_add(scr);
 
     lv_obj_t *ico = lv_label_create(scr);
     lv_label_set_text(ico, LV_SYMBOL_WARNING);

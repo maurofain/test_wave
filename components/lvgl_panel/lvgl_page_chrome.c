@@ -4,8 +4,10 @@
 
 #include <time.h>
 
-static lv_obj_t *s_chrome_time_lbl = NULL;
-static lv_timer_t *s_chrome_time_timer = NULL;
+static lv_obj_t      *s_chrome_time_lbl   = NULL;
+static lv_timer_t    *s_chrome_time_timer  = NULL;
+static lv_event_cb_t  s_flag_cb            = NULL;  /* callback per click bandiera */
+static void          *s_flag_ud            = NULL;
 
 static void chrome_update_time_label(void)
 {
@@ -15,10 +17,13 @@ static void chrome_update_time_label(void)
 
     char time_buf[8] = "--:--";
     time_t now = time(NULL);
-    if (now != (time_t)-1) {
+    if (now > 0) {
         struct tm tm_now;
         localtime_r(&now, &tm_now);
-        strftime(time_buf, sizeof(time_buf), "%H:%M", &tm_now);
+        /* Mostra l'ora solo se l'anno è plausibile (NTP sincronizzato) */
+        if (tm_now.tm_year + 1900 >= 2020) {
+            strftime(time_buf, sizeof(time_buf), "%H:%M", &tm_now);
+        }
     }
     lv_label_set_text(s_chrome_time_lbl, time_buf);
 }
@@ -76,4 +81,31 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
     lv_image_set_src(flag, get_flag_src_for_language(lang));
     lv_image_set_scale(flag, 256);
     lv_obj_align(flag, LV_ALIGN_TOP_RIGHT, -18, top_margin + 30);
+
+    /* [C] Se la pagina ha registrato un callback, rende la bandiera cliccabile */
+    if (s_flag_cb) {
+        lv_obj_add_flag(flag, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_opa(flag, LV_OPA_TRANSP, LV_STATE_PRESSED | LV_PART_MAIN);
+        lv_obj_add_event_cb(flag, s_flag_cb, LV_EVENT_CLICKED, s_flag_ud);
+    }
+}
+
+void lvgl_page_chrome_remove(void)
+{
+    /* [C] Elimina il timer prima che lv_obj_clean distrugga la label;
+       NON elimina le widget (ci pensa lv_obj_clean del chiamante). */
+    if (s_chrome_time_timer) {
+        lv_timer_delete(s_chrome_time_timer);
+        s_chrome_time_timer = NULL;
+    }
+    s_chrome_time_lbl = NULL;
+    /* [C] Azzera il callback bandiera: ogni pagina lo re-imposta prima di chrome_add */
+    s_flag_cb = NULL;
+    s_flag_ud = NULL;
+}
+
+void lvgl_page_chrome_set_flag_callback(lv_event_cb_t cb, void *user_data)
+{
+    s_flag_cb = cb;
+    s_flag_ud = user_data;
 }

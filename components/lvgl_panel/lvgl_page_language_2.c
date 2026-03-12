@@ -38,7 +38,63 @@ static const panel_language_option_t s_panel_lang_opts[] = {
 };
 
 static char s_selected_user_lang[8] = "it";
+static void (*s_return_cb)(void)       = NULL;  /* [C] Pagina da cui tornare dopo la selezione */
+static lv_timer_t *s_lang_timeout_timer = NULL; /* [C] Timer 60s: ritorno automatico */
+static lv_timer_t *s_lang_tick_timer    = NULL; /* [C] Ticker 1s per countdown */
+static lv_obj_t   *s_timeout_lbl        = NULL; /* [C] Label contatore */
+static uint32_t    s_lang_ticks_left    = 60;
+
+#define LANG_TIMEOUT_S  60
+#define LANG_TICK_MS    1000U
+
 static void panel_reenable_scanner(const char *context);
+
+/* [C] Ferma i timer lingua senza toccare le widget (sicuro da chiamare sempre). */
+void lvgl_page_language_2_deactivate(void)
+{
+    if (s_lang_timeout_timer) {
+        lv_timer_delete(s_lang_timeout_timer);
+        s_lang_timeout_timer = NULL;
+    }
+    if (s_lang_tick_timer) {
+        lv_timer_delete(s_lang_tick_timer);
+        s_lang_tick_timer = NULL;
+    }
+    s_timeout_lbl = NULL;
+    s_return_cb   = NULL;
+}
+
+/* [C] Torna alla pagina chiamante e smantella i timer. */
+static void lang_do_return(void)
+{
+    void (*cb)(void) = s_return_cb;
+    lvgl_page_language_2_deactivate();  /* azzera tutto prima di chiamare il callback */
+    if (cb) {
+        cb();
+    } else {
+        lvgl_page_main_show();  /* fallback di sicurezza */
+    }
+}
+
+static void lang_timeout_cb(lv_timer_t *t)
+{
+    (void)t;
+    ESP_LOGI(TAG, "[C] Timeout selezione lingua (%d s), ritorno automatico", LANG_TIMEOUT_S);
+    lang_do_return();
+}
+
+static void lang_tick_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (s_lang_ticks_left > 0) {
+        s_lang_ticks_left--;
+    }
+    if (s_timeout_lbl && lv_obj_is_valid(s_timeout_lbl)) {
+        char buf[24] = {0};
+        snprintf(buf, sizeof(buf), "(%lu s)", (unsigned long)s_lang_ticks_left);
+        lv_label_set_text(s_timeout_lbl, buf);
+    }
+}
 
 static void panel_reenable_scanner_async(void *arg)
 {
@@ -89,7 +145,7 @@ static void panel_apply_selected_language_async(void *arg)
     }
 
     panel_reenable_scanner("dopo scelta lingua");
-    lvgl_page_main_show();
+    lang_do_return();  /* [C] Torna alla pagina chiamante (ads o programmi) */
 }
 
 static void on_lang_btn(lv_event_t *e)
@@ -126,11 +182,22 @@ static void style_lang_btn(lv_obj_t *btn, bool selected)
     }
 }
 
-void lvgl_page_language_2_show(void)
+void lvgl_page_language_2_show(void (*return_cb)(void))
 {
+    s_return_cb = return_cb ? return_cb : lvgl_page_main_show;
     lv_obj_t *scr = lv_scr_act();
 
     lvgl_page_main_deactivate();
+
+    /* [C] Ferma il timer chrome e resetta indev PRIMA di distruggere gli oggetti,
+       per evitare crash in lv_event_mark_deleted durante le transizioni. */
+    lvgl_page_chrome_remove();
+    lv_indev_t *indev_l = lv_indev_get_next(NULL);
+    while (indev_l) {
+        lv_indev_reset(indev_l, NULL);
+        indev_l = lv_indev_get_next(indev_l);
+    }
+
     lv_obj_clean(scr);
 
     lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
@@ -151,13 +218,6 @@ void lvgl_page_language_2_show(void)
             active_opt = &s_panel_lang_opts[i];
             break;
         }
-    }
-
-    if (active_opt->code) {
-        lv_obj_t *lang_img = lv_image_create(scr);
-        lv_image_set_src(lang_img, get_flag_src_for_language(active_opt->code));
-        lv_image_set_scale(lang_img, 256);
-        lv_obj_align(lang_img, LV_ALIGN_TOP_RIGHT, -34, 42);
     }
 
     lv_obj_t *title = lv_label_create(scr);
@@ -202,4 +262,19 @@ void lvgl_page_language_2_show(void)
 
     ESP_LOGI(TAG, "[C] Pagina selezione lingua v2 visualizzata");
     lv_async_call(panel_reenable_scanner_async, NULL);
+
+    /* [C] Timer timeout 60 s: torna automaticamente alla pagina chiamante */
+    s_lang_ticks_left    = LANG_TIMEOUT_S;
+    s_lang_timeout_timer = lv_timer_create(lang_timeout_cb, (uint32_t)LANG_TIMEOUT_S * 1000U, NULL);
+    lv_timer_set_repeat_count(s_lang_timeout_timer, 1);
+    s_lang_tick_timer    = lv_timer_create(lang_tick_cb, LANG_TICK_MS, NULL);
+
+    /* [C] Label con conto alla rovescia in basso a destra */
+    s_timeout_lbl = lv_label_create(scr);
+    char ticks_buf[24] = {0};
+    snprintf(ticks_buf, sizeof(ticks_buf), "(%d s)", LANG_TIMEOUT_S);
+    lv_label_set_text(s_timeout_lbl, ticks_buf);
+    lv_obj_set_style_text_color(s_timeout_lbl, lv_color_make(0x80, 0x80, 0x80), LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_timeout_lbl, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_align(s_timeout_lbl, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
 }

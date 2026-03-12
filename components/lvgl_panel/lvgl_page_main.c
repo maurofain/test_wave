@@ -1045,6 +1045,15 @@ void lvgl_page_main_show(void)
 
     lvgl_page_ads_deactivate();
     lvgl_page_main_deactivate();
+
+    /* [C] Ferma chrome timer e resetta indev prima di lv_obj_clean */
+    lvgl_page_chrome_remove();
+    lv_indev_t *indev_m = lv_indev_get_next(NULL);
+    while (indev_m) {
+        lv_indev_reset(indev_m, NULL);
+        indev_m = lv_indev_get_next(indev_m);
+    }
+
     lv_obj_clean(scr);
 
     lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);

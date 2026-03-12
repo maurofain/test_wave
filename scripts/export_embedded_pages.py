@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ast
 import html
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -164,6 +165,12 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Aggiunge lo script read-only della pagina /config.",
+    )
+    parser.add_argument(
+        "--minify-json",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Minify all JSON files in the data directory.",
     )
     return parser.parse_args()
 
@@ -434,6 +441,43 @@ def page_specs() -> list[PageSpec]:
     ]
 
 
+def minify_json_file(file_path: Path) -> bool:
+    """Minify a JSON file in place."""
+    try:
+        # Read the JSON file
+        content = file_path.read_text(encoding='utf-8')
+        
+        # Parse and re-dump without indentation
+        data = json.loads(content)
+        minified = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+        
+        # Write back the minified version
+        file_path.write_text(minified, encoding='utf-8')
+        return True
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Error processing {file_path}: {e}", file=sys.stderr)
+        return False
+
+
+def process_json_files(data_dir: Path) -> int:
+    """Process and minify all JSON files in the data directory."""
+    json_files = list(data_dir.glob("*.json"))
+    if not json_files:
+        print("No JSON files found to process.")
+        return 0
+    
+    processed = 0
+    for json_file in json_files:
+        if minify_json_file(json_file):
+            original_size = len(json_file.read_text(encoding='utf-8'))
+            print(f"[OK] Minified {json_file.name} ({original_size} bytes)")
+            processed += 1
+        else:
+            print(f"[FAIL] Could not process {json_file.name}", file=sys.stderr)
+    
+    return processed
+
+
 def parse_selected_pages(raw_pages: str) -> set[str]:
     if not raw_pages.strip():
         return set()
@@ -500,6 +544,15 @@ def main() -> int:
         return 3
 
     print(f"Completato: esportati {exported_count} file HTML in {output_dir}")
+    
+    # Process JSON files if requested
+    if args.minify_json:
+        print("\n--- Minificazione file JSON ---")
+        data_dir = Path(args.output).parent  # data/www -> data
+        json_processed = process_json_files(data_dir)
+        if json_processed > 0:
+            print(f"Completato: minificati {json_processed} file JSON in {data_dir}")
+    
     return 0
 
 

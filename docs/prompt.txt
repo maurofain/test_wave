@@ -25,10 +25,14 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [X]nel log indica con evidenza il cambio di stato della PSM racchiudendo il messaggio tra due righe con *
 
 [V]all'attivazione della pagina programmi inviamo una sequenza CCTALK come quella inviata dal tasto /test/cctalk -> Abilita (Start CCTALK)
-[ ] La bandierina della lingua selezionata (in alto a dx) va inclusa assieme a ora e cerchietti e va abbassata di 30px
-[ ] Ti carico l'immagine della nuova scheda scelta programmi da creare in un file lvgl_page_programmi.c : non c'è più la barra che scende con il passare del tempo in zona centrale ma sopra la zona che mostra i crediti, e cambia colore quando mancano 15 secondi alla fine del programma
-[ ] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2, 4, 6, 8, 10 .Nel caso di 1 programma occuperà tutto lo spazio previsto per i pulsanti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità. In questa sezione mettiamo anche due input per le coordinate geografiche della posizione dell'impianto
-[ ] Rigenera le immagini delle bandierine con la trasparenza con LV_IMG_CF_TRUE_COLOR_ALPHA
+[X] La bandierina della lingua selezionata (in alto a dx) va inclusa assieme a ora e cerchietti e va abbassata di 30px
+[X] Ti carico l'immagine della nuova scheda scelta programmi da creare in un file lvgl_page_programmi.c : non c'è più la barra che scende con il passare del tempo in zona centrale ma sopra la zona che mostra i crediti, e cambia colore quando mancano 15 secondi alla fine del programma
+[V] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2, 4, 6, 8, 10 .Nel caso di 1 programma occuperà tutto lo spazio previsto per i pulsanti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità. In questa sezione mettiamo anche due input per le coordinate geografiche della posizione dell'impianto
+[X] nella pagina logo non deve apparire lo header con ora  e bandierina. Nella scelta lingue c'e una bandiera che si sovrappone a quella nello header
+[X] Rigenera le immagini delle bandierine con la trasparenza con LV_IMG_CF_TRUE_COLOR_ALPHA
+
+[ ] la sequenza delle pagine è : Init con logo > pubblicità con tasto per scelta programmi e bandierina per passare a scelta lingua - dopo scelta lingua (o timeour 60 secondi) si ritorna alla pagina su cui si è premuta la bandierina - da scelta programmi si ritorna a pubblicità dopo timeout inayyività 60 secondi
+[V] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => 30% i tutti i pulsanti e la basrra diventanono porpora 
 [ ] La gestione della striscia LED deve prevedere che ci sono 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione)
 ------------------
 I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
@@ -37,4 +41,79 @@ I (19334) APP: [F] [M] Cmd2 - Modify Inhibit Status (all channels): OK
 I (19404) APP: [F] [M] Cmd3 - Modify Master Inhibit (accept enabled): OK
 I (19474) APP: [F] [M] Cmd4 - Request Inhibit Status: OK (mask=0xFFFF)
 I (19474) APP: [F] [M] Sequenza CCTalk completata
+
+[ ] gestione brightness:
+L'utilizzo dell'**ESP32-P4** per controllare questo monitor tramite MIPI-DSI e I2C è un'ottima scelta, data la potenza del chip nel gestire flussi video. Per la luminosità, Waveshare espone un'interfaccia I2C specifica che funge da "ponte" verso il driver della retroilluminazione.
+
+Ecco i dettagli tecnici per implementare il controllo sul tuo ESP32-P4.
+
+---
+
+### Specifiche del Protocollo I2C
+
+Sulla scheda del display, il controllo della luminosità è gestito da un microcontrollore dedicato che risponde a un indirizzo specifico.
+
+* **Indirizzo I2C del Dispositivo:** `0x45`
+* **Indirizzo del Registro:** `0x86`
+* **Gamma Valori:** `0` (0% - Spento) a `255` (100% - Luminosità Massima).
+
+---
+
+### Implementazione su ESP32-P4 (ESP-IDF)
+
+Poiché l'ESP32-P4 utilizza le versioni più recenti dell'ESP-IDF (v5.3+), è consigliabile usare il nuovo driver `i2c_master`.
+
+#### 1. Configurazione del Bus
+
+Assicurati di collegare i pin SDA/SCL del monitor ai pin GPIO dell'ESP32-P4 che hai definito (es. GPIO 7 e 8 sono comuni per I2C su questo chip).
+
+```c
+#include "driver/i2c_master.h"
+
+i2c_master_bus_handle_t bus_handle;
+i2c_master_bus_config_t bus_config = {
+    .clk_source = I2C_CLK_SRC_DEFAULT,
+    .i2c_port = I2C_NUM_0,
+    .scl_io_num = GPIO_NUM_8,
+    .sda_io_num = GPIO_NUM_7,
+    .glitch_ignore_cnt = 7,
+};
+ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus_handle));
+
+i2c_master_dev_handle_t dev_handle;
+i2c_device_config_t dev_config = {
+    .dev_addr = 0x45,
+    .device_config.device_address = 0x45,
+    .scl_speed_hz = 100000, // 100kHz standard
+};
+ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &dev_handle));
+
+```
+
+#### 2. Funzione di regolazione
+
+Per cambiare la luminosità, invia il registro seguito dal valore desiderato:
+
+```c
+esp_err_t set_backlight_brightness(uint8_t level) {
+    uint8_t write_buf[2] = {0x86, level};
+    return i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), -1);
+}
+
+```
+
+---
+
+### Note Importanti per ESP32-P4
+
+* **Alimentazione:** Il monitor richiede 5V stabili per la retroilluminazione. Assicurati che l'ESP32-P4 e il monitor condividano la massa (GND).
+* **Conflitto Indirizzi:** Se hai collegato anche il touch, l'indirizzo del touch controller (Goodix) sarà solitamente `0x5D` o `0x14`. Non confonderlo con lo `0x45` del backlight.
+* **Inizializzazione DSI:** Ricorda che la retroilluminazione potrebbe non accendersi se il segnale MIPI-DSI non è attivo o se il pannello non è stato correttamente inizializzato tramite i comandi DSI (solitamente gestiti dai componenti BSP di Espressif come `esp_lcd_ek79007`).
+
+---
+
+[Display Waveshare DSI Setup](https://www.youtube.com/watch?v=liIlQvlp9Co)
+Questo video mostra l'interfaccia e i collegamenti fisici necessari per far funzionare correttamente i display Waveshare DSI, inclusa la gestione della luminosità.
+
+Vuoi che ti aiuti a integrare questo codice con l'inizializzazione del driver video MIPI-DSI specifico per l'ESP32-P4?
 

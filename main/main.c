@@ -352,7 +352,7 @@ void app_main(void)
     if (cfg && cfg->display.enabled) {
         /* [M] Show ads slideshow at boot, then transition to main by touch or timeout */
         main_cctalk_send_initialization_sequence();
-        lvgl_page_ads_show();
+        lvgl_panel_show_ads_page();  /* [M] usa lock + preload imagini fuori lock */
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: slideshow pubblicitario attivato");
     } else {
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto slideshow");

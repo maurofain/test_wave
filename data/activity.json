@@ -1,6 +1,1 @@
-[
-  {"id":1,"description":"Start program"},
-  {"id":2,"description":"Stop program"},
-  {"id":3,"description":"Pause program"},
-  {"id":4,"description":"Resume program"}
-]
+[{"id":1,"description":"Start program"},{"id":2,"description":"Stop program"},{"id":3,"description":"Pause program"},{"id":4,"description":"Resume program"}]

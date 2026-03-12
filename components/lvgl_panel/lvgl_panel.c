@@ -67,14 +67,21 @@ static void panel_show_boot_logo_screen(void)
     lv_obj_t *scr = lv_scr_act();
 
     lvgl_page_main_deactivate();
-    lv_obj_clean(scr);
 
+    /* [C] Ferma chrome timer e resetta indev prima di lv_obj_clean */
+    lvgl_page_chrome_remove();
+    lv_indev_t *indev_b = lv_indev_get_next(NULL);
+    while (indev_b) {
+        lv_indev_reset(indev_b, NULL);
+        indev_b = lv_indev_get_next(indev_b);
+    }
+
+    lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, COL_BOOT_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
     s_init_status_label = NULL;
-    lvgl_page_chrome_add(scr);
 
     bool logo_drawn = false;
     if (panel_boot_logo_file_exists()) {
@@ -172,7 +179,7 @@ void lvgl_panel_show_language_select(void)
         }
     }
 
-    lvgl_page_language_2_show();
+    lvgl_page_language_2_show(lvgl_page_main_show);  /* [C] Fallback: ritorna a programmi */
 
     bsp_display_unlock();
 
@@ -244,6 +251,9 @@ void lvgl_panel_show_main_page(void)
 
 void lvgl_panel_show_ads_page(void)
 {
+    /* [C] Pre-carica le immagini SPIFFS fuori dal lock LVGL per non bloccare il rendering */
+    lvgl_page_ads_preload_images();
+
     if (!bsp_display_lock(0)) {
         ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_ads_page");
         return;

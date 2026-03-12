@@ -13,4417 +13,4417 @@
   },
   {
     "scope": 2,
-    "key": 467,
+    "key": 3,
     "section": 0,
     "text": "Fuori servizio"
   },
   {
     "scope": 2,
-    "key": 468,
+    "key": 4,
     "section": 0,
     "text": "Reboot consecutivi: %lu\nContatt"
   },
   {
     "scope": 2,
-    "key": 468,
-    "section": 1,
+    "key": 4,
+    "section": 0,
     "text": "are l'assistenza"
   },
   {
     "scope": 2,
-    "key": 469,
+    "key": 5,
     "section": 0,
     "text": "Credito"
   },
   {
     "scope": 2,
-    "key": 470,
+    "key": 6,
     "section": 0,
     "text": "Secondi   %s"
   },
   {
     "scope": 2,
-    "key": 471,
+    "key": 7,
     "section": 0,
     "text": "Pausa: %s"
   },
   {
     "scope": 2,
-    "key": 472,
+    "key": 8,
     "section": 0,
     "text": "Programma %d"
   },
   {
     "scope": 3,
-    "key": 3,
+    "key": 9,
     "section": 0,
     "text": "Config"
   },
   {
     "scope": 3,
-    "key": 4,
+    "key": 10,
     "section": 0,
     "text": "Emulatore"
   },
   {
     "scope": 3,
-    "key": 5,
+    "key": 11,
     "section": 0,
     "text": "Home"
   },
   {
     "scope": 3,
-    "key": 6,
+    "key": 12,
     "section": 0,
     "text": "Log"
   },
   {
     "scope": 3,
-    "key": 7,
+    "key": 13,
     "section": 0,
     "text": "OTA"
   },
   {
     "scope": 3,
-    "key": 8,
+    "key": 14,
     "section": 0,
     "text": "Statistiche"
   },
   {
     "scope": 3,
-    "key": 9,
+    "key": 15,
     "section": 0,
     "text": "Task"
   },
   {
     "scope": 3,
-    "key": 10,
+    "key": 16,
     "section": 0,
     "text": "Test"
   },
   {
     "scope": 4,
-    "key": 11,
-    "section": 0,
-    "text": "Abilitato"
-  },
-  {
-    "scope": 4,
-    "key": 12,
-    "section": 0,
-    "text": "Aggiorna"
-  },
-  {
-    "scope": 4,
-    "key": 13,
-    "section": 0,
-    "text": "🔄 Aggiorna Dati"
-  },
-  {
-    "scope": 4,
-    "key": 14,
-    "section": 0,
-    "text": "Apri editor programmi"
-  },
-  {
-    "scope": 4,
-    "key": 15,
-    "section": 0,
-    "text": "Attendere il riavvio."
-  },
-  {
-    "scope": 4,
-    "key": 16,
-    "section": 0,
-    "text": "📥 Backup Config"
-  },
-  {
-    "scope": 4,
     "key": 17,
     "section": 0,
-    "text": "Base server URL"
+    "text": "Abilitato"
   },
   {
     "scope": 4,
     "key": 18,
     "section": 0,
-    "text": "Baudrate"
+    "text": "Aggiorna"
   },
   {
     "scope": 4,
     "key": 19,
     "section": 0,
-    "text": "Buffer RX"
+    "text": "🔄 Aggiorna Dati"
   },
   {
     "scope": 4,
     "key": 20,
     "section": 0,
-    "text": "Buffer TX"
+    "text": "Apri editor programmi"
   },
   {
     "scope": 4,
     "key": 21,
     "section": 0,
-    "text": "⬆️ Carica Firmware"
+    "text": "Attendere il riavvio."
   },
   {
     "scope": 4,
     "key": 22,
     "section": 0,
-    "text": "Conferma nuova password"
+    "text": "📥 Backup Config"
   },
   {
     "scope": 4,
     "key": 23,
     "section": 0,
-    "text": "Data Bits"
+    "text": "Base server URL"
   },
   {
     "scope": 4,
     "key": 24,
     "section": 0,
-    "text": "DHCP"
+    "text": "Baudrate"
   },
   {
     "scope": 4,
     "key": 25,
     "section": 0,
-    "text": "📺 Display"
+    "text": "Buffer RX"
   },
   {
     "scope": 4,
     "key": 26,
     "section": 0,
-    "text": "Display abilitato"
+    "text": "Buffer TX"
   },
   {
     "scope": 4,
     "key": 27,
     "section": 0,
-    "text": "Dual PID (opzionale)"
+    "text": "⬆️ Carica Firmware"
   },
   {
     "scope": 4,
     "key": 28,
     "section": 0,
-    "text": "🌐 Ethernet"
+    "text": "Conferma nuova password"
   },
   {
     "scope": 4,
     "key": 29,
     "section": 0,
-    "text": "Gateway"
+    "text": "Data Bits"
   },
   {
     "scope": 4,
     "key": 30,
     "section": 0,
-    "text": "Gestione prezzi, durata e relay"
-  },
-  {
-    "scope": 4,
-    "key": 30,
-    "section": 1,
-    "text": " per programma."
+    "text": "DHCP"
   },
   {
     "scope": 4,
     "key": 31,
     "section": 0,
-    "text": "GPIO 33"
+    "text": "📺 Display"
   },
   {
     "scope": 4,
     "key": 32,
     "section": 0,
-    "text": "🔘 GPIO Ausiliario (GPIO33)"
+    "text": "Display abilitato"
   },
   {
     "scope": 4,
     "key": 33,
     "section": 0,
-    "text": "I/O Expander"
+    "text": "Dual PID (opzionale)"
   },
   {
     "scope": 4,
     "key": 34,
     "section": 0,
-    "text": "🆔 Identità Dispositivo"
+    "text": "🌐 Ethernet"
   },
   {
     "scope": 4,
     "key": 35,
     "section": 0,
-    "text": "Indirizzo IP"
+    "text": "Gateway"
   },
   {
     "scope": 4,
     "key": 36,
     "section": 0,
-    "text": "Input (Float)"
+    "text": "Gestione prezzi, durata e relay"
+  },
+  {
+    "scope": 4,
+    "key": 36,
+    "section": 0,
+    "text": " per programma."
   },
   {
     "scope": 4,
     "key": 37,
     "section": 0,
-    "text": "Input (Pull-down)"
+    "text": "GPIO 33"
   },
   {
     "scope": 4,
     "key": 38,
     "section": 0,
-    "text": "Input (Pull-up)"
+    "text": "🔘 GPIO Ausiliario (GPIO33)"
   },
   {
     "scope": 4,
     "key": 39,
     "section": 0,
-    "text": "Italiano (IT)"
+    "text": "I/O Expander"
   },
   {
     "scope": 4,
     "key": 40,
     "section": 0,
-    "text": "LED Strip (WS2812)"
+    "text": "🆔 Identità Dispositivo"
   },
   {
     "scope": 4,
     "key": 41,
     "section": 0,
-    "text": "Lingua UI"
+    "text": "Indirizzo IP"
   },
   {
     "scope": 4,
     "key": 42,
     "section": 0,
-    "text": "📊 Logging Remoto"
+    "text": "Input (Float)"
   },
   {
     "scope": 4,
     "key": 43,
     "section": 0,
-    "text": "Luminosità LCD ("
+    "text": "Input (Pull-down)"
   },
   {
     "scope": 4,
     "key": 44,
     "section": 0,
-    "text": "MDB Configuration"
+    "text": "Input (Pull-up)"
   },
   {
     "scope": 4,
     "key": 45,
     "section": 0,
-    "text": "MDB Engine"
+    "text": "Italiano (IT)"
   },
   {
     "scope": 4,
     "key": 46,
     "section": 0,
-    "text": "Modalità"
+    "text": "LED Strip (WS2812)"
   },
   {
     "scope": 4,
     "key": 47,
     "section": 0,
-    "text": "Modifica password richiesta per"
-  },
-  {
-    "scope": 4,
-    "key": 47,
-    "section": 1,
-    "text": " /emulator e reboot FACTORY."
+    "text": "Lingua UI"
   },
   {
     "scope": 4,
     "key": 48,
     "section": 0,
-    "text": "Nome Dispositivo"
+    "text": "📊 Logging Remoto"
   },
   {
     "scope": 4,
     "key": 49,
     "section": 0,
-    "text": "NTP"
+    "text": "Luminosità LCD ("
   },
   {
     "scope": 4,
     "key": 50,
     "section": 0,
-    "text": "NTP Abilitato"
+    "text": "MDB Configuration"
   },
   {
     "scope": 4,
     "key": 51,
     "section": 0,
-    "text": "Numero di LED"
+    "text": "MDB Engine"
   },
   {
     "scope": 4,
     "key": 52,
     "section": 0,
-    "text": "Nuova password"
+    "text": "Modalità"
   },
   {
     "scope": 4,
     "key": 53,
     "section": 0,
-    "text": "Offset Fuso Orario (ore)"
+    "text": "Modifica password richiesta per"
+  },
+  {
+    "scope": 4,
+    "key": 53,
+    "section": 0,
+    "text": " /emulator e reboot FACTORY."
   },
   {
     "scope": 4,
     "key": 54,
     "section": 0,
-    "text": "Output"
+    "text": "Nome Dispositivo"
   },
   {
     "scope": 4,
     "key": 55,
     "section": 0,
-    "text": "Parità (0:None, 1:Odd, 2:Even)"
+    "text": "NTP"
   },
   {
     "scope": 4,
     "key": 56,
     "section": 0,
-    "text": "Password"
+    "text": "NTP Abilitato"
   },
   {
     "scope": 4,
     "key": 57,
     "section": 0,
-    "text": "Password attuale"
+    "text": "Numero di LED"
   },
   {
     "scope": 4,
     "key": 58,
     "section": 0,
-    "text": "🔐 Password boot/emulatore"
+    "text": "Nuova password"
   },
   {
     "scope": 4,
     "key": 59,
     "section": 0,
-    "text": "🔌 Periferiche Hardware"
+    "text": "Offset Fuso Orario (ore)"
   },
   {
     "scope": 4,
     "key": 60,
     "section": 0,
-    "text": "PID"
+    "text": "Output"
   },
   {
     "scope": 4,
     "key": 61,
     "section": 0,
-    "text": "Porta UDP"
+    "text": "Parità (0:None, 1:Odd, 2:Even)"
   },
   {
     "scope": 4,
     "key": 62,
     "section": 0,
-    "text": "PWM Canale 1"
+    "text": "Password"
   },
   {
     "scope": 4,
     "key": 63,
     "section": 0,
-    "text": "PWM Canale 2"
+    "text": "Password attuale"
   },
   {
     "scope": 4,
     "key": 64,
     "section": 0,
-    "text": "Reboot in App Last..."
+    "text": "🔐 Password boot/emulatore"
   },
   {
     "scope": 4,
     "key": 65,
     "section": 0,
-    "text": "Reboot in Factory Mode..."
+    "text": "🔌 Periferiche Hardware"
   },
   {
     "scope": 4,
     "key": 66,
     "section": 0,
-    "text": "Reboot in OTA0..."
+    "text": "PID"
   },
   {
     "scope": 4,
     "key": 67,
     "section": 0,
-    "text": "Reboot in OTA1..."
+    "text": "Porta UDP"
   },
   {
     "scope": 4,
     "key": 68,
     "section": 0,
-    "text": "Reboot in Production Mode..."
+    "text": "PWM Canale 1"
   },
   {
     "scope": 4,
     "key": 69,
     "section": 0,
-    "text": "⚠️ Reset Fabbrica"
+    "text": "PWM Canale 2"
   },
   {
     "scope": 4,
     "key": 70,
     "section": 0,
-    "text": "RS232 Configuration"
+    "text": "Reboot in App Last..."
   },
   {
     "scope": 4,
     "key": 71,
     "section": 0,
-    "text": "RS485 Configuration"
+    "text": "Reboot in Factory Mode..."
   },
   {
     "scope": 4,
     "key": 72,
     "section": 0,
-    "text": "💾 Salva Configurazione"
+    "text": "Reboot in OTA0..."
   },
   {
     "scope": 4,
     "key": 73,
     "section": 0,
-    "text": "💾 Salva password boot"
+    "text": "Reboot in OTA1..."
   },
   {
     "scope": 4,
     "key": 74,
     "section": 0,
-    "text": "Scanner USB (CDC)"
+    "text": "Reboot in Production Mode..."
   },
   {
     "scope": 4,
     "key": 75,
     "section": 0,
-    "text": "Scheda SD"
+    "text": "⚠️ Reset Fabbrica"
   },
   {
     "scope": 4,
     "key": 76,
     "section": 0,
-    "text": "Sensore Temperatura"
+    "text": "RS232 Configuration"
   },
   {
     "scope": 4,
     "key": 77,
     "section": 0,
-    "text": "Server abilitato"
+    "text": "RS485 Configuration"
   },
   {
     "scope": 4,
     "key": 78,
     "section": 0,
-    "text": "Server NTP 1"
+    "text": "💾 Salva Configurazione"
   },
   {
     "scope": 4,
     "key": 79,
     "section": 0,
-    "text": "Server NTP 2"
+    "text": "💾 Salva password boot"
   },
   {
     "scope": 4,
     "key": 80,
     "section": 0,
-    "text": "Server password (MD5)"
+    "text": "Scanner USB (CDC)"
   },
   {
     "scope": 4,
     "key": 81,
     "section": 0,
-    "text": "🔁 Server Remoto"
+    "text": "Scheda SD"
   },
   {
     "scope": 4,
     "key": 82,
     "section": 0,
-    "text": "Server serial"
+    "text": "Sensore Temperatura"
   },
   {
     "scope": 4,
     "key": 83,
     "section": 0,
-    "text": "SSID"
+    "text": "Server abilitato"
   },
   {
     "scope": 4,
     "key": 84,
     "section": 0,
-    "text": "Stato Iniziale (Solo Out)"
+    "text": "Server NTP 1"
   },
   {
     "scope": 4,
     "key": 85,
     "section": 0,
-    "text": "Stop Bits (1, 2)"
+    "text": "Server NTP 2"
   },
   {
     "scope": 4,
     "key": 86,
     "section": 0,
-    "text": "Subnet Mask"
+    "text": "Server password (MD5)"
   },
   {
     "scope": 4,
     "key": 87,
     "section": 0,
-    "text": "📊 Tabella Programmi"
+    "text": "🔁 Server Remoto"
   },
   {
     "scope": 4,
     "key": 88,
     "section": 0,
-    "text": "(TAG) Porte Seriali"
+    "text": "Server serial"
   },
   {
     "scope": 4,
     "key": 89,
     "section": 0,
-    "text": "UART RS232"
+    "text": "SSID"
   },
   {
     "scope": 4,
     "key": 90,
     "section": 0,
-    "text": "UART RS485"
+    "text": "Stato Iniziale (Solo Out)"
   },
   {
     "scope": 4,
     "key": 91,
     "section": 0,
-    "text": "Usa broadcast UDP"
+    "text": "Stop Bits (1, 2)"
   },
   {
     "scope": 4,
     "key": 92,
     "section": 0,
-    "text": "VID"
+    "text": "Subnet Mask"
   },
   {
     "scope": 4,
     "key": 93,
     "section": 0,
-    "text": "WiFi Abilitato"
+    "text": "📊 Tabella Programmi"
   },
   {
     "scope": 4,
     "key": 94,
     "section": 0,
+    "text": "(TAG) Porte Seriali"
+  },
+  {
+    "scope": 4,
+    "key": 95,
+    "section": 0,
+    "text": "UART RS232"
+  },
+  {
+    "scope": 4,
+    "key": 96,
+    "section": 0,
+    "text": "UART RS485"
+  },
+  {
+    "scope": 4,
+    "key": 97,
+    "section": 0,
+    "text": "Usa broadcast UDP"
+  },
+  {
+    "scope": 4,
+    "key": 98,
+    "section": 0,
+    "text": "VID"
+  },
+  {
+    "scope": 4,
+    "key": 99,
+    "section": 0,
+    "text": "WiFi Abilitato"
+  },
+  {
+    "scope": 4,
+    "key": 100,
+    "section": 0,
     "text": "📡 WiFi STA"
   },
   {
     "scope": 4,
-    "key": 475,
+    "key": 101,
     "section": 0,
     "text": "Lingua Pannello Utente (LCD)"
   },
   {
     "scope": 4,
-    "key": 476,
+    "key": 102,
     "section": 0,
     "text": "Lingua Backend (Web UI/Server)"
   },
   {
     "scope": 5,
-    "key": 95,
+    "key": 103,
     "section": 0,
     "text": "Annulla"
   },
   {
     "scope": 5,
-    "key": 96,
+    "key": 104,
     "section": 0,
     "text": "Continua"
   },
   {
     "scope": 5,
-    "key": 97,
+    "key": 105,
     "section": 0,
     "text": "Credito"
   },
   {
     "scope": 5,
-    "key": 98,
+    "key": 106,
     "section": 0,
     "text": "In pausa: 00:00"
   },
   {
     "scope": 5,
-    "key": 99,
+    "key": 107,
     "section": 0,
     "text": "Inserire la password per contin"
   },
   {
     "scope": 5,
-    "key": 99,
-    "section": 1,
-    "text": "uare."
-  },
-  {
-    "scope": 5,
-    "key": 100,
-    "section": 0,
-    "text": "Layout operativo: pannello uten"
-  },
-  {
-    "scope": 5,
-    "key": 100,
-    "section": 1,
-    "text": "te 800x1280 a sinistra, quadro "
-  },
-  {
-    "scope": 5,
-    "key": 100,
-    "section": 2,
-    "text": "elettrico a destra"
-  },
-  {
-    "scope": 5,
-    "key": 101,
-    "section": 0,
-    "text": "Nessun evento in coda"
-  },
-  {
-    "scope": 5,
-    "key": 102,
-    "section": 0,
-    "text": "🔒 Password richiesta"
-  },
-  {
-    "scope": 5,
-    "key": 103,
-    "section": 0,
-    "text": "Programma 1"
-  },
-  {
-    "scope": 5,
-    "key": 104,
-    "section": 0,
-    "text": "Programma 2"
-  },
-  {
-    "scope": 5,
-    "key": 105,
-    "section": 0,
-    "text": "Programma 3"
-  },
-  {
-    "scope": 5,
-    "key": 106,
-    "section": 0,
-    "text": "Programma 4"
-  },
-  {
-    "scope": 5,
     "key": 107,
     "section": 0,
-    "text": "Programma 5"
+    "text": "uare."
   },
   {
     "scope": 5,
     "key": 108,
     "section": 0,
-    "text": "Programma 6"
+    "text": "Layout operativo: pannello uten"
+  },
+  {
+    "scope": 5,
+    "key": 108,
+    "section": 0,
+    "text": "te 800x1280 a sinistra, quadro "
+  },
+  {
+    "scope": 5,
+    "key": 108,
+    "section": 0,
+    "text": "elettrico a destra"
   },
   {
     "scope": 5,
     "key": 109,
     "section": 0,
-    "text": "Programma 7"
+    "text": "Nessun evento in coda"
   },
   {
     "scope": 5,
     "key": 110,
     "section": 0,
-    "text": "Programma 8"
+    "text": "🔒 Password richiesta"
   },
   {
     "scope": 5,
     "key": 111,
     "section": 0,
-    "text": "Quadro elettrico"
+    "text": "Programma 1"
   },
   {
     "scope": 5,
     "key": 112,
     "section": 0,
-    "text": "R1"
+    "text": "Programma 2"
   },
   {
     "scope": 5,
     "key": 113,
     "section": 0,
-    "text": "R10"
+    "text": "Programma 3"
   },
   {
     "scope": 5,
     "key": 114,
     "section": 0,
-    "text": "R2"
+    "text": "Programma 4"
   },
   {
     "scope": 5,
     "key": 115,
     "section": 0,
-    "text": "R3"
+    "text": "Programma 5"
   },
   {
     "scope": 5,
     "key": 116,
     "section": 0,
-    "text": "R4"
+    "text": "Programma 6"
   },
   {
     "scope": 5,
     "key": 117,
     "section": 0,
-    "text": "R5"
+    "text": "Programma 7"
   },
   {
     "scope": 5,
     "key": 118,
     "section": 0,
-    "text": "R6"
+    "text": "Programma 8"
   },
   {
     "scope": 5,
     "key": 119,
     "section": 0,
-    "text": "R7"
+    "text": "Quadro elettrico"
   },
   {
     "scope": 5,
     "key": 120,
     "section": 0,
-    "text": "R8"
+    "text": "R1"
   },
   {
     "scope": 5,
     "key": 121,
     "section": 0,
-    "text": "R9"
+    "text": "R10"
   },
   {
     "scope": 5,
     "key": 122,
     "section": 0,
-    "text": "Relay"
+    "text": "R2"
   },
   {
     "scope": 5,
     "key": 123,
     "section": 0,
-    "text": "Ricarica Coin"
+    "text": "R3"
   },
   {
     "scope": 5,
     "key": 124,
     "section": 0,
-    "text": "Stato credito"
+    "text": "R4"
   },
   {
     "scope": 5,
     "key": 125,
     "section": 0,
+    "text": "R5"
+  },
+  {
+    "scope": 5,
+    "key": 126,
+    "section": 0,
+    "text": "R6"
+  },
+  {
+    "scope": 5,
+    "key": 127,
+    "section": 0,
+    "text": "R7"
+  },
+  {
+    "scope": 5,
+    "key": 128,
+    "section": 0,
+    "text": "R8"
+  },
+  {
+    "scope": 5,
+    "key": 129,
+    "section": 0,
+    "text": "R9"
+  },
+  {
+    "scope": 5,
+    "key": 130,
+    "section": 0,
+    "text": "Relay"
+  },
+  {
+    "scope": 5,
+    "key": 131,
+    "section": 0,
+    "text": "Ricarica Coin"
+  },
+  {
+    "scope": 5,
+    "key": 132,
+    "section": 0,
+    "text": "Stato credito"
+  },
+  {
+    "scope": 5,
+    "key": 133,
+    "section": 0,
     "text": "Tempo: 00:00"
   },
   {
     "scope": 5,
-    "key": 473,
+    "key": 134,
     "section": 0,
     "text": "Programma 9"
   },
   {
     "scope": 5,
-    "key": 474,
+    "key": 135,
     "section": 0,
     "text": "Programma 10"
   },
   {
     "scope": 6,
-    "key": 126,
+    "key": 136,
     "section": 0,
     "text": "Applica filtro"
   },
   {
     "scope": 6,
-    "key": 127,
+    "key": 137,
     "section": 0,
     "text": "Configura il logging remoto nel"
   },
   {
     "scope": 6,
-    "key": 127,
-    "section": 1,
-    "text": "la pagina"
-  },
-  {
-    "scope": 6,
-    "key": 128,
-    "section": 0,
-    "text": "Configurazione"
-  },
-  {
-    "scope": 6,
-    "key": 129,
-    "section": 0,
-    "text": "dere i nuovi log.              "
-  },
-  {
-    "scope": 6,
-    "key": 129,
-    "section": 1,
-    "text": "                               "
-  },
-  {
-    "scope": 6,
-    "key": 129,
-    "section": 2,
-    "text": "                  Applica livel"
-  },
-  {
-    "scope": 6,
-    "key": 129,
-    "section": 3,
-    "text": "li"
-  },
-  {
-    "scope": 6,
-    "key": 130,
-    "section": 0,
-    "text": "html += '"
-  },
-  {
-    "scope": 6,
-    "key": 131,
-    "section": 0,
-    "text": "I log vengono ricevuti via UDP "
-  },
-  {
-    "scope": 6,
-    "key": 131,
-    "section": 1,
-    "text": "dal server configurato. Aggiorn"
-  },
-  {
-    "scope": 6,
-    "key": 131,
-    "section": 2,
-    "text": "a la pagina per ve"
-  },
-  {
-    "scope": 6,
-    "key": 132,
-    "section": 0,
-    "text": "In attesa di log..."
-  },
-  {
-    "scope": 6,
-    "key": 133,
-    "section": 0,
-    "text": "' + item.tag + '"
-  },
-  {
-    "scope": 6,
-    "key": 134,
-    "section": 0,
-    "text": "' + l.t + '"
-  },
-  {
-    "scope": 6,
-    "key": 135,
-    "section": 0,
-    "text": "📋 Log Remoto Ricevuti"
-  },
-  {
-    "scope": 6,
-    "key": 136,
-    "section": 0,
-    "text": "Nessun tag disponibile"
-  },
-  {
-    "scope": 6,
     "key": 137,
     "section": 0,
-    "text": "per iniziare a ricevere log."
+    "text": "la pagina"
   },
   {
     "scope": 6,
     "key": 138,
     "section": 0,
+    "text": "Configurazione"
+  },
+  {
+    "scope": 6,
+    "key": 139,
+    "section": 0,
+    "text": "dere i nuovi log.              "
+  },
+  {
+    "scope": 6,
+    "key": 139,
+    "section": 0,
+    "text": "                               "
+  },
+  {
+    "scope": 6,
+    "key": 139,
+    "section": 0,
+    "text": "                  Applica livel"
+  },
+  {
+    "scope": 6,
+    "key": 139,
+    "section": 0,
+    "text": "li"
+  },
+  {
+    "scope": 6,
+    "key": 140,
+    "section": 0,
+    "text": "html += '"
+  },
+  {
+    "scope": 6,
+    "key": 141,
+    "section": 0,
+    "text": "I log vengono ricevuti via UDP "
+  },
+  {
+    "scope": 6,
+    "key": 141,
+    "section": 0,
+    "text": "dal server configurato. Aggiorn"
+  },
+  {
+    "scope": 6,
+    "key": 141,
+    "section": 0,
+    "text": "a la pagina per ve"
+  },
+  {
+    "scope": 6,
+    "key": 142,
+    "section": 0,
+    "text": "In attesa di log..."
+  },
+  {
+    "scope": 6,
+    "key": 143,
+    "section": 0,
+    "text": "' + item.tag + '"
+  },
+  {
+    "scope": 6,
+    "key": 144,
+    "section": 0,
+    "text": "' + l.t + '"
+  },
+  {
+    "scope": 6,
+    "key": 145,
+    "section": 0,
+    "text": "📋 Log Remoto Ricevuti"
+  },
+  {
+    "scope": 6,
+    "key": 146,
+    "section": 0,
+    "text": "Nessun tag disponibile"
+  },
+  {
+    "scope": 6,
+    "key": 147,
+    "section": 0,
+    "text": "per iniziare a ricevere log."
+  },
+  {
+    "scope": 6,
+    "key": 148,
+    "section": 0,
     "text": "Pulisci filtro"
   },
   {
     "scope": 7,
-    "key": 11,
+    "key": 17,
     "section": 0,
     "text": "Abilitato"
   },
   {
     "scope": 7,
-    "key": 87,
+    "key": 93,
     "section": 0,
     "text": "Tabella Programmi"
   },
   {
     "scope": 7,
-    "key": 139,
+    "key": 149,
     "section": 0,
     "text": "400 Bad Request"
   },
   {
     "scope": 7,
-    "key": 140,
+    "key": 150,
     "section": 0,
     "text": "403 Forbidden"
   },
   {
     "scope": 7,
-    "key": 141,
+    "key": 151,
     "section": 0,
     "text": "404 Non Trovato"
   },
   {
     "scope": 7,
-    "key": 142,
+    "key": 152,
     "section": 0,
     "text": "405 Method Not Allowed"
   },
   {
     "scope": 7,
-    "key": 143,
+    "key": 153,
     "section": 0,
     "text": "<button class='btn-secondary' o"
   },
   {
     "scope": 7,
-    "key": 143,
-    "section": 1,
+    "key": 153,
+    "section": 0,
     "text": "nclick='loadPrograms()'>🔄 Ri"
   },
   {
     "scope": 7,
-    "key": 143,
-    "section": 2,
+    "key": 153,
+    "section": 0,
     "text": "carica</button>"
-  },
-  {
-    "scope": 7,
-    "key": 144,
-    "section": 0,
-    "text": "<button onclick='savePrograms()"
-  },
-  {
-    "scope": 7,
-    "key": 144,
-    "section": 1,
-    "text": "'>💾 Salva tabella</button>"
-  },
-  {
-    "scope": 7,
-    "key": 145,
-    "section": 0,
-    "text": "[C] GET /config/programs"
-  },
-  {
-    "scope": 7,
-    "key": 146,
-    "section": 0,
-    "text": "Campi current_password/new_pass"
-  },
-  {
-    "scope": 7,
-    "key": 146,
-    "section": 1,
-    "text": "word obbligatori"
-  },
-  {
-    "scope": 7,
-    "key": 147,
-    "section": 0,
-    "text": "Campi relay_number/status/durat"
-  },
-  {
-    "scope": 7,
-    "key": 147,
-    "section": 1,
-    "text": "ion obbligatori"
-  },
-  {
-    "scope": 7,
-    "key": 148,
-    "section": 0,
-    "text": "</div>"
-  },
-  {
-    "scope": 7,
-    "key": 149,
-    "section": 0,
-    "text": "<div class='container'><div cla"
-  },
-  {
-    "scope": 7,
-    "key": 149,
-    "section": 1,
-    "text": "ss='section'>"
-  },
-  {
-    "scope": 7,
-    "key": 150,
-    "section": 0,
-    "text": "</div></div>"
-  },
-  {
-    "scope": 7,
-    "key": 151,
-    "section": 0,
-    "text": "<div id='status' class='status'"
-  },
-  {
-    "scope": 7,
-    "key": 151,
-    "section": 1,
-    "text": "></div>"
-  },
-  {
-    "scope": 7,
-    "key": 152,
-    "section": 0,
-    "text": "Durata (s)"
-  },
-  {
-    "scope": 7,
-    "key": 153,
-    "section": 0,
-    "text": "📊 Editor Tabella Programmi ("
-  },
-  {
-    "scope": 7,
-    "key": 153,
-    "section": 1,
-    "text": "FACTORY)"
   },
   {
     "scope": 7,
     "key": 154,
     "section": 0,
-    "text": "Errore lettura payload"
+    "text": "<button onclick='savePrograms()"
+  },
+  {
+    "scope": 7,
+    "key": 154,
+    "section": 0,
+    "text": "'>💾 Salva tabella</button>"
   },
   {
     "scope": 7,
     "key": 155,
     "section": 0,
-    "text": "Errore validazione"
+    "text": "[C] GET /config/programs"
   },
   {
     "scope": 7,
     "key": 156,
     "section": 0,
-    "text": "<h2>📊 Editor Tabella Program"
+    "text": "Campi current_password/new_pass"
   },
   {
     "scope": 7,
     "key": 156,
-    "section": 1,
-    "text": "mi (FACTORY)</h2>"
+    "section": 0,
+    "text": "word obbligatori"
   },
   {
     "scope": 7,
     "key": 157,
     "section": 0,
-    "text": "ID"
+    "text": "Campi relay_number/status/durat"
+  },
+  {
+    "scope": 7,
+    "key": 157,
+    "section": 0,
+    "text": "ion obbligatori"
   },
   {
     "scope": 7,
     "key": 158,
     "section": 0,
-    "text": "Imposta nome, abilitazione, pre"
-  },
-  {
-    "scope": 7,
-    "key": 158,
-    "section": 1,
-    "text": "zzo, durata e relay mask per og"
-  },
-  {
-    "scope": 7,
-    "key": 158,
-    "section": 2,
-    "text": "ni programma."
+    "text": "</div>"
   },
   {
     "scope": 7,
     "key": 159,
     "section": 0,
-    "text": "JSON non valido"
+    "text": "<div class='container'><div cla"
+  },
+  {
+    "scope": 7,
+    "key": 159,
+    "section": 0,
+    "text": "ss='section'>"
   },
   {
     "scope": 7,
     "key": 160,
     "section": 0,
-    "text": "Method not allowed"
+    "text": "</div></div>"
   },
   {
     "scope": 7,
     "key": 161,
     "section": 0,
-    "text": "Nome"
+    "text": "<div id='status' class='status'"
+  },
+  {
+    "scope": 7,
+    "key": 161,
+    "section": 0,
+    "text": "></div>"
   },
   {
     "scope": 7,
     "key": 162,
     "section": 0,
-    "text": "Nuova password non valida o err"
-  },
-  {
-    "scope": 7,
-    "key": 162,
-    "section": 1,
-    "text": "ore salvataggio"
+    "text": "Durata (s)"
   },
   {
     "scope": 7,
     "key": 163,
     "section": 0,
-    "text": "<p>Imposta nome, abilitazione, "
+    "text": "📊 Editor Tabella Programmi ("
   },
   {
     "scope": 7,
     "key": 163,
-    "section": 1,
-    "text": "prezzo, durata e relay mask per"
-  },
-  {
-    "scope": 7,
-    "key": 163,
-    "section": 2,
-    "text": " ogni programma.</p>"
+    "section": 0,
+    "text": "FACTORY)"
   },
   {
     "scope": 7,
     "key": 164,
     "section": 0,
-    "text": "Password attuale non valida"
+    "text": "Errore lettura payload"
   },
   {
     "scope": 7,
     "key": 165,
     "section": 0,
-    "text": "Pausa Max (s)"
+    "text": "Errore validazione"
   },
   {
     "scope": 7,
     "key": 166,
     "section": 0,
-    "text": "Secondi pausa (tutti)"
+    "text": "<h2>📊 Editor Tabella Program"
+  },
+  {
+    "scope": 7,
+    "key": 166,
+    "section": 0,
+    "text": "mi (FACTORY)</h2>"
   },
   {
     "scope": 7,
     "key": 167,
     "section": 0,
-    "text": "Imposta"
+    "text": "ID"
   },
   {
     "scope": 7,
     "key": 168,
     "section": 0,
-    "text": "Payload non valido"
+    "text": "Imposta nome, abilitazione, pre"
+  },
+  {
+    "scope": 7,
+    "key": 168,
+    "section": 0,
+    "text": "zzo, durata e relay mask per og"
+  },
+  {
+    "scope": 7,
+    "key": 168,
+    "section": 0,
+    "text": "ni programma."
   },
   {
     "scope": 7,
     "key": 169,
     "section": 0,
-    "text": "Prezzo"
+    "text": "JSON non valido"
   },
   {
     "scope": 7,
     "key": 170,
     "section": 0,
-    "text": "Relay mask"
+    "text": "Method not allowed"
   },
   {
     "scope": 7,
     "key": 171,
     "section": 0,
-    "text": "relay_number fuori range"
+    "text": "Nome"
   },
   {
     "scope": 7,
     "key": 172,
     "section": 0,
-    "text": "return `"
+    "text": "Nuova password non valida o err"
+  },
+  {
+    "scope": 7,
+    "key": 172,
+    "section": 0,
+    "text": "ore salvataggio"
   },
   {
     "scope": 7,
     "key": 173,
     "section": 0,
-    "text": "return `<tr>`+"
+    "text": "<p>Imposta nome, abilitazione, "
+  },
+  {
+    "scope": 7,
+    "key": 173,
+    "section": 0,
+    "text": "prezzo, durata e relay mask per"
+  },
+  {
+    "scope": 7,
+    "key": 173,
+    "section": 0,
+    "text": " ogni programma.</p>"
   },
   {
     "scope": 7,
     "key": 174,
     "section": 0,
-    "text": "🔄 Ricarica"
+    "text": "Password attuale non valida"
   },
   {
     "scope": 7,
     "key": 175,
     "section": 0,
-    "text": "💾 Salva tabella"
+    "text": "Pausa Max (s)"
   },
   {
     "scope": 7,
     "key": 176,
     "section": 0,
-    "text": "</script></body></html>"
+    "text": "Secondi pausa (tutti)"
   },
   {
     "scope": 7,
     "key": 177,
     "section": 0,
-    "text": "<table><thead><tr><th>ID</th><t"
-  },
-  {
-    "scope": 7,
-    "key": 177,
-    "section": 1,
-    "text": "h>Nome</th><th>Abilitato</th><t"
-  },
-  {
-    "scope": 7,
-    "key": 177,
-    "section": 2,
-    "text": "h>Prezzo</th><th>Durata (s)</th"
-  },
-  {
-    "scope": 7,
-    "key": 177,
-    "section": 3,
-    "text": "><th>Pausa Max (s)</th><th>Rela"
-  },
-  {
-    "scope": 7,
-    "key": 177,
-    "section": 4,
-    "text": "y mask</th></tr></thead><tbody "
-  },
-  {
-    "scope": 7,
-    "key": 177,
-    "section": 5,
-    "text": "id='programRows'></tbody></tabl"
-  },
-  {
-    "scope": 7,
-    "key": 177,
-    "section": 6,
-    "text": "e>"
+    "text": "Imposta"
   },
   {
     "scope": 7,
     "key": 178,
     "section": 0,
+    "text": "Payload non valido"
+  },
+  {
+    "scope": 7,
+    "key": 179,
+    "section": 0,
+    "text": "Prezzo"
+  },
+  {
+    "scope": 7,
+    "key": 180,
+    "section": 0,
+    "text": "Relay mask"
+  },
+  {
+    "scope": 7,
+    "key": 181,
+    "section": 0,
+    "text": "relay_number fuori range"
+  },
+  {
+    "scope": 7,
+    "key": 182,
+    "section": 0,
+    "text": "return `"
+  },
+  {
+    "scope": 7,
+    "key": 183,
+    "section": 0,
+    "text": "return `<tr>`+"
+  },
+  {
+    "scope": 7,
+    "key": 184,
+    "section": 0,
+    "text": "🔄 Ricarica"
+  },
+  {
+    "scope": 7,
+    "key": 185,
+    "section": 0,
+    "text": "💾 Salva tabella"
+  },
+  {
+    "scope": 7,
+    "key": 186,
+    "section": 0,
+    "text": "</script></body></html>"
+  },
+  {
+    "scope": 7,
+    "key": 187,
+    "section": 0,
+    "text": "<table><thead><tr><th>ID</th><t"
+  },
+  {
+    "scope": 7,
+    "key": 187,
+    "section": 0,
+    "text": "h>Nome</th><th>Abilitato</th><t"
+  },
+  {
+    "scope": 7,
+    "key": 187,
+    "section": 0,
+    "text": "h>Prezzo</th><th>Durata (s)</th"
+  },
+  {
+    "scope": 7,
+    "key": 187,
+    "section": 0,
+    "text": "><th>Pausa Max (s)</th><th>Rela"
+  },
+  {
+    "scope": 7,
+    "key": 187,
+    "section": 0,
+    "text": "y mask</th></tr></thead><tbody "
+  },
+  {
+    "scope": 7,
+    "key": 187,
+    "section": 0,
+    "text": "id='programRows'></tbody></tabl"
+  },
+  {
+    "scope": 7,
+    "key": 187,
+    "section": 0,
+    "text": "e>"
+  },
+  {
+    "scope": 7,
+    "key": 188,
+    "section": 0,
     "text": "WEB_UI_PROGRAMS_PAGE"
   },
   {
     "scope": 8,
-    "key": 13,
+    "key": 19,
     "section": 0,
     "text": "🔄 Aggiorna Dati"
   },
   {
     "scope": 8,
-    "key": 33,
+    "key": 39,
     "section": 0,
     "text": "I/O Expander"
   },
   {
     "scope": 8,
-    "key": 45,
+    "key": 51,
     "section": 0,
     "text": "MDB Engine"
   },
   {
     "scope": 8,
-    "key": 76,
+    "key": 82,
     "section": 0,
     "text": "Sensore Temperatura"
   },
   {
     "scope": 8,
-    "key": 87,
+    "key": 93,
     "section": 0,
     "text": "Tabella Programmi"
   },
   {
     "scope": 8,
-    "key": 89,
+    "key": 95,
     "section": 0,
     "text": "UART RS232"
   },
   {
     "scope": 8,
-    "key": 90,
+    "key": 96,
     "section": 0,
     "text": "UART RS485"
   },
   {
     "scope": 8,
-    "key": 128,
+    "key": 138,
     "section": 0,
     "text": "Configurazione"
   },
   {
     "scope": 8,
-    "key": 161,
+    "key": 171,
     "section": 0,
     "text": "Nome"
   },
   {
     "scope": 8,
-    "key": 179,
+    "key": 189,
     "section": 0,
     "text": "Activity"
   },
   {
     "scope": 8,
-    "key": 180,
+    "key": 190,
     "section": 0,
     "text": "🔄 Aggiorna Pagina"
   },
   {
     "scope": 8,
-    "key": 181,
+    "key": 191,
     "section": 0,
     "text": "➕ Aggiungi Task"
   },
   {
     "scope": 8,
-    "key": 182,
+    "key": 192,
     "section": 0,
     "text": "️ Ambiente"
   },
   {
     "scope": 8,
-    "key": 183,
+    "key": 193,
     "section": 0,
     "text": "API"
   },
   {
     "scope": 8,
-    "key": 184,
+    "key": 194,
     "section": 0,
     "text": "📡 API Endpoints"
   },
   {
     "scope": 8,
-    "key": 185,
+    "key": 195,
     "section": 0,
     "text": "APP LAST"
   },
   {
     "scope": 8,
-    "key": 186,
-    "section": 0,
-    "text": "🚀 Applica"
-  },
-  {
-    "scope": 8,
-    "key": 187,
-    "section": 0,
-    "text": "Apply tasks"
-  },
-  {
-    "scope": 8,
-    "key": 188,
-    "section": 0,
-    "text": "Authenticate (remote)"
-  },
-  {
-    "scope": 8,
-    "key": 189,
-    "section": 0,
-    "text": "Backup configuration"
-  },
-  {
-    "scope": 8,
-    "key": 190,
-    "section": 0,
-    "text": "Benvenuti nell'interfaccia di c"
-  },
-  {
-    "scope": 8,
-    "key": 190,
-    "section": 1,
-    "text": "onfigurazione e test."
-  },
-  {
-    "scope": 8,
-    "key": 191,
-    "section": 0,
-    "text": "Caricamento..."
-  },
-  {
-    "scope": 8,
-    "key": 192,
-    "section": 0,
-    "text": "📋 Configurazione Task"
-  },
-  {
-    "scope": 8,
-    "key": 193,
-    "section": 0,
-    "text": "Copia"
-  },
-  {
-    "scope": 8,
-    "key": 194,
-    "section": 0,
-    "text": "Core"
-  },
-  {
-    "scope": 8,
-    "key": 195,
-    "section": 0,
-    "text": "Credito Accumulato"
-  },
-  {
-    "scope": 8,
     "key": 196,
     "section": 0,
-    "text": "Current configuration"
+    "text": "🚀 Applica"
   },
   {
     "scope": 8,
     "key": 197,
     "section": 0,
-    "text": "Description"
+    "text": "Apply tasks"
   },
   {
     "scope": 8,
     "key": 198,
     "section": 0,
-    "text": "Device status JSON"
+    "text": "Authenticate (remote)"
   },
   {
     "scope": 8,
     "key": 199,
     "section": 0,
-    "text": "Editor Task"
+    "text": "Backup configuration"
   },
   {
     "scope": 8,
     "key": 200,
     "section": 0,
-    "text": "Emulatore"
+    "text": "Benvenuti nell'interfaccia di c"
+  },
+  {
+    "scope": 8,
+    "key": 200,
+    "section": 0,
+    "text": "onfigurazione e test."
   },
   {
     "scope": 8,
     "key": 201,
     "section": 0,
-    "text": "FACTORY"
+    "text": "Caricamento..."
   },
   {
     "scope": 8,
     "key": 202,
     "section": 0,
-    "text": "Factory reset"
+    "text": "📋 Configurazione Task"
   },
   {
     "scope": 8,
     "key": 203,
     "section": 0,
-    "text": "Fetch firmware"
+    "text": "Copia"
   },
   {
     "scope": 8,
     "key": 204,
     "section": 0,
-    "text": "Fetch images"
+    "text": "Core"
   },
   {
     "scope": 8,
     "key": 205,
     "section": 0,
-    "text": "Fetch translations"
+    "text": "Credito Accumulato"
   },
   {
     "scope": 8,
     "key": 206,
     "section": 0,
-    "text": "💾 Firmware"
+    "text": "Current configuration"
   },
   {
     "scope": 8,
     "key": 207,
     "section": 0,
-    "text": "Force NTP sync"
+    "text": "Description"
   },
   {
     "scope": 8,
     "key": 208,
     "section": 0,
-    "text": "GET"
+    "text": "Device status JSON"
   },
   {
     "scope": 8,
     "key": 209,
     "section": 0,
-    "text": "Get customers"
+    "text": "Editor Task"
   },
   {
     "scope": 8,
     "key": 210,
     "section": 0,
-    "text": "Get operators"
+    "text": "Emulatore"
   },
   {
     "scope": 8,
     "key": 211,
     "section": 0,
-    "text": "Get remote config"
+    "text": "FACTORY"
   },
   {
     "scope": 8,
     "key": 212,
     "section": 0,
-    "text": "Gettoniera"
+    "text": "Factory reset"
   },
   {
     "scope": 8,
     "key": 213,
     "section": 0,
-    "text": "Header"
+    "text": "Fetch firmware"
   },
   {
     "scope": 8,
     "key": 214,
     "section": 0,
-    "text": "HTTP Services"
+    "text": "Fetch images"
   },
   {
     "scope": 8,
     "key": 215,
     "section": 0,
-    "text": "Indirizzo IP Ethernet"
+    "text": "Fetch translations"
   },
   {
     "scope": 8,
     "key": 216,
     "section": 0,
-    "text": "Indirizzo IP WiFi AP"
+    "text": "💾 Firmware"
   },
   {
     "scope": 8,
     "key": 217,
     "section": 0,
-    "text": "Indirizzo IP WiFi STA"
+    "text": "Force NTP sync"
   },
   {
     "scope": 8,
     "key": 218,
     "section": 0,
-    "text": "ℹ️ Informazioni"
+    "text": "GET"
   },
   {
     "scope": 8,
     "key": 219,
     "section": 0,
-    "text": "Invia"
+    "text": "Get customers"
   },
   {
     "scope": 8,
     "key": 220,
     "section": 0,
-    "text": "Is JWT"
+    "text": "Get operators"
   },
   {
     "scope": 8,
     "key": 221,
     "section": 0,
-    "text": "Keepalive"
+    "text": "Get remote config"
   },
   {
     "scope": 8,
     "key": 222,
     "section": 0,
-    "text": "LED WS2812"
+    "text": "Gettoniera"
   },
   {
     "scope": 8,
     "key": 223,
     "section": 0,
-    "text": "Log levels"
+    "text": "Header"
   },
   {
     "scope": 8,
     "key": 224,
     "section": 0,
-    "text": "🔐 Login + Chiamate HTTP"
+    "text": "HTTP Services"
   },
   {
     "scope": 8,
     "key": 225,
     "section": 0,
-    "text": "🎰 MDB Status"
+    "text": "Indirizzo IP Ethernet"
   },
   {
     "scope": 8,
     "key": 226,
     "section": 0,
-    "text": "Method"
+    "text": "Indirizzo IP WiFi AP"
   },
   {
     "scope": 8,
     "key": 227,
     "section": 0,
-    "text": "Offline payment"
+    "text": "Indirizzo IP WiFi STA"
   },
   {
     "scope": 8,
     "key": 228,
     "section": 0,
-    "text": "OTA0"
+    "text": "ℹ️ Informazioni"
   },
   {
     "scope": 8,
     "key": 229,
     "section": 0,
-    "text": "OTA1"
+    "text": "Invia"
   },
   {
     "scope": 8,
     "key": 230,
     "section": 0,
-    "text": "Partizione al Boot"
+    "text": "Is JWT"
   },
   {
     "scope": 8,
     "key": 231,
     "section": 0,
-    "text": "Partizione Corrente"
+    "text": "Keepalive"
   },
   {
     "scope": 8,
     "key": 232,
     "section": 0,
-    "text": "Password (MD5):"
+    "text": "LED WS2812"
   },
   {
     "scope": 8,
     "key": 233,
     "section": 0,
-    "text": "Payload"
+    "text": "Log levels"
   },
   {
     "scope": 8,
     "key": 234,
     "section": 0,
-    "text": "Payment request"
+    "text": "🔐 Login + Chiamate HTTP"
   },
   {
     "scope": 8,
     "key": 235,
     "section": 0,
-    "text": "Periodo (ms)"
+    "text": "🎰 MDB Status"
   },
   {
     "scope": 8,
     "key": 236,
     "section": 0,
-    "text": "POST"
+    "text": "Method"
   },
   {
     "scope": 8,
     "key": 237,
     "section": 0,
-    "text": "POST /api/activity"
+    "text": "Offline payment"
   },
   {
     "scope": 8,
     "key": 238,
     "section": 0,
-    "text": "POST /api/getconfig"
+    "text": "OTA0"
   },
   {
     "scope": 8,
     "key": 239,
     "section": 0,
-    "text": "POST /api/getcustomers"
+    "text": "OTA1"
   },
   {
     "scope": 8,
     "key": 240,
     "section": 0,
-    "text": "POST /api/getfirmware"
+    "text": "Partizione al Boot"
   },
   {
     "scope": 8,
     "key": 241,
     "section": 0,
-    "text": "POST /api/getimages"
+    "text": "Partizione Corrente"
   },
   {
     "scope": 8,
     "key": 242,
     "section": 0,
-    "text": "POST /api/getoperators"
+    "text": "Password (MD5):"
   },
   {
     "scope": 8,
     "key": 243,
     "section": 0,
-    "text": "POST /api/gettranslations"
+    "text": "Payload"
   },
   {
     "scope": 8,
     "key": 244,
     "section": 0,
-    "text": "POST /api/keepalive"
+    "text": "Payment request"
   },
   {
     "scope": 8,
     "key": 245,
     "section": 0,
-    "text": "POST /api/payment"
+    "text": "Periodo (ms)"
   },
   {
     "scope": 8,
     "key": 246,
     "section": 0,
-    "text": "POST /api/paymentoffline"
+    "text": "POST"
   },
   {
     "scope": 8,
     "key": 247,
     "section": 0,
-    "text": "POST /api/serviceused"
+    "text": "POST /api/activity"
   },
   {
     "scope": 8,
     "key": 248,
     "section": 0,
-    "text": "Priorità"
+    "text": "POST /api/getconfig"
   },
   {
     "scope": 8,
     "key": 249,
     "section": 0,
-    "text": "Profilo:"
+    "text": "POST /api/getcustomers"
   },
   {
     "scope": 8,
     "key": 250,
     "section": 0,
-    "text": "PWM Channel 1/2"
+    "text": "POST /api/getfirmware"
   },
   {
     "scope": 8,
     "key": 251,
     "section": 0,
-    "text": "Reboot"
+    "text": "POST /api/getimages"
   },
   {
     "scope": 8,
     "key": 252,
     "section": 0,
-    "text": "Restart USB host"
+    "text": "POST /api/getoperators"
   },
   {
     "scope": 8,
     "key": 253,
     "section": 0,
-    "text": "🌐 Rete"
+    "text": "POST /api/gettranslations"
   },
   {
     "scope": 8,
     "key": 254,
     "section": 0,
-    "text": "Richiesta"
+    "text": "POST /api/keepalive"
   },
   {
     "scope": 8,
     "key": 255,
     "section": 0,
-    "text": "Rimuovi"
+    "text": "POST /api/payment"
   },
   {
     "scope": 8,
     "key": 256,
     "section": 0,
-    "text": "Risposta"
+    "text": "POST /api/paymentoffline"
   },
   {
     "scope": 8,
     "key": 257,
     "section": 0,
-    "text": "Run internal tests"
+    "text": "POST /api/serviceused"
   },
   {
     "scope": 8,
     "key": 258,
     "section": 0,
-    "text": "💾 Salva"
+    "text": "Priorità"
   },
   {
     "scope": 8,
     "key": 259,
     "section": 0,
-    "text": "Save configuration"
+    "text": "Profilo:"
   },
   {
     "scope": 8,
     "key": 260,
     "section": 0,
-    "text": "Save tasks"
+    "text": "PWM Channel 1/2"
   },
   {
     "scope": 8,
     "key": 261,
     "section": 0,
-    "text": "SD Card"
+    "text": "Reboot"
   },
   {
     "scope": 8,
     "key": 262,
     "section": 0,
-    "text": "Serial:"
+    "text": "Restart USB host"
   },
   {
     "scope": 8,
     "key": 263,
     "section": 0,
-    "text": "Service used"
+    "text": "🌐 Rete"
   },
   {
     "scope": 8,
     "key": 264,
     "section": 0,
-    "text": "Set log level"
+    "text": "Richiesta"
   },
   {
     "scope": 8,
     "key": 265,
     "section": 0,
-    "text": "Spazio Totale"
+    "text": "Rimuovi"
   },
   {
     "scope": 8,
     "key": 266,
     "section": 0,
-    "text": "Spazio Usato"
+    "text": "Risposta"
   },
   {
     "scope": 8,
     "key": 267,
     "section": 0,
-    "text": "Stack bytess"
+    "text": "Run internal tests"
   },
   {
     "scope": 8,
     "key": 268,
     "section": 0,
-    "text": "Statistiche"
+    "text": "💾 Salva"
   },
   {
     "scope": 8,
     "key": 269,
     "section": 0,
-    "text": "Stato"
+    "text": "Save configuration"
   },
   {
     "scope": 8,
     "key": 270,
     "section": 0,
-    "text": "🔌 Stato Driver"
+    "text": "Save tasks"
   },
   {
     "scope": 8,
     "key": 271,
     "section": 0,
-    "text": "Stato Logico (SM)"
+    "text": "SD Card"
   },
   {
     "scope": 8,
     "key": 272,
     "section": 0,
-    "text": "Stored logs"
+    "text": "Serial:"
   },
   {
     "scope": 8,
     "key": 273,
     "section": 0,
-    "text": "Task"
+    "text": "Service used"
   },
   {
     "scope": 8,
     "key": 274,
     "section": 0,
-    "text": "Temperatura"
+    "text": "Set log level"
   },
   {
     "scope": 8,
     "key": 275,
     "section": 0,
-    "text": "Test Hardware"
+    "text": "Spazio Totale"
   },
   {
     "scope": 8,
     "key": 276,
     "section": 0,
-    "text": "Token:"
+    "text": "Spazio Usato"
   },
   {
     "scope": 8,
     "key": 277,
     "section": 0,
-    "text": "Umidità"
+    "text": "Stack bytess"
   },
   {
     "scope": 8,
     "key": 278,
     "section": 0,
-    "text": "Update OTA"
+    "text": "Statistiche"
   },
   {
     "scope": 8,
     "key": 279,
     "section": 0,
-    "text": "URI"
+    "text": "Stato"
   },
   {
     "scope": 8,
     "key": 280,
     "section": 0,
+    "text": "🔌 Stato Driver"
+  },
+  {
+    "scope": 8,
+    "key": 281,
+    "section": 0,
+    "text": "Stato Logico (SM)"
+  },
+  {
+    "scope": 8,
+    "key": 282,
+    "section": 0,
+    "text": "Stored logs"
+  },
+  {
+    "scope": 8,
+    "key": 283,
+    "section": 0,
+    "text": "Task"
+  },
+  {
+    "scope": 8,
+    "key": 284,
+    "section": 0,
+    "text": "Temperatura"
+  },
+  {
+    "scope": 8,
+    "key": 285,
+    "section": 0,
+    "text": "Test Hardware"
+  },
+  {
+    "scope": 8,
+    "key": 286,
+    "section": 0,
+    "text": "Token:"
+  },
+  {
+    "scope": 8,
+    "key": 287,
+    "section": 0,
+    "text": "Umidità"
+  },
+  {
+    "scope": 8,
+    "key": 288,
+    "section": 0,
+    "text": "Update OTA"
+  },
+  {
+    "scope": 8,
+    "key": 289,
+    "section": 0,
+    "text": "URI"
+  },
+  {
+    "scope": 8,
+    "key": 290,
+    "section": 0,
     "text": "USB enumerate"
   },
   {
     "scope": 9,
-    "key": 12,
+    "key": 18,
     "section": 0,
     "text": "🔄 Aggiorna"
   },
   {
     "scope": 9,
-    "key": 33,
+    "key": 39,
     "section": 0,
     "text": "🔌 I/O Expander"
   },
   {
     "scope": 9,
-    "key": 148,
+    "key": 158,
     "section": 0,
     "text": "</div>"
   },
   {
     "scope": 9,
-    "key": 150,
+    "key": 160,
     "section": 0,
     "text": "</div></div>"
   },
   {
     "scope": 9,
-    "key": 176,
+    "key": 186,
     "section": 0,
     "text": "</script></body></html>"
   },
   {
     "scope": 9,
-    "key": 180,
+    "key": 190,
     "section": 0,
     "text": "🔄 Aggiorna Pagina"
   },
   {
     "scope": 9,
-    "key": 186,
+    "key": 196,
     "section": 0,
     "text": "🚀 Applica"
   },
   {
     "scope": 9,
-    "key": 191,
+    "key": 201,
     "section": 0,
     "text": "Caricamento..."
   },
   {
     "scope": 9,
-    "key": 219,
+    "key": 229,
     "section": 0,
     "text": "🚀 Invia"
   },
   {
     "scope": 9,
-    "key": 275,
+    "key": 285,
     "section": 0,
     "text": "Test Hardware"
   },
   {
     "scope": 9,
-    "key": 281,
+    "key": 291,
     "section": 0,
     "text": "(4800 baud — PIN 21 RX, 20 TX"
   },
   {
     "scope": 9,
-    "key": 281,
-    "section": 1,
+    "key": 291,
+    "section": 0,
     "text": ")"
   },
   {
     "scope": 9,
-    "key": 282,
+    "key": 292,
     "section": 0,
     "text": "// avvia aggiornamenti periodic"
   },
   {
     "scope": 9,
-    "key": 282,
-    "section": 1,
+    "key": 292,
+    "section": 0,
     "text": "i per la sezione Scanner"
   },
   {
     "scope": 9,
-    "key": 283,
+    "key": 293,
     "section": 0,
     "text": "📥 Backup"
   },
   {
     "scope": 9,
-    "key": 284,
+    "key": 294,
     "section": 0,
     "text": "Backup JSON Config"
   },
   {
     "scope": 9,
-    "key": 285,
+    "key": 295,
     "section": 0,
     "text": "Blink Tutte le Uscite (1Hz)"
   },
   {
     "scope": 9,
-    "key": 286,
+    "key": 296,
     "section": 0,
     "text": "<button id='btn_led_manual' onc"
   },
   {
     "scope": 9,
-    "key": 286,
-    "section": 1,
+    "key": 296,
+    "section": 0,
     "text": "lick=\"toggleLedManual()\" style="
   },
   {
     "scope": 9,
-    "key": 286,
-    "section": 2,
+    "key": 296,
+    "section": 0,
     "text": "'background:#2ecc71'>🚀 Inizi"
   },
   {
     "scope": 9,
-    "key": 286,
-    "section": 3,
+    "key": 296,
+    "section": 0,
     "text": "a Manuale</button>"
   },
   {
     "scope": 9,
-    "key": 287,
+    "key": 297,
     "section": 0,
     "text": "<button onclick='refreshSDStatu"
   },
   {
     "scope": 9,
-    "key": 287,
-    "section": 1,
+    "key": 297,
+    "section": 0,
     "text": "s()' style='background:#3498db'"
   },
   {
     "scope": 9,
-    "key": 287,
-    "section": 2,
+    "key": 297,
+    "section": 0,
     "text": ">🔄 Aggiorna</button>"
-  },
-  {
-    "scope": 9,
-    "key": 288,
-    "section": 0,
-    "text": "<button onclick=\"runTest('sd_in"
-  },
-  {
-    "scope": 9,
-    "key": 288,
-    "section": 1,
-    "text": "it')\" style='background:#27ae60"
-  },
-  {
-    "scope": 9,
-    "key": 288,
-    "section": 2,
-    "text": "'>⚡ Init</button>"
-  },
-  {
-    "scope": 9,
-    "key": 289,
-    "section": 0,
-    "text": "<button onclick=\"runTest('sht_r"
-  },
-  {
-    "scope": 9,
-    "key": 289,
-    "section": 1,
-    "text": "ead')\" style='background:#f39c1"
-  },
-  {
-    "scope": 9,
-    "key": 289,
-    "section": 2,
-    "text": "2'>🔄 FORZA TEST LETTURA</but"
-  },
-  {
-    "scope": 9,
-    "key": 289,
-    "section": 3,
-    "text": "ton>"
-  },
-  {
-    "scope": 9,
-    "key": 290,
-    "section": 0,
-    "text": "<button onclick=\"setPWM()\" styl"
-  },
-  {
-    "scope": 9,
-    "key": 290,
-    "section": 1,
-    "text": "e='background:#2980b9'>🚀 App"
-  },
-  {
-    "scope": 9,
-    "key": 290,
-    "section": 2,
-    "text": "lica</button>"
-  },
-  {
-    "scope": 9,
-    "key": 291,
-    "section": 0,
-    "text": "<button onclick=\"testEEPROM('re"
-  },
-  {
-    "scope": 9,
-    "key": 291,
-    "section": 1,
-    "text": "ad_json')\" style='background:#9"
-  },
-  {
-    "scope": 9,
-    "key": 291,
-    "section": 2,
-    "text": "b59b6'>📄 Leggi JSON</button>"
-  },
-  {
-    "scope": 9,
-    "key": 292,
-    "section": 0,
-    "text": "<button onclick=\"testEEPROM('re"
-  },
-  {
-    "scope": 9,
-    "key": 292,
-    "section": 1,
-    "text": "ad')\" style='background:#3498db"
-  },
-  {
-    "scope": 9,
-    "key": 292,
-    "section": 2,
-    "text": "'>📖 Leggi</button>"
-  },
-  {
-    "scope": 9,
-    "key": 293,
-    "section": 0,
-    "text": "<button onclick=\"testEEPROM('wr"
-  },
-  {
-    "scope": 9,
-    "key": 293,
-    "section": 1,
-    "text": "ite')\">✍️ Scrivi</button>"
-  },
-  {
-    "scope": 9,
-    "key": 294,
-    "section": 0,
-    "text": "<button type='button' onclick=\""
-  },
-  {
-    "scope": 9,
-    "key": 294,
-    "section": 1,
-    "text": "runScannerCommand('scanner_off'"
-  },
-  {
-    "scope": 9,
-    "key": 294,
-    "section": 2,
-    "text": ")\" class='btn-stop'>Scanner OFF"
-  },
-  {
-    "scope": 9,
-    "key": 294,
-    "section": 3,
-    "text": "</button>"
-  },
-  {
-    "scope": 9,
-    "key": 295,
-    "section": 0,
-    "text": "<button type='button' onclick=\""
-  },
-  {
-    "scope": 9,
-    "key": 295,
-    "section": 1,
-    "text": "runScannerCommand('scanner_on')"
-  },
-  {
-    "scope": 9,
-    "key": 295,
-    "section": 2,
-    "text": "\" style='background:#2ecc71'>Sc"
-  },
-  {
-    "scope": 9,
-    "key": 295,
-    "section": 3,
-    "text": "anner ON</button>"
-  },
-  {
-    "scope": 9,
-    "key": 296,
-    "section": 0,
-    "text": "<button type='button' onclick=\""
-  },
-  {
-    "scope": 9,
-    "key": 296,
-    "section": 1,
-    "text": "runScannerCommand('scanner_setu"
-  },
-  {
-    "scope": 9,
-    "key": 296,
-    "section": 2,
-    "text": "p')\" style='background:#8e44ad'"
-  },
-  {
-    "scope": 9,
-    "key": 296,
-    "section": 3,
-    "text": ">Scanner SETUP</button>"
-  },
-  {
-    "scope": 9,
-    "key": 297,
-    "section": 0,
-    "text": "<button type='button' onclick=\""
-  },
-  {
-    "scope": 9,
-    "key": 297,
-    "section": 1,
-    "text": "runScannerCommand('scanner_stat"
-  },
-  {
-    "scope": 9,
-    "key": 297,
-    "section": 2,
-    "text": "e')\" style='background:#3498db'"
-  },
-  {
-    "scope": 9,
-    "key": 297,
-    "section": 3,
-    "text": ">Scanner STATE</button>"
   },
   {
     "scope": 9,
     "key": 298,
     "section": 0,
-    "text": "-- °C / -- %"
+    "text": "<button onclick=\"runTest('sd_in"
+  },
+  {
+    "scope": 9,
+    "key": 298,
+    "section": 0,
+    "text": "it')\" style='background:#27ae60"
+  },
+  {
+    "scope": 9,
+    "key": 298,
+    "section": 0,
+    "text": "'>⚡ Init</button>"
   },
   {
     "scope": 9,
     "key": 299,
     "section": 0,
-    "text": "[C] GET /test"
+    "text": "<button onclick=\"runTest('sht_r"
+  },
+  {
+    "scope": 9,
+    "key": 299,
+    "section": 0,
+    "text": "ead')\" style='background:#f39c1"
+  },
+  {
+    "scope": 9,
+    "key": 299,
+    "section": 0,
+    "text": "2'>🔄 FORZA TEST LETTURA</but"
+  },
+  {
+    "scope": 9,
+    "key": 299,
+    "section": 0,
+    "text": "ton>"
   },
   {
     "scope": 9,
     "key": 300,
     "section": 0,
-    "text": "Canale:"
+    "text": "<button onclick=\"setPWM()\" styl"
+  },
+  {
+    "scope": 9,
+    "key": 300,
+    "section": 0,
+    "text": "e='background:#2980b9'>🚀 App"
+  },
+  {
+    "scope": 9,
+    "key": 300,
+    "section": 0,
+    "text": "lica</button>"
   },
   {
     "scope": 9,
     "key": 301,
     "section": 0,
-    "text": "📡 CCtalk"
+    "text": "<button onclick=\"testEEPROM('re"
+  },
+  {
+    "scope": 9,
+    "key": 301,
+    "section": 0,
+    "text": "ad_json')\" style='background:#9"
+  },
+  {
+    "scope": 9,
+    "key": 301,
+    "section": 0,
+    "text": "b59b6'>📄 Leggi JSON</button>"
   },
   {
     "scope": 9,
     "key": 302,
     "section": 0,
-    "text": "🗑️ Clear"
+    "text": "<button onclick=\"testEEPROM('re"
+  },
+  {
+    "scope": 9,
+    "key": 302,
+    "section": 0,
+    "text": "ad')\" style='background:#3498db"
+  },
+  {
+    "scope": 9,
+    "key": 302,
+    "section": 0,
+    "text": "'>📖 Leggi</button>"
   },
   {
     "scope": 9,
     "key": 303,
     "section": 0,
-    "text": "/* Collapsible sections support"
+    "text": "<button onclick=\"testEEPROM('wr"
   },
   {
     "scope": 9,
     "key": 303,
-    "section": 1,
-    "text": " */"
+    "section": 0,
+    "text": "ite')\">✍️ Scrivi</button>"
   },
   {
     "scope": 9,
     "key": 304,
     "section": 0,
-    "text": "📄 Config JSON:"
+    "text": "<button type='button' onclick=\""
+  },
+  {
+    "scope": 9,
+    "key": 304,
+    "section": 0,
+    "text": "runScannerCommand('scanner_off'"
+  },
+  {
+    "scope": 9,
+    "key": 304,
+    "section": 0,
+    "text": ")\" class='btn-stop'>Scanner OFF"
+  },
+  {
+    "scope": 9,
+    "key": 304,
+    "section": 0,
+    "text": "</button>"
   },
   {
     "scope": 9,
     "key": 305,
     "section": 0,
-    "text": "Controllo Manuale"
+    "text": "<button type='button' onclick=\""
+  },
+  {
+    "scope": 9,
+    "key": 305,
+    "section": 0,
+    "text": "runScannerCommand('scanner_on')"
+  },
+  {
+    "scope": 9,
+    "key": 305,
+    "section": 0,
+    "text": "\" style='background:#2ecc71'>Sc"
+  },
+  {
+    "scope": 9,
+    "key": 305,
+    "section": 0,
+    "text": "anner ON</button>"
   },
   {
     "scope": 9,
     "key": 306,
     "section": 0,
-    "text": "Controllo Manuale PWM"
+    "text": "<button type='button' onclick=\""
+  },
+  {
+    "scope": 9,
+    "key": 306,
+    "section": 0,
+    "text": "runScannerCommand('scanner_setu"
+  },
+  {
+    "scope": 9,
+    "key": 306,
+    "section": 0,
+    "text": "p')\" style='background:#8e44ad'"
+  },
+  {
+    "scope": 9,
+    "key": 306,
+    "section": 0,
+    "text": ">Scanner SETUP</button>"
   },
   {
     "scope": 9,
     "key": 307,
     "section": 0,
-    "text": "📋 Copiato"
+    "text": "<button type='button' onclick=\""
+  },
+  {
+    "scope": 9,
+    "key": 307,
+    "section": 0,
+    "text": "runScannerCommand('scanner_stat"
+  },
+  {
+    "scope": 9,
+    "key": 307,
+    "section": 0,
+    "text": "e')\" style='background:#3498db'"
+  },
+  {
+    "scope": 9,
+    "key": 307,
+    "section": 0,
+    "text": ">Scanner STATE</button>"
   },
   {
     "scope": 9,
     "key": 308,
     "section": 0,
-    "text": "Dato Byte (0-255)"
+    "text": "-- °C / -- %"
   },
   {
     "scope": 9,
     "key": 309,
     "section": 0,
-    "text": "// display brightness slider ha"
-  },
-  {
-    "scope": 9,
-    "key": 309,
-    "section": 1,
-    "text": "ndler (debounced + persist afte"
-  },
-  {
-    "scope": 9,
-    "key": 309,
-    "section": 2,
-    "text": "r idle)"
+    "text": "[C] GET /test"
   },
   {
     "scope": 9,
     "key": 310,
     "section": 0,
-    "text": "<div class='container'>"
+    "text": "Canale:"
   },
   {
     "scope": 9,
     "key": 311,
     "section": 0,
+    "text": "📡 CCtalk"
+  },
+  {
+    "scope": 9,
+    "key": 312,
+    "section": 0,
+    "text": "🗑️ Clear"
+  },
+  {
+    "scope": 9,
+    "key": 313,
+    "section": 0,
+    "text": "/* Collapsible sections support"
+  },
+  {
+    "scope": 9,
+    "key": 313,
+    "section": 0,
+    "text": " */"
+  },
+  {
+    "scope": 9,
+    "key": 314,
+    "section": 0,
+    "text": "📄 Config JSON:"
+  },
+  {
+    "scope": 9,
+    "key": 315,
+    "section": 0,
+    "text": "Controllo Manuale"
+  },
+  {
+    "scope": 9,
+    "key": 316,
+    "section": 0,
+    "text": "Controllo Manuale PWM"
+  },
+  {
+    "scope": 9,
+    "key": 317,
+    "section": 0,
+    "text": "📋 Copiato"
+  },
+  {
+    "scope": 9,
+    "key": 318,
+    "section": 0,
+    "text": "Dato Byte (0-255)"
+  },
+  {
+    "scope": 9,
+    "key": 319,
+    "section": 0,
+    "text": "// display brightness slider ha"
+  },
+  {
+    "scope": 9,
+    "key": 319,
+    "section": 0,
+    "text": "ndler (debounced + persist afte"
+  },
+  {
+    "scope": 9,
+    "key": 319,
+    "section": 0,
+    "text": "r idle)"
+  },
+  {
+    "scope": 9,
+    "key": 320,
+    "section": 0,
+    "text": "<div class='container'>"
+  },
+  {
+    "scope": 9,
+    "key": 321,
+    "section": 0,
     "text": "<div class='test-controls'>"
   },
   {
     "scope": 9,
-    "key": 312,
+    "key": 322,
     "section": 0,
     "text": "<div class='test-controls'><but"
   },
   {
     "scope": 9,
-    "key": 312,
-    "section": 1,
+    "key": 322,
+    "section": 0,
     "text": "ton id='btn_cctalk' onclick=\"to"
   },
   {
     "scope": 9,
-    "key": 312,
-    "section": 2,
+    "key": 322,
+    "section": 0,
     "text": "ggleSimpleTest('cctalk', 'btn_c"
   },
   {
     "scope": 9,
-    "key": 312,
-    "section": 3,
+    "key": 322,
+    "section": 0,
     "text": "ctalk', 'Test CCtalk')\">▶️ "
   },
   {
     "scope": 9,
-    "key": 312,
-    "section": 4,
+    "key": 322,
+    "section": 0,
     "text": "Inizia Test</button></div></div"
   },
   {
     "scope": 9,
-    "key": 312,
-    "section": 5,
+    "key": 322,
+    "section": 0,
     "text": ">"
   },
   {
     "scope": 9,
-    "key": 313,
+    "key": 323,
     "section": 0,
     "text": "<div class='test-controls'><but"
   },
   {
     "scope": 9,
-    "key": 313,
-    "section": 1,
+    "key": 323,
+    "section": 0,
     "text": "ton id='btn_ioexp' onclick=\"tog"
   },
   {
     "scope": 9,
-    "key": 313,
-    "section": 2,
+    "key": 323,
+    "section": 0,
     "text": "gleSimpleTest('ioexp', 'btn_ioe"
   },
   {
     "scope": 9,
-    "key": 313,
-    "section": 3,
+    "key": 323,
+    "section": 0,
     "text": "xp', 'Blink')\">▶️ Inizia Bl"
   },
   {
     "scope": 9,
-    "key": 313,
-    "section": 4,
+    "key": 323,
+    "section": 0,
     "text": "ink</button></div></div>"
   },
   {
     "scope": 9,
-    "key": 314,
+    "key": 324,
     "section": 0,
     "text": "<div class='test-controls'><but"
   },
   {
     "scope": 9,
-    "key": 314,
-    "section": 1,
+    "key": 324,
+    "section": 0,
     "text": "ton id='btn_led_rainbow' onclic"
   },
   {
     "scope": 9,
-    "key": 314,
-    "section": 2,
+    "key": 324,
+    "section": 0,
     "text": "k=\"toggleLedRainbow()\">▶️ I"
   },
   {
     "scope": 9,
-    "key": 314,
-    "section": 3,
+    "key": 324,
+    "section": 0,
     "text": "nizia Rainbow</button></div></d"
   },
   {
     "scope": 9,
-    "key": 314,
-    "section": 4,
+    "key": 324,
+    "section": 0,
     "text": "iv>"
   },
   {
     "scope": 9,
-    "key": 315,
+    "key": 325,
     "section": 0,
     "text": "<div class='test-controls'><but"
   },
   {
     "scope": 9,
-    "key": 315,
-    "section": 1,
+    "key": 325,
+    "section": 0,
     "text": "ton id='btn_mdb' onclick=\"toggl"
   },
   {
     "scope": 9,
-    "key": 315,
-    "section": 2,
+    "key": 325,
+    "section": 0,
     "text": "eSimpleTest('mdb', 'btn_mdb', '"
   },
   {
     "scope": 9,
-    "key": 315,
-    "section": 3,
+    "key": 325,
+    "section": 0,
     "text": "Test MDB')\">▶️ Inizia Test<"
   },
   {
     "scope": 9,
-    "key": 315,
-    "section": 4,
+    "key": 325,
+    "section": 0,
     "text": "/button></div></div>"
   },
   {
     "scope": 9,
-    "key": 316,
+    "key": 326,
     "section": 0,
     "text": "<div class='test-controls'><but"
   },
   {
     "scope": 9,
-    "key": 316,
-    "section": 1,
+    "key": 326,
+    "section": 0,
     "text": "ton id='btn_pwm1' onclick=\"togg"
   },
   {
     "scope": 9,
-    "key": 316,
-    "section": 2,
+    "key": 326,
+    "section": 0,
     "text": "leSimpleTest('pwm1', 'btn_pwm1'"
   },
   {
     "scope": 9,
-    "key": 316,
-    "section": 3,
+    "key": 326,
+    "section": 0,
     "text": ", 'Sweep PWM1')\">▶️ Inizia "
   },
   {
     "scope": 9,
-    "key": 316,
-    "section": 4,
+    "key": 326,
+    "section": 0,
     "text": "Sweep</button></div></div>"
   },
   {
     "scope": 9,
-    "key": 317,
+    "key": 327,
     "section": 0,
     "text": "<div class='test-controls'><but"
   },
   {
     "scope": 9,
-    "key": 317,
-    "section": 1,
+    "key": 327,
+    "section": 0,
     "text": "ton id='btn_pwm2' onclick=\"togg"
   },
   {
     "scope": 9,
-    "key": 317,
-    "section": 2,
+    "key": 327,
+    "section": 0,
     "text": "leSimpleTest('pwm2', 'btn_pwm2'"
   },
   {
     "scope": 9,
-    "key": 317,
-    "section": 3,
+    "key": 327,
+    "section": 0,
     "text": ", 'Sweep PWM2')\">▶️ Inizia "
   },
   {
     "scope": 9,
-    "key": 317,
-    "section": 4,
+    "key": 327,
+    "section": 0,
     "text": "Sweep</button></div></div>"
   },
   {
     "scope": 9,
-    "key": 318,
+    "key": 328,
     "section": 0,
     "text": "<div class='test-controls'><but"
   },
   {
     "scope": 9,
-    "key": 318,
-    "section": 1,
+    "key": 328,
+    "section": 0,
     "text": "ton id='btn_rs232' onclick=\"tog"
   },
   {
     "scope": 9,
-    "key": 318,
-    "section": 2,
+    "key": 328,
+    "section": 0,
     "text": "gleSimpleTest('rs232', 'btn_rs2"
   },
   {
     "scope": 9,
-    "key": 318,
-    "section": 3,
+    "key": 328,
+    "section": 0,
     "text": "32', 'Test RS232')\">▶️ Iniz"
   },
   {
     "scope": 9,
-    "key": 318,
-    "section": 4,
+    "key": 328,
+    "section": 0,
     "text": "ia Test</button></div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 319,
-    "section": 0,
-    "text": "<div class='test-controls'><but"
-  },
-  {
-    "scope": 9,
-    "key": 319,
-    "section": 1,
-    "text": "ton id='btn_rs485' onclick=\"tog"
-  },
-  {
-    "scope": 9,
-    "key": 319,
-    "section": 2,
-    "text": "gleSimpleTest('rs485', 'btn_rs4"
-  },
-  {
-    "scope": 9,
-    "key": 319,
-    "section": 3,
-    "text": "85', 'Test RS485')\">▶️ Iniz"
-  },
-  {
-    "scope": 9,
-    "key": 319,
-    "section": 4,
-    "text": "ia Test</button></div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 320,
-    "section": 0,
-    "text": "<div class='test-controls'><but"
-  },
-  {
-    "scope": 9,
-    "key": 320,
-    "section": 1,
-    "text": "ton onclick=\"if(confirm('Cancel"
-  },
-  {
-    "scope": 9,
-    "key": 320,
-    "section": 2,
-    "text": "lare TUTTI i dati per pulire la"
-  },
-  {
-    "scope": 9,
-    "key": 320,
-    "section": 3,
-    "text": " scheda?'))runTest('sd_format')"
-  },
-  {
-    "scope": 9,
-    "key": 320,
-    "section": 4,
-    "text": "\" style='background:#c0392b'>"
-  },
-  {
-    "scope": 9,
-    "key": 320,
-    "section": 5,
-    "text": "🧨 Pulisci/Formatta</button><"
-  },
-  {
-    "scope": 9,
-    "key": 320,
-    "section": 6,
-    "text": "/div>"
-  },
-  {
-    "scope": 9,
-    "key": 321,
-    "section": 0,
-    "text": "<div class='test-controls'><but"
-  },
-  {
-    "scope": 9,
-    "key": 321,
-    "section": 1,
-    "text": "ton onclick=\"runConfigBackup()\""
-  },
-  {
-    "scope": 9,
-    "key": 321,
-    "section": 2,
-    "text": " style='background:#9b59b6'>"
-  },
-  {
-    "scope": 9,
-    "key": 321,
-    "section": 3,
-    "text": "📥 Backup</button></div></div"
-  },
-  {
-    "scope": 9,
-    "key": 321,
-    "section": 4,
-    "text": ">"
-  },
-  {
-    "scope": 9,
-    "key": 322,
-    "section": 0,
-    "text": "<div class='test-controls'><but"
-  },
-  {
-    "scope": 9,
-    "key": 322,
-    "section": 1,
-    "text": "ton onclick=\"runTest('sd_list')"
-  },
-  {
-    "scope": 9,
-    "key": 322,
-    "section": 2,
-    "text": "\">📂 Elenca</button></div></d"
-  },
-  {
-    "scope": 9,
-    "key": 322,
-    "section": 3,
-    "text": "iv>"
-  },
-  {
-    "scope": 9,
-    "key": 323,
-    "section": 0,
-    "text": "<div class='test-controls'><inp"
-  },
-  {
-    "scope": 9,
-    "key": 323,
-    "section": 1,
-    "text": "ut type='number' id='eeprom_add"
-  },
-  {
-    "scope": 9,
-    "key": 323,
-    "section": 2,
-    "text": "r' value='0' min='0' max='2047'"
-  },
-  {
-    "scope": 9,
-    "key": 323,
-    "section": 3,
-    "text": " style='width:80px'></div></div"
-  },
-  {
-    "scope": 9,
-    "key": 323,
-    "section": 4,
-    "text": ">"
-  },
-  {
-    "scope": 9,
-    "key": 324,
-    "section": 0,
-    "text": "<div class='test-controls'><inp"
-  },
-  {
-    "scope": 9,
-    "key": 324,
-    "section": 1,
-    "text": "ut type='number' id='eeprom_val"
-  },
-  {
-    "scope": 9,
-    "key": 324,
-    "section": 2,
-    "text": "' value='123' min='0' max='255'"
-  },
-  {
-    "scope": 9,
-    "key": 324,
-    "section": 3,
-    "text": " style='width:80px'>"
-  },
-  {
-    "scope": 9,
-    "key": 325,
-    "section": 0,
-    "text": "<div class='test-controls'><inp"
-  },
-  {
-    "scope": 9,
-    "key": 325,
-    "section": 1,
-    "text": "ut type='text' id='cctalk_input"
-  },
-  {
-    "scope": 9,
-    "key": 325,
-    "section": 2,
-    "text": "' placeholder='0x01 0x02...'><b"
-  },
-  {
-    "scope": 9,
-    "key": 325,
-    "section": 3,
-    "text": "utton onclick=\"sendSerial('ccta"
-  },
-  {
-    "scope": 9,
-    "key": 325,
-    "section": 4,
-    "text": "lk')\">🚀 Invia</button></div>"
-  },
-  {
-    "scope": 9,
-    "key": 325,
-    "section": 5,
-    "text": "</div>"
-  },
-  {
-    "scope": 9,
-    "key": 326,
-    "section": 0,
-    "text": "<div class='test-controls'><inp"
-  },
-  {
-    "scope": 9,
-    "key": 326,
-    "section": 1,
-    "text": "ut type='text' id='mdb_input' p"
-  },
-  {
-    "scope": 9,
-    "key": 326,
-    "section": 2,
-    "text": "laceholder='08 00...'><button o"
-  },
-  {
-    "scope": 9,
-    "key": 326,
-    "section": 3,
-    "text": "nclick=\"sendSerial('mdb')\">🚀"
-  },
-  {
-    "scope": 9,
-    "key": 326,
-    "section": 4,
-    "text": " Invia</button></div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 327,
-    "section": 0,
-    "text": "<div class='test-controls'><inp"
-  },
-  {
-    "scope": 9,
-    "key": 327,
-    "section": 1,
-    "text": "ut type='text' id='rs232_input'"
-  },
-  {
-    "scope": 9,
-    "key": 327,
-    "section": 2,
-    "text": " placeholder='\\\\0x55 Test...'><"
-  },
-  {
-    "scope": 9,
-    "key": 327,
-    "section": 3,
-    "text": "button onclick=\"sendSerial('rs2"
-  },
-  {
-    "scope": 9,
-    "key": 327,
-    "section": 4,
-    "text": "32')\">🚀 Invia</button></div>"
-  },
-  {
-    "scope": 9,
-    "key": 327,
-    "section": 5,
-    "text": "</div>"
-  },
-  {
-    "scope": 9,
-    "key": 328,
-    "section": 0,
-    "text": "<div class='test-controls'><inp"
-  },
-  {
-    "scope": 9,
-    "key": 328,
-    "section": 1,
-    "text": "ut type='text' id='rs485_input'"
-  },
-  {
-    "scope": 9,
-    "key": 328,
-    "section": 2,
-    "text": " placeholder='Richiesta...'><bu"
-  },
-  {
-    "scope": 9,
-    "key": 328,
-    "section": 3,
-    "text": "tton onclick=\"sendSerial('rs485"
-  },
-  {
-    "scope": 9,
-    "key": 328,
-    "section": 4,
-    "text": "')\">🚀 Invia</button></div></"
-  },
-  {
-    "scope": 9,
-    "key": 328,
-    "section": 5,
-    "text": "div>"
   },
   {
     "scope": 9,
     "key": 329,
     "section": 0,
-    "text": "<div class='test-item'>"
+    "text": "<div class='test-controls'><but"
+  },
+  {
+    "scope": 9,
+    "key": 329,
+    "section": 0,
+    "text": "ton id='btn_rs485' onclick=\"tog"
+  },
+  {
+    "scope": 9,
+    "key": 329,
+    "section": 0,
+    "text": "gleSimpleTest('rs485', 'btn_rs4"
+  },
+  {
+    "scope": 9,
+    "key": 329,
+    "section": 0,
+    "text": "85', 'Test RS485')\">▶️ Iniz"
+  },
+  {
+    "scope": 9,
+    "key": 329,
+    "section": 0,
+    "text": "ia Test</button></div></div>"
   },
   {
     "scope": 9,
     "key": 330,
+    "section": 0,
+    "text": "<div class='test-controls'><but"
+  },
+  {
+    "scope": 9,
+    "key": 330,
+    "section": 0,
+    "text": "ton onclick=\"if(confirm('Cancel"
+  },
+  {
+    "scope": 9,
+    "key": 330,
+    "section": 0,
+    "text": "lare TUTTI i dati per pulire la"
+  },
+  {
+    "scope": 9,
+    "key": 330,
+    "section": 0,
+    "text": " scheda?'))runTest('sd_format')"
+  },
+  {
+    "scope": 9,
+    "key": 330,
+    "section": 0,
+    "text": "\" style='background:#c0392b'>"
+  },
+  {
+    "scope": 9,
+    "key": 330,
+    "section": 0,
+    "text": "🧨 Pulisci/Formatta</button><"
+  },
+  {
+    "scope": 9,
+    "key": 330,
+    "section": 0,
+    "text": "/div>"
+  },
+  {
+    "scope": 9,
+    "key": 331,
+    "section": 0,
+    "text": "<div class='test-controls'><but"
+  },
+  {
+    "scope": 9,
+    "key": 331,
+    "section": 0,
+    "text": "ton onclick=\"runConfigBackup()\""
+  },
+  {
+    "scope": 9,
+    "key": 331,
+    "section": 0,
+    "text": " style='background:#9b59b6'>"
+  },
+  {
+    "scope": 9,
+    "key": 331,
+    "section": 0,
+    "text": "📥 Backup</button></div></div"
+  },
+  {
+    "scope": 9,
+    "key": 331,
+    "section": 0,
+    "text": ">"
+  },
+  {
+    "scope": 9,
+    "key": 332,
+    "section": 0,
+    "text": "<div class='test-controls'><but"
+  },
+  {
+    "scope": 9,
+    "key": 332,
+    "section": 0,
+    "text": "ton onclick=\"runTest('sd_list')"
+  },
+  {
+    "scope": 9,
+    "key": 332,
+    "section": 0,
+    "text": "\">📂 Elenca</button></div></d"
+  },
+  {
+    "scope": 9,
+    "key": 332,
+    "section": 0,
+    "text": "iv>"
+  },
+  {
+    "scope": 9,
+    "key": 333,
+    "section": 0,
+    "text": "<div class='test-controls'><inp"
+  },
+  {
+    "scope": 9,
+    "key": 333,
+    "section": 0,
+    "text": "ut type='number' id='eeprom_add"
+  },
+  {
+    "scope": 9,
+    "key": 333,
+    "section": 0,
+    "text": "r' value='0' min='0' max='2047'"
+  },
+  {
+    "scope": 9,
+    "key": 333,
+    "section": 0,
+    "text": " style='width:80px'></div></div"
+  },
+  {
+    "scope": 9,
+    "key": 333,
+    "section": 0,
+    "text": ">"
+  },
+  {
+    "scope": 9,
+    "key": 334,
+    "section": 0,
+    "text": "<div class='test-controls'><inp"
+  },
+  {
+    "scope": 9,
+    "key": 334,
+    "section": 0,
+    "text": "ut type='number' id='eeprom_val"
+  },
+  {
+    "scope": 9,
+    "key": 334,
+    "section": 0,
+    "text": "' value='123' min='0' max='255'"
+  },
+  {
+    "scope": 9,
+    "key": 334,
+    "section": 0,
+    "text": " style='width:80px'>"
+  },
+  {
+    "scope": 9,
+    "key": 335,
+    "section": 0,
+    "text": "<div class='test-controls'><inp"
+  },
+  {
+    "scope": 9,
+    "key": 335,
+    "section": 0,
+    "text": "ut type='text' id='cctalk_input"
+  },
+  {
+    "scope": 9,
+    "key": 335,
+    "section": 0,
+    "text": "' placeholder='0x01 0x02...'><b"
+  },
+  {
+    "scope": 9,
+    "key": 335,
+    "section": 0,
+    "text": "utton onclick=\"sendSerial('ccta"
+  },
+  {
+    "scope": 9,
+    "key": 335,
+    "section": 0,
+    "text": "lk')\">🚀 Invia</button></div>"
+  },
+  {
+    "scope": 9,
+    "key": 335,
+    "section": 0,
+    "text": "</div>"
+  },
+  {
+    "scope": 9,
+    "key": 336,
+    "section": 0,
+    "text": "<div class='test-controls'><inp"
+  },
+  {
+    "scope": 9,
+    "key": 336,
+    "section": 0,
+    "text": "ut type='text' id='mdb_input' p"
+  },
+  {
+    "scope": 9,
+    "key": 336,
+    "section": 0,
+    "text": "laceholder='08 00...'><button o"
+  },
+  {
+    "scope": 9,
+    "key": 336,
+    "section": 0,
+    "text": "nclick=\"sendSerial('mdb')\">🚀"
+  },
+  {
+    "scope": 9,
+    "key": 336,
+    "section": 0,
+    "text": " Invia</button></div></div>"
+  },
+  {
+    "scope": 9,
+    "key": 337,
+    "section": 0,
+    "text": "<div class='test-controls'><inp"
+  },
+  {
+    "scope": 9,
+    "key": 337,
+    "section": 0,
+    "text": "ut type='text' id='rs232_input'"
+  },
+  {
+    "scope": 9,
+    "key": 337,
+    "section": 0,
+    "text": " placeholder='\\\\0x55 Test...'><"
+  },
+  {
+    "scope": 9,
+    "key": 337,
+    "section": 0,
+    "text": "button onclick=\"sendSerial('rs2"
+  },
+  {
+    "scope": 9,
+    "key": 337,
+    "section": 0,
+    "text": "32')\">🚀 Invia</button></div>"
+  },
+  {
+    "scope": 9,
+    "key": 337,
+    "section": 0,
+    "text": "</div>"
+  },
+  {
+    "scope": 9,
+    "key": 338,
+    "section": 0,
+    "text": "<div class='test-controls'><inp"
+  },
+  {
+    "scope": 9,
+    "key": 338,
+    "section": 0,
+    "text": "ut type='text' id='rs485_input'"
+  },
+  {
+    "scope": 9,
+    "key": 338,
+    "section": 0,
+    "text": " placeholder='Richiesta...'><bu"
+  },
+  {
+    "scope": 9,
+    "key": 338,
+    "section": 0,
+    "text": "tton onclick=\"sendSerial('rs485"
+  },
+  {
+    "scope": 9,
+    "key": 338,
+    "section": 0,
+    "text": "')\">🚀 Invia</button></div></"
+  },
+  {
+    "scope": 9,
+    "key": 338,
+    "section": 0,
+    "text": "div>"
+  },
+  {
+    "scope": 9,
+    "key": 339,
+    "section": 0,
+    "text": "<div class='test-item'>"
+  },
+  {
+    "scope": 9,
+    "key": 340,
     "section": 0,
     "text": "<div class='test-item'><span>Ba"
   },
   {
     "scope": 9,
-    "key": 330,
-    "section": 1,
+    "key": 340,
+    "section": 0,
     "text": "ckup JSON Config</span>"
   },
   {
     "scope": 9,
-    "key": 331,
+    "key": 341,
     "section": 0,
     "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 331,
-    "section": 1,
-    "text": "ass='test-label'>Blink Tutte le"
-  },
-  {
-    "scope": 9,
-    "key": 331,
-    "section": 2,
-    "text": " Uscite (1Hz)</span>"
-  },
-  {
-    "scope": 9,
-    "key": 332,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 332,
-    "section": 1,
-    "text": "ass='test-label'>Pattern Rainbo"
-  },
-  {
-    "scope": 9,
-    "key": 332,
-    "section": 2,
-    "text": "w</span>"
-  },
-  {
-    "scope": 9,
-    "key": 333,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 333,
-    "section": 1,
-    "text": "ass='test-label'>PWM1 Duty Cycl"
-  },
-  {
-    "scope": 9,
-    "key": 333,
-    "section": 2,
-    "text": "e Sweep</span>"
-  },
-  {
-    "scope": 9,
-    "key": 334,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 334,
-    "section": 1,
-    "text": "ass='test-label'>PWM2 Duty Cycl"
-  },
-  {
-    "scope": 9,
-    "key": 334,
-    "section": 2,
-    "text": "e Sweep</span>"
-  },
-  {
-    "scope": 9,
-    "key": 335,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 335,
-    "section": 1,
-    "text": "ass='test-label'>Stato Montaggi"
-  },
-  {
-    "scope": 9,
-    "key": 335,
-    "section": 2,
-    "text": "o:</span>"
-  },
-  {
-    "scope": 9,
-    "key": 336,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 336,
-    "section": 1,
-    "text": "ass='test-label'>Test Loopback:"
-  },
-  {
-    "scope": 9,
-    "key": 336,
-    "section": 2,
-    "text": " 0x55, 0xAA, 0x01, 0x07</span>"
-  },
-  {
-    "scope": 9,
-    "key": 337,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 337,
-    "section": 1,
-    "text": "ass='test-label'>Test Loopback/"
-  },
-  {
-    "scope": 9,
-    "key": 337,
-    "section": 2,
-    "text": "Echo</span>"
-  },
-  {
-    "scope": 9,
-    "key": 338,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 338,
-    "section": 1,
-    "text": "ass='test-label'>Test Loopback:"
-  },
-  {
-    "scope": 9,
-    "key": 338,
-    "section": 2,
-    "text": " invia pacchetto di prova</span"
-  },
-  {
-    "scope": 9,
-    "key": 338,
-    "section": 3,
-    "text": ">"
-  },
-  {
-    "scope": 9,
-    "key": 339,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 339,
-    "section": 1,
-    "text": "ass='test-label'>Ultime Letture"
-  },
-  {
-    "scope": 9,
-    "key": 339,
-    "section": 2,
-    "text": "</span>"
-  },
-  {
-    "scope": 9,
-    "key": 340,
-    "section": 0,
-    "text": "<div class='test-item'><span cl"
-  },
-  {
-    "scope": 9,
-    "key": 340,
-    "section": 1,
-    "text": "ass='test-label'>Ultimo Errore:"
-  },
-  {
-    "scope": 9,
-    "key": 340,
-    "section": 2,
-    "text": "</span>"
   },
   {
     "scope": 9,
     "key": 341,
+    "section": 0,
+    "text": "ass='test-label'>Blink Tutte le"
+  },
+  {
+    "scope": 9,
+    "key": 341,
+    "section": 0,
+    "text": " Uscite (1Hz)</span>"
+  },
+  {
+    "scope": 9,
+    "key": 342,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 342,
+    "section": 0,
+    "text": "ass='test-label'>Pattern Rainbo"
+  },
+  {
+    "scope": 9,
+    "key": 342,
+    "section": 0,
+    "text": "w</span>"
+  },
+  {
+    "scope": 9,
+    "key": 343,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 343,
+    "section": 0,
+    "text": "ass='test-label'>PWM1 Duty Cycl"
+  },
+  {
+    "scope": 9,
+    "key": 343,
+    "section": 0,
+    "text": "e Sweep</span>"
+  },
+  {
+    "scope": 9,
+    "key": 344,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 344,
+    "section": 0,
+    "text": "ass='test-label'>PWM2 Duty Cycl"
+  },
+  {
+    "scope": 9,
+    "key": 344,
+    "section": 0,
+    "text": "e Sweep</span>"
+  },
+  {
+    "scope": 9,
+    "key": 345,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 345,
+    "section": 0,
+    "text": "ass='test-label'>Stato Montaggi"
+  },
+  {
+    "scope": 9,
+    "key": 345,
+    "section": 0,
+    "text": "o:</span>"
+  },
+  {
+    "scope": 9,
+    "key": 346,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 346,
+    "section": 0,
+    "text": "ass='test-label'>Test Loopback:"
+  },
+  {
+    "scope": 9,
+    "key": 346,
+    "section": 0,
+    "text": " 0x55, 0xAA, 0x01, 0x07</span>"
+  },
+  {
+    "scope": 9,
+    "key": 347,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 347,
+    "section": 0,
+    "text": "ass='test-label'>Test Loopback/"
+  },
+  {
+    "scope": 9,
+    "key": 347,
+    "section": 0,
+    "text": "Echo</span>"
+  },
+  {
+    "scope": 9,
+    "key": 348,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 348,
+    "section": 0,
+    "text": "ass='test-label'>Test Loopback:"
+  },
+  {
+    "scope": 9,
+    "key": 348,
+    "section": 0,
+    "text": " invia pacchetto di prova</span"
+  },
+  {
+    "scope": 9,
+    "key": 348,
+    "section": 0,
+    "text": ">"
+  },
+  {
+    "scope": 9,
+    "key": 349,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 349,
+    "section": 0,
+    "text": "ass='test-label'>Ultime Letture"
+  },
+  {
+    "scope": 9,
+    "key": 349,
+    "section": 0,
+    "text": "</span>"
+  },
+  {
+    "scope": 9,
+    "key": 350,
+    "section": 0,
+    "text": "<div class='test-item'><span cl"
+  },
+  {
+    "scope": 9,
+    "key": 350,
+    "section": 0,
+    "text": "ass='test-label'>Ultimo Errore:"
+  },
+  {
+    "scope": 9,
+    "key": 350,
+    "section": 0,
+    "text": "</span>"
+  },
+  {
+    "scope": 9,
+    "key": 351,
     "section": 0,
     "text": "<div class='test-item'><span>Da"
   },
   {
     "scope": 9,
-    "key": 341,
-    "section": 1,
+    "key": 351,
+    "section": 0,
     "text": "to Byte (0-255)</span>"
   },
   {
     "scope": 9,
-    "key": 342,
+    "key": 352,
     "section": 0,
     "text": "<div class='test-item'><span>El"
   },
   {
     "scope": 9,
-    "key": 342,
-    "section": 1,
+    "key": 352,
+    "section": 0,
     "text": "enco File (Root)</span>"
   },
   {
     "scope": 9,
-    "key": 343,
+    "key": 353,
     "section": 0,
     "text": "<div class='test-item'><span>In"
   },
   {
     "scope": 9,
-    "key": 343,
-    "section": 1,
+    "key": 353,
+    "section": 0,
     "text": "dirizzo (0-2047)</span>"
   },
   {
     "scope": 9,
-    "key": 344,
+    "key": 354,
     "section": 0,
     "text": "<div class='test-item'><span>In"
   },
   {
     "scope": 9,
-    "key": 344,
-    "section": 1,
+    "key": 354,
+    "section": 0,
     "text": "via Pacchetto (es: 0x01 0x02)</"
   },
   {
     "scope": 9,
-    "key": 344,
-    "section": 2,
+    "key": 354,
+    "section": 0,
     "text": "span>"
   },
   {
     "scope": 9,
-    "key": 345,
+    "key": 355,
     "section": 0,
     "text": "<div class='test-item'><span>In"
   },
   {
     "scope": 9,
-    "key": 345,
-    "section": 1,
+    "key": 355,
+    "section": 0,
     "text": "via Stringa (es: \\\\0x55\\\\0xAA\\\\"
   },
   {
     "scope": 9,
-    "key": 345,
-    "section": 2,
+    "key": 355,
+    "section": 0,
     "text": "\r\\ )</span>"
   },
   {
     "scope": 9,
-    "key": 346,
+    "key": 356,
     "section": 0,
     "text": "<div class='test-item'><span>In"
   },
   {
     "scope": 9,
-    "key": 346,
-    "section": 1,
+    "key": 356,
+    "section": 0,
     "text": "via Stringa (Hex, es: 08 00)</s"
   },
   {
     "scope": 9,
-    "key": 346,
-    "section": 2,
+    "key": 356,
+    "section": 0,
     "text": "pan>"
   },
   {
     "scope": 9,
-    "key": 347,
+    "key": 357,
     "section": 0,
     "text": "<div class='test-item'><span>In"
   },
   {
     "scope": 9,
-    "key": 347,
-    "section": 1,
+    "key": 357,
+    "section": 0,
     "text": "via Stringa</span>"
   },
   {
     "scope": 9,
-    "key": 348,
+    "key": 358,
     "section": 0,
     "text": "<div class='test-item'><span>Se"
   },
   {
     "scope": 9,
-    "key": 348,
-    "section": 1,
+    "key": 358,
+    "section": 0,
     "text": "leziona Colore:</span>"
   },
   {
     "scope": 9,
-    "key": 349,
+    "key": 359,
     "section": 0,
     "text": "<div class='test-item'><span>Va"
   },
   {
     "scope": 9,
-    "key": 349,
-    "section": 1,
+    "key": 359,
+    "section": 0,
     "text": "lori Correnti:</span>"
   },
   {
     "scope": 9,
-    "key": 350,
+    "key": 360,
     "section": 0,
     "text": "<div id='cctalk_status' class='"
   },
   {
     "scope": 9,
-    "key": 350,
-    "section": 1,
+    "key": 360,
+    "section": 0,
     "text": "status-box'>Monitor:</div></div"
   },
   {
     "scope": 9,
-    "key": 350,
-    "section": 2,
+    "key": 360,
+    "section": 0,
     "text": ">"
   },
   {
     "scope": 9,
-    "key": 351,
+    "key": 361,
     "section": 0,
     "text": "<div id='eeprom_status' class='"
   },
   {
     "scope": 9,
-    "key": 351,
-    "section": 1,
+    "key": 361,
+    "section": 0,
     "text": "status-box'>Pronto per test EEP"
   },
   {
     "scope": 9,
-    "key": 351,
-    "section": 2,
+    "key": 361,
+    "section": 0,
     "text": "ROM</div></div>"
   },
   {
     "scope": 9,
-    "key": 352,
+    "key": 362,
     "section": 0,
     "text": "<div id='gpios_status' class='s"
   },
   {
     "scope": 9,
-    "key": 352,
-    "section": 1,
+    "key": 362,
+    "section": 0,
     "text": "tatus-box'>Stato GPIO in lettur"
   },
   {
     "scope": 9,
-    "key": 352,
-    "section": 2,
+    "key": 362,
+    "section": 0,
     "text": "a...</div></div>"
   },
   {
     "scope": 9,
-    "key": 353,
+    "key": 363,
     "section": 0,
     "text": "<div id='gpios_test_grid'>Caric"
   },
   {
     "scope": 9,
-    "key": 353,
-    "section": 1,
+    "key": 363,
+    "section": 0,
     "text": "amento...</div>"
   },
   {
     "scope": 9,
-    "key": 354,
+    "key": 364,
     "section": 0,
     "text": "<div id='ioexp_status' class='s"
   },
   {
     "scope": 9,
-    "key": 354,
-    "section": 1,
+    "key": 364,
+    "section": 0,
     "text": "tatus-box'>Pronto per test I/O "
   },
   {
     "scope": 9,
-    "key": 354,
-    "section": 2,
+    "key": 364,
+    "section": 0,
     "text": "Expander</div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 355,
-    "section": 0,
-    "text": "<div id='led_status' class='sta"
-  },
-  {
-    "scope": 9,
-    "key": 355,
-    "section": 1,
-    "text": "tus-box'>Pronto per test LED</d"
-  },
-  {
-    "scope": 9,
-    "key": 355,
-    "section": 2,
-    "text": "iv></div>"
-  },
-  {
-    "scope": 9,
-    "key": 356,
-    "section": 0,
-    "text": "<div id='mdb_status' class='sta"
-  },
-  {
-    "scope": 9,
-    "key": 356,
-    "section": 1,
-    "text": "tus-box'>Pronto per test MDB</d"
-  },
-  {
-    "scope": 9,
-    "key": 356,
-    "section": 2,
-    "text": "iv></div>"
-  },
-  {
-    "scope": 9,
-    "key": 357,
-    "section": 0,
-    "text": "<div id='pwm_status' class='sta"
-  },
-  {
-    "scope": 9,
-    "key": 357,
-    "section": 1,
-    "text": "tus-box'>Pronto per test PWM</d"
-  },
-  {
-    "scope": 9,
-    "key": 357,
-    "section": 2,
-    "text": "iv></div>"
-  },
-  {
-    "scope": 9,
-    "key": 358,
-    "section": 0,
-    "text": "<div id='rs232_status' class='s"
-  },
-  {
-    "scope": 9,
-    "key": 358,
-    "section": 1,
-    "text": "tatus-box'>Monitor:</div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 359,
-    "section": 0,
-    "text": "<div id='rs485_status' class='s"
-  },
-  {
-    "scope": 9,
-    "key": 359,
-    "section": 1,
-    "text": "tatus-box'>Monitor:</div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 360,
-    "section": 0,
-    "text": "<div id='scanner_status' class="
-  },
-  {
-    "scope": 9,
-    "key": 360,
-    "section": 1,
-    "text": "'status-box'>Nessuna lettura an"
-  },
-  {
-    "scope": 9,
-    "key": 360,
-    "section": 2,
-    "text": "cora.</div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 361,
-    "section": 0,
-    "text": "<div id='sd_status' class='stat"
-  },
-  {
-    "scope": 9,
-    "key": 361,
-    "section": 1,
-    "text": "us-box' style='display:none'></"
-  },
-  {
-    "scope": 9,
-    "key": 361,
-    "section": 2,
-    "text": "div></div>"
-  },
-  {
-    "scope": 9,
-    "key": 362,
-    "section": 0,
-    "text": "<div id='section_gpio33' class="
-  },
-  {
-    "scope": 9,
-    "key": 362,
-    "section": 1,
-    "text": "'section collapsed'><h2>🔘 GP"
-  },
-  {
-    "scope": 9,
-    "key": 362,
-    "section": 2,
-    "text": "IO Ausiliari (GPIO33)<span clas"
-  },
-  {
-    "scope": 9,
-    "key": 362,
-    "section": 3,
-    "text": "s='section-toggle-icon'>▸</sp"
-  },
-  {
-    "scope": 9,
-    "key": 362,
-    "section": 4,
-    "text": "an></h2>"
-  },
-  {
-    "scope": 9,
-    "key": 363,
-    "section": 0,
-    "text": "<div id='section_scanner' class"
-  },
-  {
-    "scope": 9,
-    "key": 363,
-    "section": 1,
-    "text": "='section collapsed'><h2>🔍 S"
-  },
-  {
-    "scope": 9,
-    "key": 363,
-    "section": 2,
-    "text": "canner USB (Barcode/QR)<span cl"
-  },
-  {
-    "scope": 9,
-    "key": 363,
-    "section": 3,
-    "text": "ass='section-toggle-icon'>▸</"
-  },
-  {
-    "scope": 9,
-    "key": 363,
-    "section": 4,
-    "text": "span></h2>"
-  },
-  {
-    "scope": 9,
-    "key": 364,
-    "section": 0,
-    "text": "<div id='sht_status' class='sta"
-  },
-  {
-    "scope": 9,
-    "key": 364,
-    "section": 1,
-    "text": "tus-box'>Pronto per test SHT40<"
-  },
-  {
-    "scope": 9,
-    "key": 364,
-    "section": 2,
-    "text": "/div></div>"
   },
   {
     "scope": 9,
     "key": 365,
     "section": 0,
-    "text": "Duty (%):"
+    "text": "<div id='led_status' class='sta"
+  },
+  {
+    "scope": 9,
+    "key": 365,
+    "section": 0,
+    "text": "tus-box'>Pronto per test LED</d"
+  },
+  {
+    "scope": 9,
+    "key": 365,
+    "section": 0,
+    "text": "iv></div>"
   },
   {
     "scope": 9,
     "key": 366,
     "section": 0,
-    "text": "💾 EEPROM 24LC16"
+    "text": "<div id='mdb_status' class='sta"
+  },
+  {
+    "scope": 9,
+    "key": 366,
+    "section": 0,
+    "text": "tus-box'>Pronto per test MDB</d"
+  },
+  {
+    "scope": 9,
+    "key": 366,
+    "section": 0,
+    "text": "iv></div>"
   },
   {
     "scope": 9,
     "key": 367,
     "section": 0,
-    "text": "📂 Elenca"
+    "text": "<div id='pwm_status' class='sta"
+  },
+  {
+    "scope": 9,
+    "key": 367,
+    "section": 0,
+    "text": "tus-box'>Pronto per test PWM</d"
+  },
+  {
+    "scope": 9,
+    "key": 367,
+    "section": 0,
+    "text": "iv></div>"
   },
   {
     "scope": 9,
     "key": 368,
     "section": 0,
-    "text": "Elenco File (Root)"
+    "text": "<div id='rs232_status' class='s"
+  },
+  {
+    "scope": 9,
+    "key": 368,
+    "section": 0,
+    "text": "tatus-box'>Monitor:</div></div>"
   },
   {
     "scope": 9,
     "key": 369,
     "section": 0,
-    "text": "else out += '"
+    "text": "<div id='rs485_status' class='s"
+  },
+  {
+    "scope": 9,
+    "key": 369,
+    "section": 0,
+    "text": "tatus-box'>Monitor:</div></div>"
   },
   {
     "scope": 9,
     "key": 370,
     "section": 0,
-    "text": "❌ Errore"
+    "text": "<div id='scanner_status' class="
+  },
+  {
+    "scope": 9,
+    "key": 370,
+    "section": 0,
+    "text": "'status-box'>Nessuna lettura an"
+  },
+  {
+    "scope": 9,
+    "key": 370,
+    "section": 0,
+    "text": "cora.</div></div>"
   },
   {
     "scope": 9,
     "key": 371,
     "section": 0,
-    "text": "❌ Errore comando scanner"
+    "text": "<div id='sd_status' class='stat"
+  },
+  {
+    "scope": 9,
+    "key": 371,
+    "section": 0,
+    "text": "us-box' style='display:none'></"
+  },
+  {
+    "scope": 9,
+    "key": 371,
+    "section": 0,
+    "text": "div></div>"
   },
   {
     "scope": 9,
     "key": 372,
     "section": 0,
-    "text": "⚠️ Formattazione FAT32"
+    "text": "<div id='section_gpio33' class="
+  },
+  {
+    "scope": 9,
+    "key": 372,
+    "section": 0,
+    "text": "'section collapsed'><h2>🔘 GP"
+  },
+  {
+    "scope": 9,
+    "key": 372,
+    "section": 0,
+    "text": "IO Ausiliari (GPIO33)<span clas"
+  },
+  {
+    "scope": 9,
+    "key": 372,
+    "section": 0,
+    "text": "s='section-toggle-icon'>▸</sp"
+  },
+  {
+    "scope": 9,
+    "key": 372,
+    "section": 0,
+    "text": "an></h2>"
   },
   {
     "scope": 9,
     "key": 373,
     "section": 0,
-    "text": "🔄 FORZA TEST LETTURA"
+    "text": "<div id='section_scanner' class"
+  },
+  {
+    "scope": 9,
+    "key": 373,
+    "section": 0,
+    "text": "='section collapsed'><h2>🔍 S"
+  },
+  {
+    "scope": 9,
+    "key": 373,
+    "section": 0,
+    "text": "canner USB (Barcode/QR)<span cl"
+  },
+  {
+    "scope": 9,
+    "key": 373,
+    "section": 0,
+    "text": "ass='section-toggle-icon'>▸</"
+  },
+  {
+    "scope": 9,
+    "key": 373,
+    "section": 0,
+    "text": "span></h2>"
   },
   {
     "scope": 9,
     "key": 374,
     "section": 0,
-    "text": "Freq (Hz):"
+    "text": "<div id='sht_status' class='sta"
+  },
+  {
+    "scope": 9,
+    "key": 374,
+    "section": 0,
+    "text": "tus-box'>Pronto per test SHT40<"
+  },
+  {
+    "scope": 9,
+    "key": 374,
+    "section": 0,
+    "text": "/div></div>"
   },
   {
     "scope": 9,
     "key": 375,
     "section": 0,
-    "text": "🔘 GPIO Ausiliari (GPIO33)"
+    "text": "Duty (%):"
   },
   {
     "scope": 9,
     "key": 376,
     "section": 0,
-    "text": "h+='"
+    "text": "💾 EEPROM 24LC16"
   },
   {
     "scope": 9,
     "key": 377,
     "section": 0,
-    "text": "<h3>Controllo Manuale</h3>"
+    "text": "📂 Elenca"
   },
   {
     "scope": 9,
     "key": 378,
     "section": 0,
-    "text": "<h3>Controllo Manuale PWM</h3>"
+    "text": "Elenco File (Root)"
   },
   {
     "scope": 9,
     "key": 379,
     "section": 0,
-    "text": "HEX"
+    "text": "else out += '"
   },
   {
     "scope": 9,
     "key": 380,
     "section": 0,
-    "text": ".' + hex + '"
+    "text": "❌ Errore"
   },
   {
     "scope": 9,
     "key": 381,
     "section": 0,
-    "text": "// Hide /test sections when cor"
-  },
-  {
-    "scope": 9,
-    "key": 381,
-    "section": 1,
-    "text": "responding peripheral is disabl"
-  },
-  {
-    "scope": 9,
-    "key": 381,
-    "section": 2,
-    "text": "ed in /config"
+    "text": "❌ Errore comando scanner"
   },
   {
     "scope": 9,
     "key": 382,
     "section": 0,
-    "text": "(I2C 0x45)"
+    "text": "⚠️ Formattazione FAT32"
   },
   {
     "scope": 9,
     "key": 383,
     "section": 0,
-    "text": "if(isOut) h+='"
+    "text": "🔄 FORZA TEST LETTURA"
   },
   {
     "scope": 9,
     "key": 384,
     "section": 0,
-    "text": "Indirizzo (0-2047)"
+    "text": "Freq (Hz):"
   },
   {
     "scope": 9,
     "key": 385,
     "section": 0,
-    "text": "Ingressi (Chip 0x44)"
+    "text": "🔘 GPIO Ausiliari (GPIO33)"
   },
   {
     "scope": 9,
     "key": 386,
     "section": 0,
-    "text": "⚡ Init"
+    "text": "h+='"
   },
   {
     "scope": 9,
     "key": 387,
     "section": 0,
-    "text": "▶️ Inizia Blink"
+    "text": "<h3>Controllo Manuale</h3>"
   },
   {
     "scope": 9,
     "key": 388,
     "section": 0,
-    "text": "🚀 Inizia Manuale"
+    "text": "<h3>Controllo Manuale PWM</h3>"
   },
   {
     "scope": 9,
     "key": 389,
     "section": 0,
-    "text": "▶️ Inizia Rainbow"
+    "text": "HEX"
   },
   {
     "scope": 9,
     "key": 390,
     "section": 0,
-    "text": "▶️ Inizia Sweep"
+    "text": ".' + hex + '"
   },
   {
     "scope": 9,
     "key": 391,
     "section": 0,
-    "text": "▶️ Inizia Test"
+    "text": "// Hide /test sections when cor"
+  },
+  {
+    "scope": 9,
+    "key": 391,
+    "section": 0,
+    "text": "responding peripheral is disabl"
+  },
+  {
+    "scope": 9,
+    "key": 391,
+    "section": 0,
+    "text": "ed in /config"
   },
   {
     "scope": 9,
     "key": 392,
     "section": 0,
-    "text": "Invia Pacchetto (es: 0x01 0x02)"
+    "text": "(I2C 0x45)"
   },
   {
     "scope": 9,
     "key": 393,
     "section": 0,
-    "text": "Invia Stringa"
+    "text": "if(isOut) h+='"
   },
   {
     "scope": 9,
     "key": 394,
     "section": 0,
-    "text": "Invia Stringa (es: \\0x55\\0xAA\\"
+    "text": "Indirizzo (0-2047)"
   },
   {
     "scope": 9,
     "key": 395,
     "section": 0,
-    "text": "Invia Stringa (Hex, es: 08 00)"
+    "text": "Ingressi (Chip 0x44)"
   },
   {
     "scope": 9,
     "key": 396,
     "section": 0,
-    "text": "➡️ Invio Backup..."
+    "text": "⚡ Init"
   },
   {
     "scope": 9,
     "key": 397,
     "section": 0,
-    "text": "📖 Leggi"
+    "text": "▶️ Inizia Blink"
   },
   {
     "scope": 9,
     "key": 398,
     "section": 0,
-    "text": "📄 Leggi JSON"
+    "text": "🚀 Inizia Manuale"
   },
   {
     "scope": 9,
     "key": 399,
     "section": 0,
-    "text": "✅ Lettura OK"
+    "text": "▶️ Inizia Rainbow"
   },
   {
     "scope": 9,
     "key": 400,
     "section": 0,
-    "text": "// live update to hardware (sho"
-  },
-  {
-    "scope": 9,
-    "key": 400,
-    "section": 1,
-    "text": "rt debounce)"
+    "text": "▶️ Inizia Sweep"
   },
   {
     "scope": 9,
     "key": 401,
     "section": 0,
-    "text": "Log operazioni SD..."
+    "text": "▶️ Inizia Test"
   },
   {
     "scope": 9,
     "key": 402,
     "section": 0,
-    "text": "Luminosità:"
+    "text": "Invia Pacchetto (es: 0x01 0x02)"
   },
   {
     "scope": 9,
     "key": 403,
     "section": 0,
-    "text": "🎰 MDB (Multi-Drop Bus)"
+    "text": "Invia Stringa"
   },
   {
     "scope": 9,
     "key": 404,
     "section": 0,
-    "text": "Monitor:"
+    "text": "Invia Stringa (es: \\0x55\\0xAA\\"
   },
   {
     "scope": 9,
     "key": 405,
     "section": 0,
-    "text": "Nessuna lettura ancora."
+    "text": "Invia Stringa (Hex, es: 08 00)"
   },
   {
     "scope": 9,
     "key": 406,
     "section": 0,
-    "text": "OFF"
+    "text": "➡️ Invio Backup..."
   },
   {
     "scope": 9,
     "key": 407,
     "section": 0,
-    "text": "✅ OK"
+    "text": "📖 Leggi"
   },
   {
     "scope": 9,
     "key": 408,
     "section": 0,
-    "text": "ON"
+    "text": "📄 Leggi JSON"
   },
   {
     "scope": 9,
     "key": 409,
     "section": 0,
-    "text": "OUT1 (GPIO47)"
+    "text": "✅ Lettura OK"
   },
   {
     "scope": 9,
     "key": 410,
     "section": 0,
-    "text": "OUT2 (GPIO48)"
+    "text": "// live update to hardware (sho"
+  },
+  {
+    "scope": 9,
+    "key": 410,
+    "section": 0,
+    "text": "rt debounce)"
   },
   {
     "scope": 9,
     "key": 411,
     "section": 0,
-    "text": "Pattern Rainbow"
+    "text": "Log operazioni SD..."
   },
   {
     "scope": 9,
     "key": 412,
     "section": 0,
-    "text": "(PIN 12 A, 17 B)"
+    "text": "Luminosità:"
   },
   {
     "scope": 9,
     "key": 413,
     "section": 0,
-    "text": "(PIN 15 / GPIO 5)"
+    "text": "🎰 MDB (Multi-Drop Bus)"
   },
   {
     "scope": 9,
     "key": 414,
     "section": 0,
-    "text": "(PIN 23 TX, 35 RX)"
+    "text": "Monitor:"
   },
   {
     "scope": 9,
     "key": 415,
     "section": 0,
-    "text": "(PIN 32, 37 / I2C)"
+    "text": "Nessuna lettura ancora."
   },
   {
     "scope": 9,
     "key": 416,
     "section": 0,
-    "text": "(PIN 34, 38)"
+    "text": "OFF"
   },
   {
     "scope": 9,
     "key": 417,
     "section": 0,
-    "text": "(PIN 39)"
+    "text": "✅ OK"
   },
   {
     "scope": 9,
     "key": 418,
     "section": 0,
-    "text": "(PIN 8, 11)"
+    "text": "ON"
   },
   {
     "scope": 9,
     "key": 419,
     "section": 0,
-    "text": "// Poi pulisce lato server"
+    "text": "OUT1 (GPIO47)"
   },
   {
     "scope": 9,
     "key": 420,
     "section": 0,
-    "text": "Pronto per test EEPROM"
+    "text": "OUT2 (GPIO48)"
   },
   {
     "scope": 9,
     "key": 421,
     "section": 0,
-    "text": "Pronto per test I/O Expander"
+    "text": "Pattern Rainbow"
   },
   {
     "scope": 9,
     "key": 422,
     "section": 0,
-    "text": "Pronto per test LED"
+    "text": "(PIN 12 A, 17 B)"
   },
   {
     "scope": 9,
     "key": 423,
     "section": 0,
-    "text": "Pronto per test MDB"
+    "text": "(PIN 15 / GPIO 5)"
   },
   {
     "scope": 9,
     "key": 424,
     "section": 0,
-    "text": "Pronto per test PWM"
+    "text": "(PIN 23 TX, 35 RX)"
   },
   {
     "scope": 9,
     "key": 425,
     "section": 0,
-    "text": "Pronto per test SHT40"
+    "text": "(PIN 32, 37 / I2C)"
   },
   {
     "scope": 9,
     "key": 426,
     "section": 0,
-    "text": "// Pulisce immediatamente l'are"
-  },
-  {
-    "scope": 9,
-    "key": 426,
-    "section": 1,
-    "text": "a di testo lato client"
+    "text": "(PIN 34, 38)"
   },
   {
     "scope": 9,
     "key": 427,
     "section": 0,
-    "text": "🧨 Pulisci/Formatta"
+    "text": "(PIN 39)"
   },
   {
     "scope": 9,
     "key": 428,
     "section": 0,
-    "text": "⚡ PWM"
+    "text": "(PIN 8, 11)"
   },
   {
     "scope": 9,
     "key": 429,
     "section": 0,
-    "text": "PWM1 Duty Cycle Sweep"
+    "text": "// Poi pulisce lato server"
   },
   {
     "scope": 9,
     "key": 430,
     "section": 0,
-    "text": "PWM2 Duty Cycle Sweep"
+    "text": "Pronto per test EEPROM"
   },
   {
     "scope": 9,
     "key": 431,
     "section": 0,
-    "text": "Scanner OFF"
+    "text": "Pronto per test I/O Expander"
   },
   {
     "scope": 9,
     "key": 432,
     "section": 0,
-    "text": "Scanner ON"
+    "text": "Pronto per test LED"
   },
   {
     "scope": 9,
     "key": 433,
     "section": 0,
-    "text": "Scanner SETUP"
+    "text": "Pronto per test MDB"
   },
   {
     "scope": 9,
     "key": 434,
     "section": 0,
-    "text": "Scanner STATE"
+    "text": "Pronto per test PWM"
   },
   {
     "scope": 9,
     "key": 435,
     "section": 0,
-    "text": "// Scanner UI: mostra le ultime"
-  },
-  {
-    "scope": 9,
-    "key": 435,
-    "section": 1,
-    "text": " letture (tag 'SCANNER') e coma"
-  },
-  {
-    "scope": 9,
-    "key": 435,
-    "section": 2,
-    "text": "ndi ON/OFF"
+    "text": "Pronto per test SHT40"
   },
   {
     "scope": 9,
     "key": 436,
     "section": 0,
-    "text": "🔍 Scanner USB (Barcode/QR)"
+    "text": "// Pulisce immediatamente l'are"
+  },
+  {
+    "scope": 9,
+    "key": 436,
+    "section": 0,
+    "text": "a di testo lato client"
   },
   {
     "scope": 9,
     "key": 437,
     "section": 0,
-    "text": "💾 Scheda MicroSD"
+    "text": "🧨 Pulisci/Formatta"
   },
   {
     "scope": 9,
     "key": 438,
     "section": 0,
-    "text": "// schedule persistence after 5"
-  },
-  {
-    "scope": 9,
-    "key": 438,
-    "section": 1,
-    "text": "s of inactivity"
+    "text": "⚡ PWM"
   },
   {
     "scope": 9,
     "key": 439,
     "section": 0,
-    "text": "✍️ Scrivi"
+    "text": "PWM1 Duty Cycle Sweep"
   },
   {
     "scope": 9,
     "key": 440,
     "section": 0,
-    "text": "<select id='cctalk_mode' onchan"
-  },
-  {
-    "scope": 9,
-    "key": 440,
-    "section": 1,
-    "text": "ge=\"clearSerial('cctalk')\"><opt"
-  },
-  {
-    "scope": 9,
-    "key": 440,
-    "section": 2,
-    "text": "ion value='HEX'>HEX</option><op"
-  },
-  {
-    "scope": 9,
-    "key": 440,
-    "section": 3,
-    "text": "tion value='TEXT'>TEXT</option>"
-  },
-  {
-    "scope": 9,
-    "key": 440,
-    "section": 4,
-    "text": "</select>"
+    "text": "PWM2 Duty Cycle Sweep"
   },
   {
     "scope": 9,
     "key": 441,
     "section": 0,
-    "text": "<select id='mdb_mode' onchange="
-  },
-  {
-    "scope": 9,
-    "key": 441,
-    "section": 1,
-    "text": "\"clearSerial('mdb')\"><option va"
-  },
-  {
-    "scope": 9,
-    "key": 441,
-    "section": 2,
-    "text": "lue='HEX'>HEX</option><option v"
-  },
-  {
-    "scope": 9,
-    "key": 441,
-    "section": 3,
-    "text": "alue='TEXT'>TEXT</option></sele"
-  },
-  {
-    "scope": 9,
-    "key": 441,
-    "section": 4,
-    "text": "ct>"
+    "text": "Scanner OFF"
   },
   {
     "scope": 9,
     "key": 442,
     "section": 0,
-    "text": "<select id='rs232_mode' onchang"
-  },
-  {
-    "scope": 9,
-    "key": 442,
-    "section": 1,
-    "text": "e=\"clearSerial('rs232')\"><optio"
-  },
-  {
-    "scope": 9,
-    "key": 442,
-    "section": 2,
-    "text": "n value='HEX'>HEX</option><opti"
-  },
-  {
-    "scope": 9,
-    "key": 442,
-    "section": 3,
-    "text": "on value='TEXT'>TEXT</option></"
-  },
-  {
-    "scope": 9,
-    "key": 442,
-    "section": 4,
-    "text": "select>"
+    "text": "Scanner ON"
   },
   {
     "scope": 9,
     "key": 443,
     "section": 0,
-    "text": "<select id='rs485_mode' onchang"
-  },
-  {
-    "scope": 9,
-    "key": 443,
-    "section": 1,
-    "text": "e=\"clearSerial('rs485')\"><optio"
-  },
-  {
-    "scope": 9,
-    "key": 443,
-    "section": 2,
-    "text": "n value='HEX'>HEX</option><opti"
-  },
-  {
-    "scope": 9,
-    "key": 443,
-    "section": 3,
-    "text": "on value='TEXT'>TEXT</option></"
-  },
-  {
-    "scope": 9,
-    "key": 443,
-    "section": 4,
-    "text": "select>"
+    "text": "Scanner SETUP"
   },
   {
     "scope": 9,
     "key": 444,
     "section": 0,
-    "text": "Seleziona Colore:"
+    "text": "Scanner STATE"
   },
   {
     "scope": 9,
     "key": 445,
     "section": 0,
-    "text": "🌡️ Sensore SHT40"
+    "text": "// Scanner UI: mostra le ultime"
+  },
+  {
+    "scope": 9,
+    "key": 445,
+    "section": 0,
+    "text": " letture (tag 'SCANNER') e coma"
+  },
+  {
+    "scope": 9,
+    "key": 445,
+    "section": 0,
+    "text": "ndi ON/OFF"
   },
   {
     "scope": 9,
     "key": 446,
     "section": 0,
-    "text": "/* sensors */"
+    "text": "🔍 Scanner USB (Barcode/QR)"
   },
   {
     "scope": 9,
     "key": 447,
     "section": 0,
-    "text": "📡 Seriale RS232"
+    "text": "💾 Scheda MicroSD"
   },
   {
     "scope": 9,
     "key": 448,
     "section": 0,
-    "text": "📡 Seriale RS485"
+    "text": "// schedule persistence after 5"
+  },
+  {
+    "scope": 9,
+    "key": 448,
+    "section": 0,
+    "text": "s of inactivity"
   },
   {
     "scope": 9,
     "key": 449,
     "section": 0,
-    "text": "<span>Canale:</span>"
+    "text": "✍️ Scrivi"
   },
   {
     "scope": 9,
     "key": 450,
     "section": 0,
-    "text": "<span>Duty (%):</span><input ty"
+    "text": "<select id='cctalk_mode' onchan"
   },
   {
     "scope": 9,
     "key": 450,
-    "section": 1,
-    "text": "pe='number' id='pwm_duty' value"
+    "section": 0,
+    "text": "ge=\"clearSerial('cctalk')\"><opt"
   },
   {
     "scope": 9,
     "key": 450,
-    "section": 2,
-    "text": "='50' min='0' max='100' style='"
+    "section": 0,
+    "text": "ion value='HEX'>HEX</option><op"
   },
   {
     "scope": 9,
     "key": 450,
-    "section": 3,
-    "text": "width:60px'>"
+    "section": 0,
+    "text": "tion value='TEXT'>TEXT</option>"
+  },
+  {
+    "scope": 9,
+    "key": 450,
+    "section": 0,
+    "text": "</select>"
   },
   {
     "scope": 9,
     "key": 451,
     "section": 0,
-    "text": "<span>Freq (Hz):</span><input t"
+    "text": "<select id='mdb_mode' onchange="
   },
   {
     "scope": 9,
     "key": 451,
-    "section": 1,
-    "text": "ype='number' id='pwm_freq' valu"
+    "section": 0,
+    "text": "\"clearSerial('mdb')\"><option va"
   },
   {
     "scope": 9,
     "key": 451,
-    "section": 2,
-    "text": "e='1000' min='100' max='20000' "
+    "section": 0,
+    "text": "lue='HEX'>HEX</option><option v"
   },
   {
     "scope": 9,
     "key": 451,
-    "section": 3,
-    "text": "style='width:80px'>"
+    "section": 0,
+    "text": "alue='TEXT'>TEXT</option></sele"
+  },
+  {
+    "scope": 9,
+    "key": 451,
+    "section": 0,
+    "text": "ct>"
   },
   {
     "scope": 9,
     "key": 452,
     "section": 0,
-    "text": "<span id='sd_mounted_status' st"
+    "text": "<select id='rs232_mode' onchang"
   },
   {
     "scope": 9,
     "key": 452,
-    "section": 1,
-    "text": "yle='font-weight:bold'>--</span"
+    "section": 0,
+    "text": "e=\"clearSerial('rs232')\"><optio"
   },
   {
     "scope": 9,
     "key": 452,
-    "section": 2,
-    "text": "></div>"
+    "section": 0,
+    "text": "n value='HEX'>HEX</option><opti"
+  },
+  {
+    "scope": 9,
+    "key": 452,
+    "section": 0,
+    "text": "on value='TEXT'>TEXT</option></"
+  },
+  {
+    "scope": 9,
+    "key": 452,
+    "section": 0,
+    "text": "select>"
   },
   {
     "scope": 9,
     "key": 453,
     "section": 0,
-    "text": "<span>Luminosità:</span><input"
+    "text": "<select id='rs485_mode' onchang"
   },
   {
     "scope": 9,
     "key": 453,
-    "section": 1,
-    "text": " type='range' id='led_bright' m"
+    "section": 0,
+    "text": "e=\"clearSerial('rs485')\"><optio"
   },
   {
     "scope": 9,
     "key": 453,
-    "section": 2,
-    "text": "in='0' max='100' value='50' oni"
+    "section": 0,
+    "text": "n value='HEX'>HEX</option><opti"
   },
   {
     "scope": 9,
     "key": 453,
-    "section": 3,
-    "text": "nput='updateLedRealtime()' styl"
+    "section": 0,
+    "text": "on value='TEXT'>TEXT</option></"
   },
   {
     "scope": 9,
     "key": 453,
-    "section": 4,
-    "text": "e='width:100px'>"
+    "section": 0,
+    "text": "select>"
   },
   {
     "scope": 9,
     "key": 454,
     "section": 0,
-    "text": "Stato GPIO in lettura..."
+    "text": "Seleziona Colore:"
   },
   {
     "scope": 9,
     "key": 455,
     "section": 0,
-    "text": "Stato Montaggio:"
+    "text": "🌡️ Sensore SHT40"
   },
   {
     "scope": 9,
     "key": 456,
     "section": 0,
-    "text": "💡 Striscia LED (WS2812)"
+    "text": "/* sensors */"
   },
   {
     "scope": 9,
     "key": 457,
     "section": 0,
-    "text": "Test Loopback: 0x55, 0xAA, 0x01"
-  },
-  {
-    "scope": 9,
-    "key": 457,
-    "section": 1,
-    "text": ", 0x07"
+    "text": "📡 Seriale RS232"
   },
   {
     "scope": 9,
     "key": 458,
     "section": 0,
-    "text": "Test Loopback/Echo"
+    "text": "📡 Seriale RS485"
   },
   {
     "scope": 9,
     "key": 459,
     "section": 0,
-    "text": "Test Loopback: invia pacchetto "
-  },
-  {
-    "scope": 9,
-    "key": 459,
-    "section": 1,
-    "text": "di prova"
+    "text": "<span>Canale:</span>"
   },
   {
     "scope": 9,
     "key": 460,
     "section": 0,
-    "text": "TEXT"
+    "text": "<span>Duty (%):</span><input ty"
+  },
+  {
+    "scope": 9,
+    "key": 460,
+    "section": 0,
+    "text": "pe='number' id='pwm_duty' value"
+  },
+  {
+    "scope": 9,
+    "key": 460,
+    "section": 0,
+    "text": "='50' min='0' max='100' style='"
+  },
+  {
+    "scope": 9,
+    "key": 460,
+    "section": 0,
+    "text": "width:60px'>"
   },
   {
     "scope": 9,
     "key": 461,
     "section": 0,
-    "text": "' + text + '"
+    "text": "<span>Freq (Hz):</span><input t"
+  },
+  {
+    "scope": 9,
+    "key": 461,
+    "section": 0,
+    "text": "ype='number' id='pwm_freq' valu"
+  },
+  {
+    "scope": 9,
+    "key": 461,
+    "section": 0,
+    "text": "e='1000' min='100' max='20000' "
+  },
+  {
+    "scope": 9,
+    "key": 461,
+    "section": 0,
+    "text": "style='width:80px'>"
   },
   {
     "scope": 9,
     "key": 462,
     "section": 0,
-    "text": "Ultime Letture"
+    "text": "<span id='sd_mounted_status' st"
+  },
+  {
+    "scope": 9,
+    "key": 462,
+    "section": 0,
+    "text": "yle='font-weight:bold'>--</span"
+  },
+  {
+    "scope": 9,
+    "key": 462,
+    "section": 0,
+    "text": "></div>"
   },
   {
     "scope": 9,
     "key": 463,
     "section": 0,
-    "text": "Ultimo Errore:"
+    "text": "<span>Luminosità:</span><input"
+  },
+  {
+    "scope": 9,
+    "key": 463,
+    "section": 0,
+    "text": " type='range' id='led_bright' m"
+  },
+  {
+    "scope": 9,
+    "key": 463,
+    "section": 0,
+    "text": "in='0' max='100' value='50' oni"
+  },
+  {
+    "scope": 9,
+    "key": 463,
+    "section": 0,
+    "text": "nput='updateLedRealtime()' styl"
+  },
+  {
+    "scope": 9,
+    "key": 463,
+    "section": 0,
+    "text": "e='width:100px'>"
   },
   {
     "scope": 9,
     "key": 464,
     "section": 0,
-    "text": "Uscite (Chip 0x43)"
+    "text": "Stato GPIO in lettura..."
   },
   {
     "scope": 9,
     "key": 465,
     "section": 0,
-    "text": "Valori Correnti:"
+    "text": "Stato Montaggio:"
   },
   {
     "scope": 9,
     "key": 466,
+    "section": 0,
+    "text": "💡 Striscia LED (WS2812)"
+  },
+  {
+    "scope": 9,
+    "key": 467,
+    "section": 0,
+    "text": "Test Loopback: 0x55, 0xAA, 0x01"
+  },
+  {
+    "scope": 9,
+    "key": 467,
+    "section": 0,
+    "text": ", 0x07"
+  },
+  {
+    "scope": 9,
+    "key": 468,
+    "section": 0,
+    "text": "Test Loopback/Echo"
+  },
+  {
+    "scope": 9,
+    "key": 469,
+    "section": 0,
+    "text": "Test Loopback: invia pacchetto "
+  },
+  {
+    "scope": 9,
+    "key": 469,
+    "section": 0,
+    "text": "di prova"
+  },
+  {
+    "scope": 9,
+    "key": 470,
+    "section": 0,
+    "text": "TEXT"
+  },
+  {
+    "scope": 9,
+    "key": 471,
+    "section": 0,
+    "text": "' + text + '"
+  },
+  {
+    "scope": 9,
+    "key": 472,
+    "section": 0,
+    "text": "Ultime Letture"
+  },
+  {
+    "scope": 9,
+    "key": 473,
+    "section": 0,
+    "text": "Ultimo Errore:"
+  },
+  {
+    "scope": 9,
+    "key": 474,
+    "section": 0,
+    "text": "Uscite (Chip 0x43)"
+  },
+  {
+    "scope": 9,
+    "key": 475,
+    "section": 0,
+    "text": "Valori Correnti:"
+  },
+  {
+    "scope": 9,
+    "key": 476,
     "section": 0,
     "text": "WEB_UI_TEST_PAGE"
   }

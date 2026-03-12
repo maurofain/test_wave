@@ -612,9 +612,9 @@ static void ntp_task(void *arg)
             ESP_LOGI(TAG, "[NTP] Checking NTP sync...");
             esp_err_t ret = init_sync_ntp();
             if (ret == ESP_OK) {
-                ESP_LOGI(TAG, "[NTP] NTP sync successful");
+                ESP_LOGI(TAG, "[NTP] NTP sync request sent (completamento asincrono)");
             } else {
-                ESP_LOGW(TAG, "[NTP] NTP sync failed");
+                ESP_LOGW(TAG, "[NTP] NTP sync request failed");
             }
         } else {
             ESP_LOGD(TAG, "[NTP] NTP disabled in configuration");

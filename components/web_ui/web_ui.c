@@ -1032,6 +1032,10 @@ esp_err_t api_config_get(httpd_req_t *req)
     device_config_t *cfg = device_config_get();
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "device_name", cfg->device_name);
+    cJSON_AddStringToObject(root, "location_name", cfg->location_name);
+    cJSON_AddNumberToObject(root, "num_programs", cfg->num_programs ? cfg->num_programs : 10);
+    cJSON_AddNumberToObject(root, "latitude",  cfg->latitude);
+    cJSON_AddNumberToObject(root, "longitude", cfg->longitude);
     
     cJSON *eth = cJSON_CreateObject();
     cJSON_AddBoolToObject(eth, "enabled", cfg->eth.enabled);
@@ -1359,7 +1363,8 @@ esp_err_t api_config_backup(httpd_req_t *req)
     device_config_t *cfg = device_config_get();
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "device_name", cfg->device_name);
-    
+    cJSON_AddStringToObject(root, "location_name", cfg->location_name);
+
     cJSON *eth = cJSON_CreateObject();
     cJSON_AddBoolToObject(eth, "enabled", cfg->eth.enabled);
     cJSON_AddBoolToObject(eth, "dhcp_enabled", cfg->eth.dhcp_enabled);
@@ -1525,6 +1530,26 @@ esp_err_t api_config_save(httpd_req_t *req)
 
     cJSON *name_obj = cJSON_GetObjectItem(root, "device_name");
     if (name_obj && name_obj->valuestring) strncpy(cfg->device_name, name_obj->valuestring, sizeof(cfg->device_name)-1);
+    cJSON *loc_obj = cJSON_GetObjectItem(root, "location_name");
+    if (loc_obj && loc_obj->valuestring) strncpy(cfg->location_name, loc_obj->valuestring, sizeof(cfg->location_name)-1);
+
+    /* [C] Numero pulsanti programma (valori ammessi: 1,2,4,6,8,10) */
+    cJSON *num_prog_obj = cJSON_GetObjectItem(root, "num_programs");
+    if (num_prog_obj && cJSON_IsNumber(num_prog_obj)) {
+        static const uint8_t s_valid_np[] = {1, 2, 4, 6, 8, 10};
+        uint8_t np = (uint8_t)num_prog_obj->valueint;
+        bool np_ok = false;
+        for (int _i = 0; _i < (int)(sizeof(s_valid_np)/sizeof(s_valid_np[0])); _i++) {
+            if (s_valid_np[_i] == np) { np_ok = true; break; }
+        }
+        cfg->num_programs = np_ok ? np : 10;
+    }
+
+    /* [C] Coordinate geografiche impianto */
+    cJSON *lat_obj = cJSON_GetObjectItem(root, "latitude");
+    if (lat_obj && cJSON_IsNumber(lat_obj)) cfg->latitude  = lat_obj->valuedouble;
+    cJSON *lon_obj = cJSON_GetObjectItem(root, "longitude");
+    if (lon_obj && cJSON_IsNumber(lon_obj)) cfg->longitude = lon_obj->valuedouble;
     
     cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
     if (eth_obj) {

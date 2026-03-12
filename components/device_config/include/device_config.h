@@ -13,6 +13,8 @@ typedef struct {
     char ip[16];           ///< Indirizzo IP statico
     char subnet[16];       ///< Subnet mask
     char gateway[16];      ///< Gateway
+    char dns1[16];         ///< DNS primario
+    char dns2[16];         ///< DNS secondario
 } device_eth_config_t;
 
 /**
@@ -183,7 +185,11 @@ typedef struct {
  */
 typedef struct {
     char device_name[32];       ///< Nome del dispositivo
+    char location_name[64];     ///< Nome dell'impianto / locale commerciale
     bool updated;               ///< Indica se la configurazione è stata aggiornata
+    uint8_t  num_programs;      ///< Numero pulsanti programma sul pannello (valori ammessi: 1,2,4,6,8,10)
+    double   latitude;          ///< Latitudine geografica impianto (gradi decimali, -90..+90)
+    double   longitude;         ///< Longitudine geografica impianto (gradi decimali, -180..+180)
     device_eth_config_t eth;
     device_wifi_config_t wifi;
     bool ntp_enabled;           ///< NTP abilitato

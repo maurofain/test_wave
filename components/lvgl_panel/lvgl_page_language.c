@@ -153,6 +153,15 @@ void lvgl_page_language_show(void)
     lv_obj_t *scr = lv_scr_act();
 
     lvgl_page_main_deactivate();
+
+    /* [C] Ferma il timer chrome e resetta indev prima di distruggere gli oggetti */
+    lvgl_page_chrome_remove();
+    lv_indev_t *indev_lg = lv_indev_get_next(NULL);
+    while (indev_lg) {
+        lv_indev_reset(indev_lg, NULL);
+        indev_lg = lv_indev_get_next(indev_lg);
+    }
+
     lv_obj_clean(scr);
 
     lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);

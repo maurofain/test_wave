@@ -948,6 +948,8 @@ static void ntp_sync_callback(struct timeval *tv)
 /* forward declarations */
 static void init_sntp(void);
 
+static bool s_sntp_initialized = false;  /* [C] Flag: init_sntp() già chiamato */
+
 
 /**
  * @brief Inizializza il servizio SNTP.
@@ -965,22 +967,18 @@ static void init_sntp(void)
     esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, cfg->ntp.server1);
     esp_sntp_setservername(1, cfg->ntp.server2);
-    
+
     // Imposta la callback da chiamare alla sincronizzazione NTP riuscita
     esp_sntp_set_time_sync_notification_cb(ntp_sync_callback);
-    
+
     esp_sntp_init();
 
-    // Imposta la modalità di sincronizzazione su "immediata" per velocizzare la sync iniziale
+    // Imposta modalità e intervallo dopo init() (come nell'implementazione originale)
     sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
+    sntp_set_sync_interval(300000);  /* 5 min — tentativi iniziali frequenti */
 
-    // Avvia con intervallo di 5 minuti per i tentativi di sincronizzazione iniziali
-    sntp_set_sync_interval(300000);
-
+    s_sntp_initialized = true;
     ESP_LOGI(TAG, "[NTP] SNTP inizializzato - la sincronizzazione avverrà in background");
-
-    // Nota: rimosso il loop di attesa bloccante — la sincronizzazione NTP è asincrona
-    // Il sistema può proseguire l'inizializzazione mentre NTP si sincronizza in background
 }
 
 /**
@@ -1006,19 +1004,28 @@ esp_err_t init_sync_ntp(void)
         return ESP_FAIL;
     }
 
-    /* check_internet_access() rimosso: la connessione HTTP(S) esaurisce lo heap
-     * per l'init mbedTLS. SNTP è UDP e gestisce internamente le retry — inutile
-     * verificare la connettività prima. */
     ESP_LOGI(TAG, "[NTP] Forcing NTP synchronization...");
-    
-    // Riavvia SNTP per forzare la sincronizzazione
+
+    // Se SNTP non è mai stato inizializzato (es. ip_event non ricevuto), inizializza ora
+    if (!s_sntp_initialized) {
+        ESP_LOGW(TAG, "[NTP] SNTP non ancora inizializzato — eseguo init");
+        init_sntp();
+        ESP_LOGI(TAG, "[NTP] Richiesta inviata — completamento in background");
+        return ESP_OK;
+    }
+
+    // Controlla se già sincronizzato
+    sntp_sync_status_t status = sntp_get_sync_status();
+    if (status == SNTP_SYNC_STATUS_COMPLETED) {
+        ESP_LOGI(TAG, "[NTP] Ora già sincronizzata, skip restart");
+        return ESP_OK;
+    }
+
+    // SNTP già inizializzato: forza un nuovo tentativo
     esp_sntp_restart();
-    
-    ESP_LOGI(TAG, "[NTP] Richiesta di sincronizzazione inviata — completamento in background");
-    
-    // Nota: rimosso il wait bloccante — la sincronizzazione è asincrona
-    // L'interfaccia web può interrogare lo stato se necessario
-    
+
+    ESP_LOGI(TAG, "[NTP] Richiesta di sincronizzazione inviata (status=%d) — completamento in background", (int)status);
+
     return ESP_OK;
 }
 
@@ -1306,7 +1313,27 @@ static esp_err_t start_ethernet(void)
         ip_info.gw.addr = ipaddr_addr(cfg->eth.gateway);
         ip_info.netmask.addr = ipaddr_addr(cfg->eth.subnet);
         esp_netif_set_ip_info(s_netif_eth, &ip_info);
-        ESP_LOGI(TAG, "[M] Ethernet IP statico: %s", cfg->eth.ip);
+        
+        // Imposta i server DNS quando si usa IP statico
+        esp_netif_dns_info_t dns_info;
+        if (strlen(cfg->eth.dns1) > 0) {
+            dns_info.ip.u_addr.ip4.addr = ipaddr_addr(cfg->eth.dns1);
+        } else {
+            dns_info.ip.u_addr.ip4.addr = ipaddr_addr("8.8.8.8");  // Google DNS default
+        }
+        dns_info.ip.type = ESP_IPADDR_TYPE_V4;
+        esp_netif_set_dns_info(s_netif_eth, ESP_NETIF_DNS_MAIN, &dns_info);
+        
+        if (strlen(cfg->eth.dns2) > 0) {
+            dns_info.ip.u_addr.ip4.addr = ipaddr_addr(cfg->eth.dns2);
+        } else {
+            dns_info.ip.u_addr.ip4.addr = ipaddr_addr("8.8.4.4");  // Google DNS secondary default
+        }
+        esp_netif_set_dns_info(s_netif_eth, ESP_NETIF_DNS_BACKUP, &dns_info);
+        
+        ESP_LOGI(TAG, "[M] Ethernet IP statico: %s, DNS: %s, %s", cfg->eth.ip, 
+                 strlen(cfg->eth.dns1) > 0 ? cfg->eth.dns1 : "8.8.8.8",
+                 strlen(cfg->eth.dns2) > 0 ? cfg->eth.dns2 : "8.8.4.4");
     }
 
     // Start Ethernet driver (come nel progetto factory)

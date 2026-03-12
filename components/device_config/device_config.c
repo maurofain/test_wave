@@ -648,6 +648,12 @@ static void _set_defaults(device_config_t *config)
 
     // Nome dispositivo
     strncpy(config->device_name, "TestWave-Device", sizeof(config->device_name) - 1);
+    strncpy(config->location_name, "", sizeof(config->location_name) - 1);
+
+    // Numero pulsanti programma e coordinate geografiche
+    config->num_programs = 10;   /* default: 10 programmi (2 colonne x 5 righe) */
+    config->latitude     = 0.0;
+    config->longitude    = 0.0;
 
     // Default Ethernet
     config->eth.enabled = true;
@@ -655,6 +661,8 @@ static void _set_defaults(device_config_t *config)
     strncpy(config->eth.ip, "192.168.1.100", sizeof(config->eth.ip) - 1);
     strncpy(config->eth.subnet, "255.255.255.0", sizeof(config->eth.subnet) - 1);
     strncpy(config->eth.gateway, "192.168.1.1", sizeof(config->eth.gateway) - 1);
+    strncpy(config->eth.dns1, "8.8.8.8", sizeof(config->eth.dns1) - 1);
+    strncpy(config->eth.dns2, "8.8.4.4", sizeof(config->eth.dns2) - 1);
 
     // Default WiFi
     config->wifi.sta_enabled = false;
@@ -1073,6 +1081,26 @@ esp_err_t device_config_load(device_config_t *config)
             // Nome dispositivo
             cJSON *name = cJSON_GetObjectItem(root, "device_name");
             if (name && name->valuestring) strncpy(config->device_name, name->valuestring, sizeof(config->device_name) - 1);
+            cJSON *loc = cJSON_GetObjectItem(root, "location_name");
+            if (loc && loc->valuestring) strncpy(config->location_name, loc->valuestring, sizeof(config->location_name) - 1);
+
+                // Numero pulsanti programma (valori ammessi: 1,2,4,6,8,10)
+                cJSON *num_prog_j = cJSON_GetObjectItem(root, "num_programs");
+                if (num_prog_j && cJSON_IsNumber(num_prog_j)) {
+                    static const uint8_t valid_np[] = {1, 2, 4, 6, 8, 10};
+                    uint8_t np = (uint8_t)num_prog_j->valueint;
+                    bool ok = false;
+                    for (int _i = 0; _i < (int)(sizeof(valid_np)/sizeof(valid_np[0])); _i++) {
+                        if (valid_np[_i] == np) { ok = true; break; }
+                    }
+                    config->num_programs = ok ? np : 10;
+                }
+
+                // Coordinate geografiche impianto
+                cJSON *lat_j = cJSON_GetObjectItem(root, "latitude");
+                if (lat_j && cJSON_IsNumber(lat_j)) config->latitude  = lat_j->valuedouble;
+                cJSON *lon_j = cJSON_GetObjectItem(root, "longitude");
+                if (lon_j && cJSON_IsNumber(lon_j)) config->longitude = lon_j->valuedouble;
 
                 // Analisi config Ethernet
                 cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
@@ -1085,6 +1113,10 @@ esp_err_t device_config_load(device_config_t *config)
                     if (subnet && subnet->valuestring) strncpy(config->eth.subnet, subnet->valuestring, sizeof(config->eth.subnet) - 1);
                     cJSON *gateway = cJSON_GetObjectItem(eth_obj, "gateway");
                     if (gateway && gateway->valuestring) strncpy(config->eth.gateway, gateway->valuestring, sizeof(config->eth.gateway) - 1);
+                    cJSON *dns1 = cJSON_GetObjectItem(eth_obj, "dns1");
+                    if (dns1 && dns1->valuestring) strncpy(config->eth.dns1, dns1->valuestring, sizeof(config->eth.dns1) - 1);
+                    cJSON *dns2 = cJSON_GetObjectItem(eth_obj, "dns2");
+                    if (dns2 && dns2->valuestring) strncpy(config->eth.dns2, dns2->valuestring, sizeof(config->eth.dns2) - 1);
                 }
 
                 // Analisi config WiFi
@@ -1387,6 +1419,12 @@ char* device_config_to_json(const device_config_t *config)
 
     // Nome dispositivo
     cJSON_AddStringToObject(root, "device_name", config->device_name);
+    cJSON_AddStringToObject(root, "location_name", config->location_name);
+
+    // Numero programmi e coordinate geografiche
+    cJSON_AddNumberToObject(root, "num_programs", config->num_programs);
+    cJSON_AddNumberToObject(root, "latitude",     config->latitude);
+    cJSON_AddNumberToObject(root, "longitude",    config->longitude);
 
     // Ethernet
     cJSON *eth_obj = cJSON_CreateObject();
@@ -1395,6 +1433,8 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddStringToObject(eth_obj, "ip", config->eth.ip);
     cJSON_AddStringToObject(eth_obj, "subnet", config->eth.subnet);
     cJSON_AddStringToObject(eth_obj, "gateway", config->eth.gateway);
+    cJSON_AddStringToObject(eth_obj, "dns1", config->eth.dns1);
+    cJSON_AddStringToObject(eth_obj, "dns2", config->eth.dns2);
     cJSON_AddItemToObject(root, "eth", eth_obj);
 
     // WiFi
