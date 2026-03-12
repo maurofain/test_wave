@@ -179,7 +179,7 @@ void lvgl_page_language_show(void)
     const int32_t btn_h = 150;
     const int32_t gap = 14;
     const int32_t start_y = 120;
-    const uint32_t flag_scale = 768;
+    const uint32_t flag_scale = 256;
     const int32_t flag_x = 30;
     const int32_t label_x = 136;
 

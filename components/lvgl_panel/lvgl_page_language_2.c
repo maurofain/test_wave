@@ -156,7 +156,7 @@ void lvgl_page_language_2_show(void)
     if (active_opt->code) {
         lv_obj_t *lang_img = lv_image_create(scr);
         lv_image_set_src(lang_img, get_flag_src_for_language(active_opt->code));
-        lv_image_set_scale(lang_img, 1024);
+        lv_image_set_scale(lang_img, 256);
         lv_obj_align(lang_img, LV_ALIGN_TOP_RIGHT, -34, 42);
     }
 
@@ -192,7 +192,7 @@ void lvgl_page_language_2_show(void)
         if (opt->code) {
             lv_obj_t *img = lv_image_create(btn);
             lv_image_set_src(img, get_flag_src_for_language(opt->code));
-            lv_image_set_scale(img, 1536);
+            lv_image_set_scale(img, 256);
             lv_obj_align(img, LV_ALIGN_RIGHT_MID, 0, 0);
         }
 

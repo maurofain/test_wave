@@ -681,7 +681,7 @@ static void build_header(lv_obj_t *scr)
     /* Crea l'immagine della bandiera all'interno del pulsante */
     s_flag_img = lv_image_create(s_language_flag_btn);
     lv_image_set_src(s_flag_img, get_flag_src_for_language(s_current_language));
-    lv_image_set_scale(s_flag_img, 1024);
+    lv_image_set_scale(s_flag_img, 256);
     lv_obj_center(s_flag_img);
 
     ESP_LOGI(TAG, "[H] Bandiera lingua creata in alto a destra, linguaggio: %s", s_current_language);

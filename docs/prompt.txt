@@ -27,8 +27,9 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [V]all'attivazione della pagina programmi inviamo una sequenza CCTALK come quella inviata dal tasto /test/cctalk -> Abilita (Start CCTALK)
 [ ] La bandierina della lingua selezionata (in alto a dx) va inclusa assieme a ora e cerchietti e va abbassata di 30px
 [ ] Ti carico l'immagine della nuova scheda scelta programmi da creare in un file lvgl_page_programmi.c : non c'è più la barra che scende con il passare del tempo in zona centrale ma sopra la zona che mostra i crediti, e cambia colore quando mancano 15 secondi alla fine del programma
-[ ] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2, 4, 6, 8, 10 .Nel caso di 1 programma occuperà tutto lo spazio previsto per i pulsanti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità
-
+[ ] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2, 4, 6, 8, 10 .Nel caso di 1 programma occuperà tutto lo spazio previsto per i pulsanti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità. In questa sezione mettiamo anche due input per le coordinate geografiche della posizione dell'impianto
+[ ] Rigenera le immagini delle bandierine con la trasparenza con LV_IMG_CF_TRUE_COLOR_ALPHA
+[ ] La gestione della striscia LED deve prevedere che ci sono 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione)
 ------------------
 I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
 I (19254) APP: [F] [M] Cmd1 - Address Poll: OK

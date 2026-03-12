@@ -21,6 +21,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <time.h>
 #include "cJSON.h"
 
 #ifndef DNA_LED_STRIP
@@ -438,7 +439,16 @@ static void fsm_task(void *arg)
         alive_ms += elapsed_ms;
         if (alive_ms >= ALIVE_INTERVAL_MS) {
             alive_ms = 0;
-            ESP_LOGI(TAG, "[FSM] Alive: state=%s credit=%ldc heap=%lu",
+            char now_buf[24] = "--/--/---- --:--:--";
+            time_t now = time(NULL);
+            if (now != (time_t)-1) {
+                struct tm ti;
+                localtime_r(&now, &ti);
+                strftime(now_buf, sizeof(now_buf), "%d/%m/%Y %H:%M:%S", &ti);
+            }
+
+            ESP_LOGI(TAG, "[FSM] Alive: now=%s state=%s credit=%ldc heap=%lu",
+                     now_buf,
                      fsm_state_to_string(fsm.state),
                      (long)fsm.credit_cents,
                      (unsigned long)esp_get_free_heap_size());
