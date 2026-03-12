@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "lvgl_page_main.c" "lvgl_page_ads.c"
+    SRCS "lvgl_page_ads.c"
          "GoogleSans35.c"
          "GoogleSans40.c"
          "GoogleSans50.c"
