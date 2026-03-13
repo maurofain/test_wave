@@ -95,5 +95,5 @@ i18n_editor/
 
 ## Note
 
-- I file Python precedenti restano nel repository come riferimento, ma l'avvio standard ora è Electron.
+- I file Python legacy sono stati archiviati in `i18n_editor/legacy_py`; l'avvio standard resta Electron.
 - In caso di errori traduzione, verificare endpoint/configurazione del servizio impostato.
