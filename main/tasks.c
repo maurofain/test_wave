@@ -1705,6 +1705,17 @@ void tasks_apply_n_run(void)
         if (strcmp(t->name, "io_expander") == 0 && !cfg->sensors.io_expander_enabled) {
             t->state = TASK_STATE_IDLE;
         }
+        
+        // Forza stato idle/running su usb_scanner in base alla configurazione
+        if (strcmp(t->name, "usb_scanner") == 0) {
+            if (cfg->scanner.enabled) {
+                t->state = TASK_STATE_RUN;
+                ESP_LOGI(TAG, "[M] Task %s forzato RUN (scanner.enabled=true)", t->name);
+            } else {
+                t->state = TASK_STATE_IDLE;
+                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (scanner.enabled=false)", t->name);
+            }
+        }
 
         if (t->state == TASK_STATE_RUN) {
             if (t->handle == NULL) {

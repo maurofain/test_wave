@@ -248,6 +248,13 @@ esp_err_t device_config_save(const device_config_t *config);
 char* device_config_to_json(const device_config_t *config);
 
 /**
+ * @brief Aggiorna la configurazione corrente da una stringa JSON
+ * @param json_str Stringa JSON con la configurazione
+ * @return ESP_OK se riuscito, ESP_FAIL altrimenti
+ */
+esp_err_t device_config_update_from_json(const char *json_str);
+
+/**
  * @brief Legge il JSON configurazione direttamente da EEPROM (senza fallback NVS)
  * @return Stringa JSON allocata (da liberare con free()) oppure NULL se EEPROM non valida/non disponibile
  */

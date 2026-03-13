@@ -1080,6 +1080,7 @@ esp_err_t device_config_load(device_config_t *config)
 
     if (json_str) {
         bool parse_ok = false;
+        ESP_LOGI(TAG, "[CONFIG] Loading JSON config (%zu bytes): %s", strlen(json_str), json_str);
         cJSON *root = cJSON_Parse(json_str);
         if (root) {
             parse_ok = true;
@@ -1228,7 +1229,16 @@ esp_err_t device_config_load(device_config_t *config)
                 cJSON *scanner_obj = cJSON_GetObjectItem(root, "scanner");
                 if (scanner_obj) {
                     cJSON *_sc_en = cJSON_GetObjectItem(scanner_obj, "en"); if (!_sc_en) _sc_en = cJSON_GetObjectItem(scanner_obj, "enabled");
+                    if (_sc_en) {
+                        ESP_LOGI(TAG, "[CONFIG] scanner._sc_en found - type: %d, valueint: %d, valuedouble: %f", 
+                                 _sc_en->type, _sc_en->valueint, _sc_en->valuedouble);
+                        ESP_LOGI(TAG, "[CONFIG] cJSON_IsTrue result: %d, cJSON_IsBool: %d", 
+                                 cJSON_IsTrue(_sc_en), cJSON_IsBool(_sc_en));
+                    } else {
+                        ESP_LOGI(TAG, "[CONFIG] scanner._sc_en is NULL!");
+                    }
                     config->scanner.enabled = cJSON_IsTrue(_sc_en);
+                    ESP_LOGI(TAG, "[CONFIG] scanner.enabled FINAL VALUE: %d", config->scanner.enabled);
                     cJSON *vid = cJSON_GetObjectItem(scanner_obj, "vid");
                     cJSON *pid = cJSON_GetObjectItem(scanner_obj, "pid");
                     cJSON *dual = cJSON_GetObjectItem(scanner_obj, "dpid"); if (!dual) dual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
@@ -1239,6 +1249,8 @@ esp_err_t device_config_load(device_config_t *config)
                     if (cooldown && cJSON_IsNumber(cooldown) && cooldown->valueint > 0) {
                         config->scanner.cooldown_ms = (uint32_t)cooldown->valueint;
                     }
+                } else {
+                    ESP_LOGI(TAG, "[CONFIG] scanner section not found in JSON");
                 }
 
                 // Analisi timeout applicativi

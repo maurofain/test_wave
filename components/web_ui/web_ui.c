@@ -1848,7 +1848,10 @@ esp_err_t api_config_save(httpd_req_t *req)
     // Scanner configuration (API save)
     cJSON *scanner_obj = cJSON_GetObjectItem(root, "scanner");
     if (scanner_obj) {
-        cfg->scanner.enabled = cJSON_IsTrue(cJSON_GetObjectItem(scanner_obj, "enabled"));
+        cJSON *_sc_en = cJSON_GetObjectItem(scanner_obj, "en");
+        if (!_sc_en) _sc_en = cJSON_GetObjectItem(scanner_obj, "enabled");
+        cfg->scanner.enabled = cJSON_IsTrue(_sc_en);
+        ESP_LOGI(TAG, "[CONFIG] Scanner enabled set to: %d (from web UI)", cfg->scanner.enabled);
         cJSON *sv = cJSON_GetObjectItem(scanner_obj, "vid");
         if (sv) {
             if (cJSON_IsNumber(sv)) cfg->scanner.vid = (uint16_t)sv->valueint;
