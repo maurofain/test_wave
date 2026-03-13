@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>i18n Editor (Electron)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="theme-light">
+    <div class="app-shell">
+      <header class="top-panel">
+        <div class="top-row">
+          <div class="field-group">
+            <label for="scope-select">Scope</label>
+            <select id="scope-select"></select>
+          </div>
+
+          <label class="toggle-group">
+            <input id="auto-translate-toggle" type="checkbox" />
+            <span>Traduzione automatica</span>
+          </label>
+
+          <label class="toggle-group">
+            <input id="theme-toggle" type="checkbox" />
+            <span>Tema scuro</span>
+          </label>
+
+          <div class="meta" id="scope-meta"></div>
+        </div>
+
+        <div class="top-row">
+          <div class="field-group search-group">
+            <label for="search-input">Ricerca</label>
+            <input id="search-input" type="text" placeholder="Cerca in tutti gli scope e lingue" />
+          </div>
+
+          <button id="search-btn" class="btn btn-neutral">Cerca</button>
+          <button id="prev-btn" class="btn btn-neutral" disabled>&lt;</button>
+          <button id="next-btn" class="btn btn-neutral" disabled>&gt;</button>
+          <div id="search-status" class="meta"></div>
+
+          <div class="spacer"></div>
+
+          <button id="save-btn" class="btn btn-success">💾 Salva</button>
+        </div>
+      </header>
+
+      <main class="main-panel">
+        <div class="meta-bar" id="rows-info"></div>
+
+        <div class="table-wrapper">
+          <table id="i18n-table">
+            <thead>
+              <tr id="table-head-row"></tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </main>
+
+      <footer class="footer" id="footer-info"></footer>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="renderer.js"></script>
+  </body>
+  </html>

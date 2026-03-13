@@ -1,0 +1,16 @@
+{
+  "name": "i18n-editor-electron",
+  "version": "2.0.0",
+  "description": "Editor i18n multilingua per MicroHard basato su Electron",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "electron": "^32.2.0"
+  }
+}

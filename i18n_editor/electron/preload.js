@@ -1,0 +1,11 @@
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("editorApi", {
+  init: () => ipcRenderer.invoke("editor:init"),
+  getScopeData: (scope) => ipcRenderer.invoke("editor:get-scope-data", scope),
+  updateTranslation: (payload) => ipcRenderer.invoke("editor:update-translation", payload),
+  search: (searchText) => ipcRenderer.invoke("editor:search", searchText),
+  save: () => ipcRenderer.invoke("editor:save"),
+  setTranslatorEnabled: (enabled) => ipcRenderer.invoke("editor:set-translator-enabled", enabled),
+  translate: (payload) => ipcRenderer.invoke("editor:translate", payload),
+});
