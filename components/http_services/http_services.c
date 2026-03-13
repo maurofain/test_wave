@@ -993,7 +993,7 @@ static esp_err_t api_login_post(httpd_req_t *req)
  */
 static esp_err_t api_keepalive_post(httpd_req_t *req)
 {
-    if (send_http_log) ESP_LOGI(TAG, "POST /api/keepalive -> processing request");
+    ESP_LOGI(TAG, "[C] POST /api/keepalive -> processing request");
 
     // Extract the Authorization header (dynamic length to support long JWT)
     size_t auth_len = httpd_req_get_hdr_value_len(req, "Authorization");

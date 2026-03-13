@@ -43,6 +43,7 @@ GLOBAL_FETCH_WRAPPER = (
     "window.fetch = function(input, init){ try{ const token = window.getAuthToken(); if(token){ init = init || {}; if(!init.headers){ init.headers = {'Authorization':'Bearer '+token}; } else if(init.headers instanceof Headers){ if(!init.headers.get('Authorization')) init.headers.set('Authorization','Bearer '+token); } else if(Array.isArray(init.headers)){ let has=false; for(const h of init.headers){ if(h[0].toLowerCase()==='authorization'){ has=true; break; } } if(!has) init.headers.push(['Authorization','Bearer '+token]); } else if(typeof init.headers==='object'){ if(!init.headers['Authorization'] && !init.headers['authorization']) init.headers['Authorization'] = 'Bearer '+token; } } }catch(e){} return _fetch(input, init); };"
     "window.goProtectedPath=function(path){window.location.href=path;return false;};"
     "(function(){function tc(){var e=document.getElementById('hdr_clock');if(e)e.textContent=new Date().toTimeString().slice(0,8);}tc();setInterval(tc,1000);})();"
+    "(function(){var e=document.getElementById('build_info');if(!e)return;fetch('/api/version',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(d){if(!d)return;var ts=d.build_timestamp||d.date||'';e.textContent='v'+(d.version||'?')+(ts?(' ('+ts+')'):'');}).catch(function(){e.textContent='v?';});})();"
     # Aggiorna dinamicamente l'etichetta partizione nell'header leggendo /status
     "(function(){fetch('/status',{cache:'no-store'}).then(function(r){return r.json();}).then(function(s){var el=document.getElementById('hdr_run_mode');if(el&&s&&s.partition_running)el.textContent=s.partition_running.toUpperCase();}).catch(function(){});})();"
     "})();</script>"
@@ -301,11 +302,7 @@ def build_head(
         + "</span></h1>"
         + emu_button
         + "</div>"
-        + "<div style='text-align:right;font-size:12px;opacity:0.8;'>v"
-        + html.escape(args.version)
-        + " ("
-        + html.escape(args.build_date)
-        + ")</div>"
+        + "<div id='build_info' style='text-align:right;font-size:12px;opacity:0.8;'>--</div>"
         + "</header>"
         + nav_html
         + GLOBAL_FETCH_WRAPPER

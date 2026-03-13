@@ -2001,6 +2001,10 @@ void init_i2c_and_io_expander(void) {
     }
     ESP_LOGI(TAG, "[M] [IOX] I/O Expander inizializzato correttamente");
 
+    ESP_LOGI(TAG, "************************************************************");
+    ESP_LOGI(TAG, "[M] Build v%s | APP_DATE=%s | COMPILER_TS=%s %s", APP_VERSION, APP_DATE, __DATE__, __TIME__);
+    ESP_LOGI(TAG, "************************************************************");
+
     // Log riepilogativo sezioni DNA mock attive
     {
         char dna[192] = "";

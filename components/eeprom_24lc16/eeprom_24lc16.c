@@ -14,6 +14,9 @@ static const char *TAG = "EEPROM";
 #define EEPROM_TOTAL_SIZE   2048
 #define EEPROM_WRITE_CYCLE_DELAY_MS 6
 #define EEPROM_INIT_CHECK_TIMEOUT_MS 30
+#define EEPROM_INIT_SCL_SPEED_HZ 50000
+#define EEPROM_PROBE_TIMEOUT_MS 100
+#define EEPROM_RW_TIMEOUT_MS 200
 
 static i2c_master_dev_handle_t s_eeprom_dev_handles[EEPROM_BLOCK_COUNT] = {0};
 static bool s_eeprom_available = false;
@@ -53,6 +56,24 @@ static i2c_master_dev_handle_t get_dev_handle_for_address(uint16_t address)
     return s_eeprom_dev_handles[block];
 }
 
+static esp_err_t detect_eeprom_address(i2c_master_bus_handle_t bus, uint8_t *detected_addr)
+{
+    if (bus == NULL || detected_addr == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    for (uint8_t addr = EEPROM_BASE_ADDR; addr < (EEPROM_BASE_ADDR + EEPROM_BLOCK_COUNT); addr++) {
+        esp_err_t ret = i2c_master_probe(bus, addr, EEPROM_PROBE_TIMEOUT_MS);
+        if (ret == ESP_OK) {
+            *detected_addr = addr;
+            ESP_LOGI("INIT", "[M] EEPROM init: dispositivo rilevato su 0x%02X", addr);
+            return ESP_OK;
+        }
+    }
+
+    return ESP_ERR_NOT_FOUND;
+}
+
 esp_err_t eeprom_24lc16_init(void) {
     ESP_LOGI("INIT", "[M] EEPROM init: INIZIO funzione");
     ESP_LOGI(TAG, "[M] EEPROM init: INIZIO funzione");
@@ -78,7 +99,16 @@ esp_err_t eeprom_24lc16_init(void) {
         return ESP_OK; // Non bloccante
     }
 
-    ESP_LOGI("INIT", "[M] EEPROM init: Utilizzo bus I2C periferiche (GPIO%d SCL, GPIO%d SDA)", CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
+    ESP_LOGI("INIT", "[M] EEPROM init: Utilizzo bus I2C periferiche (GPIO%d SCL, GPIO%d SDA)",
+             CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
+
+    uint8_t detected_addr = 0;
+    esp_err_t detect_ret = detect_eeprom_address(bus, &detected_addr);
+    if (detect_ret != ESP_OK) {
+        ESP_LOGW("INIT", "[M] EEPROM init: nessuna EEPROM rilevata tra 0x50 e 0x57 (%s)",
+                 esp_err_to_name(detect_ret));
+        return ESP_OK;
+    }
 
     for (uint8_t block = 0; block < EEPROM_BLOCK_COUNT; block++) {
         if (s_eeprom_dev_handles[block] != NULL) {
@@ -86,28 +116,37 @@ esp_err_t eeprom_24lc16_init(void) {
         }
 
         i2c_device_config_t dev_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
             .device_address = get_dev_addr_for_block(block),
-            .scl_speed_hz = CONFIG_APP_I2C_CLOCK_HZ,
+            .scl_speed_hz = EEPROM_INIT_SCL_SPEED_HZ,
+            .flags.disable_ack_check = false,
         };
 
         esp_err_t add_ret = i2c_master_bus_add_device(bus, &dev_cfg, &s_eeprom_dev_handles[block]);
         if (add_ret != ESP_OK) {
-            ESP_LOGW(TAG, "[C] Failed to add EEPROM block dev 0x%02X: %s",
+            ESP_LOGW("INIT", "[M] EEPROM init: fallita add_device su 0x%02X: %s",
                      get_dev_addr_for_block(block), esp_err_to_name(add_ret));
             cleanup_dev_handles();
             return ESP_OK; // Non bloccante
         }
     }
 
-    // Check presenza EEPROM con lettura reale (evita spam di timeout da i2c_master_probe)
+    // Check presenza EEPROM con lettura reale
+    uint8_t check_block = (uint8_t)(detected_addr - EEPROM_BASE_ADDR);
+    if (check_block >= EEPROM_BLOCK_COUNT || s_eeprom_dev_handles[check_block] == NULL) {
+        ESP_LOGW("INIT", "[M] EEPROM init: handle non valido per blocco %u", check_block);
+        cleanup_dev_handles();
+        return ESP_OK;
+    }
+
     uint8_t mem_addr = 0x00;
     uint8_t value = 0;
-    esp_err_t ret = i2c_master_transmit_receive(s_eeprom_dev_handles[0],
+    esp_err_t ret = i2c_master_transmit_receive(s_eeprom_dev_handles[check_block],
                                                 &mem_addr,
                                                 1,
                                                 &value,
                                                 1,
-                                                pdMS_TO_TICKS(EEPROM_INIT_CHECK_TIMEOUT_MS));
+                                                EEPROM_INIT_CHECK_TIMEOUT_MS);
     
     if (ret == ESP_OK) {
         s_eeprom_available = true;
@@ -119,7 +158,7 @@ esp_err_t eeprom_24lc16_init(void) {
         if (read_ret == ESP_OK) {
             ESP_LOGI("INIT", "[M] EEPROM TEST: Lettura locazione 400 -> valore originale: 0x%02X (%d)", original_value, original_value);
             
-            uint8_t modified_value = original_value ^ 256; // XOR con 256
+            uint8_t modified_value = (uint8_t)(original_value ^ 0xFF);
             ESP_LOGI("INIT", "[M] EEPROM TEST: Valore modificato (XOR 256): 0x%02X (%d)", modified_value, modified_value);
             
             esp_err_t write_ret = eeprom_24lc16_write_byte(400, modified_value);
@@ -189,7 +228,7 @@ esp_err_t eeprom_24lc16_read(uint16_t address, uint8_t *buffer, size_t length) {
         size_t can_read = 256 - mem_addr;
         size_t to_read = (left < can_read) ? left : can_read;
 
-        esp_err_t ret = i2c_master_transmit_receive(dev, &mem_addr, 1, ptr, to_read, pdMS_TO_TICKS(200));
+        esp_err_t ret = i2c_master_transmit_receive(dev, &mem_addr, 1, ptr, to_read, EEPROM_RW_TIMEOUT_MS);
         if (ret != ESP_OK) return ret;
 
         left -= to_read;
@@ -230,7 +269,7 @@ esp_err_t eeprom_24lc16_write(uint16_t address, const uint8_t *buffer, size_t le
         write_buf[0] = mem_addr;
         memcpy(&write_buf[1], ptr, to_write);
 
-        esp_err_t ret = i2c_master_transmit(dev, write_buf, to_write + 1, pdMS_TO_TICKS(100));
+        esp_err_t ret = i2c_master_transmit(dev, write_buf, to_write + 1, EEPROM_RW_TIMEOUT_MS);
         if (ret != ESP_OK) return ret;
 
         // Attesa ciclo interno EEPROM (datasheet max 5ms)

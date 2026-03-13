@@ -83,16 +83,8 @@ esp_err_t api_version_get(httpd_req_t *req)
         return ESP_FAIL;
     }
     
-    // Genera versione e data dinamiche
-    char version_info[64];
-    char date_info[64];
-    snprintf(version_info, sizeof(version_info), "%s (%s %s)", 
-             APP_VERSION, __DATE__, __TIME__);
-    snprintf(date_info, sizeof(date_info), "%s %s", 
-             APP_DATE, __TIME__);
-    
-    cJSON_AddStringToObject(root, "version", version_info);
-    cJSON_AddStringToObject(root, "date", date_info);
+    cJSON_AddStringToObject(root, "version", APP_VERSION);
+    cJSON_AddStringToObject(root, "build_timestamp", __DATE__ " " __TIME__);
     
     char *json_str = cJSON_PrintUnformatted(root);
     if (!json_str) {
@@ -2894,6 +2886,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     
     httpd_uri_t uri_status = {.uri = "/status", .method = HTTP_GET, .handler = status_get_handler};
     httpd_register_uri_handler(server, &uri_status);
+
+    httpd_uri_t uri_api_version = {.uri = "/api/version", .method = HTTP_GET, .handler = api_version_get};
+    httpd_register_uri_handler(server, &uri_api_version);
 
 #if DNA_SYS_MONITOR == 0
     httpd_uri_t uri_sysinfo = {.uri = "/api/sysinfo", .method = HTTP_GET, .handler = sysinfo_get_handler};

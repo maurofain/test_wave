@@ -3,6 +3,7 @@
 - per il sourcing di ESP-IDF si può usare get_idf 
 - per analizzare il funzionamento di idfc chiamare 'idfc -h'
 - per la compilazione usare `idfc -b`, flash `idfc -f`, per flash solo factory `idfc -ff`, per monitor `idfc -m`, per la sola partizione SPIFFS `idfc -fs`
+- i flag di idfc si possono concatenare
 - va gestito un blocco per la generazione del codice che deve inibire la modifica di funzioni marcate con //DO_NOT_MODIFY o di sezioni di codice racchiuse tra //DO_NOT_MODIFY and //DO_NOT_MODIFY_END : io indicherò l'operazione con `fai DNM a <file>` o `fai DNME a <file>`
 - Il markup/JS generato per le pagine ` /config ` e ` / ` (home) deve essere sempre racchiuso tra i marcatori `/* DO_NOT_MODIFY_START: <page> */` e `/* DO_NOT_MODIFY_END: <page> */` per impedire modifiche automatiche.
 - l'esecuzione degli script deve avvenire col path `/home/mauro/Progetti/0.Clienti/MicroHard/scripts`
