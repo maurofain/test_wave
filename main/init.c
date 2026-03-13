@@ -1983,7 +1983,8 @@ void init_i2c_and_io_expander(void) {
     ESP_LOGW(TAG, "[M] [I2C] CONFIG_BSP_I2C_NUM non definito: init bus I2C BSP non disponibile");
 #endif
     ESP_LOGI(TAG, "[M] [IOX] Avvio init Periferiche su bus I2C (port=%d SDA=%d SCL=%d)", CONFIG_APP_I2C_PORT,CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
-    periph_i2c_init();
+    esp_err_t periph_ret = periph_i2c_init();
+    ESP_LOGI(TAG, "[M] DEBUG: periph_i2c_init() ritornato con: %s", esp_err_to_name(periph_ret));
     
     // Inizializza EEPROM dopo che periph_i2c è pronto
     ESP_LOGI(TAG, "[M] Inizializzo EEPROM 24LC16 su periph_i2c (port=%d, GPIO%d SCL, GPIO%d SDA)",

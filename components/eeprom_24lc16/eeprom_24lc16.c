@@ -54,6 +54,7 @@ static i2c_master_dev_handle_t get_dev_handle_for_address(uint16_t address)
 }
 
 esp_err_t eeprom_24lc16_init(void) {
+    ESP_LOGI("INIT", "[M] EEPROM init: INIZIO funzione");
     ESP_LOGI(TAG, "[M] EEPROM init: INIZIO funzione");
     
     // Atendi che periph_i2c sia completamente inizializzato
@@ -70,12 +71,14 @@ esp_err_t eeprom_24lc16_init(void) {
     }
     
     s_eeprom_available = false;
+    ESP_LOGI("INIT", "[M] DEBUG: bus handle dopo retry = %p, retry_count=%d", bus, retry_count);
     if (bus == NULL) {
+        ESP_LOGW("INIT", "[M] EEPROM init: Periph I2C bus not initialized dopo %d tentativi", retry_count);
         ESP_LOGW(TAG, "[M] EEPROM init: Periph I2C bus not initialized dopo %d tentativi", retry_count);
         return ESP_OK; // Non bloccante
     }
 
-    ESP_LOGI(TAG, "[M] EEPROM init: Utilizzo bus I2C periferiche (GPIO%d SCL, GPIO%d SDA)", CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
+    ESP_LOGI("INIT", "[M] EEPROM init: Utilizzo bus I2C periferiche (GPIO%d SCL, GPIO%d SDA)", CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
 
     for (uint8_t block = 0; block < EEPROM_BLOCK_COUNT; block++) {
         if (s_eeprom_dev_handles[block] != NULL) {
@@ -108,52 +111,52 @@ esp_err_t eeprom_24lc16_init(void) {
     
     if (ret == ESP_OK) {
         s_eeprom_available = true;
-        ESP_LOGI(TAG, "[M] EEPROM init: 24LC16BT trovata e pronta");
+        ESP_LOGI("INIT", "[M] EEPROM init: 24LC16BT trovata e pronta");
         
         // Test EEPROM: leggi, modifica, verifica, ripristina byte alla locazione 400
         uint8_t original_value = 0;
         esp_err_t read_ret = eeprom_24lc16_read_byte(400, &original_value);
         if (read_ret == ESP_OK) {
-            ESP_LOGI(TAG, "[M] EEPROM TEST: Lettura locazione 400 -> valore originale: 0x%02X (%d)", original_value, original_value);
+            ESP_LOGI("INIT", "[M] EEPROM TEST: Lettura locazione 400 -> valore originale: 0x%02X (%d)", original_value, original_value);
             
             uint8_t modified_value = original_value ^ 256; // XOR con 256
-            ESP_LOGI(TAG, "[M] EEPROM TEST: Valore modificato (XOR 256): 0x%02X (%d)", modified_value, modified_value);
+            ESP_LOGI("INIT", "[M] EEPROM TEST: Valore modificato (XOR 256): 0x%02X (%d)", modified_value, modified_value);
             
             esp_err_t write_ret = eeprom_24lc16_write_byte(400, modified_value);
             if (write_ret == ESP_OK) {
-                ESP_LOGI(TAG, "[M] EEPROM TEST: Scrittura completata");
+                ESP_LOGI("INIT", "[M] EEPROM TEST: Scrittura completata");
                 
                 // Verifica lettura
                 uint8_t verify_value = 0;
                 esp_err_t verify_ret = eeprom_24lc16_read_byte(400, &verify_value);
                 if (verify_ret == ESP_OK) {
-                    ESP_LOGI(TAG, "[M] EEPROM TEST: Verifica lettura -> valore: 0x%02X (%d)", verify_value, verify_value);
+                    ESP_LOGI("INIT", "[M] EEPROM TEST: Verifica lettura -> valore: 0x%02X (%d)", verify_value, verify_value);
                     
                     if (verify_value == modified_value) {
-                        ESP_LOGI(TAG, "[M] EEPROM TEST: ✅ Verifica SUCCESSO - dato corretto");
+                        ESP_LOGI("INIT", "[M] EEPROM TEST: ✅ Verifica SUCCESSO - dato corretto");
                         
                         // Ripristina valore originale
                         esp_err_t restore_ret = eeprom_24lc16_write_byte(400, original_value);
                         if (restore_ret == ESP_OK) {
-                            ESP_LOGI(TAG, "[M] EEPROM TEST: ✅ Valore originale ripristinato con successo");
+                            ESP_LOGI("INIT", "[M] EEPROM TEST: ✅ Valore originale ripristinato con successo");
                         } else {
-                            ESP_LOGE(TAG, "[M] EEPROM TEST: ❌ Errore ripristino valore originale: %s", esp_err_to_name(restore_ret));
+                            ESP_LOGE("INIT", "[M] EEPROM TEST: ❌ Errore ripristino valore originale: %s", esp_err_to_name(restore_ret));
                         }
                     } else {
-                        ESP_LOGE(TAG, "[M] EEPROM TEST: ❌ Verifica FALLITA - atteso: 0x%02X, letto: 0x%02X", modified_value, verify_value);
+                        ESP_LOGE("INIT", "[M] EEPROM TEST: ❌ Verifica FALLITA - atteso: 0x%02X, letto: 0x%02X", modified_value, verify_value);
                     }
                 } else {
-                    ESP_LOGE(TAG, "[M] EEPROM TEST: ❌ Errore verifica lettura: %s", esp_err_to_name(verify_ret));
+                    ESP_LOGE("INIT", "[M] EEPROM TEST: ❌ Errore verifica lettura: %s", esp_err_to_name(verify_ret));
                 }
             } else {
-                ESP_LOGE(TAG, "[M] EEPROM TEST: ❌ Errore scrittura: %s", esp_err_to_name(write_ret));
+                ESP_LOGE("INIT", "[M] EEPROM TEST: ❌ Errore scrittura: %s", esp_err_to_name(write_ret));
             }
         } else {
-            ESP_LOGE(TAG, "[M] EEPROM TEST: ❌ Errore lettura iniziale: %s", esp_err_to_name(read_ret));
+            ESP_LOGE("INIT", "[M] EEPROM TEST: ❌ Errore lettura iniziale: %s", esp_err_to_name(read_ret));
         }
     } else {
         s_eeprom_available = false;
-        ESP_LOGW(TAG, "[M] EEPROM init: 24LC16BT non presente su indirizzo 0x%02X (%s)", EEPROM_BASE_ADDR, esp_err_to_name(ret));
+        ESP_LOGW("INIT", "[M] EEPROM init: 24LC16BT non presente su indirizzo 0x%02X (%s)", EEPROM_BASE_ADDR, esp_err_to_name(ret));
         cleanup_dev_handles();
     }
     return ESP_OK; 

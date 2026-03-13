@@ -1,8 +1,8 @@
 - il progetto gestisce 2 modalità di esecuzione: APP e FACTORY, compilate da base codice unica (`main/`) tramite flag `COMPILE_APP` in `main/app_version.h`. Le partizioni restano separate per OTA sicuro.
 - La app è multilingua e carica la tabella stringhe dai file in SPIFFS i18n_XX.json dove XX è il cofice lingua. Ogni tsto che appare nell'interfaccia web o nel pannello touch va tabellata
 - per il sourcing di ESP-IDF si può usare get_idf 
-- per la compilazione usare `idfc -b`, flash `idfc -f`, per flash solo factory `idfc -f -o f`, per monitor `idfc -m`
 - per analizzare il funzionamento di idfc chiamare 'idfc -h'
+- per la compilazione usare `idfc -b`, flash `idfc -f`, per flash solo factory `idfc -ff`, per monitor `idfc -m`, per la sola partizione SPIFFS `idfc -fs`
 - va gestito un blocco per la generazione del codice che deve inibire la modifica di funzioni marcate con //DO_NOT_MODIFY o di sezioni di codice racchiuse tra //DO_NOT_MODIFY and //DO_NOT_MODIFY_END : io indicherò l'operazione con `fai DNM a <file>` o `fai DNME a <file>`
 - Il markup/JS generato per le pagine ` /config ` e ` / ` (home) deve essere sempre racchiuso tra i marcatori `/* DO_NOT_MODIFY_START: <page> */` e `/* DO_NOT_MODIFY_END: <page> */` per impedire modifiche automatiche.
 - l'esecuzione degli script deve avvenire col path `/home/mauro/Progetti/0.Clienti/MicroHard/scripts`

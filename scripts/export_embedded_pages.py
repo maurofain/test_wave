@@ -117,6 +117,8 @@ class PageSpec:
 
 def read_app_version(source_path: Path) -> tuple[str, str]:
     """Legge APP_VERSION e APP_DATE da main/app_version.h relativo al sorgente."""
+    import datetime
+    
     version_file = source_path.parent.parent.parent / "main" / "app_version.h"
     if not version_file.is_file():
         return "dev", "N/A"
@@ -125,7 +127,13 @@ def read_app_version(source_path: Path) -> tuple[str, str]:
     date_match = re.search(r'#define\s+APP_DATE\s+"([^"]+)"', content)
     version = ver_match.group(1) if ver_match else "dev"
     build_date = date_match.group(1) if date_match else "N/A"
-    return version, build_date
+    
+    # Aggiungi timestamp build corrente
+    now = datetime.datetime.now()
+    build_time = now.strftime("%H:%M:%S")
+    build_date_with_time = f"{build_date} {build_time}"
+    
+    return version, build_date_with_time
 
 
 def parse_args() -> argparse.Namespace:

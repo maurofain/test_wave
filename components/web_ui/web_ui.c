@@ -1,6 +1,7 @@
 #include "web_ui.h"
 #include "web_ui_internal.h"
 #include "lvgl_panel.h"
+
 #include "esp_log.h"
 #include "esp_check.h"
 #include "device_config.h"
@@ -61,6 +62,53 @@
 
 #define TAG "WEB_UI"
 #define MAX_STORED_LOGS 100
+
+/**
+ * @brief Restituisce la versione e data build correnti
+ *
+ * Endpoint: `GET /api/version`
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK dopo invio risposta JSON.
+ */
+esp_err_t api_version_get(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, OPTIONS");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    
+    // Genera versione e data dinamiche
+    char version_info[64];
+    char date_info[64];
+    snprintf(version_info, sizeof(version_info), "%s (%s %s)", 
+             APP_VERSION, __DATE__, __TIME__);
+    snprintf(date_info, sizeof(date_info), "%s %s", 
+             APP_DATE, __TIME__);
+    
+    cJSON_AddStringToObject(root, "version", version_info);
+    cJSON_AddStringToObject(root, "date", date_info);
+    
+    char *json_str = cJSON_PrintUnformatted(root);
+    if (!json_str) {
+        cJSON_Delete(root);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json_str, strlen(json_str));
+    
+    free(json_str);
+    cJSON_Delete(root);
+    
+    return ret;
+}
 
 /*
  * Forzatura temporanea: disabilita SEMPRE la parte video.
@@ -603,6 +651,9 @@ static esp_err_t web_ui_register_factory_runtime_endpoints(void)
 
     httpd_uri_t uri_api_test = {.uri = "/api/test/*", .method = HTTP_POST, .handler = api_test_handler};
     ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_api_test), TAG, "register /api/test/*");
+
+    httpd_uri_t uri_api_version = {.uri = "/api/version", .method = HTTP_GET, .handler = api_version_get};
+    ESP_RETURN_ON_ERROR(register_uri_if_missing(server, &uri_api_version), TAG, "register /api/version");
 
     return ESP_OK;
 }
