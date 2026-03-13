@@ -1534,12 +1534,7 @@ esp_err_t init_run_factory(void)
     generic_i2c_diagnostic_scan(bsp_i2c_get_handle(), "BSP I2C", 20);
 #endif
 
-    // Inizializza I2C e EEPROM prima della configurazione (essenziale per il boot)
-    // NOTA: EEPROM è sempre su periph_i2c (port 0, GPIO26/27), indipendentemente da BSP
-    ESP_LOGI(TAG, "[M] Inizializzo EEPROM 24LC16 su periph_i2c (port=%d, GPIO%d SCL, GPIO%d SDA)",
-             CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
-    ESP_ERROR_CHECK(eeprom_24lc16_init());
-    init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NONE);
+    // NOTA: L'inizializzazione EEPROM viene spostata più avanti dopo periph_i2c_init()
 
     // Inizializza configurazione device PRIMA degli altri moduli
     ESP_ERROR_CHECK(device_config_init());
@@ -1989,6 +1984,15 @@ void init_i2c_and_io_expander(void) {
 #endif
     ESP_LOGI(TAG, "[M] [IOX] Avvio init Periferiche su bus I2C (port=%d SDA=%d SCL=%d)", CONFIG_APP_I2C_PORT,CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
     periph_i2c_init();
+    
+    // Inizializza EEPROM dopo che periph_i2c è pronto
+    ESP_LOGI(TAG, "[M] Inizializzo EEPROM 24LC16 su periph_i2c (port=%d, GPIO%d SCL, GPIO%d SDA)",
+             CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
+    ESP_LOGI(TAG, "[M] DEBUG: Chiamando eeprom_24lc16_init()...");
+    ESP_ERROR_CHECK(eeprom_24lc16_init());
+    ESP_LOGI(TAG, "[M] DEBUG: eeprom_24lc16_init() completata");
+    init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NONE);
+    
     esp_err_t exp_ret = io_expander_init();
     if (exp_ret != ESP_OK) {
         ESP_LOGW(TAG, "[M] [IOX] I/O Expander non disponibile o errore (%s): proseguo senza bloccare l'esecuzione", esp_err_to_name(exp_ret));

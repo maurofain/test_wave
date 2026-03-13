@@ -41,7 +41,10 @@ Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
 Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
 ------------------
 
-Crea webuna app python da far girare su un pc windows o linux che permetta di editare i file delle lingue:
+!IMPORTANT
+ca completata l'unificazione della gestione di config che ha parti in wen_ui.c
+------------------
+[X]Nella cartella i18n_editor Crea webuna app python da far girare su un pc windows o linux che permetta di editare i file delle lingue:
 - si sceglie lo scope ed appaiono tutte le stringhe di quello scope incolonnate per lingua, la prima colonna è l'ID. la prima lingua è ITALIANO, Ogni voce è editabile e di fianco alla textbox ha un button per la traduzione automatica da fare interrogando un servizio web definito in un file di configurazione. In alto a sx abbiamo la scelta dello scope e a destra i tasti SALVA e ESCI. Il salvataggio crea automaticamente un json con tutti i dati di tutte le lingue con nome 'i18n_{tiomestamp}.json'
 ------------------
 I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
