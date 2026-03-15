@@ -77,6 +77,9 @@ static void ps_free(void *p)
 }
 
 #define I18N_CACHE_MAX_ENTRIES 8
+#ifndef WEB_UI_I18N_RUNTIME_SCRIPT_ENABLED
+#define WEB_UI_I18N_RUNTIME_SCRIPT_ENABLED 0
+#endif
 
 typedef struct
 {
@@ -381,6 +384,7 @@ void web_ui_i18n_cache_invalidate(void)
         s_i18n_cache[i].scope[0] = '\0';
     }
     s_i18n_cache_next_slot = 0;
+    webpages_localized_cache_invalidate();
 }
 
 /*
@@ -965,6 +969,10 @@ static char *escape_script_end_tag(const char *src)
  */
 static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
 {
+#if WEB_UI_I18N_RUNTIME_SCRIPT_ENABLED == 0
+    (void)req;
+    return ESP_OK;
+#else
     const char *lang = device_config_get_ui_backend_language();
     const char *page_scope = i18n_scope_for_uri(req ? req->uri : NULL);
 
@@ -1038,6 +1046,7 @@ static esp_err_t send_i18n_runtime_script(httpd_req_t *req)
     esp_err_t ret = httpd_resp_sendstr_chunk(req, script);
     free(script);
     return ret;
+#endif
 }
 
 // Nota: questa funzione è usata da diverse pagine; non è più `static` perché

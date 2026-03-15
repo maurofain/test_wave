@@ -7,10 +7,9 @@ const editorRoot = path.resolve(__dirname, "..");
 const projectRoot = path.resolve(editorRoot, "..");
 
 const dataDir = path.join(projectRoot, "data");
-const mapFilePath = path.join(projectRoot, "docs", "i18n", "i18n_it.map.json");
 const translatorConfigPath = path.join(editorRoot, "translator_config.json");
 
-const i18nService = new I18nService(dataDir, mapFilePath);
+const i18nService = new I18nService(dataDir);
 const translatorConfigService = new TranslatorConfigService(translatorConfigPath);
 const translatorService = new TranslatorService(translatorConfigService);
 
@@ -72,8 +71,8 @@ ipcMain.handle("editor:init", async () => {
 ipcMain.handle("editor:get-scope-data", async (_event, scope) => {
   ensureDataLoaded();
   return {
-    scope: Number(scope),
-    entries: i18nService.getScopeData(Number(scope)),
+    scope: String(scope),
+    entries: i18nService.getScopeData(String(scope)),
   };
 });
 
@@ -81,7 +80,7 @@ ipcMain.handle("editor:update-translation", async (_event, payload) => {
   ensureDataLoaded();
 
   const ok = i18nService.updateTranslation(
-    Number(payload.scope),
+    String(payload.scope),
     Number(payload.key),
     Number(payload.section ?? 0),
     String(payload.lang),
@@ -93,6 +92,16 @@ ipcMain.handle("editor:update-translation", async (_event, payload) => {
   }
 
   return { ok: true };
+});
+
+ipcMain.handle("editor:add-key", async (_event, payload) => {
+  ensureDataLoaded();
+  const created = i18nService.addKey(
+    String(payload.scope ?? ""),
+    String(payload.label ?? ""),
+    String(payload.italianText ?? "")
+  );
+  return created;
 });
 
 ipcMain.handle("editor:search", async (_event, searchText) => {

@@ -1,8 +1,13 @@
 #include "web_ui_internal.h"
 #include "sd_card.h"
+#include "device_config.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "cJSON.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/stat.h>
 
 #ifndef WEB_UI_PAGE_SOURCE
@@ -15,6 +20,8 @@
 
 #define WEB_PAGES_SPIFFS_BASE "/spiffs/www"
 #define WEB_PAGES_SD_BASE "/sdcard/www"
+#define I18N_V2_FILE_PATH "/spiffs/i18n_v2.json"
+#define WEB_LOCALIZED_CACHE_MAX 24
 
 static const char *TAG = "WEB_PAGES";
 
@@ -22,6 +29,529 @@ typedef struct {
     const char *filename;
     const char *content;
 } webpage_seed_t;
+
+typedef struct {
+    char lang[8];
+    char relative_path[64];
+    char *content;
+    size_t length;
+} localized_page_cache_entry_t;
+
+static localized_page_cache_entry_t s_page_cache[WEB_LOCALIZED_CACHE_MAX];
+static size_t s_page_cache_next_slot = 0;
+static cJSON *s_i18n_v2_root = NULL;
+
+static void *psram_malloc(size_t size)
+{
+#ifdef MALLOC_CAP_SPIRAM
+    void *p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (p) {
+        return p;
+    }
+#endif
+    return malloc(size);
+}
+
+static void psram_free(void *p)
+{
+#ifdef MALLOC_CAP_SPIRAM
+    heap_caps_free(p);
+#else
+    free(p);
+#endif
+}
+
+static void page_cache_entry_clear(localized_page_cache_entry_t *entry)
+{
+    if (!entry) {
+        return;
+    }
+    if (entry->content) {
+        psram_free(entry->content);
+        entry->content = NULL;
+    }
+    entry->length = 0;
+    entry->lang[0] = '\0';
+    entry->relative_path[0] = '\0';
+}
+
+void webpages_localized_cache_invalidate(void)
+{
+    for (size_t i = 0; i < WEB_LOCALIZED_CACHE_MAX; ++i) {
+        page_cache_entry_clear(&s_page_cache[i]);
+    }
+    s_page_cache_next_slot = 0;
+
+    if (s_i18n_v2_root) {
+        cJSON_Delete(s_i18n_v2_root);
+        s_i18n_v2_root = NULL;
+    }
+}
+
+static bool is_html_path(const char *relative_path)
+{
+    if (!relative_path) {
+        return false;
+    }
+    const char *ext = strrchr(relative_path, '.');
+    if (!ext) {
+        return false;
+    }
+    return strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0;
+}
+
+static bool extract_page_name(const char *relative_path, char *out, size_t out_len)
+{
+    if (!relative_path || !out || out_len < 2) {
+        return false;
+    }
+
+    const char *name = strrchr(relative_path, '/');
+    name = name ? name + 1 : relative_path;
+    if (!name[0]) {
+        return false;
+    }
+
+    size_t len = 0;
+    while (name[len] && name[len] != '.' && len < out_len - 1) {
+        out[len] = name[len];
+        len++;
+    }
+    out[len] = '\0';
+    return len > 0;
+}
+
+static char *read_text_file(const char *path, size_t *out_len)
+{
+    if (out_len) {
+        *out_len = 0;
+    }
+
+    FILE *f = fopen(path, "rb");
+    if (!f) {
+        return NULL;
+    }
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return NULL;
+    }
+    long sz = ftell(f);
+    if (sz < 0) {
+        fclose(f);
+        return NULL;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return NULL;
+    }
+
+    char *buf = malloc((size_t)sz + 1);
+    if (!buf) {
+        fclose(f);
+        return NULL;
+    }
+    size_t n = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    if (n != (size_t)sz) {
+        free(buf);
+        return NULL;
+    }
+    buf[n] = '\0';
+    if (out_len) {
+        *out_len = n;
+    }
+    return buf;
+}
+
+static bool js_token_is_safe(const char *token)
+{
+    if (!token || !token[0]) {
+        return false;
+    }
+    if (token[0] == '/' || strstr(token, "..") != NULL || strchr(token, '\\') != NULL) {
+        return false;
+    }
+    if (!strstr(token, ".js")) {
+        return false;
+    }
+    return true;
+}
+
+static bool append_chunk(char **buf, size_t *len, size_t *cap, const char *src, size_t src_len)
+{
+    if (!buf || !len || !cap || !src) {
+        return false;
+    }
+    size_t needed = *len + src_len + 1;
+    if (needed > *cap) {
+        size_t next_cap = (*cap == 0) ? 1024 : *cap;
+        while (next_cap < needed) {
+            next_cap *= 2;
+        }
+        char *next = realloc(*buf, next_cap);
+        if (!next) {
+            return false;
+        }
+        *buf = next;
+        *cap = next_cap;
+    }
+    memcpy(*buf + *len, src, src_len);
+    *len += src_len;
+    (*buf)[*len] = '\0';
+    return true;
+}
+
+static char *expand_js_include_markers(const char *html, const char *full_path, size_t *out_len)
+{
+    if (out_len) {
+        *out_len = 0;
+    }
+    if (!html || !full_path) {
+        return NULL;
+    }
+
+    char base_dir[256] = {0};
+    strncpy(base_dir, full_path, sizeof(base_dir) - 1);
+    char *slash = strrchr(base_dir, '/');
+    if (!slash) {
+        return strdup(html);
+    }
+    *slash = '\0';
+
+    char *out = NULL;
+    size_t out_size = 0;
+    size_t out_cap = 0;
+    const char *cursor = html;
+
+    while (true) {
+        const char *marker = strstr(cursor, "{{JS:");
+        if (!marker) {
+            if (!append_chunk(&out, &out_size, &out_cap, cursor, strlen(cursor))) {
+                free(out);
+                return NULL;
+            }
+            break;
+        }
+
+        if (!append_chunk(&out, &out_size, &out_cap, cursor, (size_t)(marker - cursor))) {
+            free(out);
+            return NULL;
+        }
+
+        const char *token_start = marker + 5;
+        const char *token_end = strstr(token_start, "}}");
+        if (!token_end) {
+            if (!append_chunk(&out, &out_size, &out_cap, marker, strlen(marker))) {
+                free(out);
+                return NULL;
+            }
+            break;
+        }
+
+        size_t token_len = (size_t)(token_end - token_start);
+        if (token_len == 0 || token_len >= 120) {
+            if (!append_chunk(&out, &out_size, &out_cap, marker, (size_t)(token_end + 2 - marker))) {
+                free(out);
+                return NULL;
+            }
+            cursor = token_end + 2;
+            continue;
+        }
+
+        char token[128] = {0};
+        memcpy(token, token_start, token_len);
+        token[token_len] = '\0';
+
+        if (!js_token_is_safe(token)) {
+            if (!append_chunk(&out, &out_size, &out_cap, marker, (size_t)(token_end + 2 - marker))) {
+                free(out);
+                return NULL;
+            }
+            cursor = token_end + 2;
+            continue;
+        }
+
+        char js_path[384] = {0};
+        snprintf(js_path, sizeof(js_path), "%s/%s", base_dir, token);
+        size_t js_len = 0;
+        char *js_body = read_text_file(js_path, &js_len);
+        if (!js_body) {
+            ESP_LOGW(TAG, "[C] JS include non trovato: %s", js_path);
+            if (!append_chunk(&out, &out_size, &out_cap, marker, (size_t)(token_end + 2 - marker))) {
+                free(out);
+                return NULL;
+            }
+            cursor = token_end + 2;
+            continue;
+        }
+
+        if (!append_chunk(&out, &out_size, &out_cap, "<script>", 8) ||
+            !append_chunk(&out, &out_size, &out_cap, js_body, js_len) ||
+            !append_chunk(&out, &out_size, &out_cap, "</script>", 9)) {
+            free(js_body);
+            free(out);
+            return NULL;
+        }
+        free(js_body);
+        cursor = token_end + 2;
+    }
+
+    if (!out) {
+        out = strdup(html);
+        if (!out) {
+            return NULL;
+        }
+        out_size = strlen(out);
+    }
+    if (out_len) {
+        *out_len = out_size;
+    }
+    return out;
+}
+
+static cJSON *i18n_v2_root_get(void)
+{
+    if (s_i18n_v2_root) {
+        return s_i18n_v2_root;
+    }
+
+    size_t sz = 0;
+    char *json = read_text_file(I18N_V2_FILE_PATH, &sz);
+    if (!json || sz == 0) {
+        if (json) {
+            free(json);
+        }
+        return NULL;
+    }
+
+    cJSON *root = cJSON_Parse(json);
+    free(json);
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) {
+            cJSON_Delete(root);
+        }
+        return NULL;
+    }
+    s_i18n_v2_root = root;
+    return s_i18n_v2_root;
+}
+
+static const char *entry_get_lang_text(cJSON *entry, const char *lang)
+{
+    if (!entry || !cJSON_IsObject(entry)) {
+        return NULL;
+    }
+
+    cJSON *text = cJSON_GetObjectItemCaseSensitive(entry, "text");
+    if (!cJSON_IsObject(text)) {
+        return NULL;
+    }
+
+    cJSON *lang_item = cJSON_GetObjectItemCaseSensitive(text, lang ? lang : "it");
+    if (cJSON_IsString(lang_item) && lang_item->valuestring) {
+        return lang_item->valuestring;
+    }
+
+    cJSON *it_item = cJSON_GetObjectItemCaseSensitive(text, "it");
+    if (cJSON_IsString(it_item) && it_item->valuestring) {
+        return it_item->valuestring;
+    }
+
+    return NULL;
+}
+
+static const char *i18n_v2_lookup(const char *page_name, const char *key3, const char *lang)
+{
+    cJSON *root = i18n_v2_root_get();
+    if (!root || !page_name || !key3) {
+        return NULL;
+    }
+
+    cJSON *web = cJSON_GetObjectItemCaseSensitive(root, "web");
+    if (!cJSON_IsObject(web)) {
+        return NULL;
+    }
+    cJSON *page = cJSON_GetObjectItemCaseSensitive(web, page_name);
+    if (!cJSON_IsObject(page)) {
+        return NULL;
+    }
+    cJSON *entry = cJSON_GetObjectItemCaseSensitive(page, key3);
+    return entry_get_lang_text(entry, lang);
+}
+
+static bool parse_placeholder_key(const char *s, size_t max_len, size_t *consumed, char out_key[4])
+{
+    if (!s || max_len < 7 || !consumed || !out_key) {
+        return false;
+    }
+    if (s[0] != '{' || s[1] != '{') {
+        return false;
+    }
+    if (!isdigit((unsigned char)s[2]) || !isdigit((unsigned char)s[3]) || !isdigit((unsigned char)s[4])) {
+        return false;
+    }
+    if (s[5] != '}' || s[6] != '}') {
+        return false;
+    }
+    out_key[0] = s[2];
+    out_key[1] = s[3];
+    out_key[2] = s[4];
+    out_key[3] = '\0';
+    *consumed = 7;
+    return true;
+}
+
+static char *localize_html_template(const char *html, const char *page_name, const char *lang, size_t *out_len)
+{
+    if (out_len) {
+        *out_len = 0;
+    }
+    if (!html || !page_name) {
+        return NULL;
+    }
+
+    const size_t in_len = strlen(html);
+    size_t needed = 0;
+    for (size_t i = 0; i < in_len;) {
+        char key3[4] = {0};
+        size_t consumed = 0;
+        if (parse_placeholder_key(html + i, in_len - i, &consumed, key3)) {
+            const char *tr = i18n_v2_lookup(page_name, key3, lang);
+            needed += tr ? strlen(tr) : 0;
+            i += consumed;
+        } else {
+            needed++;
+            i++;
+        }
+    }
+
+    char *out = psram_malloc(needed + 1);
+    if (!out) {
+        return NULL;
+    }
+
+    size_t pos = 0;
+    for (size_t i = 0; i < in_len;) {
+        char key3[4] = {0};
+        size_t consumed = 0;
+        if (parse_placeholder_key(html + i, in_len - i, &consumed, key3)) {
+            const char *tr = i18n_v2_lookup(page_name, key3, lang);
+            if (tr) {
+                size_t tl = strlen(tr);
+                memcpy(out + pos, tr, tl);
+                pos += tl;
+            }
+            i += consumed;
+        } else {
+            out[pos++] = html[i++];
+        }
+    }
+    out[pos] = '\0';
+    if (out_len) {
+        *out_len = pos;
+    }
+    return out;
+}
+
+static localized_page_cache_entry_t *page_cache_find(const char *lang, const char *relative_path)
+{
+    if (!lang || !relative_path) {
+        return NULL;
+    }
+    for (size_t i = 0; i < WEB_LOCALIZED_CACHE_MAX; ++i) {
+        localized_page_cache_entry_t *entry = &s_page_cache[i];
+        if (entry->content && strcmp(entry->lang, lang) == 0 && strcmp(entry->relative_path, relative_path) == 0) {
+            return entry;
+        }
+    }
+    return NULL;
+}
+
+static void page_cache_put(const char *lang, const char *relative_path, char *content, size_t length)
+{
+    if (!lang || !relative_path || !content || length == 0) {
+        if (content) {
+            psram_free(content);
+        }
+        return;
+    }
+
+    localized_page_cache_entry_t *existing = page_cache_find(lang, relative_path);
+    if (existing) {
+        page_cache_entry_clear(existing);
+        strncpy(existing->lang, lang, sizeof(existing->lang) - 1);
+        strncpy(existing->relative_path, relative_path, sizeof(existing->relative_path) - 1);
+        existing->content = content;
+        existing->length = length;
+        return;
+    }
+
+    localized_page_cache_entry_t *slot = &s_page_cache[s_page_cache_next_slot % WEB_LOCALIZED_CACHE_MAX];
+    page_cache_entry_clear(slot);
+    strncpy(slot->lang, lang, sizeof(slot->lang) - 1);
+    strncpy(slot->relative_path, relative_path, sizeof(slot->relative_path) - 1);
+    slot->content = content;
+    slot->length = length;
+    s_page_cache_next_slot = (s_page_cache_next_slot + 1) % WEB_LOCALIZED_CACHE_MAX;
+}
+
+static esp_err_t send_html_localized_cached(httpd_req_t *req, const char *full_path, const char *relative_path)
+{
+    const char *lang = device_config_get_ui_backend_language();
+    if (!lang || !lang[0]) {
+        lang = "it";
+    }
+
+    localized_page_cache_entry_t *cached = page_cache_find(lang, relative_path);
+    if (cached) {
+        httpd_resp_set_type(req, "text/html; charset=utf-8");
+        return httpd_resp_send(req, cached->content, (ssize_t)cached->length);
+    }
+
+    size_t raw_len = 0;
+    char *raw_html = read_text_file(full_path, &raw_len);
+    if (!raw_html || raw_len == 0) {
+        if (raw_html) {
+            free(raw_html);
+        }
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    size_t expanded_len = 0;
+    char *expanded_html = expand_js_include_markers(raw_html, full_path, &expanded_len);
+    free(raw_html);
+    if (!expanded_html || expanded_len == 0) {
+        if (expanded_html) {
+            free(expanded_html);
+        }
+        return ESP_ERR_NO_MEM;
+    }
+
+    char page_name[32] = {0};
+    if (!extract_page_name(relative_path, page_name, sizeof(page_name))) {
+        free(expanded_html);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    size_t localized_len = 0;
+    char *localized = localize_html_template(expanded_html, page_name, lang, &localized_len);
+    free(expanded_html);
+    if (!localized || localized_len == 0) {
+        if (localized) {
+            psram_free(localized);
+        }
+        return ESP_ERR_NO_MEM;
+    }
+
+    page_cache_put(lang, relative_path, localized, localized_len);
+    cached = page_cache_find(lang, relative_path);
+    if (!cached) {
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    return httpd_resp_send(req, cached->content, (ssize_t)cached->length);
+}
 
 #if WEB_UI_EXPORT_ON_BOOT == 1
 #define SEED_INDEX_HTML \
@@ -275,6 +805,14 @@ esp_err_t webpages_try_send_external(httpd_req_t *req, const char *relative_path
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (is_html_path(relative_path)) {
+        esp_err_t localized_ret = send_html_localized_cached(req, full_path, relative_path);
+        if (localized_ret == ESP_OK) {
+            return ESP_OK;
+        }
+        ESP_LOGW(TAG, "[C] Localized send failed for %s: %s. Fallback raw file.", relative_path, esp_err_to_name(localized_ret));
+    }
+
     return send_file_as_chunks(req, full_path, content_type);
 }
 
@@ -414,5 +952,6 @@ esp_err_t webpages_bootstrap(void)
     ESP_LOGI(TAG, "[C] Export pagine seed completato in %s", base);
 #endif
 
+    webpages_localized_cache_invalidate();
     return ESP_OK;
 }

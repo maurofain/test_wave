@@ -40,7 +40,39 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
 Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
 ------------------
-
+## refactor i18n: ristrutturiamo tutta la localizzazione
+- La lingua di riferimento è l'italiano
+- separiamo la parte web dalla parte lvgl
+- lvgl: 
+    - abbiamo poche stringhe da gestire: utilizzaimo un file json con un array della lingue, in ogni elemento ci sarà una array composto da tuple chiave:valore con i testi da visualizzare. 
+    - all'avvio carichiamo tutte le lingue in PSRAM
+    - nelle pagine lvgl al posto delle stringhe effettive mettiamo dei placeholder {{KEY}} che vengono espansi nel valore della lingua corrente
+- html
+    - qui ci sono più stringhe da gestire e quindi modifichiamo la struttura : utilizzaimo un file json con un array della lingue, in ogni elemento ci sarà un array di pagine web che contiene una array composto da tuple chiave:valore con i testi da visualizzare. La chiave è un valore numerico univoco per pagina 
+    - all'avvio carichiamo la lingua corrente in PSRAM : 
+        - si creano dei blob (1 per ogni pagina) in cui le stringhe sono memorizzate una di seguito all'altra in ordine numerico di KEY separate da un carattere 0x00.
+        - Eventuali interruzzioni nella continuità della numerazione comporteranno l'inserimento di 0x00 per ogni numero mancante (es. abbiamo key 25 e poi 28: andranno inserti 2 0x00). 
+        - durante la compilazione si salva la posizione di inizio di ogni stringa (anche equelle vuote o di riempimento sequenza) in un array di uint_16t . 
+        - le pagine web conterranno al posto delle stringhe localizzate dei placeholder {{KEY}} che verranno sostiuiti con le stringhe i18n prima della pubblicazione al browser.
+    . in questo modo la il preporocessore delle pagine web trova i placeholder, ricava dall'array posizioni la posizione della stringa da pubblicare (termonata da 0) la sostiusce e ripete per ogni placeholder.
+    in fase di sviluppo ogni nuovo inserimento di testo deve verificare se la stringa esiste già ed utilizzare la KEY gia assegnata, oppure creare un nuovo record nel set della pagina web in creazione con la prossima KEY e la nuova stringa 
+------------------
+## refactor i18n v2 (decisioni aggiornate)
+- Pipeline web primaria: HTML-first su SPIFFS (`data/www/*.html` + `data/www/js/*.js`), senza passaggio di conversione embedded->html nel flusso principale.
+- Localizzazione web: preload al boot (o su cambio lingua) con cache pagine localizzate in PSRAM; nessun parsing JSON durante la singola richiesta HTTP.
+- Placeholder web: numerici compatti a 3 cifre (`{{001}}..{{999}}`) con validazione formale.
+- Catalogo JSON i18n: per ogni chiave web includere anche `label` alfanumerica descrittiva per editing/manutenzione.
+- Runtime contract: il parser usa solo la chiave numerica; `label` non è usata a runtime.
+- Fallback obbligatorio: lingua richiesta -> `it` -> stringa vuota.
+- JS: separazione script inline in moduli dedicati; include ordinati (`core -> page -> init`).
+- `i18n_editor` v2:
+  - supporto schema nuovo (key numerica + `label`)
+  - aggiunta nuove chiavi da UI (assegnazione automatica prossima libera per pagina)
+  - validazioni bloccanti su duplicati, formato `label`, presenza `text.it`.
+- Validatore build-time:
+  - errori su placeholder invalidi/non mappati, key duplicate, `label` invalida, `text.it` mancante
+  - warning su traduzioni non-base mancanti e chiavi non usate.
+------------------
 !IMPORTANT
 ca completata l'unificazione della gestione di config che ha parti in wen_ui.c
 ------------------

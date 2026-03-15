@@ -810,6 +810,17 @@ esp_err_t ota_post_handler(httpd_req_t *req)
  */
 esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
 {
+    (void)error;
+    if (req) {
+        const char *uri = req->uri;
+        if (strncmp(uri, "/js/", 4) == 0 || strncmp(uri, "/css/", 5) == 0) {
+            const char *relative_path = uri + 1;
+            esp_err_t ret = webpages_try_send_external(req, relative_path, NULL);
+            if (ret == ESP_OK) {
+                return ESP_OK;
+            }
+        }
+    }
     httpd_resp_set_status(req, "404 Non Trovato");
     return httpd_resp_send(req, "404 Non Trovato", -1);
 }

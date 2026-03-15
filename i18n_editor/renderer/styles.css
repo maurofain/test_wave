@@ -83,6 +83,10 @@ body {
   gap: 8px;
 }
 
+.field-group.compact {
+  min-width: 260px;
+}
+
 .field-group label {
   font-size: 13px;
   color: var(--text-primary);
@@ -97,6 +101,10 @@ body {
   padding: 6px 8px;
   border-radius: 6px;
   min-height: 34px;
+}
+
+.field-group.compact input {
+  min-width: 220px;
 }
 
 .search-group input {

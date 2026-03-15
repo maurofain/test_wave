@@ -17,7 +17,6 @@ description: a small size and highly integrated development board designed by wa
 repository: git://github.com/waveshareteam/Waveshare-ESP32-components.git
 repository_info:
   commit_sha: a086e96a278479e67353d6784563bfe7f10a98c9
-  path: bsp/esp32_p4_nano
 tags:
 - bsp
 targets:

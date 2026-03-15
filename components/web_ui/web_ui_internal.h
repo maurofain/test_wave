@@ -142,6 +142,7 @@ esp_err_t webpages_bootstrap(void);
 esp_err_t webpages_try_send_external(httpd_req_t *req, const char *relative_path, const char *content_type);
 esp_err_t webpages_send_external_or_error(httpd_req_t *req, const char *relative_path, const char *content_type);
 const char *webpages_source_name(void);
+void webpages_localized_cache_invalidate(void);
 
 // Profilo/UI feature flags (factory/app) per visibilità e accessibilità endpoint
 bool web_ui_feature_enabled(web_ui_feature_t feature);

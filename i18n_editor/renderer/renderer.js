@@ -36,6 +36,9 @@ function cacheDom() {
   dom.nextBtn = document.getElementById("next-btn");
   dom.searchStatus = document.getElementById("search-status");
   dom.saveBtn = document.getElementById("save-btn");
+  dom.addKeyBtn = document.getElementById("add-key-btn");
+  dom.newKeyLabel = document.getElementById("new-key-label");
+  dom.newKeyItText = document.getElementById("new-key-it-text");
   dom.rowsInfo = document.getElementById("rows-info");
   dom.tableHeadRow = document.getElementById("table-head-row");
   dom.tableBody = document.getElementById("table-body");
@@ -45,8 +48,8 @@ function cacheDom() {
 
 function bindEvents() {
   dom.scopeSelect.addEventListener("change", async (event) => {
-    const nextScope = Number(event.target.value);
-    if (!Number.isNaN(nextScope)) {
+    const nextScope = String(event.target.value ?? "").trim();
+    if (nextScope) {
       await loadScope(nextScope);
     }
   });
@@ -69,6 +72,34 @@ function bindEvents() {
       return;
     }
     showToast(result.error ?? "Errore durante il salvataggio", "error", 5000);
+  });
+
+  dom.addKeyBtn.addEventListener("click", async () => {
+    const scope = String(state.currentScope ?? "").trim();
+    const label = String(dom.newKeyLabel.value ?? "").trim();
+    const italianText = String(dom.newKeyItText.value ?? "").trim();
+    if (!scope) {
+      showToast("Scope non selezionato", "error");
+      return;
+    }
+    if (!label) {
+      showToast("Inserisci una label", "error");
+      return;
+    }
+    if (!italianText) {
+      showToast("Inserisci il testo italiano", "error");
+      return;
+    }
+    try {
+      const created = await window.editorApi.addKey({ scope, label, italianText });
+      await loadScope(scope);
+      dom.newKeyLabel.value = "";
+      dom.newKeyItText.value = "";
+      setHasChanges(true);
+      showToast(`Nuova key creata: ${created.keyCode}`, "success");
+    } catch (error) {
+      showToast(`Creazione key fallita: ${error.message}`, "error", 5000);
+    }
   });
 
   dom.autoTranslateToggle.addEventListener("change", async (event) => {
@@ -151,7 +182,7 @@ function renderTableHeader() {
 
 async function loadScope(scopeId) {
   const payload = await window.editorApi.getScopeData(scopeId);
-  state.currentScope = Number(scopeId);
+  state.currentScope = String(scopeId);
   dom.scopeSelect.value = String(state.currentScope);
 
   renderTableRows(payload.entries ?? []);
@@ -257,7 +288,7 @@ function renderTableRows(entries) {
 }
 
 function updateScopeMeta(entries) {
-  const scopeInfo = state.scopes.find((scope) => scope.id === state.currentScope);
+  const scopeInfo = state.scopes.find((scope) => String(scope.id) === String(state.currentScope));
   const scopeLabel = scopeInfo ? scopeInfo.label : `Scope ${state.currentScope}`;
   dom.scopeMeta.textContent = `${scopeLabel} · campi: ${entries.length}`;
 }
@@ -306,8 +337,8 @@ async function showSearchResult(index) {
   const normalized = ((index % state.searchResults.length) + state.searchResults.length) % state.searchResults.length;
   const result = state.searchResults[normalized];
 
-  if (Number(result.scope) !== Number(state.currentScope)) {
-    await loadScope(Number(result.scope));
+  if (String(result.scope) !== String(state.currentScope)) {
+    await loadScope(String(result.scope));
   }
 
   const fieldKey = makeFieldKey(result.scope, result.key, result.section, result.lang);
@@ -404,7 +435,8 @@ function refreshTranslateButtons() {
 }
 
 function makeFieldKey(scope, key, section, lang) {
-  return `${Number(scope)}:${Number(key)}:${Number(section ?? 0)}:${lang}`;
+  const scopePart = String(scope ?? "");
+  return `${scopePart}:${Number(key)}:${Number(section ?? 0)}:${lang}`;
 }
 
 function restoreTheme() {

@@ -2,134 +2,94 @@ const fs = require("fs");
 const path = require("path");
 
 class I18nService {
+  static LANGUAGE_NAMES = {
+    it: "Italiano",
+    en: "Inglese",
+    fr: "Francese",
+    de: "Tedesco",
+    es: "Spagnolo",
+  };
+
   static LANGUAGE_ORDER = {
     it: 0,
     en: 1,
-    de: 2,
-    es: 3,
-    fr: 4,
+    fr: 2,
+    de: 3,
+    es: 4,
   };
 
-  static LANGUAGE_NAMES = {
-    it: "Italiano",
-    en: "English",
-    de: "Deutsch",
-    es: "Español",
-    fr: "Français",
-  };
-
-  constructor(dataDir, mapFilePath) {
+  constructor(dataDir) {
     this.dataDir = dataDir;
-    this.mapFilePath = mapFilePath;
-    this.i18nData = {};
+    this.catalogPath = path.join(this.dataDir, "i18n_v2.json");
+    this.catalog = null;
     this.languages = [];
-    this.entriesByScope = new Map();
     this.scopes = [];
-    this.scopeNameMap = new Map();
-    this.keyNameMap = new Map();
-    this.mapLoaded = false;
+    this.entriesByScope = new Map();
   }
 
   loadIdNameMap() {
-    this.scopeNameMap.clear();
-    this.keyNameMap.clear();
-    this.mapLoaded = false;
-
-    if (!fs.existsSync(this.mapFilePath)) {
-      return false;
-    }
-
-    try {
-      const raw = fs.readFileSync(this.mapFilePath, "utf-8");
-      const parsed = JSON.parse(raw);
-
-      const scopes = parsed.scopes ?? {};
-      const keys = parsed.keys ?? {};
-
-      for (const [scopeId, scopeName] of Object.entries(scopes)) {
-        const parsedId = Number(scopeId);
-        if (!Number.isNaN(parsedId)) {
-          this.scopeNameMap.set(parsedId, String(scopeName));
-        }
-      }
-
-      for (const [keyId, keyName] of Object.entries(keys)) {
-        const parsedId = Number(keyId);
-        if (!Number.isNaN(parsedId)) {
-          this.keyNameMap.set(parsedId, String(keyName));
-        }
-      }
-
-      this.mapLoaded = true;
-      return true;
-    } catch {
-      return false;
-    }
+    return true;
   }
 
-  getScopeName(scopeId) {
-    return this.scopeNameMap.get(scopeId) ?? "";
-  }
-
-  getKeyName(keyId) {
-    return this.keyNameMap.get(keyId) ?? "";
-  }
-
-  getScopeLabel(scopeId) {
-    const scopeName = this.getScopeName(scopeId);
-    if (scopeName) {
-      return `Scope ${scopeId} · ${scopeName}`;
-    }
-    return `Scope ${scopeId}`;
+  getScopeLabel(scope) {
+    return `Pagina ${scope}`;
   }
 
   getLanguageName(langCode) {
     return I18nService.LANGUAGE_NAMES[langCode] ?? langCode.toUpperCase();
   }
 
-  loadAllFiles() {
-    this.i18nData = {};
+  ensureCatalog() {
+    if (this.catalog) {
+      return;
+    }
+    this.catalog = {
+      version: 2,
+      base_language: "it",
+      languages: ["it", "en", "fr", "de", "es"],
+      web: {},
+      lvgl: {},
+    };
+  }
 
+  loadAllFiles() {
+    this.ensureCatalog();
     if (!fs.existsSync(this.dataDir)) {
       throw new Error(`Directory non trovata: ${this.dataDir}`);
     }
 
-    const languageFiles = fs
-      .readdirSync(this.dataDir)
-      .filter((name) => /^i18n_[a-z]{2}\.json$/i.test(name))
-      .sort((a, b) => a.localeCompare(b));
-
-    for (const fileName of languageFiles) {
-      const match = /^i18n_([a-z]{2})\.json$/i.exec(fileName);
-      if (!match) {
-        continue;
-      }
-
-      const langCode = match[1].toLowerCase();
-      const fullPath = path.join(this.dataDir, fileName);
-
+    if (fs.existsSync(this.catalogPath)) {
       try {
-        const raw = fs.readFileSync(fullPath, "utf-8");
+        const raw = fs.readFileSync(this.catalogPath, "utf-8");
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          this.i18nData[langCode] = parsed;
+        if (parsed && typeof parsed === "object") {
+          this.catalog = parsed;
         }
       } catch (error) {
-        console.error(`Errore nel caricamento ${fileName}:`, error.message);
+        throw new Error(`Errore lettura catalogo v2: ${error.message}`);
       }
     }
 
-    this.languages = Object.keys(this.i18nData).sort((langA, langB) => {
-      const orderA = I18nService.LANGUAGE_ORDER[langA] ?? 999;
-      const orderB = I18nService.LANGUAGE_ORDER[langB] ?? 999;
+    if (!this.catalog.web || typeof this.catalog.web !== "object") {
+      this.catalog.web = {};
+    }
+    if (!this.catalog.lvgl || typeof this.catalog.lvgl !== "object") {
+      this.catalog.lvgl = {};
+    }
+    if (!Array.isArray(this.catalog.languages) || this.catalog.languages.length === 0) {
+      this.catalog.languages = ["it", "en", "fr", "de", "es"];
+    }
+
+    this.languages = [...new Set(this.catalog.languages.map((x) => String(x).toLowerCase()))].sort((a, b) => {
+      const orderA = I18nService.LANGUAGE_ORDER[a] ?? 999;
+      const orderB = I18nService.LANGUAGE_ORDER[b] ?? 999;
       if (orderA !== orderB) {
         return orderA - orderB;
       }
-      return langA.localeCompare(langB);
+      return a.localeCompare(b);
     });
-
-    if (this.languages.length === 0) {
-      return false;
+    if (!this.languages.includes("it")) {
+      this.languages.unshift("it");
     }
 
     this.buildScopeIndex();
@@ -137,103 +97,113 @@ class I18nService {
   }
 
   buildScopeIndex() {
-    this.scopes = this.extractUniqueScopesFromReference();
+    const web = this.catalog?.web ?? {};
+    this.scopes = Object.keys(web).sort((a, b) => a.localeCompare(b));
+    if (this.scopes.length === 0) {
+      this.scopes = this.discoverWebScopes();
+      for (const scope of this.scopes) {
+        if (!web[scope]) {
+          web[scope] = {};
+        }
+      }
+    }
     this.entriesByScope = new Map();
 
     for (const scope of this.scopes) {
-      const keyToEntry = new Map();
-
-      for (const lang of this.languages) {
-        const langEntries = this.i18nData[lang] ?? [];
-        for (const entry of langEntries) {
-          if (Number(entry.scope) !== Number(scope)) {
-            continue;
-          }
-
-          if (entry.key === undefined || entry.key === null) {
-            continue;
-          }
-
-          const key = Number(entry.key);
-          const section = entry.section === undefined || entry.section === null ? 0 : Number(entry.section);
-          const entryId = `${key}:${section}`;
-
-          if (!keyToEntry.has(entryId)) {
-            keyToEntry.set(entryId, {
-              scope,
-              key,
-              section,
-              keyName: this.getKeyName(key),
-              translations: {},
-            });
-          }
-
-          const text = typeof entry.text === "string" ? entry.text : String(entry.text ?? "");
-          keyToEntry.get(entryId).translations[lang] = text;
+      const pageEntries = web[scope];
+      const rows = [];
+      for (const [keyCode, entry] of Object.entries(pageEntries ?? {})) {
+        if (!entry || typeof entry !== "object") {
+          continue;
         }
+        const keyNum = Number(keyCode);
+        const textObj = entry.text && typeof entry.text === "object" ? entry.text : {};
+        const translations = {};
+        for (const lang of this.languages) {
+          translations[lang] = String(textObj[lang] ?? "");
+        }
+
+        rows.push({
+          scope,
+          key: Number.isNaN(keyNum) ? keyCode : keyNum,
+          keyCode: String(keyCode).padStart(3, "0"),
+          section: 0,
+          keyName: String(entry.label ?? ""),
+          translations,
+        });
       }
 
-      const sortedEntries = Array.from(keyToEntry.values()).sort((a, b) => {
-        if (a.key !== b.key) {
-          return a.key - b.key;
-        }
-        return a.section - b.section;
-      });
-
-      this.entriesByScope.set(scope, sortedEntries);
+      rows.sort((a, b) => Number(a.keyCode) - Number(b.keyCode));
+      this.entriesByScope.set(scope, rows);
     }
   }
 
-  extractUniqueScopesFromReference() {
-    const referenceLang = this.i18nData.it ? "it" : this.languages[0];
-    if (!referenceLang) {
-      return [];
-    }
-
-    const uniqueScopes = new Set();
-    const entries = this.i18nData[referenceLang] ?? [];
-
-    for (const entry of entries) {
-      if (entry.scope !== undefined && entry.scope !== null) {
-        uniqueScopes.add(Number(entry.scope));
+  discoverWebScopes() {
+    try {
+      const wwwPath = path.join(this.dataDir, "www");
+      if (!fs.existsSync(wwwPath)) {
+        return ["index"];
       }
+      const scopes = fs
+        .readdirSync(wwwPath)
+        .filter((name) => /\.(html?|HTML?)$/.test(name))
+        .map((name) => name.replace(/\.[^.]+$/, ""))
+        .sort((a, b) => a.localeCompare(b));
+      return scopes.length ? scopes : ["index"];
+    } catch {
+      return ["index"];
     }
-
-    return Array.from(uniqueScopes).sort((a, b) => a - b);
   }
 
   getScopeData(scope) {
-    return this.entriesByScope.get(Number(scope)) ?? [];
+    return this.entriesByScope.get(String(scope)) ?? [];
   }
 
-  updateTranslation(scope, key, section, lang, text) {
-    const langEntries = this.i18nData[lang];
-    if (!Array.isArray(langEntries)) {
+  updateTranslation(scope, key, _section, lang, text) {
+    const s = String(scope);
+    const k = String(Number(key)).padStart(3, "0");
+    if (!this.catalog?.web?.[s]?.[k]) {
       return false;
     }
+    const entry = this.catalog.web[s][k];
+    if (!entry.text || typeof entry.text !== "object") {
+      entry.text = {};
+    }
+    entry.text[String(lang)] = String(text ?? "");
+    this.buildScopeIndex();
+    return true;
+  }
 
-    for (const entry of langEntries) {
-      const entrySection = entry.section === undefined || entry.section === null ? 0 : Number(entry.section);
-      if (
-        Number(entry.scope) === Number(scope) &&
-        Number(entry.key) === Number(key) &&
-        entrySection === Number(section)
-      ) {
-        entry.text = text;
-
-        const indexedEntries = this.entriesByScope.get(Number(scope)) ?? [];
-        for (const indexedEntry of indexedEntries) {
-          if (indexedEntry.key === Number(key) && indexedEntry.section === Number(section)) {
-            indexedEntry.translations[lang] = text;
-            break;
-          }
-        }
-
-        return true;
-      }
+  addKey(scope, label, italianText) {
+    const s = String(scope ?? "").trim();
+    if (!s) {
+      throw new Error("Scope non valido");
+    }
+    if (!/^[a-z0-9]+(\.[a-z0-9_]+){2,}$/.test(String(label ?? ""))) {
+      throw new Error("Label non valida (formato richiesto: page.section.name)");
+    }
+    const it = String(italianText ?? "").trim();
+    if (!it) {
+      throw new Error("Il testo italiano è obbligatorio");
     }
 
-    return false;
+    if (!this.catalog.web[s] || typeof this.catalog.web[s] !== "object") {
+      this.catalog.web[s] = {};
+    }
+    const page = this.catalog.web[s];
+
+    for (let i = 1; i <= 999; i++) {
+      const code = String(i).padStart(3, "0");
+      if (!page[code]) {
+        page[code] = {
+          label: String(label),
+          text: { it },
+        };
+        this.buildScopeIndex();
+        return { scope: s, keyCode: code, key: i };
+      }
+    }
+    throw new Error(`Scope ${s} pieno: nessuna key libera tra 001..999`);
   }
 
   saveAllFiles() {
@@ -242,23 +212,9 @@ class I18nService {
     const backupPath = path.join(this.dataDir, backupFilename);
 
     try {
-      const backupData = {
-        timestamp,
-        languages: this.languages,
-        data: {},
-      };
-
-      for (const lang of this.languages) {
-        backupData.data[lang] = this.i18nData[lang] ?? [];
-      }
-
-      fs.writeFileSync(backupPath, JSON.stringify(backupData, null, 2), "utf-8");
-
-      for (const lang of this.languages) {
-        const filePath = path.join(this.dataDir, `i18n_${lang}.json`);
-        fs.writeFileSync(filePath, JSON.stringify(this.i18nData[lang] ?? []), "utf-8");
-      }
-
+      this.catalog.languages = this.languages;
+      fs.writeFileSync(backupPath, JSON.stringify(this.catalog, null, 2), "utf-8");
+      fs.writeFileSync(this.catalogPath, JSON.stringify(this.catalog, null, 2), "utf-8");
       return {
         success: true,
         backupFile: backupFilename,
@@ -281,13 +237,23 @@ class I18nService {
     for (const scope of this.scopes) {
       const entries = this.getScopeData(scope);
       for (const entry of entries) {
+        const label = String(entry.keyName ?? "");
+        if (label.toLowerCase().includes(query)) {
+          results.push({
+            scope,
+            key: entry.key,
+            section: 0,
+            lang: "label",
+            text: label,
+          });
+        }
         for (const lang of this.languages) {
-          const text = String(entry.translations[lang] ?? "");
+          const text = String(entry.translations?.[lang] ?? "");
           if (text.toLowerCase().includes(query)) {
             results.push({
               scope,
               key: entry.key,
-              section: entry.section,
+              section: 0,
               lang,
               text,
             });
@@ -295,22 +261,14 @@ class I18nService {
         }
       }
     }
-
     return results;
   }
 
   getTimestamp() {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
-    const seconds = String(now.getSeconds()).padStart(2, "0");
-    return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   }
 }
 
-module.exports = {
-  I18nService,
-};
+module.exports = { I18nService };

@@ -1,0 +1,5604 @@
+{
+  "version": 2,
+  "base_language": "it",
+  "languages": [
+    "it",
+    "en",
+    "fr",
+    "de",
+    "es"
+  ],
+  "web": {
+    "api": {
+      "001": {
+        "label": "api.text.001",
+        "text": {
+          "it": "API Endpoints"
+        }
+      },
+      "002": {
+        "label": "api.text.002",
+        "text": {
+          "it": "API Endpoints ["
+        }
+      },
+      "003": {
+        "label": "api.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "api.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "api.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "api.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "api.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "api.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "api.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "api.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "api.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "api.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "api.text.013",
+        "text": {
+          "it": "📡 API Endpoints"
+        }
+      },
+      "014": {
+        "label": "api.text.014",
+        "text": {
+          "it": "Tutte le API sono azionabili. Per endpoint con parametri viene richiesto un popup (query o JSON)."
+        }
+      },
+      "015": {
+        "label": "api.text.015",
+        "text": {
+          "it": "Method"
+        }
+      },
+      "016": {
+        "label": "api.text.016",
+        "text": {
+          "it": "URI"
+        }
+      },
+      "017": {
+        "label": "api.text.017",
+        "text": {
+          "it": "Description"
+        }
+      },
+      "018": {
+        "label": "api.text.018",
+        "text": {
+          "it": "Action"
+        }
+      },
+      "019": {
+        "label": "api.text.019",
+        "text": {
+          "it": "GET"
+        }
+      },
+      "020": {
+        "label": "api.text.020",
+        "text": {
+          "it": "API index"
+        }
+      },
+      "021": {
+        "label": "api.text.021",
+        "text": {
+          "it": "Apri"
+        }
+      },
+      "022": {
+        "label": "api.text.022",
+        "text": {
+          "it": "Device status JSON"
+        }
+      },
+      "023": {
+        "label": "api.text.023",
+        "text": {
+          "it": "Current configuration"
+        }
+      },
+      "024": {
+        "label": "api.text.024",
+        "text": {
+          "it": "UI texts"
+        }
+      },
+      "025": {
+        "label": "api.text.025",
+        "text": {
+          "it": "UI languages"
+        }
+      },
+      "026": {
+        "label": "api.text.026",
+        "text": {
+          "it": "POST"
+        }
+      },
+      "027": {
+        "label": "api.text.027",
+        "text": {
+          "it": "Save configuration (JSON)"
+        }
+      },
+      "028": {
+        "label": "api.text.028",
+        "text": {
+          "it": "Invia"
+        }
+      },
+      "029": {
+        "label": "api.text.029",
+        "text": {
+          "it": "Backup configuration"
+        }
+      },
+      "030": {
+        "label": "api.text.030",
+        "text": {
+          "it": "Factory reset"
+        }
+      },
+      "031": {
+        "label": "api.text.031",
+        "text": {
+          "it": "Force NTP sync"
+        }
+      },
+      "032": {
+        "label": "api.text.032",
+        "text": {
+          "it": "File list (query: storage)"
+        }
+      },
+      "033": {
+        "label": "api.text.033",
+        "text": {
+          "it": "Upload raw (usa /files per body binario)"
+        }
+      },
+      "034": {
+        "label": "api.text.034",
+        "text": {
+          "it": "Delete file (JSON)"
+        }
+      },
+      "035": {
+        "label": "api.text.035",
+        "text": {
+          "it": "Download file (query)"
+        }
+      },
+      "036": {
+        "label": "api.text.036",
+        "text": {
+          "it": "Programs table"
+        }
+      },
+      "037": {
+        "label": "api.text.037",
+        "text": {
+          "it": "Save programs (JSON, feature-gated)"
+        }
+      },
+      "038": {
+        "label": "api.text.038",
+        "text": {
+          "it": "Set UI password (JSON, feature-gated)"
+        }
+      },
+      "039": {
+        "label": "api.text.039",
+        "text": {
+          "it": "Emulator relay control (JSON)"
+        }
+      },
+      "040": {
+        "label": "api.text.040",
+        "text": {
+          "it": "Emulator coin event (JSON)"
+        }
+      },
+      "041": {
+        "label": "api.text.041",
+        "text": {
+          "it": "Program start (JSON)"
+        }
+      },
+      "042": {
+        "label": "api.text.042",
+        "text": {
+          "it": "Program stop"
+        }
+      },
+      "043": {
+        "label": "api.text.043",
+        "text": {
+          "it": "Program pause toggle"
+        }
+      },
+      "044": {
+        "label": "api.text.044",
+        "text": {
+          "it": "FSM queue/snapshot"
+        }
+      },
+      "045": {
+        "label": "api.text.045",
+        "text": {
+          "it": "Tasks"
+        }
+      },
+      "046": {
+        "label": "api.text.046",
+        "text": {
+          "it": "Save tasks (JSON)"
+        }
+      },
+      "047": {
+        "label": "api.text.047",
+        "text": {
+          "it": "Apply tasks"
+        }
+      },
+      "048": {
+        "label": "api.text.048",
+        "text": {
+          "it": "Run internal tests"
+        }
+      },
+      "049": {
+        "label": "api.text.049",
+        "text": {
+          "it": "Info"
+        }
+      },
+      "050": {
+        "label": "api.text.050",
+        "text": {
+          "it": "Stored logs"
+        }
+      },
+      "051": {
+        "label": "api.text.051",
+        "text": {
+          "it": "Receive external logs (JSON)"
+        }
+      },
+      "052": {
+        "label": "api.text.052",
+        "text": {
+          "it": "Log levels"
+        }
+      },
+      "053": {
+        "label": "api.text.053",
+        "text": {
+          "it": "Set log level (JSON)"
+        }
+      },
+      "054": {
+        "label": "api.text.054",
+        "text": {
+          "it": "OPTIONS"
+        }
+      },
+      "055": {
+        "label": "api.text.055",
+        "text": {
+          "it": "CORS preflight"
+        }
+      },
+      "056": {
+        "label": "api.text.056",
+        "text": {
+          "it": "USB enumerate"
+        }
+      },
+      "057": {
+        "label": "api.text.057",
+        "text": {
+          "it": "Restart USB host"
+        }
+      },
+      "058": {
+        "label": "api.text.058",
+        "text": {
+          "it": "Crash intenzionale (Factory)"
+        }
+      },
+      "059": {
+        "label": "api.text.059",
+        "text": {
+          "it": "Restore factory su OTA inattiva (APP)"
+        }
+      },
+      "060": {
+        "label": "api.text.060",
+        "text": {
+          "it": "Copia OTA running su Factory (Mantainer)"
+        }
+      },
+      "061": {
+        "label": "api.text.061",
+        "text": {
+          "it": "Authenticate remote (JSON)"
+        }
+      },
+      "062": {
+        "label": "api.text.062",
+        "text": {
+          "it": "Get remote config"
+        }
+      },
+      "063": {
+        "label": "api.text.063",
+        "text": {
+          "it": "Fetch images"
+        }
+      },
+      "064": {
+        "label": "api.text.064",
+        "text": {
+          "it": "Fetch translations"
+        }
+      },
+      "065": {
+        "label": "api.text.065",
+        "text": {
+          "it": "Fetch firmware"
+        }
+      },
+      "066": {
+        "label": "api.text.066",
+        "text": {
+          "it": "Payment request (JSON)"
+        }
+      },
+      "067": {
+        "label": "api.text.067",
+        "text": {
+          "it": "Offline payment (JSON)"
+        }
+      },
+      "068": {
+        "label": "api.text.068",
+        "text": {
+          "it": "Service used (JSON)"
+        }
+      },
+      "069": {
+        "label": "api.text.069",
+        "text": {
+          "it": "Get customers (JSON)"
+        }
+      },
+      "070": {
+        "label": "api.text.070",
+        "text": {
+          "it": "Get operators"
+        }
+      },
+      "071": {
+        "label": "api.text.071",
+        "text": {
+          "it": "Activity (JSON)"
+        }
+      },
+      "072": {
+        "label": "api.text.072",
+        "text": {
+          "it": "Device activity (JSON)"
+        }
+      },
+      "073": {
+        "label": "api.text.073",
+        "text": {
+          "it": "Keepalive (JSON)"
+        }
+      },
+      "074": {
+        "label": "api.text.074",
+        "text": {
+          "it": "Remote file list (query)"
+        }
+      },
+      "075": {
+        "label": "api.text.075",
+        "text": {
+          "it": "Remote upload raw (usa /files per body binario)"
+        }
+      },
+      "076": {
+        "label": "api.text.076",
+        "text": {
+          "it": "Remote delete file (JSON)"
+        }
+      },
+      "077": {
+        "label": "api.text.077",
+        "text": {
+          "it": "Remote download (query)"
+        }
+      },
+      "078": {
+        "label": "api.text.078",
+        "text": {
+          "it": "Note"
+        }
+      },
+      "079": {
+        "label": "api.text.079",
+        "text": {
+          "it": "Alcuni endpoint sono disponibili solo per profilo runtime (Factory/App) o feature flag."
+        }
+      },
+      "080": {
+        "label": "api.js.080",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "081": {
+        "label": "api.js.081",
+        "text": {
+          "it": "Inserisci query string (senza ?)"
+        }
+      },
+      "082": {
+        "label": "api.js.082",
+        "text": {
+          "it": "Inserisci JSON body"
+        }
+      },
+      "083": {
+        "label": "api.js.083",
+        "text": {
+          "it": "JSON non valido"
+        }
+      },
+      "084": {
+        "label": "api.js.084",
+        "text": {
+          "it": "\\n"
+        }
+      },
+      "085": {
+        "label": "api.js.085",
+        "text": {
+          "it": "Errore chiamata:"
+        }
+      }
+    },
+    "config": {
+      "001": {
+        "label": "config.text.001",
+        "text": {
+          "it": "Configurazione Device"
+        }
+      },
+      "002": {
+        "label": "config.text.002",
+        "text": {
+          "it": "Configurazione Device ["
+        }
+      },
+      "003": {
+        "label": "config.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "config.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "config.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "config.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "config.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "config.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "config.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "config.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "config.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "config.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "config.text.013",
+        "text": {
+          "it": "🆔 Identità Dispositivo"
+        }
+      },
+      "014": {
+        "label": "config.text.014",
+        "text": {
+          "it": "Nome Dispositivo"
+        }
+      },
+      "015": {
+        "label": "config.text.015",
+        "text": {
+          "it": "Nome Impianto"
+        }
+      },
+      "016": {
+        "label": "config.text.016",
+        "text": {
+          "it": "Lingua Pannello Utente (LCD)"
+        }
+      },
+      "017": {
+        "label": "config.text.017",
+        "text": {
+          "it": "Italiano (IT)"
+        }
+      },
+      "018": {
+        "label": "config.text.018",
+        "text": {
+          "it": "Lingua Backend (Web UI/Server)"
+        }
+      },
+      "019": {
+        "label": "config.text.019",
+        "text": {
+          "it": "Numero Programmi (pulsanti pannello)"
+        }
+      },
+      "020": {
+        "label": "config.text.020",
+        "text": {
+          "it": "Latitudine impianto (&deg;)"
+        }
+      },
+      "021": {
+        "label": "config.text.021",
+        "text": {
+          "it": "Longitudine impianto (&deg;)"
+        }
+      },
+      "022": {
+        "label": "config.text.022",
+        "text": {
+          "it": "🌐 Ethernet"
+        }
+      },
+      "023": {
+        "label": "config.text.023",
+        "text": {
+          "it": "Abilitato"
+        }
+      },
+      "024": {
+        "label": "config.text.024",
+        "text": {
+          "it": "DHCP"
+        }
+      },
+      "025": {
+        "label": "config.text.025",
+        "text": {
+          "it": "Indirizzo IP"
+        }
+      },
+      "026": {
+        "label": "config.text.026",
+        "text": {
+          "it": "Subnet"
+        }
+      },
+      "027": {
+        "label": "config.text.027",
+        "text": {
+          "it": "Gateway"
+        }
+      },
+      "028": {
+        "label": "config.text.028",
+        "text": {
+          "it": "DNS"
+        }
+      },
+      "029": {
+        "label": "config.text.029",
+        "text": {
+          "it": "DNS Secondario"
+        }
+      },
+      "030": {
+        "label": "config.text.030",
+        "text": {
+          "it": "📡 WiFi STA"
+        }
+      },
+      "031": {
+        "label": "config.text.031",
+        "text": {
+          "it": "WiFi Abilitato"
+        }
+      },
+      "032": {
+        "label": "config.text.032",
+        "text": {
+          "it": "SSID"
+        }
+      },
+      "033": {
+        "label": "config.text.033",
+        "text": {
+          "it": "Password"
+        }
+      },
+      "034": {
+        "label": "config.text.034",
+        "text": {
+          "it": "NTP"
+        }
+      },
+      "035": {
+        "label": "config.text.035",
+        "text": {
+          "it": "NTP Abilitato"
+        }
+      },
+      "036": {
+        "label": "config.text.036",
+        "text": {
+          "it": "Aggiorna"
+        }
+      },
+      "037": {
+        "label": "config.text.037",
+        "text": {
+          "it": "Server NTP 1"
+        }
+      },
+      "038": {
+        "label": "config.text.038",
+        "text": {
+          "it": "Server NTP 2"
+        }
+      },
+      "039": {
+        "label": "config.text.039",
+        "text": {
+          "it": "Offset Fuso Orario (ore)"
+        }
+      },
+      "040": {
+        "label": "config.text.040",
+        "text": {
+          "it": "🔁 Server Remoto"
+        }
+      },
+      "041": {
+        "label": "config.text.041",
+        "text": {
+          "it": "Server abilitato"
+        }
+      },
+      "042": {
+        "label": "config.text.042",
+        "text": {
+          "it": "Base server URL"
+        }
+      },
+      "043": {
+        "label": "config.text.043",
+        "text": {
+          "it": "Server serial"
+        }
+      },
+      "044": {
+        "label": "config.text.044",
+        "text": {
+          "it": "Server password (MD5)"
+        }
+      },
+      "045": {
+        "label": "config.text.045",
+        "text": {
+          "it": "📊 Logging Remoto"
+        }
+      },
+      "046": {
+        "label": "config.text.046",
+        "text": {
+          "it": "Usa broadcast UDP"
+        }
+      },
+      "047": {
+        "label": "config.text.047",
+        "text": {
+          "it": "Salva log su SD"
+        }
+      },
+      "048": {
+        "label": "config.text.048",
+        "text": {
+          "it": "Disabilita log POST/GET API"
+        }
+      },
+      "049": {
+        "label": "config.text.049",
+        "text": {
+          "it": "Porta UDP"
+        }
+      },
+      "050": {
+        "label": "config.text.050",
+        "text": {
+          "it": "🔌 Periferiche Hardware"
+        }
+      },
+      "051": {
+        "label": "config.text.051",
+        "text": {
+          "it": "I/O Expander"
+        }
+      },
+      "052": {
+        "label": "config.text.052",
+        "text": {
+          "it": "Sensore Temperatura"
+        }
+      },
+      "053": {
+        "label": "config.text.053",
+        "text": {
+          "it": "LED Strip (WS2812)"
+        }
+      },
+      "054": {
+        "label": "config.text.054",
+        "text": {
+          "it": "Numero di LED"
+        }
+      },
+      "055": {
+        "label": "config.text.055",
+        "text": {
+          "it": "UART RS232"
+        }
+      },
+      "056": {
+        "label": "config.text.056",
+        "text": {
+          "it": "UART RS485"
+        }
+      },
+      "057": {
+        "label": "config.text.057",
+        "text": {
+          "it": "MDB Engine"
+        }
+      },
+      "058": {
+        "label": "config.text.058",
+        "text": {
+          "it": "EEPROM 24LC16"
+        }
+      },
+      "059": {
+        "label": "config.text.059",
+        "text": {
+          "it": "Scheda SD"
+        }
+      },
+      "060": {
+        "label": "config.text.060",
+        "text": {
+          "it": "PWM Canale 1"
+        }
+      },
+      "061": {
+        "label": "config.text.061",
+        "text": {
+          "it": "PWM Canale 2"
+        }
+      },
+      "062": {
+        "label": "config.text.062",
+        "text": {
+          "it": "🔍 Scanner USB (CDC)"
+        }
+      },
+      "063": {
+        "label": "config.text.063",
+        "text": {
+          "it": "Scanner USB (CDC)"
+        }
+      },
+      "064": {
+        "label": "config.text.064",
+        "text": {
+          "it": "VID"
+        }
+      },
+      "065": {
+        "label": "config.text.065",
+        "text": {
+          "it": "PID"
+        }
+      },
+      "066": {
+        "label": "config.text.066",
+        "text": {
+          "it": "Dual PID (opzionale)"
+        }
+      },
+      "067": {
+        "label": "config.text.067",
+        "text": {
+          "it": "Attesa post-lettura (ms)"
+        }
+      },
+      "068": {
+        "label": "config.text.068",
+        "text": {
+          "it": "⏱️ Timeouts"
+        }
+      },
+      "069": {
+        "label": "config.text.069",
+        "text": {
+          "it": "Uscita da Scelta Programmi (s)"
+        }
+      },
+      "070": {
+        "label": "config.text.070",
+        "text": {
+          "it": "Uscita da scelta lingua (s)"
+        }
+      },
+      "071": {
+        "label": "config.text.071",
+        "text": {
+          "it": "Velocità Slideshow (ms)"
+        }
+      },
+      "072": {
+        "label": "config.text.072",
+        "text": {
+          "it": "📺 Display"
+        }
+      },
+      "073": {
+        "label": "config.text.073",
+        "text": {
+          "it": "Display abilitato"
+        }
+      },
+      "074": {
+        "label": "config.text.074",
+        "text": {
+          "it": "Luminosità LCD ("
+        }
+      },
+      "075": {
+        "label": "config.text.075",
+        "text": {
+          "it": "Modalità test LVGL inattiva"
+        }
+      },
+      "076": {
+        "label": "config.text.076",
+        "text": {
+          "it": "Logo Boot"
+        }
+      },
+      "077": {
+        "label": "config.text.077",
+        "text": {
+          "it": "Pagina Principale"
+        }
+      },
+      "078": {
+        "label": "config.text.078",
+        "text": {
+          "it": "Slideshow"
+        }
+      },
+      "079": {
+        "label": "config.text.079",
+        "text": {
+          "it": "Scelta Lingua"
+        }
+      },
+      "080": {
+        "label": "config.text.080",
+        "text": {
+          "it": "Fuori Servizio"
+        }
+      },
+      "081": {
+        "label": "config.text.081",
+        "text": {
+          "it": "🔄 Reboot App"
+        }
+      },
+      "082": {
+        "label": "config.text.082",
+        "text": {
+          "it": "🔘 GPIO Ausiliario (GPIO33)"
+        }
+      },
+      "083": {
+        "label": "config.text.083",
+        "text": {
+          "it": "GPIO 33"
+        }
+      },
+      "084": {
+        "label": "config.text.084",
+        "text": {
+          "it": "Modalità"
+        }
+      },
+      "085": {
+        "label": "config.text.085",
+        "text": {
+          "it": "Input (Float)"
+        }
+      },
+      "086": {
+        "label": "config.text.086",
+        "text": {
+          "it": "Input (Pull-up)"
+        }
+      },
+      "087": {
+        "label": "config.text.087",
+        "text": {
+          "it": "Input (Pull-down)"
+        }
+      },
+      "088": {
+        "label": "config.text.088",
+        "text": {
+          "it": "Output"
+        }
+      },
+      "089": {
+        "label": "config.text.089",
+        "text": {
+          "it": "Stato Iniziale (Solo Out)"
+        }
+      },
+      "090": {
+        "label": "config.text.090",
+        "text": {
+          "it": "📡 CCTalk"
+        }
+      },
+      "091": {
+        "label": "config.text.091",
+        "text": {
+          "it": "ADDR Gettoniera (1-255)"
+        }
+      },
+      "092": {
+        "label": "config.text.092",
+        "text": {
+          "it": "Baudrate"
+        }
+      },
+      "093": {
+        "label": "config.text.093",
+        "text": {
+          "it": "Data Bits"
+        }
+      },
+      "094": {
+        "label": "config.text.094",
+        "text": {
+          "it": "Parità (0:None, 1:Odd, 2:Even)"
+        }
+      },
+      "095": {
+        "label": "config.text.095",
+        "text": {
+          "it": "Stop Bits (1, 2)"
+        }
+      },
+      "096": {
+        "label": "config.text.096",
+        "text": {
+          "it": "Buffer RX"
+        }
+      },
+      "097": {
+        "label": "config.text.097",
+        "text": {
+          "it": "Buffer TX"
+        }
+      },
+      "098": {
+        "label": "config.text.098",
+        "text": {
+          "it": "Log TX/RX"
+        }
+      },
+      "099": {
+        "label": "config.text.099",
+        "text": {
+          "it": "Configurazione fissa driver CCTalk (GPIO20/GPIO21, 9600 8N1)."
+        }
+      },
+      "100": {
+        "label": "config.text.100",
+        "text": {
+          "it": "(TAG) Porte Seriali"
+        }
+      },
+      "101": {
+        "label": "config.text.101",
+        "text": {
+          "it": "RS232 Configuration"
+        }
+      },
+      "102": {
+        "label": "config.text.102",
+        "text": {
+          "it": "RS485 Configuration"
+        }
+      },
+      "103": {
+        "label": "config.text.103",
+        "text": {
+          "it": "MDB Configuration"
+        }
+      },
+      "104": {
+        "label": "config.text.104",
+        "text": {
+          "it": "💾 Salva Configurazione"
+        }
+      },
+      "105": {
+        "label": "config.text.105",
+        "text": {
+          "it": "📥 Backup Config"
+        }
+      },
+      "106": {
+        "label": "config.text.106",
+        "text": {
+          "it": "🔄 Aggiorna Dati"
+        }
+      },
+      "107": {
+        "label": "config.text.107",
+        "text": {
+          "it": "⚠️ Reset Fabbrica"
+        }
+      },
+      "108": {
+        "label": "config.attr.108",
+        "text": {
+          "it": "es: TestWave-01"
+        }
+      },
+      "109": {
+        "label": "config.attr.109",
+        "text": {
+          "it": "es: Ceglia Carwashing"
+        }
+      },
+      "110": {
+        "label": "config.attr.110",
+        "text": {
+          "it": "it"
+        }
+      },
+      "111": {
+        "label": "config.attr.111",
+        "text": {
+          "it": "es: 45.464161"
+        }
+      },
+      "112": {
+        "label": "config.attr.112",
+        "text": {
+          "it": "es: 9.190299"
+        }
+      },
+      "113": {
+        "label": "config.attr.113",
+        "text": {
+          "it": "time.google.com"
+        }
+      },
+      "114": {
+        "label": "config.attr.114",
+        "text": {
+          "it": "pool.ntp.org"
+        }
+      },
+      "115": {
+        "label": "config.attr.115",
+        "text": {
+          "it": "AD-34-DFG-333"
+        }
+      },
+      "116": {
+        "label": "config.attr.116",
+        "text": {
+          "it": "c1ef6429c5e0f753ff24a114de6ee7d4"
+        }
+      },
+      "117": {
+        "label": "config.attr.117",
+        "text": {
+          "it": "0x1EAB"
+        }
+      },
+      "118": {
+        "label": "config.attr.118",
+        "text": {
+          "it": "0x0006"
+        }
+      },
+      "119": {
+        "label": "config.attr.119",
+        "text": {
+          "it": "0x0000"
+        }
+      },
+      "120": {
+        "label": "config.attr.120",
+        "text": {
+          "it": "Tempo transizione immagini"
+        }
+      },
+      "121": {
+        "label": "config.js.121",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "122": {
+        "label": "config.js.122",
+        "text": {
+          "it": "❌ Errore:"
+        }
+      },
+      "123": {
+        "label": "config.js.123",
+        "text": {
+          "it": "Resettare ai valori di fabbrica?"
+        }
+      },
+      "124": {
+        "label": "config.js.124",
+        "text": {
+          "it": "#c0392b"
+        }
+      },
+      "125": {
+        "label": "config.js.125",
+        "text": {
+          "it": "#2c3e50"
+        }
+      },
+      "126": {
+        "label": "config.js.126",
+        "text": {
+          "it": "Invio comando pagina"
+        }
+      },
+      "127": {
+        "label": "config.js.127",
+        "text": {
+          "it": "Errore pagina"
+        }
+      },
+      "128": {
+        "label": "config.js.128",
+        "text": {
+          "it": "Errore rete comando LVGL"
+        }
+      },
+      "129": {
+        "label": "config.js.129",
+        "text": {
+          "it": "Riavviare app?"
+        }
+      },
+      "130": {
+        "label": "config.js.130",
+        "text": {
+          "it": "Invio reboot app..."
+        }
+      },
+      "131": {
+        "label": "config.js.131",
+        "text": {
+          "it": "Reboot in corso..."
+        }
+      },
+      "132": {
+        "label": "config.js.132",
+        "text": {
+          "it": "Errore reboot:"
+        }
+      },
+      "133": {
+        "label": "config.js.133",
+        "text": {
+          "it": "Errore rete reboot LVGL"
+        }
+      },
+      "134": {
+        "label": "config.js.134",
+        "text": {
+          "it": "enable_api_log update failed"
+        }
+      },
+      "135": {
+        "label": "config.js.135",
+        "text": {
+          "it": "<h2>🔐 Password boot/emulatore</h2><p style='margin:8px 0 12px 0;color:#566573;'>Modifica password richiesta per /emulator e reboot FACTORY.</p><div class='form-group'><label>Password attuale</label><input type='password' id='boot_pwd_current' placeholder='password attuale'></div><div class='form-group'><label>Nuova password</label><input type='password' id='boot_pwd_new' placeholder='min 4 caratteri'></div><div class='form-group'><label>Conferma nuova password</label><input type='password' id='boot_pwd_confirm' placeholder='ripeti password'></div><button type='button' onclick='saveBootPassword()' style='background:#8e44ad;'>💾 Salva password boot</button>"
+        }
+      },
+      "136": {
+        "label": "config.js.136",
+        "text": {
+          "it": "<label class='switch'><input type='checkbox' id='cctalk' name='cctalk'><span class='slider'></span></label><span>CCtalk</span>"
+        }
+      },
+      "137": {
+        "label": "config.js.137",
+        "text": {
+          "it": "❌ Errore aggiornamento Log TX/RX"
+        }
+      },
+      "138": {
+        "label": "config.js.138",
+        "text": {
+          "it": "cctalk log state fetch failed"
+        }
+      },
+      "139": {
+        "label": "config.js.139",
+        "text": {
+          "it": "ui languages fetch failed"
+        }
+      },
+      "140": {
+        "label": "config.js.140",
+        "text": {
+          "it": "[CONFIG] scannerCfg initialized:"
+        }
+      },
+      "141": {
+        "label": "config.js.141",
+        "text": {
+          "it": "api log state fetch failed"
+        }
+      },
+      "142": {
+        "label": "config.js.142",
+        "text": {
+          "it": "[CONFIG] scannerCfg found:"
+        }
+      },
+      "143": {
+        "label": "config.js.143",
+        "text": {
+          "it": "[CONFIG] scanner_en.checked set to:"
+        }
+      },
+      "144": {
+        "label": "config.js.144",
+        "text": {
+          "it": "[CONFIG] scannerCfg is null, setting scanner_en.checked = false"
+        }
+      },
+      "145": {
+        "label": "config.js.145",
+        "text": {
+          "it": "Password troppo corta (min 4)"
+        }
+      },
+      "146": {
+        "label": "config.js.146",
+        "text": {
+          "it": "Conferma password non valida"
+        }
+      },
+      "147": {
+        "label": "config.js.147",
+        "text": {
+          "it": "✅ Password aggiornata"
+        }
+      },
+      "148": {
+        "label": "config.js.148",
+        "text": {
+          "it": "Confermi il cambio lingua? Verranno ricaricate le tabelle di traduzione per le interfacce modificate."
+        }
+      },
+      "149": {
+        "label": "config.js.149",
+        "text": {
+          "it": "reloadLanguageTables failed"
+        }
+      },
+      "150": {
+        "label": "config.js.150",
+        "text": {
+          "it": "✅ Configurazione salvata. Lingue aggiornate!"
+        }
+      },
+      "151": {
+        "label": "config.js.151",
+        "text": {
+          "it": "✅ Configurazione salvata!"
+        }
+      },
+      "152": {
+        "label": "config.js.152",
+        "text": {
+          "it": "❌ Errore durante il salvataggio!"
+        }
+      },
+      "153": {
+        "label": "config.js.153",
+        "text": {
+          "it": "USB:Enumerate (Sperimentali)"
+        }
+      },
+      "154": {
+        "label": "config.js.154",
+        "text": {
+          "it": "USB:Restart Host (Sperimentali)"
+        }
+      }
+    },
+    "emulator": {
+      "001": {
+        "label": "emulator.text.001",
+        "text": {
+          "it": "Emulator"
+        }
+      },
+      "002": {
+        "label": "emulator.text.002",
+        "text": {
+          "it": "Emulator ["
+        }
+      },
+      "003": {
+        "label": "emulator.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "emulator.text.004",
+        "text": {
+          "it": "Home"
+        }
+      },
+      "005": {
+        "label": "emulator.text.005",
+        "text": {
+          "it": "--/--/----\\n--:--:--"
+        }
+      },
+      "006": {
+        "label": "emulator.text.006",
+        "text": {
+          "it": "Credito"
+        }
+      },
+      "007": {
+        "label": "emulator.text.007",
+        "text": {
+          "it": "Secondi   00:00"
+        }
+      },
+      "008": {
+        "label": "emulator.text.008",
+        "text": {
+          "it": "Pausa: 00:00"
+        }
+      },
+      "009": {
+        "label": "emulator.text.009",
+        "text": {
+          "it": "Quadro elettrico"
+        }
+      },
+      "010": {
+        "label": "emulator.text.010",
+        "text": {
+          "it": "&#128247; Crediti QR"
+        }
+      },
+      "011": {
+        "label": "emulator.text.011",
+        "text": {
+          "it": "&#128190; Crediti Tessera"
+        }
+      },
+      "012": {
+        "label": "emulator.text.012",
+        "text": {
+          "it": "Tessera ON"
+        }
+      },
+      "013": {
+        "label": "emulator.text.013",
+        "text": {
+          "it": "&#129689; Monete"
+        }
+      },
+      "014": {
+        "label": "emulator.text.014",
+        "text": {
+          "it": "1 coin"
+        }
+      },
+      "015": {
+        "label": "emulator.text.015",
+        "text": {
+          "it": "2 coin"
+        }
+      },
+      "016": {
+        "label": "emulator.text.016",
+        "text": {
+          "it": "Relay"
+        }
+      },
+      "017": {
+        "label": "emulator.text.017",
+        "text": {
+          "it": "R1"
+        }
+      },
+      "018": {
+        "label": "emulator.text.018",
+        "text": {
+          "it": "R2"
+        }
+      },
+      "019": {
+        "label": "emulator.text.019",
+        "text": {
+          "it": "R3"
+        }
+      },
+      "020": {
+        "label": "emulator.text.020",
+        "text": {
+          "it": "R4"
+        }
+      },
+      "021": {
+        "label": "emulator.text.021",
+        "text": {
+          "it": "R5"
+        }
+      },
+      "022": {
+        "label": "emulator.text.022",
+        "text": {
+          "it": "R6"
+        }
+      },
+      "023": {
+        "label": "emulator.text.023",
+        "text": {
+          "it": "R7"
+        }
+      },
+      "024": {
+        "label": "emulator.text.024",
+        "text": {
+          "it": "R8"
+        }
+      },
+      "025": {
+        "label": "emulator.text.025",
+        "text": {
+          "it": "R9"
+        }
+      },
+      "026": {
+        "label": "emulator.text.026",
+        "text": {
+          "it": "R10"
+        }
+      },
+      "027": {
+        "label": "emulator.text.027",
+        "text": {
+          "it": "Nessun evento in coda"
+        }
+      },
+      "028": {
+        "label": "emulator.text.028",
+        "text": {
+          "it": "Layout operativo: pannello utente 720x1280 a sinistra (1-5 | counter | barra | 6-10), quadro elettrico a destra con ricarica credito e stato relay."
+        }
+      },
+      "029": {
+        "label": "emulator.js.029",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "030": {
+        "label": "emulator.js.030",
+        "text": {
+          "it": "\\n"
+        }
+      },
+      "031": {
+        "label": "emulator.js.031",
+        "text": {
+          "it": "&amp;"
+        }
+      },
+      "032": {
+        "label": "emulator.js.032",
+        "text": {
+          "it": "&lt;"
+        }
+      },
+      "033": {
+        "label": "emulator.js.033",
+        "text": {
+          "it": "&gt;"
+        }
+      },
+      "034": {
+        "label": "emulator.js.034",
+        "text": {
+          "it": "<div>•"
+        }
+      },
+      "035": {
+        "label": "emulator.js.035",
+        "text": {
+          "it": "</div>"
+        }
+      },
+      "036": {
+        "label": "emulator.js.036",
+        "text": {
+          "it": "fsm messages fetch failed"
+        }
+      },
+      "037": {
+        "label": "emulator.js.037",
+        "text": {
+          "it": "load programs failed"
+        }
+      },
+      "038": {
+        "label": "emulator.js.038",
+        "text": {
+          "it": "[EMULATOR_CMD]"
+        }
+      },
+      "039": {
+        "label": "emulator.js.039",
+        "text": {
+          "it": "#e74c3c"
+        }
+      },
+      "040": {
+        "label": "emulator.js.040",
+        "text": {
+          "it": "#2c3e50"
+        }
+      },
+      "041": {
+        "label": "emulator.js.041",
+        "text": {
+          "it": "virtual relay update failed"
+        }
+      },
+      "042": {
+        "label": "emulator.js.042",
+        "text": {
+          "it": "credit-value credit-value-small"
+        }
+      },
+      "043": {
+        "label": "emulator.js.043",
+        "text": {
+          "it": "Credito insufficiente"
+        }
+      },
+      "044": {
+        "label": "emulator.js.044",
+        "text": {
+          "it": "Errore pausa/ripresa: HTTP"
+        }
+      },
+      "045": {
+        "label": "emulator.js.045",
+        "text": {
+          "it": "in pausa"
+        }
+      },
+      "046": {
+        "label": "emulator.js.046",
+        "text": {
+          "it": "Errore avvio programma: HTTP"
+        }
+      },
+      "047": {
+        "label": "emulator.js.047",
+        "text": {
+          "it": "in running"
+        }
+      },
+      "048": {
+        "label": "emulator.js.048",
+        "text": {
+          "it": "Errore programma:"
+        }
+      },
+      "049": {
+        "label": "emulator.js.049",
+        "text": {
+          "it": "Errore invio coin: HTTP"
+        }
+      },
+      "050": {
+        "label": "emulator.js.050",
+        "text": {
+          "it": "Errore invio coin:"
+        }
+      },
+      "051": {
+        "label": "emulator.js.051",
+        "text": {
+          "it": "Comando Relay R"
+        }
+      },
+      "052": {
+        "label": "emulator.js.052",
+        "text": {
+          "it": "Requested app to send CCTALK frames (addr="
+        }
+      },
+      "053": {
+        "label": "emulator.js.053",
+        "text": {
+          "it": "sendCctalkFramesFromApp invocation failed"
+        }
+      },
+      "054": {
+        "label": "emulator.js.054",
+        "text": {
+          "it": "Dispatched hardware command cctalk_sequence"
+        }
+      },
+      "055": {
+        "label": "emulator.js.055",
+        "text": {
+          "it": "dispatchHardwareCommand failed"
+        }
+      },
+      "056": {
+        "label": "emulator.js.056",
+        "text": {
+          "it": "No app function to send CCTALK frames found"
+        }
+      },
+      "057": {
+        "label": "emulator.js.057",
+        "text": {
+          "it": "cctalk sequence exception"
+        }
+      }
+    },
+    "files": {
+      "001": {
+        "label": "files.text.001",
+        "text": {
+          "it": "File Manager"
+        }
+      },
+      "002": {
+        "label": "files.text.002",
+        "text": {
+          "it": "File Manager ["
+        }
+      },
+      "003": {
+        "label": "files.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "files.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "files.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "files.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "files.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "files.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "files.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "files.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "files.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "files.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "files.text.013",
+        "text": {
+          "it": "📁 Mini File Manager (root only)"
+        }
+      },
+      "014": {
+        "label": "files.text.014",
+        "text": {
+          "it": "Storage:"
+        }
+      },
+      "015": {
+        "label": "files.text.015",
+        "text": {
+          "it": "SPIFFS"
+        }
+      },
+      "016": {
+        "label": "files.text.016",
+        "text": {
+          "it": "SDCARD"
+        }
+      },
+      "017": {
+        "label": "files.text.017",
+        "text": {
+          "it": "Aggiorna elenco"
+        }
+      },
+      "018": {
+        "label": "files.text.018",
+        "text": {
+          "it": "Carica file"
+        }
+      },
+      "019": {
+        "label": "files.text.019",
+        "text": {
+          "it": "Seleziona/Deseleziona tutto"
+        }
+      },
+      "020": {
+        "label": "files.text.020",
+        "text": {
+          "it": "Copia su SPIFFS"
+        }
+      },
+      "021": {
+        "label": "files.text.021",
+        "text": {
+          "it": "Scarica tutto"
+        }
+      },
+      "022": {
+        "label": "files.text.022",
+        "text": {
+          "it": "Elimina tutto"
+        }
+      },
+      "023": {
+        "label": "files.text.023",
+        "text": {
+          "it": "Anteprima file"
+        }
+      },
+      "024": {
+        "label": "files.text.024",
+        "text": {
+          "it": "Chiudi"
+        }
+      },
+      "025": {
+        "label": "files.text.025",
+        "text": {
+          "it": "Sel"
+        }
+      },
+      "026": {
+        "label": "files.text.026",
+        "text": {
+          "it": "Nome"
+        }
+      },
+      "027": {
+        "label": "files.text.027",
+        "text": {
+          "it": "Dimensione (byte)"
+        }
+      },
+      "028": {
+        "label": "files.text.028",
+        "text": {
+          "it": "Azione"
+        }
+      },
+      "029": {
+        "label": "files.js.029",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "030": {
+        "label": "files.js.030",
+        "text": {
+          "it": "); tb.innerHTML="
+        }
+      },
+      "031": {
+        "label": "files.js.031",
+        "text": {
+          "it": ");      tr.innerHTML="
+        }
+      },
+      "032": {
+        "label": "files.js.032",
+        "text": {
+          "it": "'+encodeURIComponent(f.name)+'"
+        }
+      },
+      "033": {
+        "label": "files.js.033",
+        "text": {
+          "it": "+esc(f.name)+"
+        }
+      },
+      "034": {
+        "label": "files.js.034",
+        "text": {
+          "it": "+f.size+"
+        }
+      },
+      "035": {
+        "label": "files.js.035",
+        "text": {
+          "it": "fmView(\\''+encodeURIComponent(f.name)+'\\')"
+        }
+      },
+      "036": {
+        "label": "files.js.036",
+        "text": {
+          "it": "fmDownload(\\''+encodeURIComponent(f.name)+'\\')"
+        }
+      },
+      "037": {
+        "label": "files.js.037",
+        "text": {
+          "it": "fmDelete(\\''+encodeURIComponent(f.name)+'\\')"
+        }
+      },
+      "038": {
+        "label": "files.js.038",
+        "text": {
+          "it": ";    fmSetStatus("
+        }
+      },
+      "039": {
+        "label": "files.js.039",
+        "text": {
+          "it": "+(j.files?j.files.length:0)+"
+        }
+      },
+      "040": {
+        "label": "files.js.040",
+        "text": {
+          "it": "+usedKb+"
+        }
+      },
+      "041": {
+        "label": "files.js.041",
+        "text": {
+          "it": "+totalKb+"
+        }
+      },
+      "042": {
+        "label": "files.js.042",
+        "text": {
+          "it": "+f.name+"
+        }
+      },
+      "043": {
+        "label": "files.js.043",
+        "text": {
+          "it": "+encodeURIComponent(fmStorage())+"
+        }
+      },
+      "044": {
+        "label": "files.js.044",
+        "text": {
+          "it": "+f.name):("
+        }
+      },
+      "045": {
+        "label": "files.js.045",
+        "text": {
+          "it": "+name+"
+        }
+      },
+      "046": {
+        "label": "files.js.046",
+        "text": {
+          "it": ")) return;  fmSetStatus("
+        }
+      },
+      "047": {
+        "label": "files.js.047",
+        "text": {
+          "it": "+name):("
+        }
+      },
+      "048": {
+        "label": "files.js.048",
+        "text": {
+          "it": "+encodeURIComponent(name);  window.open(url,"
+        }
+      },
+      "049": {
+        "label": "files.js.049",
+        "text": {
+          "it": "+encodeURIComponent(name);  fmSetStatus("
+        }
+      },
+      "050": {
+        "label": "files.js.050",
+        "text": {
+          "it": ")||lower.endsWith("
+        }
+      },
+      "051": {
+        "label": "files.js.051",
+        "text": {
+          "it": ");    const title=document.getElementById("
+        }
+      },
+      "052": {
+        "label": "files.js.052",
+        "text": {
+          "it": ");    const content=document.getElementById("
+        }
+      },
+      "053": {
+        "label": "files.js.053",
+        "text": {
+          "it": ");    if(title) title.textContent="
+        }
+      },
+      "054": {
+        "label": "files.js.054",
+        "text": {
+          "it": "+name;    if(content) content.textContent=shown;    if(wrap) wrap.style.display="
+        }
+      },
+      "055": {
+        "label": "files.js.055",
+        "text": {
+          "it": ");  const content=document.getElementById("
+        }
+      },
+      "056": {
+        "label": "files.js.056",
+        "text": {
+          "it": ");  const title=document.getElementById("
+        }
+      },
+      "057": {
+        "label": "files.js.057",
+        "text": {
+          "it": ");  if(content) content.textContent="
+        }
+      },
+      "058": {
+        "label": "files.js.058",
+        "text": {
+          "it": ";  if(title) title.textContent="
+        }
+      },
+      "059": {
+        "label": "files.js.059",
+        "text": {
+          "it": ";  if(wrap) wrap.style.display="
+        }
+      },
+      "060": {
+        "label": "files.js.060",
+        "text": {
+          "it": "+names.length+"
+        }
+      },
+      "061": {
+        "label": "files.js.061",
+        "text": {
+          "it": "+ok+"
+        }
+      },
+      "062": {
+        "label": "files.js.062",
+        "text": {
+          "it": ");  if(!btn) return;  btn.textContent=fmStorage()==="
+        }
+      },
+      "063": {
+        "label": "files.js.063",
+        "text": {
+          "it": ";  fmSetStatus("
+        }
+      },
+      "064": {
+        "label": "files.js.064",
+        "text": {
+          "it": "+from+"
+        }
+      },
+      "065": {
+        "label": "files.js.065",
+        "text": {
+          "it": "+to+"
+        }
+      },
+      "066": {
+        "label": "files.js.066",
+        "text": {
+          "it": "+j.copied+"
+        }
+      }
+    },
+    "httpservices": {
+      "001": {
+        "label": "httpservices.text.001",
+        "text": {
+          "it": "HTTP Services"
+        }
+      },
+      "002": {
+        "label": "httpservices.text.002",
+        "text": {
+          "it": "HTTP Services ["
+        }
+      },
+      "003": {
+        "label": "httpservices.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "httpservices.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "httpservices.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "httpservices.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "httpservices.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "httpservices.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "httpservices.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "httpservices.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "httpservices.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "httpservices.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "httpservices.text.013",
+        "text": {
+          "it": "🔄 Aggiorna Pagina"
+        }
+      },
+      "014": {
+        "label": "httpservices.text.014",
+        "text": {
+          "it": "Richiesta"
+        }
+      },
+      "015": {
+        "label": "httpservices.text.015",
+        "text": {
+          "it": "Risposta"
+        }
+      },
+      "016": {
+        "label": "httpservices.text.016",
+        "text": {
+          "it": "Token:"
+        }
+      },
+      "017": {
+        "label": "httpservices.text.017",
+        "text": {
+          "it": "Copia"
+        }
+      },
+      "018": {
+        "label": "httpservices.text.018",
+        "text": {
+          "it": "Rimuovi"
+        }
+      },
+      "019": {
+        "label": "httpservices.text.019",
+        "text": {
+          "it": "Is JWT"
+        }
+      },
+      "020": {
+        "label": "httpservices.text.020",
+        "text": {
+          "it": "Header"
+        }
+      },
+      "021": {
+        "label": "httpservices.text.021",
+        "text": {
+          "it": "Payload"
+        }
+      },
+      "022": {
+        "label": "httpservices.text.022",
+        "text": {
+          "it": "🔐 Login + Chiamate HTTP"
+        }
+      },
+      "023": {
+        "label": "httpservices.text.023",
+        "text": {
+          "it": "Serial:"
+        }
+      },
+      "024": {
+        "label": "httpservices.text.024",
+        "text": {
+          "it": "Password (MD5):"
+        }
+      },
+      "025": {
+        "label": "httpservices.text.025",
+        "text": {
+          "it": "Invia"
+        }
+      },
+      "026": {
+        "label": "httpservices.text.026",
+        "text": {
+          "it": "POST /api/keepalive"
+        }
+      },
+      "027": {
+        "label": "httpservices.text.027",
+        "text": {
+          "it": "POST /api/getconfig"
+        }
+      },
+      "028": {
+        "label": "httpservices.text.028",
+        "text": {
+          "it": "POST /api/getimages"
+        }
+      },
+      "029": {
+        "label": "httpservices.text.029",
+        "text": {
+          "it": "POST /api/gettranslations"
+        }
+      },
+      "030": {
+        "label": "httpservices.text.030",
+        "text": {
+          "it": "POST /api/getfirmware"
+        }
+      },
+      "031": {
+        "label": "httpservices.text.031",
+        "text": {
+          "it": "POST /api/payment"
+        }
+      },
+      "032": {
+        "label": "httpservices.text.032",
+        "text": {
+          "it": "POST /api/paymentoffline"
+        }
+      },
+      "033": {
+        "label": "httpservices.text.033",
+        "text": {
+          "it": "POST /api/serviceused"
+        }
+      },
+      "034": {
+        "label": "httpservices.text.034",
+        "text": {
+          "it": "POST /api/getcustomers"
+        }
+      },
+      "035": {
+        "label": "httpservices.text.035",
+        "text": {
+          "it": "POST /api/getoperators"
+        }
+      },
+      "036": {
+        "label": "httpservices.text.036",
+        "text": {
+          "it": "POST /api/activity"
+        }
+      },
+      "037": {
+        "label": "httpservices.attr.037",
+        "text": {
+          "it": "AD-34-DFG-333"
+        }
+      },
+      "038": {
+        "label": "httpservices.attr.038",
+        "text": {
+          "it": "md5(...)"
+        }
+      },
+      "039": {
+        "label": "httpservices.attr.039",
+        "text": {
+          "it": "Errore: callGetCustomers non caricata"
+        }
+      },
+      "040": {
+        "label": "httpservices.js.040",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "041": {
+        "label": "httpservices.js.041",
+        "text": {
+          "it": "\\u23f3 Inviando..."
+        }
+      },
+      "042": {
+        "label": "httpservices.js.042",
+        "text": {
+          "it": "POST /api/getcustomers\\nContent-Type: application/json\\nX-Request-Date:"
+        }
+      },
+      "043": {
+        "label": "httpservices.js.043",
+        "text": {
+          "it": "\\nAuthorization:"
+        }
+      },
+      "044": {
+        "label": "httpservices.js.044",
+        "text": {
+          "it": "\\n\\n"
+        }
+      },
+      "045": {
+        "label": "httpservices.js.045",
+        "text": {
+          "it": "Invio in corso..."
+        }
+      },
+      "046": {
+        "label": "httpservices.js.046",
+        "text": {
+          "it": "⏳ Inviando..."
+        }
+      },
+      "047": {
+        "label": "httpservices.js.047",
+        "text": {
+          "it": "NOT FOUND"
+        }
+      },
+      "048": {
+        "label": "httpservices.js.048",
+        "text": {
+          "it": "POST /api/keepalive\\nContent-Type: application/json\\nX-Request-Date:"
+        }
+      },
+      "049": {
+        "label": "httpservices.js.049",
+        "text": {
+          "it": "--> POST /api/keepalive\\nInvio in corso..."
+        }
+      },
+      "050": {
+        "label": "httpservices.js.050",
+        "text": {
+          "it": "Errore keepalive:"
+        }
+      },
+      "051": {
+        "label": "httpservices.js.051",
+        "text": {
+          "it": "Token (localStorage):"
+        }
+      },
+      "052": {
+        "label": "httpservices.js.052",
+        "text": {
+          "it": "Compila serial e password"
+        }
+      },
+      "053": {
+        "label": "httpservices.js.053",
+        "text": {
+          "it": "POST /api/login\\nContent-Type: application/json\\nX-Request-Date:"
+        }
+      },
+      "054": {
+        "label": "httpservices.js.054",
+        "text": {
+          "it": "\\n\\nToken:"
+        }
+      },
+      "055": {
+        "label": "httpservices.js.055",
+        "text": {
+          "it": "Errore di rete:"
+        }
+      },
+      "056": {
+        "label": "httpservices.js.056",
+        "text": {
+          "it": "Token copiato"
+        }
+      },
+      "057": {
+        "label": "httpservices.js.057",
+        "text": {
+          "it": "\\nContent-Type: application/json\\nX-Request-Date:"
+        }
+      },
+      "058": {
+        "label": "httpservices.js.058",
+        "text": {
+          "it": "POST /api/getcustomers\\nContent-Type: application/json\\n\\n"
+        }
+      }
+    },
+    "index": {
+      "001": {
+        "label": "index.text.001",
+        "text": {
+          "it": "MH1001 control"
+        }
+      },
+      "002": {
+        "label": "index.text.002",
+        "text": {
+          "it": "MH1001 control ["
+        }
+      },
+      "003": {
+        "label": "index.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "index.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "index.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "index.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "index.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "index.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "index.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "index.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "index.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "index.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "index.text.013",
+        "text": {
+          "it": "Configurazione"
+        }
+      },
+      "014": {
+        "label": "index.text.014",
+        "text": {
+          "it": "Statistiche"
+        }
+      },
+      "015": {
+        "label": "index.text.015",
+        "text": {
+          "it": "File Manager"
+        }
+      },
+      "016": {
+        "label": "index.text.016",
+        "text": {
+          "it": "Test Hardware"
+        }
+      },
+      "017": {
+        "label": "index.text.017",
+        "text": {
+          "it": "Editor Task"
+        }
+      },
+      "018": {
+        "label": "index.text.018",
+        "text": {
+          "it": "HTTP Services"
+        }
+      },
+      "019": {
+        "label": "index.text.019",
+        "text": {
+          "it": "Mantainer"
+        }
+      },
+      "020": {
+        "label": "index.text.020",
+        "text": {
+          "it": "Tabella Programmi"
+        }
+      },
+      "021": {
+        "label": "index.text.021",
+        "text": {
+          "it": "Log"
+        }
+      },
+      "022": {
+        "label": "index.text.022",
+        "text": {
+          "it": "Update OTA"
+        }
+      },
+      "023": {
+        "label": "index.text.023",
+        "text": {
+          "it": "ℹ️ Informazioni"
+        }
+      },
+      "024": {
+        "label": "index.text.024",
+        "text": {
+          "it": "Profilo:"
+        }
+      },
+      "025": {
+        "label": "index.text.025",
+        "text": {
+          "it": "Factory View"
+        }
+      },
+      "026": {
+        "label": "index.text.026",
+        "text": {
+          "it": "Benvenuti nell'interfaccia di configurazione e test."
+        }
+      },
+      "027": {
+        "label": "index.text.027",
+        "text": {
+          "it": "Reboot"
+        }
+      },
+      "028": {
+        "label": "index.text.028",
+        "text": {
+          "it": "FACTORY"
+        }
+      },
+      "029": {
+        "label": "index.text.029",
+        "text": {
+          "it": "APP LAST"
+        }
+      },
+      "030": {
+        "label": "index.text.030",
+        "text": {
+          "it": "OTA0"
+        }
+      },
+      "031": {
+        "label": "index.text.031",
+        "text": {
+          "it": "OTA1"
+        }
+      },
+      "032": {
+        "label": "index.text.032",
+        "text": {
+          "it": "API"
+        }
+      },
+      "033": {
+        "label": "index.text.033",
+        "text": {
+          "it": "🧩 Stato servizi"
+        }
+      },
+      "034": {
+        "label": "index.text.034",
+        "text": {
+          "it": "Caricamento..."
+        }
+      },
+      "035": {
+        "label": "index.text.035",
+        "text": {
+          "it": "💻 CPU e Task"
+        }
+      },
+      "036": {
+        "label": "index.text.036",
+        "text": {
+          "it": "Core 0"
+        }
+      },
+      "037": {
+        "label": "index.text.037",
+        "text": {
+          "it": "Core 1"
+        }
+      },
+      "038": {
+        "label": "index.text.038",
+        "text": {
+          "it": "Uptime"
+        }
+      },
+      "039": {
+        "label": "index.text.039",
+        "text": {
+          "it": "RunTime Stats"
+        }
+      },
+      "040": {
+        "label": "index.text.040",
+        "text": {
+          "it": "refresh 2s"
+        }
+      },
+      "041": {
+        "label": "index.js.041",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "042": {
+        "label": "index.js.042",
+        "text": {
+          "it": "⚙️mock"
+        }
+      },
+      "043": {
+        "label": "index.js.043",
+        "text": {
+          "it": "<div class=\"svc-item\"><span class=\"svc-name\">"
+        }
+      },
+      "044": {
+        "label": "index.js.044",
+        "text": {
+          "it": "</span><span class=\"svc-state"
+        }
+      },
+      "045": {
+        "label": "index.js.045",
+        "text": {
+          "it": "</span></div>"
+        }
+      },
+      "046": {
+        "label": "index.js.046",
+        "text": {
+          "it": "ATTIVO (CH1+CH2)"
+        }
+      },
+      "047": {
+        "label": "index.js.047",
+        "text": {
+          "it": "ATTIVO (CH1)"
+        }
+      },
+      "048": {
+        "label": "index.js.048",
+        "text": {
+          "it": "ATTIVO (CH2)"
+        }
+      },
+      "049": {
+        "label": "index.js.049",
+        "text": {
+          "it": "ATTIVO (rete+SD)"
+        }
+      },
+      "050": {
+        "label": "index.js.050",
+        "text": {
+          "it": "ATTIVO (rete)"
+        }
+      },
+      "051": {
+        "label": "index.js.051",
+        "text": {
+          "it": "ATTIVO (SD)"
+        }
+      },
+      "052": {
+        "label": "index.js.052",
+        "text": {
+          "it": "ATTIVA (2 moduli)"
+        }
+      },
+      "053": {
+        "label": "index.js.053",
+        "text": {
+          "it": "Web UI"
+        }
+      },
+      "054": {
+        "label": "index.js.054",
+        "text": {
+          "it": "WiFi STA"
+        }
+      },
+      "055": {
+        "label": "index.js.055",
+        "text": {
+          "it": "Server remoto"
+        }
+      },
+      "056": {
+        "label": "index.js.056",
+        "text": {
+          "it": "Expansion board"
+        }
+      },
+      "057": {
+        "label": "index.js.057",
+        "text": {
+          "it": "LED STRIP"
+        }
+      },
+      "058": {
+        "label": "index.js.058",
+        "text": {
+          "it": "SD card"
+        }
+      },
+      "059": {
+        "label": "index.js.059",
+        "text": {
+          "it": "NON MONTATA"
+        }
+      },
+      "060": {
+        "label": "index.js.060",
+        "text": {
+          "it": "Stato servizi"
+        }
+      },
+      "061": {
+        "label": "index.js.061",
+        "text": {
+          "it": "ERRORE LETTURA"
+        }
+      }
+    },
+    "logs": {
+      "001": {
+        "label": "logs.text.001",
+        "text": {
+          "it": "Log Remoto"
+        }
+      },
+      "002": {
+        "label": "logs.text.002",
+        "text": {
+          "it": "Log Remoto ["
+        }
+      },
+      "003": {
+        "label": "logs.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "logs.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "logs.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "logs.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "logs.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "logs.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "logs.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "logs.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "logs.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "logs.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "logs.text.013",
+        "text": {
+          "it": "📋 Log Remoto Ricevuti"
+        }
+      },
+      "014": {
+        "label": "logs.text.014",
+        "text": {
+          "it": "I log vengono ricevuti via UDP dal server configurato. Aggiorna la pagina per vedere i nuovi log."
+        }
+      },
+      "015": {
+        "label": "logs.text.015",
+        "text": {
+          "it": "Invio log in rete (UDP)"
+        }
+      },
+      "016": {
+        "label": "logs.text.016",
+        "text": {
+          "it": "Applica livelli"
+        }
+      },
+      "017": {
+        "label": "logs.text.017",
+        "text": {
+          "it": "Applica filtro"
+        }
+      },
+      "018": {
+        "label": "logs.text.018",
+        "text": {
+          "it": "Pulisci filtro"
+        }
+      },
+      "019": {
+        "label": "logs.text.019",
+        "text": {
+          "it": "Autoscroll"
+        }
+      },
+      "020": {
+        "label": "logs.text.020",
+        "text": {
+          "it": "In attesa di log..."
+        }
+      },
+      "021": {
+        "label": "logs.text.021",
+        "text": {
+          "it": "Configura il logging remoto nella pagina"
+        }
+      },
+      "022": {
+        "label": "logs.text.022",
+        "text": {
+          "it": "Configurazione"
+        }
+      },
+      "023": {
+        "label": "logs.text.023",
+        "text": {
+          "it": "per iniziare a ricevere log."
+        }
+      },
+      "024": {
+        "label": "logs.attr.024",
+        "text": {
+          "it": "Filtro? (usa * e ?)"
+        }
+      },
+      "025": {
+        "label": "logs.js.025",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "026": {
+        "label": "logs.js.026",
+        "text": {
+          "it": "Network state error"
+        }
+      },
+      "027": {
+        "label": "logs.js.027",
+        "text": {
+          "it": "· porta"
+        }
+      },
+      "028": {
+        "label": "logs.js.028",
+        "text": {
+          "it": "Errore lettura stato invio rete"
+        }
+      },
+      "029": {
+        "label": "logs.js.029",
+        "text": {
+          "it": "Network save error"
+        }
+      },
+      "030": {
+        "label": "logs.js.030",
+        "text": {
+          "it": "· salvato in config"
+        }
+      },
+      "031": {
+        "label": "logs.js.031",
+        "text": {
+          "it": "Errore salvataggio stato invio rete"
+        }
+      },
+      "032": {
+        "label": "logs.js.032",
+        "text": {
+          "it": "Livello richiesto clamped to"
+        }
+      },
+      "033": {
+        "label": "logs.js.033",
+        "text": {
+          "it": "<em>Nessun tag disponibile</em>"
+        }
+      },
+      "034": {
+        "label": "logs.js.034",
+        "text": {
+          "it": "<label style=\"font-weight:bold;margin-right:6px\">"
+        }
+      },
+      "035": {
+        "label": "logs.js.035",
+        "text": {
+          "it": "</label><select data-tag=\""
+        }
+      },
+      "036": {
+        "label": "logs.js.036",
+        "text": {
+          "it": "<option value=\""
+        }
+      },
+      "037": {
+        "label": "logs.js.037",
+        "text": {
+          "it": "</option>"
+        }
+      },
+      "038": {
+        "label": "logs.js.038",
+        "text": {
+          "it": "</select>"
+        }
+      },
+      "039": {
+        "label": "logs.js.039",
+        "text": {
+          "it": "2px solid #27ae60"
+        }
+      },
+      "040": {
+        "label": "logs.js.040",
+        "text": {
+          "it": "Logs Error"
+        }
+      },
+      "041": {
+        "label": "logs.js.041",
+        "text": {
+          "it": "Nessun log ricevuto ancora."
+        }
+      },
+      "042": {
+        "label": "logs.js.042",
+        "text": {
+          "it": "log-entry log-"
+        }
+      },
+      "043": {
+        "label": "logs.js.043",
+        "text": {
+          "it": "Errore caricamento log:"
+        }
+      },
+      "044": {
+        "label": "logs.js.044",
+        "text": {
+          "it": ").join("
+        }
+      },
+      "045": {
+        "label": "logs.js.045",
+        "text": {
+          "it": ").split("
+        }
+      },
+      "046": {
+        "label": "logs.js.046",
+        "text": {
+          "it": "); if(!container) return; var selects = container.querySelectorAll("
+        }
+      },
+      "047": {
+        "label": "logs.js.047",
+        "text": {
+          "it": "); applyBtn.disabled=true; applyBtn.innerText="
+        }
+      },
+      "048": {
+        "label": "logs.js.048",
+        "text": {
+          "it": "); var cbtn = document.getElementById("
+        }
+      },
+      "049": {
+        "label": "logs.js.049",
+        "text": {
+          "it": "); var finp = document.getElementById("
+        }
+      },
+      "050": {
+        "label": "logs.js.050",
+        "text": {
+          "it": ");\n  var as=document.getElementById("
+        }
+      },
+      "051": {
+        "label": "logs.js.051",
+        "text": {
+          "it": "); if(!r.ok) throw new Error("
+        }
+      },
+      "052": {
+        "label": "logs.js.052",
+        "text": {
+          "it": "); const logs = await r.json(); const container = document.getElementById("
+        }
+      },
+      "053": {
+        "label": "logs.js.053",
+        "text": {
+          "it": "); entry.className="
+        }
+      },
+      "054": {
+        "label": "logs.js.054",
+        "text": {
+          "it": "+log.level.toLowerCase(); entry.innerHTML = `<span class="
+        }
+      },
+      "055": {
+        "label": "logs.js.055",
+        "text": {
+          "it": ").innerHTML ="
+        }
+      }
+    },
+    "ota": {
+      "001": {
+        "label": "ota.text.001",
+        "text": {
+          "it": "Aggiornamento OTA"
+        }
+      },
+      "002": {
+        "label": "ota.text.002",
+        "text": {
+          "it": "Aggiornamento OTA ["
+        }
+      },
+      "003": {
+        "label": "ota.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "ota.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "ota.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "ota.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "ota.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "ota.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "ota.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "ota.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "ota.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "ota.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "ota.text.013",
+        "text": {
+          "it": "⬆️ Carica Firmware"
+        }
+      },
+      "014": {
+        "label": "ota.js.014",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "015": {
+        "label": "ota.js.015",
+        "text": {
+          "it": "Upload in corso..."
+        }
+      },
+      "016": {
+        "label": "ota.js.016",
+        "text": {
+          "it": "✅ Successo! Riavvio..."
+        }
+      },
+      "017": {
+        "label": "ota.js.017",
+        "text": {
+          "it": "❌ Errore ("
+        }
+      },
+      "018": {
+        "label": "ota.js.018",
+        "text": {
+          "it": "❌ Errore di rete"
+        }
+      }
+    },
+    "programs": {
+      "001": {
+        "label": "programs.text.001",
+        "text": {
+          "it": "Tabella Programmi"
+        }
+      },
+      "002": {
+        "label": "programs.text.002",
+        "text": {
+          "it": "Tabella Programmi ["
+        }
+      },
+      "003": {
+        "label": "programs.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "programs.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "programs.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "programs.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "programs.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "programs.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "programs.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "programs.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "programs.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "programs.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "programs.text.013",
+        "text": {
+          "it": "📊 Editor Tabella Programmi (FACTORY)"
+        }
+      },
+      "014": {
+        "label": "programs.text.014",
+        "text": {
+          "it": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma."
+        }
+      },
+      "015": {
+        "label": "programs.text.015",
+        "text": {
+          "it": "ID"
+        }
+      },
+      "016": {
+        "label": "programs.text.016",
+        "text": {
+          "it": "Nome"
+        }
+      },
+      "017": {
+        "label": "programs.text.017",
+        "text": {
+          "it": "Abilitato"
+        }
+      },
+      "018": {
+        "label": "programs.text.018",
+        "text": {
+          "it": "Prezzo"
+        }
+      },
+      "019": {
+        "label": "programs.text.019",
+        "text": {
+          "it": "Durata (s)"
+        }
+      },
+      "020": {
+        "label": "programs.text.020",
+        "text": {
+          "it": "Pausa Max (s)"
+        }
+      },
+      "021": {
+        "label": "programs.text.021",
+        "text": {
+          "it": "Relay mask"
+        }
+      },
+      "022": {
+        "label": "programs.text.022",
+        "text": {
+          "it": "💾 Salva tabella"
+        }
+      },
+      "023": {
+        "label": "programs.text.023",
+        "text": {
+          "it": "🔄 Ricarica"
+        }
+      },
+      "024": {
+        "label": "programs.text.024",
+        "text": {
+          "it": "Secondi pausa:"
+        }
+      },
+      "025": {
+        "label": "programs.text.025",
+        "text": {
+          "it": "Set"
+        }
+      },
+      "026": {
+        "label": "programs.js.026",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "027": {
+        "label": "programs.js.027",
+        "text": {
+          "it": ").replace(/\"/g,"
+        }
+      },
+      "028": {
+        "label": "programs.js.028",
+        "text": {
+          "it": "Pausa impostata a"
+        }
+      },
+      "029": {
+        "label": "programs.js.029",
+        "text": {
+          "it": "s per tutti i programmi"
+        }
+      },
+      "030": {
+        "label": "programs.js.030",
+        "text": {
+          "it": "Tabella programmi caricata"
+        }
+      },
+      "031": {
+        "label": "programs.js.031",
+        "text": {
+          "it": "Errore caricamento:"
+        }
+      },
+      "032": {
+        "label": "programs.js.032",
+        "text": {
+          "it": "Tabella programmi salvata"
+        }
+      },
+      "033": {
+        "label": "programs.js.033",
+        "text": {
+          "it": "Errore salvataggio:"
+        }
+      }
+    },
+    "stats": {
+      "001": {
+        "label": "stats.text.001",
+        "text": {
+          "it": "Statistiche Device"
+        }
+      },
+      "002": {
+        "label": "stats.text.002",
+        "text": {
+          "it": "Statistiche Device ["
+        }
+      },
+      "003": {
+        "label": "stats.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "stats.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "stats.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "stats.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "stats.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "stats.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "stats.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "stats.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "stats.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "stats.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "stats.text.013",
+        "text": {
+          "it": "🌐 Rete"
+        }
+      },
+      "014": {
+        "label": "stats.text.014",
+        "text": {
+          "it": "Caricamento..."
+        }
+      },
+      "015": {
+        "label": "stats.text.015",
+        "text": {
+          "it": "💾 Firmware"
+        }
+      },
+      "016": {
+        "label": "stats.text.016",
+        "text": {
+          "it": "SD Card"
+        }
+      },
+      "017": {
+        "label": "stats.text.017",
+        "text": {
+          "it": "🔌 Stato Driver"
+        }
+      },
+      "018": {
+        "label": "stats.text.018",
+        "text": {
+          "it": "️ Ambiente"
+        }
+      },
+      "019": {
+        "label": "stats.text.019",
+        "text": {
+          "it": "🎰 MDB Status"
+        }
+      },
+      "020": {
+        "label": "stats.js.020",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "021": {
+        "label": "stats.js.021",
+        "text": {
+          "it": "Status Error"
+        }
+      },
+      "022": {
+        "label": "stats.js.022",
+        "text": {
+          "it": "Non Trovata"
+        }
+      },
+      "023": {
+        "label": "stats.js.023",
+        "text": {
+          "it": "Presente (Non Montata)"
+        }
+      },
+      "024": {
+        "label": "stats.js.024",
+        "text": {
+          "it": "MB ("
+        }
+      }
+    },
+    "tasks": {
+      "001": {
+        "label": "tasks.text.001",
+        "text": {
+          "it": "Editor Tasks"
+        }
+      },
+      "002": {
+        "label": "tasks.text.002",
+        "text": {
+          "it": "Editor Tasks ["
+        }
+      },
+      "003": {
+        "label": "tasks.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "tasks.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "tasks.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "tasks.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "tasks.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "tasks.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "tasks.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "tasks.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "tasks.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "tasks.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "tasks.text.013",
+        "text": {
+          "it": "📋 Configurazione Task"
+        }
+      },
+      "014": {
+        "label": "tasks.text.014",
+        "text": {
+          "it": "Questa tabella modifica solo i task applicativi da"
+        }
+      },
+      "015": {
+        "label": "tasks.text.015",
+        "text": {
+          "it": "tasks.json"
+        }
+      },
+      "016": {
+        "label": "tasks.text.016",
+        "text": {
+          "it": ". I task di sistema FreeRTOS (es. HTTP server, lwIP, idle) non sono mostrati qui."
+        }
+      },
+      "017": {
+        "label": "tasks.text.017",
+        "text": {
+          "it": "Nome"
+        }
+      },
+      "018": {
+        "label": "tasks.text.018",
+        "text": {
+          "it": "Stato"
+        }
+      },
+      "019": {
+        "label": "tasks.text.019",
+        "text": {
+          "it": "Priorità"
+        }
+      },
+      "020": {
+        "label": "tasks.text.020",
+        "text": {
+          "it": "Core"
+        }
+      },
+      "021": {
+        "label": "tasks.text.021",
+        "text": {
+          "it": "Periodo (ms)"
+        }
+      },
+      "022": {
+        "label": "tasks.text.022",
+        "text": {
+          "it": "Stack Words"
+        }
+      },
+      "023": {
+        "label": "tasks.text.023",
+        "text": {
+          "it": "Stack Mem"
+        }
+      },
+      "024": {
+        "label": "tasks.text.024",
+        "text": {
+          "it": "➕ Aggiungi Task"
+        }
+      },
+      "025": {
+        "label": "tasks.text.025",
+        "text": {
+          "it": "💾 Salva"
+        }
+      },
+      "026": {
+        "label": "tasks.text.026",
+        "text": {
+          "it": "🚀 Applica"
+        }
+      },
+      "027": {
+        "label": "tasks.text.027",
+        "text": {
+          "it": "🔄 Aggiorna Dati"
+        }
+      },
+      "028": {
+        "label": "tasks.js.028",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "029": {
+        "label": "tasks.js.029",
+        "text": {
+          "it": "text-align:center;color:#7f8c8d;padding:14px;"
+        }
+      },
+      "030": {
+        "label": "tasks.js.030",
+        "text": {
+          "it": "Nessun task disponibile"
+        }
+      },
+      "031": {
+        "label": "tasks.js.031",
+        "text": {
+          "it": "Errore caricamento tasks:"
+        }
+      },
+      "032": {
+        "label": "tasks.js.032",
+        "text": {
+          "it": "Errore caricamento task"
+        }
+      },
+      "033": {
+        "label": "tasks.js.033",
+        "text": {
+          "it": "✅ Tasks salvate con successo!"
+        }
+      },
+      "034": {
+        "label": "tasks.js.034",
+        "text": {
+          "it": "❌ Errore durante il salvataggio"
+        }
+      },
+      "035": {
+        "label": "tasks.js.035",
+        "text": {
+          "it": "❌ Errore:"
+        }
+      },
+      "036": {
+        "label": "tasks.js.036",
+        "text": {
+          "it": "Salvare e applicare le modifiche ai task attivi?"
+        }
+      },
+      "037": {
+        "label": "tasks.js.037",
+        "text": {
+          "it": "Salvataggio fallito"
+        }
+      },
+      "038": {
+        "label": "tasks.js.038",
+        "text": {
+          "it": "🚀 Tasks applicati con successo!"
+        }
+      },
+      "039": {
+        "label": "tasks.js.039",
+        "text": {
+          "it": "❌ Errore durante l\\'applicazione"
+        }
+      }
+    },
+    "test": {
+      "001": {
+        "label": "test.text.001",
+        "text": {
+          "it": "Test Hardware"
+        }
+      },
+      "002": {
+        "label": "test.text.002",
+        "text": {
+          "it": "Test Hardware ["
+        }
+      },
+      "003": {
+        "label": "test.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "test.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "test.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "test.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "test.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "test.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "test.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "test.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "test.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "test.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "test.text.013",
+        "text": {
+          "it": "🔄 Aggiorna Pagina"
+        }
+      },
+      "014": {
+        "label": "test.text.014",
+        "text": {
+          "it": "💡 Striscia LED (WS2812)"
+        }
+      },
+      "015": {
+        "label": "test.text.015",
+        "text": {
+          "it": "(PIN 15 / GPIO 5)"
+        }
+      },
+      "016": {
+        "label": "test.text.016",
+        "text": {
+          "it": "Pattern Rainbow"
+        }
+      },
+      "017": {
+        "label": "test.text.017",
+        "text": {
+          "it": "▶️ Inizia Rainbow"
+        }
+      },
+      "018": {
+        "label": "test.text.018",
+        "text": {
+          "it": "Controllo Manuale"
+        }
+      },
+      "019": {
+        "label": "test.text.019",
+        "text": {
+          "it": "Seleziona Colore:"
+        }
+      },
+      "020": {
+        "label": "test.text.020",
+        "text": {
+          "it": "Luminosità:"
+        }
+      },
+      "021": {
+        "label": "test.text.021",
+        "text": {
+          "it": "🚀 Inizia Manuale"
+        }
+      },
+      "022": {
+        "label": "test.text.022",
+        "text": {
+          "it": "Pronto per test LED"
+        }
+      },
+      "023": {
+        "label": "test.text.023",
+        "text": {
+          "it": "🔌 I/O Expander"
+        }
+      },
+      "024": {
+        "label": "test.text.024",
+        "text": {
+          "it": "(PIN 32, 37 / I2C)"
+        }
+      },
+      "025": {
+        "label": "test.text.025",
+        "text": {
+          "it": "Blink Tutte le Uscite (1Hz)"
+        }
+      },
+      "026": {
+        "label": "test.text.026",
+        "text": {
+          "it": "▶️ Inizia Blink"
+        }
+      },
+      "027": {
+        "label": "test.text.027",
+        "text": {
+          "it": "Uscite (Chip 0x43)"
+        }
+      },
+      "028": {
+        "label": "test.text.028",
+        "text": {
+          "it": "Ingressi (Chip 0x44)"
+        }
+      },
+      "029": {
+        "label": "test.text.029",
+        "text": {
+          "it": "Pronto per test I/O Expander"
+        }
+      },
+      "030": {
+        "label": "test.text.030",
+        "text": {
+          "it": "⚡ PWM"
+        }
+      },
+      "031": {
+        "label": "test.text.031",
+        "text": {
+          "it": "(PIN 34, 38)"
+        }
+      },
+      "032": {
+        "label": "test.text.032",
+        "text": {
+          "it": "PWM1 Duty Cycle Sweep"
+        }
+      },
+      "033": {
+        "label": "test.text.033",
+        "text": {
+          "it": "▶️ Inizia Sweep"
+        }
+      },
+      "034": {
+        "label": "test.text.034",
+        "text": {
+          "it": "PWM2 Duty Cycle Sweep"
+        }
+      },
+      "035": {
+        "label": "test.text.035",
+        "text": {
+          "it": "Controllo Manuale PWM"
+        }
+      },
+      "036": {
+        "label": "test.text.036",
+        "text": {
+          "it": "Canale:"
+        }
+      },
+      "037": {
+        "label": "test.text.037",
+        "text": {
+          "it": "OUT1 (GPIO47)"
+        }
+      },
+      "038": {
+        "label": "test.text.038",
+        "text": {
+          "it": "OUT2 (GPIO48)"
+        }
+      },
+      "039": {
+        "label": "test.text.039",
+        "text": {
+          "it": "Freq (Hz):"
+        }
+      },
+      "040": {
+        "label": "test.text.040",
+        "text": {
+          "it": "Duty (%):"
+        }
+      },
+      "041": {
+        "label": "test.text.041",
+        "text": {
+          "it": "🚀 Applica"
+        }
+      },
+      "042": {
+        "label": "test.text.042",
+        "text": {
+          "it": "Pronto per test PWM"
+        }
+      },
+      "043": {
+        "label": "test.text.043",
+        "text": {
+          "it": "📡 Seriale RS232"
+        }
+      },
+      "044": {
+        "label": "test.text.044",
+        "text": {
+          "it": "(PIN 23 TX, 35 RX)"
+        }
+      },
+      "045": {
+        "label": "test.text.045",
+        "text": {
+          "it": "Test Loopback: 0x55, 0xAA, 0x01, 0x07"
+        }
+      },
+      "046": {
+        "label": "test.text.046",
+        "text": {
+          "it": "▶️ Inizia Test"
+        }
+      },
+      "047": {
+        "label": "test.text.047",
+        "text": {
+          "it": "Invia Stringa (es: \\0x55\\0xAA\\r\\n)"
+        }
+      },
+      "048": {
+        "label": "test.text.048",
+        "text": {
+          "it": "🚀 Invia"
+        }
+      },
+      "049": {
+        "label": "test.text.049",
+        "text": {
+          "it": "📋 Copia"
+        }
+      },
+      "050": {
+        "label": "test.text.050",
+        "text": {
+          "it": "Monitor:"
+        }
+      },
+      "051": {
+        "label": "test.text.051",
+        "text": {
+          "it": "HEX"
+        }
+      },
+      "052": {
+        "label": "test.text.052",
+        "text": {
+          "it": "TEXT"
+        }
+      },
+      "053": {
+        "label": "test.text.053",
+        "text": {
+          "it": "🗑️ Clear"
+        }
+      },
+      "054": {
+        "label": "test.text.054",
+        "text": {
+          "it": "📡 CCtalk"
+        }
+      },
+      "055": {
+        "label": "test.text.055",
+        "text": {
+          "it": "(9600 baud — PIN 21 RX, 20 TX)"
+        }
+      },
+      "056": {
+        "label": "test.text.056",
+        "text": {
+          "it": "Controllo sessione CCtalk"
+        }
+      },
+      "057": {
+        "label": "test.text.057",
+        "text": {
+          "it": "▶️ Start CCtalk"
+        }
+      },
+      "058": {
+        "label": "test.text.058",
+        "text": {
+          "it": "⏹️ Stop CCtalk"
+        }
+      },
+      "059": {
+        "label": "test.text.059",
+        "text": {
+          "it": "Ritenzione monete (Master Inhibit)"
+        }
+      },
+      "060": {
+        "label": "test.text.060",
+        "text": {
+          "it": "✅ Abilita"
+        }
+      },
+      "061": {
+        "label": "test.text.061",
+        "text": {
+          "it": "✅ Abilita CH1-CH2"
+        }
+      },
+      "062": {
+        "label": "test.text.062",
+        "text": {
+          "it": "🚫 Disabilita"
+        }
+      },
+      "063": {
+        "label": "test.text.063",
+        "text": {
+          "it": "Invia Pacchetto (es: 0x01 0x02)"
+        }
+      },
+      "064": {
+        "label": "test.text.064",
+        "text": {
+          "it": "Commenti"
+        }
+      },
+      "065": {
+        "label": "test.text.065",
+        "text": {
+          "it": "📡 Logging Remoto"
+        }
+      },
+      "066": {
+        "label": "test.text.066",
+        "text": {
+          "it": "Abilita log POST"
+        }
+      },
+      "067": {
+        "label": "test.attr.067",
+        "text": {
+          "it": "#ff0000"
+        }
+      },
+      "068": {
+        "label": "test.attr.068",
+        "text": {
+          "it": "\\0x55 Test..."
+        }
+      },
+      "069": {
+        "label": "test.attr.069",
+        "text": {
+          "it": "0x01 0x02..."
+        }
+      },
+      "070": {
+        "label": "test.text.070",
+        "text": {
+          "it": "📡 Seriale RS485"
+        }
+      },
+      "071": {
+        "label": "test.text.071",
+        "text": {
+          "it": "(PIN 12 A, 17 B)"
+        }
+      },
+      "072": {
+        "label": "test.text.072",
+        "text": {
+          "it": "Invia Stringa"
+        }
+      },
+      "073": {
+        "label": "test.text.073",
+        "text": {
+          "it": "🔌 Modbus RS485 — Agenti Waveshare"
+        }
+      },
+      "074": {
+        "label": "test.text.074",
+        "text": {
+          "it": "(bus RS485)"
+        }
+      },
+      "075": {
+        "label": "test.text.075",
+        "text": {
+          "it": "Scansione bus (ID range)"
+        }
+      },
+      "076": {
+        "label": "test.text.076",
+        "text": {
+          "it": "da"
+        }
+      },
+      "077": {
+        "label": "test.text.077",
+        "text": {
+          "it": "a"
+        }
+      },
+      "078": {
+        "label": "test.text.078",
+        "text": {
+          "it": "🔍 Scansiona"
+        }
+      },
+      "079": {
+        "label": "test.text.079",
+        "text": {
+          "it": "Auto-refresh (2s)"
+        }
+      },
+      "080": {
+        "label": "test.text.080",
+        "text": {
+          "it": "▶️ Avvia Auto-refresh"
+        }
+      },
+      "081": {
+        "label": "test.text.081",
+        "text": {
+          "it": "🔄 Aggiorna ora"
+        }
+      },
+      "082": {
+        "label": "test.text.082",
+        "text": {
+          "it": "Esegui Scansiona per trovare moduli sul bus."
+        }
+      },
+      "083": {
+        "label": "test.text.083",
+        "text": {
+          "it": "Pronto per test Modbus RS485"
+        }
+      },
+      "084": {
+        "label": "test.text.084",
+        "text": {
+          "it": "💾 EEPROM 24LC16"
+        }
+      },
+      "085": {
+        "label": "test.text.085",
+        "text": {
+          "it": "Indirizzo (0-2047)"
+        }
+      },
+      "086": {
+        "label": "test.text.086",
+        "text": {
+          "it": "Lunghezza (bytes)"
+        }
+      },
+      "087": {
+        "label": "test.text.087",
+        "text": {
+          "it": "Dato Byte (0-255)"
+        }
+      },
+      "088": {
+        "label": "test.text.088",
+        "text": {
+          "it": "✍️ Scrivi"
+        }
+      },
+      "089": {
+        "label": "test.text.089",
+        "text": {
+          "it": "📖 Leggi"
+        }
+      },
+      "090": {
+        "label": "test.text.090",
+        "text": {
+          "it": "📄 Leggi JSON"
+        }
+      },
+      "091": {
+        "label": "test.text.091",
+        "text": {
+          "it": "🅰 Dump ASCII"
+        }
+      },
+      "092": {
+        "label": "test.text.092",
+        "text": {
+          "it": "🅷 Dump HEX"
+        }
+      },
+      "093": {
+        "label": "test.text.093",
+        "text": {
+          "it": "Pronto per test EEPROM"
+        }
+      },
+      "094": {
+        "label": "test.text.094",
+        "text": {
+          "it": "🎰 MDB (Multi-Drop Bus)"
+        }
+      },
+      "095": {
+        "label": "test.text.095",
+        "text": {
+          "it": "(PIN 8, 11)"
+        }
+      },
+      "096": {
+        "label": "test.text.096",
+        "text": {
+          "it": "Test Loopback/Echo"
+        }
+      },
+      "097": {
+        "label": "test.text.097",
+        "text": {
+          "it": "Invia Stringa (Hex, es: 08 00)"
+        }
+      },
+      "098": {
+        "label": "test.text.098",
+        "text": {
+          "it": "Pronto per test MDB"
+        }
+      },
+      "099": {
+        "label": "test.text.099",
+        "text": {
+          "it": "🔘 GPIO Ausiliari (GPIO33)"
+        }
+      },
+      "100": {
+        "label": "test.text.100",
+        "text": {
+          "it": "Caricamento..."
+        }
+      },
+      "101": {
+        "label": "test.text.101",
+        "text": {
+          "it": "Stato GPIO in lettura..."
+        }
+      },
+      "102": {
+        "label": "test.text.102",
+        "text": {
+          "it": "🌡️ Sensore SHT40"
+        }
+      },
+      "103": {
+        "label": "test.text.103",
+        "text": {
+          "it": "(I2C 0x45)"
+        }
+      },
+      "104": {
+        "label": "test.text.104",
+        "text": {
+          "it": "Valori Correnti:"
+        }
+      },
+      "105": {
+        "label": "test.text.105",
+        "text": {
+          "it": "-- °C / -- %"
+        }
+      },
+      "106": {
+        "label": "test.text.106",
+        "text": {
+          "it": "🔄 FORZA TEST LETTURA"
+        }
+      },
+      "107": {
+        "label": "test.text.107",
+        "text": {
+          "it": "Pronto per test SHT40"
+        }
+      },
+      "108": {
+        "label": "test.text.108",
+        "text": {
+          "it": "🔍 Scanner USB (Barcode/QR)"
+        }
+      },
+      "109": {
+        "label": "test.text.109",
+        "text": {
+          "it": "Ultime Letture"
+        }
+      },
+      "110": {
+        "label": "test.text.110",
+        "text": {
+          "it": "Scanner SETUP"
+        }
+      },
+      "111": {
+        "label": "test.text.111",
+        "text": {
+          "it": "Scanner STATE"
+        }
+      },
+      "112": {
+        "label": "test.text.112",
+        "text": {
+          "it": "Scanner ON"
+        }
+      },
+      "113": {
+        "label": "test.text.113",
+        "text": {
+          "it": "Scanner OFF"
+        }
+      },
+      "114": {
+        "label": "test.text.114",
+        "text": {
+          "it": "&#x1F4CB; Copiato"
+        }
+      },
+      "115": {
+        "label": "test.text.115",
+        "text": {
+          "it": "Nessuna lettura ancora."
+        }
+      },
+      "116": {
+        "label": "test.text.116",
+        "text": {
+          "it": "💾 Scheda MicroSD"
+        }
+      },
+      "117": {
+        "label": "test.text.117",
+        "text": {
+          "it": "(PIN 39)"
+        }
+      },
+      "118": {
+        "label": "test.text.118",
+        "text": {
+          "it": "Stato Montaggio:"
+        }
+      },
+      "119": {
+        "label": "test.text.119",
+        "text": {
+          "it": "Ultimo Errore:"
+        }
+      },
+      "120": {
+        "label": "test.text.120",
+        "text": {
+          "it": "⚡ Init"
+        }
+      },
+      "121": {
+        "label": "test.text.121",
+        "text": {
+          "it": "🔄 Aggiorna"
+        }
+      },
+      "122": {
+        "label": "test.text.122",
+        "text": {
+          "it": "Elenco File (Root)"
+        }
+      },
+      "123": {
+        "label": "test.text.123",
+        "text": {
+          "it": "📂 Elenca"
+        }
+      },
+      "124": {
+        "label": "test.text.124",
+        "text": {
+          "it": "Backup JSON Config"
+        }
+      },
+      "125": {
+        "label": "test.text.125",
+        "text": {
+          "it": "📥 Backup"
+        }
+      },
+      "126": {
+        "label": "test.text.126",
+        "text": {
+          "it": "⚠️ Formattazione FAT32"
+        }
+      },
+      "127": {
+        "label": "test.text.127",
+        "text": {
+          "it": "🧨 Pulisci/Formatta"
+        }
+      },
+      "128": {
+        "label": "test.text.128",
+        "text": {
+          "it": "Log operazioni SD..."
+        }
+      },
+      "129": {
+        "label": "test.attr.129",
+        "text": {
+          "it": "Richiesta..."
+        }
+      },
+      "130": {
+        "label": "test.attr.130",
+        "text": {
+          "it": "Ultima lettura scanner"
+        }
+      },
+      "131": {
+        "label": "test.js.131",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "132": {
+        "label": "test.js.132",
+        "text": {
+          "it": ".section>h2"
+        }
+      },
+      "133": {
+        "label": "test.js.133",
+        "text": {
+          "it": "[TEST_CMD]"
+        }
+      },
+      "134": {
+        "label": "test.js.134",
+        "text": {
+          "it": "runTest fallback"
+        }
+      },
+      "135": {
+        "label": "test.js.135",
+        "text": {
+          "it": "<div class=\"result\">"
+        }
+      },
+      "136": {
+        "label": "test.js.136",
+        "text": {
+          "it": "</div>"
+        }
+      },
+      "137": {
+        "label": "test.js.137",
+        "text": {
+          "it": "UI: toggleLedRainbow() called"
+        }
+      },
+      "138": {
+        "label": "test.js.138",
+        "text": {
+          "it": "led_stop failed"
+        }
+      },
+      "139": {
+        "label": "test.js.139",
+        "text": {
+          "it": "#2ecc71"
+        }
+      },
+      "140": {
+        "label": "test.js.140",
+        "text": {
+          "it": "⏹️ FERMA Rainbow"
+        }
+      },
+      "141": {
+        "label": "test.js.141",
+        "text": {
+          "it": "#e74c3c"
+        }
+      },
+      "142": {
+        "label": "test.js.142",
+        "text": {
+          "it": "led_bright post failed"
+        }
+      },
+      "143": {
+        "label": "test.js.143",
+        "text": {
+          "it": "led_start failed"
+        }
+      },
+      "144": {
+        "label": "test.js.144",
+        "text": {
+          "it": "UI: toggleLedManual() called"
+        }
+      },
+      "145": {
+        "label": "test.js.145",
+        "text": {
+          "it": "⏹️ FERMA Manuale"
+        }
+      },
+      "146": {
+        "label": "test.js.146",
+        "text": {
+          "it": "led_set failed"
+        }
+      },
+      "147": {
+        "label": "test.js.147",
+        "text": {
+          "it": "UI: toggleSimpleTest()"
+        }
+      },
+      "148": {
+        "label": "test.js.148",
+        "text": {
+          "it": "▶️ Inizia"
+        }
+      },
+      "149": {
+        "label": "test.js.149",
+        "text": {
+          "it": "_stop failed"
+        }
+      },
+      "150": {
+        "label": "test.js.150",
+        "text": {
+          "it": "⏹️ FERMA"
+        }
+      },
+      "151": {
+        "label": "test.js.151",
+        "text": {
+          "it": "_start failed"
+        }
+      },
+      "152": {
+        "label": "test.js.152",
+        "text": {
+          "it": "Risposta JSON non valida"
+        }
+      },
+      "153": {
+        "label": "test.js.153",
+        "text": {
+          "it": "Timeout richiesta"
+        }
+      },
+      "154": {
+        "label": "test.js.154",
+        "text": {
+          "it": "<div>["
+        }
+      },
+      "155": {
+        "label": "test.js.155",
+        "text": {
+          "it": "] INVIO:"
+        }
+      },
+      "156": {
+        "label": "test.js.156",
+        "text": {
+          "it": "...</div>"
+        }
+      },
+      "157": {
+        "label": "test.js.157",
+        "text": {
+          "it": "<div class=\"result\">➡️ Esecuzione:"
+        }
+      },
+      "158": {
+        "label": "test.js.158",
+        "text": {
+          "it": "<div style=\"color:#fff\">["
+        }
+      },
+      "159": {
+        "label": "test.js.159",
+        "text": {
+          "it": "°C /"
+        }
+      },
+      "160": {
+        "label": "test.js.160",
+        "text": {
+          "it": "<div class=\"result\">✅ Lettura OK</div>"
+        }
+      },
+      "161": {
+        "label": "test.js.161",
+        "text": {
+          "it": "<div class=\"result\">✅"
+        }
+      },
+      "162": {
+        "label": "test.js.162",
+        "text": {
+          "it": "<div style=\"color:#e74c3c\">["
+        }
+      },
+      "163": {
+        "label": "test.js.163",
+        "text": {
+          "it": "] ❌ Errore:"
+        }
+      },
+      "164": {
+        "label": "test.js.164",
+        "text": {
+          "it": "<div class=\"result\">❌ Errore:"
+        }
+      },
+      "165": {
+        "label": "test.js.165",
+        "text": {
+          "it": "UI: sendSerial()"
+        }
+      },
+      "166": {
+        "label": "test.js.166",
+        "text": {
+          "it": "⏳ Inviando..."
+        }
+      },
+      "167": {
+        "label": "test.js.167",
+        "text": {
+          "it": "<div class=\"result\">Inviato:"
+        }
+      },
+      "168": {
+        "label": "test.js.168",
+        "text": {
+          "it": "<div class=\"result\">Errore:"
+        }
+      },
+      "169": {
+        "label": "test.js.169",
+        "text": {
+          "it": "⚠️ Vuoto"
+        }
+      },
+      "170": {
+        "label": "test.js.170",
+        "text": {
+          "it": "✅ Copiato"
+        }
+      },
+      "171": {
+        "label": "test.js.171",
+        "text": {
+          "it": "❌ Errore"
+        }
+      },
+      "172": {
+        "label": "test.js.172",
+        "text": {
+          "it": "ADDR impostato a"
+        }
+      },
+      "173": {
+        "label": "test.js.173",
+        "text": {
+          "it": "<div class=\"result\">❌ Errore salvataggio ADDR</div>"
+        }
+      },
+      "174": {
+        "label": "test.js.174",
+        "text": {
+          "it": "<div class=\"result\">❌ Salvataggio ADDR fallito</div>"
+        }
+      },
+      "175": {
+        "label": "test.js.175",
+        "text": {
+          "it": "<div class=\"result\">❌ Errore comando CCtalk</div>"
+        }
+      },
+      "176": {
+        "label": "test.js.176",
+        "text": {
+          "it": "✅ Luminosità salvata"
+        }
+      },
+      "177": {
+        "label": "test.js.177",
+        "text": {
+          "it": "#ff4d4d"
+        }
+      },
+      "178": {
+        "label": "test.js.178",
+        "text": {
+          "it": "#f1c40f"
+        }
+      },
+      "179": {
+        "label": "test.js.179",
+        "text": {
+          "it": "<span style=\"color:"
+        }
+      },
+      "180": {
+        "label": "test.js.180",
+        "text": {
+          "it": ";font-weight:bold;\">"
+        }
+      },
+      "181": {
+        "label": "test.js.181",
+        "text": {
+          "it": "</span>"
+        }
+      },
+      "182": {
+        "label": "test.js.182",
+        "text": {
+          "it": "<br>"
+        }
+      },
+      "183": {
+        "label": "test.js.183",
+        "text": {
+          "it": "RX229 HEX"
+        }
+      },
+      "184": {
+        "label": "test.js.184",
+        "text": {
+          "it": "#1f2d3a"
+        }
+      },
+      "185": {
+        "label": "test.js.185",
+        "text": {
+          "it": "#f39c12"
+        }
+      },
+      "186": {
+        "label": "test.js.186",
+        "text": {
+          "it": "#145a32"
+        }
+      },
+      "187": {
+        "label": "test.js.187",
+        "text": {
+          "it": "#ecf0f1"
+        }
+      },
+      "188": {
+        "label": "test.js.188",
+        "text": {
+          "it": "#7b241c"
+        }
+      },
+      "189": {
+        "label": "test.js.189",
+        "text": {
+          "it": "#f4d03f"
+        }
+      },
+      "190": {
+        "label": "test.js.190",
+        "text": {
+          "it": "<span style=\"background:"
+        }
+      },
+      "191": {
+        "label": "test.js.191",
+        "text": {
+          "it": ";color:"
+        }
+      },
+      "192": {
+        "label": "test.js.192",
+        "text": {
+          "it": ";padding:1px 6px;border-radius:4px;font-weight:bold;display:inline-block;margin:1px 0;\">"
+        }
+      },
+      "193": {
+        "label": "test.js.193",
+        "text": {
+          "it": "<span style=\"background:#1f2d3a;color:#f39c12;padding:1px 5px;border-radius:3px;font-weight:bold;\">"
+        }
+      },
+      "194": {
+        "label": "test.js.194",
+        "text": {
+          "it": "<span style=\"background:#f9e79f;color:#7b241c;font-weight:bold;padding:0 2px;border-radius:2px;\">."
+        }
+      },
+      "195": {
+        "label": "test.js.195",
+        "text": {
+          "it": "padding:8px; border:1px solid #ccc; border-radius:4px; min-width:40px; text-align:center; background:#eee; color:#333;"
+        }
+      },
+      "196": {
+        "label": "test.js.196",
+        "text": {
+          "it": "#95a5a6"
+        }
+      },
+      "197": {
+        "label": "test.js.197",
+        "text": {
+          "it": "#34495e"
+        }
+      },
+      "198": {
+        "label": "test.js.198",
+        "text": {
+          "it": "#fff"
+        }
+      },
+      "199": {
+        "label": "test.js.199",
+        "text": {
+          "it": "#bdc3c7"
+        }
+      },
+      "200": {
+        "label": "test.js.200",
+        "text": {
+          "it": "<div class=\"result\">📖 Letto da"
+        }
+      },
+      "201": {
+        "label": "test.js.201",
+        "text": {
+          "it": ": <b>"
+        }
+      },
+      "202": {
+        "label": "test.js.202",
+        "text": {
+          "it": "</b> (0x"
+        }
+      },
+      "203": {
+        "label": "test.js.203",
+        "text": {
+          "it": ")</div>"
+        }
+      },
+      "204": {
+        "label": "test.js.204",
+        "text": {
+          "it": "<div class=\"result\">📄 Config JSON:<br><pre style=\"background:#002244;color:#00ff00;padding:10px;border-radius:4px;overflow-x:auto;margin:5px 0;font-size:11px\">"
+        }
+      },
+      "205": {
+        "label": "test.js.205",
+        "text": {
+          "it": "</pre></div>"
+        }
+      },
+      "206": {
+        "label": "test.js.206",
+        "text": {
+          "it": "<div class=\"result\">🅰 ASCII Dump:<br><pre style=\"background:#002244;color:#00ff00;padding:10px;border-radius:4px;overflow-x:auto;margin:5px 0;font-size:11px\">"
+        }
+      },
+      "207": {
+        "label": "test.js.207",
+        "text": {
+          "it": "<pre style=\"font-family:monospace;\">"
+        }
+      },
+      "208": {
+        "label": "test.js.208",
+        "text": {
+          "it": "#00f"
+        }
+      },
+      "209": {
+        "label": "test.js.209",
+        "text": {
+          "it": "</pre>"
+        }
+      },
+      "210": {
+        "label": "test.js.210",
+        "text": {
+          "it": "<div class=\"result\">🅷 HEX Dump:<br>"
+        }
+      },
+      "211": {
+        "label": "test.js.211",
+        "text": {
+          "it": "<div class=\"result\">✅ Scritto"
+        }
+      },
+      "212": {
+        "label": "test.js.212",
+        "text": {
+          "it": "<div class=\"result\">❌ Errore</div>"
+        }
+      },
+      "213": {
+        "label": "test.js.213",
+        "text": {
+          "it": "<div class=\"result\">➡️ Invio Backup...</div>"
+        }
+      },
+      "214": {
+        "label": "test.js.214",
+        "text": {
+          "it": "<div class=\"result\">✅ OK</div>"
+        }
+      },
+      "215": {
+        "label": "test.js.215",
+        "text": {
+          "it": "<div class=\"result\">❌"
+        }
+      },
+      "216": {
+        "label": "test.js.216",
+        "text": {
+          "it": "UI: clearSerial()"
+        }
+      },
+      "217": {
+        "label": "test.js.217",
+        "text": {
+          "it": "⏳ Pulendo..."
+        }
+      },
+      "218": {
+        "label": "test.js.218",
+        "text": {
+          "it": "area di testo lato client */    const elId = port +"
+        }
+      },
+      "219": {
+        "label": "test.js.219",
+        "text": {
+          "it": ";    const el = document.getElementById(elId);    if(el) el.innerHTML ="
+        }
+      },
+      "220": {
+        "label": "test.js.220",
+        "text": {
+          "it": ";    /* Poi pulisce lato server */    await fetch("
+        }
+      },
+      "221": {
+        "label": "test.js.221",
+        "text": {
+          "it": ") document.getElementById("
+        }
+      },
+      "222": {
+        "label": "test.js.222",
+        "text": {
+          "it": ").innerText="
+        }
+      },
+      "223": {
+        "label": "test.js.223",
+        "text": {
+          "it": "); if(!r.ok) return; const logs=await r.json(); const scannerLogs = logs.filter(l=> (l.tag==="
+        }
+      },
+      "224": {
+        "label": "test.js.224",
+        "text": {
+          "it": "|| l.tag==="
+        }
+      },
+      "225": {
+        "label": "test.js.225",
+        "text": {
+          "it": "; const tb=document.getElementById("
+        }
+      },
+      "226": {
+        "label": "test.js.226",
+        "text": {
+          "it": "); if(tb) tb.value="
+        }
+      },
+      "227": {
+        "label": "test.js.227",
+        "text": {
+          "it": "+l.timestamp+"
+        }
+      },
+      "228": {
+        "label": "test.js.228",
+        "text": {
+          "it": "+l.message+"
+        }
+      },
+      "229": {
+        "label": "test.js.229",
+        "text": {
+          "it": ").innerHTML = html; /* populate readonly textbox with the most recent reading */ const mostRecent = scannerLogs[scannerLogs.length-1]; const tb=document.getElementById("
+        }
+      },
+      "230": {
+        "label": "test.js.230",
+        "text": {
+          "it": "); if(tb) tb.value = (mostRecent.message ||"
+        }
+      },
+      "231": {
+        "label": "test.js.231",
+        "text": {
+          "it": ").replace(/[^ -~]/g,"
+        }
+      },
+      "232": {
+        "label": "test.js.232",
+        "text": {
+          "it": ")); const msg=(res && (res.message||res.error||res.err)) ? (res.message||res.error||res.err) : ("
+        }
+      },
+      "233": {
+        "label": "test.js.233",
+        "text": {
+          "it": "+r.status); document.getElementById("
+        }
+      },
+      "234": {
+        "label": "test.js.234",
+        "text": {
+          "it": ").innerHTML="
+        }
+      },
+      "235": {
+        "label": "test.js.235",
+        "text": {
+          "it": "+(ok?"
+        }
+      },
+      "236": {
+        "label": "test.js.236",
+        "text": {
+          "it": ")+msg+"
+        }
+      },
+      "237": {
+        "label": "test.js.237",
+        "text": {
+          "it": ");    card.id="
+        }
+      },
+      "238": {
+        "label": "test.js.238",
+        "text": {
+          "it": "+m.slave_id;    card.style="
+        }
+      },
+      "239": {
+        "label": "test.js.239",
+        "text": {
+          "it": ";    let relayHtml="
+        }
+      },
+      "240": {
+        "label": "test.js.240",
+        "text": {
+          "it": "`        +`style="
+        }
+      },
+      "241": {
+        "label": "test.js.241",
+        "text": {
+          "it": "#27ae60"
+        }
+      },
+      "242": {
+        "label": "test.js.242",
+        "text": {
+          "it": "style="
+        }
+      },
+      "243": {
+        "label": "test.js.243",
+        "text": {
+          "it": ">🔄</button>`      +`</div>`      +`<div><b style="
+        }
+      },
+      "244": {
+        "label": "test.js.244",
+        "text": {
+          "it": "><b style="
+        }
+      },
+      "245": {
+        "label": "test.js.245",
+        "text": {
+          "it": ">`      +`  <button onclick="
+        }
+      },
+      "246": {
+        "label": "test.js.246",
+        "text": {
+          "it": ">✅ Tutti ON</button>`      +`  <button onclick="
+        }
+      },
+      "247": {
+        "label": "test.js.247",
+        "text": {
+          "it": ").value)||1;  const idMax=parseInt(document.getElementById("
+        }
+      },
+      "248": {
+        "label": "test.js.248",
+        "text": {
+          "it": ").value)||16;  const statusEl=document.getElementById("
+        }
+      },
+      "249": {
+        "label": "test.js.249",
+        "text": {
+          "it": ");  statusEl.innerHTML="
+        }
+      },
+      "250": {
+        "label": "test.js.250",
+        "text": {
+          "it": "+idMin+"
+        }
+      },
+      "251": {
+        "label": "test.js.251",
+        "text": {
+          "it": "+idMax+"
+        }
+      },
+      "252": {
+        "label": "test.js.252",
+        "text": {
+          "it": ";  const res=await mbPost("
+        }
+      },
+      "253": {
+        "label": "test.js.253",
+        "text": {
+          "it": "+mbModules.length+"
+        }
+      },
+      "254": {
+        "label": "test.js.254",
+        "text": {
+          "it": "+(res.error||"
+        }
+      },
+      "255": {
+        "label": "test.js.255",
+        "text": {
+          "it": "border-radius:50%"
+        }
+      },
+      "256": {
+        "label": "test.js.256",
+        "text": {
+          "it": "); if(s) s.style.display="
+        }
+      },
+      "257": {
+        "label": "test.js.257",
+        "text": {
+          "it": ";    else if(res.sd.present) el.innerText ="
+        }
+      },
+      "258": {
+        "label": "test.js.258",
+        "text": {
+          "it": ";    else el.innerText ="
+        }
+      },
+      "259": {
+        "label": "test.js.259",
+        "text": {
+          "it": "+time+"
+        }
+      },
+      "260": {
+        "label": "test.js.260",
+        "text": {
+          "it": "+res.sd.last_error+"
+        }
+      },
+      "261": {
+        "label": "test.js.261",
+        "text": {
+          "it": ") || res.sd.last_error.includes("
+        }
+      },
+      "262": {
+        "label": "test.js.262",
+        "text": {
+          "it": "+pin+"
+        }
+      },
+      "263": {
+        "label": "test.js.263",
+        "text": {
+          "it": "+(isOut?"
+        }
+      },
+      "264": {
+        "label": "test.js.264",
+        "text": {
+          "it": ";    h+="
+        }
+      },
+      "265": {
+        "label": "test.js.265",
+        "text": {
+          "it": "background:'+(val?'#2ecc71':'#34495e')+';color:white;padding:4px 8px;border-radius:4px;"
+        }
+      },
+      "266": {
+        "label": "test.js.266",
+        "text": {
+          "it": "+(val?"
+        }
+      },
+      "267": {
+        "label": "test.js.267",
+        "text": {
+          "it": ";    if(isOut) h+="
+        }
+      },
+      "268": {
+        "label": "test.js.268",
+        "text": {
+          "it": "setAuxGPIO('+pin+',1)"
+        }
+      },
+      "269": {
+        "label": "test.js.269",
+        "text": {
+          "it": "setAuxGPIO('+pin+',0)"
+        }
+      },
+      "270": {
+        "label": "test.js.270",
+        "text": {
+          "it": "background:#95a5a6"
+        }
+      },
+      "271": {
+        "label": "test.js.271",
+        "text": {
+          "it": ").innerHTML=h;  const el=document.getElementById("
+        }
+      },
+      "272": {
+        "label": "test.js.272",
+        "text": {
+          "it": ");  if(el) el.innerText=s.env.temp.toFixed(1)+"
+        }
+      },
+      "273": {
+        "label": "test.js.273",
+        "text": {
+          "it": "+s.env.hum.toFixed(1)+"
+        }
+      }
+    }
+  },
+  "lvgl": {
+    "credit_label": {
+      "text": {
+        "it": "Credito",
+        "en": "Credit",
+        "fr": "Crédit",
+        "de": "Guthaben",
+        "es": "Crédito"
+      }
+    },
+    "elapsed_fmt": {
+      "text": {
+        "it": "Secondi   %s",
+        "en": "Seconds   %s",
+        "fr": "Secondes   %s",
+        "de": "Sekunden   %s",
+        "es": "Segundos   %s"
+      }
+    },
+    "pause_fmt": {
+      "text": {
+        "it": "Pausa: %s",
+        "en": "Pause: %s",
+        "fr": "Pause : %s",
+        "de": "Pause: %s",
+        "es": "Pausa: %s"
+      }
+    }
+  }
+}
