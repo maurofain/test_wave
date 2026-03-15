@@ -172,19 +172,28 @@ function renderScopeOptions() {
 function renderTableHeader() {
   dom.tableHeadRow.innerHTML = "";
 
-  const staticColumns = ["ID", "Nome ID"];
-  for (const columnTitle of staticColumns) {
-    const th = document.createElement("th");
-    th.textContent = columnTitle;
-    dom.tableHeadRow.appendChild(th);
-  }
+  const idTh = document.createElement("th");
+  idTh.textContent = "ID";
+  idTh.className = "col-id";
+  dom.tableHeadRow.appendChild(idTh);
+
+  const nameTh = document.createElement("th");
+  nameTh.textContent = "Nome ID";
+  nameTh.className = "col-name";
+  dom.tableHeadRow.appendChild(nameTh);
 
   for (const lang of state.languages) {
     const th = document.createElement("th");
     const langName = state.languageLabels.get(lang) ?? lang.toUpperCase();
     th.textContent = `${langName} (${lang})`;
+    th.className = "col-lang";
     dom.tableHeadRow.appendChild(th);
   }
+
+  const actionsTh = document.createElement("th");
+  actionsTh.textContent = "Azioni";
+  actionsTh.className = "col-actions";
+  dom.tableHeadRow.appendChild(actionsTh);
 }
 
 async function loadScope(scopeId) {
@@ -206,7 +215,7 @@ function renderTableRows(entries) {
   if (!entries.length) {
     const emptyRow = document.createElement("tr");
     const emptyCell = document.createElement("td");
-    emptyCell.colSpan = 2 + state.languages.length;
+    emptyCell.colSpan = 3 + state.languages.length;
     emptyCell.textContent = "Nessun dato disponibile per questo scope";
     emptyCell.className = "empty-cell";
     emptyRow.appendChild(emptyCell);
@@ -222,12 +231,12 @@ function renderTableRows(entries) {
     tr.className = index % 2 === 0 ? "row-even" : "row-odd";
 
     const keyCell = document.createElement("td");
-    keyCell.className = "meta-cell";
+    keyCell.className = "meta-cell key-cell";
     keyCell.textContent = String(entry.key);
     tr.appendChild(keyCell);
 
     const nameCell = document.createElement("td");
-    nameCell.className = "meta-cell";
+    nameCell.className = "meta-cell name-cell";
     const section = Number(entry.section ?? 0);
     const nameText = entry.keyName && entry.keyName.trim() ? entry.keyName.trim() : "-";
     nameCell.textContent = section > 0 ? `${nameText} [s${section}]` : nameText;
@@ -288,6 +297,44 @@ function renderTableRows(entries) {
       td.appendChild(editorWrap);
       tr.appendChild(td);
     }
+
+    const actionsTd = document.createElement("td");
+    actionsTd.className = "meta-cell row-actions actions-cell";
+
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "btn btn-neutral row-action-btn row-clear-btn";
+    clearBtn.textContent = "Azzera";
+    clearBtn.title = "Azzera tutte le lingue della riga (escluso Italiano)";
+    clearBtn.disabled = state.translateAllRunning;
+    clearBtn.addEventListener("click", async () => {
+      await clearRowTranslations(entry.key, section, tr);
+    });
+
+    const copyItBtn = document.createElement("button");
+    copyItBtn.type = "button";
+    copyItBtn.className = "btn btn-neutral row-action-btn row-copy-it-btn";
+    copyItBtn.textContent = "Copia IT";
+    copyItBtn.title = "Copia il testo Italiano su tutte le altre lingue della riga";
+    copyItBtn.disabled = state.translateAllRunning;
+    copyItBtn.addEventListener("click", async () => {
+      await copyItalianToRow(entry.key, section, tr);
+    });
+
+    const retranslateBtn = document.createElement("button");
+    retranslateBtn.type = "button";
+    retranslateBtn.className = "btn btn-neutral row-action-btn row-retranslate-btn";
+    retranslateBtn.textContent = "Ritraduci";
+    retranslateBtn.title = "Ritraduce tutte le lingue della riga da Italiano";
+    retranslateBtn.disabled = !state.translatorEnabled || state.translateAllRunning;
+    retranslateBtn.addEventListener("click", async () => {
+      await retranslateRow(entry.key, section, tr);
+    });
+
+    actionsTd.appendChild(clearBtn);
+    actionsTd.appendChild(copyItBtn);
+    actionsTd.appendChild(retranslateBtn);
+    tr.appendChild(actionsTd);
 
     fragment.appendChild(tr);
   });
@@ -441,10 +488,200 @@ function refreshTranslateButtons() {
   for (const button of translateButtons) {
     button.disabled = !state.translatorEnabled || state.translateAllRunning;
   }
+  const rowRetranslateButtons = dom.tableBody.querySelectorAll(".row-retranslate-btn");
+  for (const button of rowRetranslateButtons) {
+    button.disabled = !state.translatorEnabled || state.translateAllRunning;
+  }
+  const rowClearButtons = dom.tableBody.querySelectorAll(".row-clear-btn");
+  for (const button of rowClearButtons) {
+    button.disabled = state.translateAllRunning;
+  }
+  const rowCopyButtons = dom.tableBody.querySelectorAll(".row-copy-it-btn");
+  for (const button of rowCopyButtons) {
+    button.disabled = state.translateAllRunning;
+  }
   if (dom.translateAllBtn) {
     dom.translateAllBtn.disabled =
       !state.translatorEnabled || state.translateAllRunning || !Array.isArray(state.currentEntries) || state.currentEntries.length === 0;
   }
+}
+
+function setRowActionButtonsDisabled(rowElement, disabled) {
+  if (!rowElement) {
+    return;
+  }
+  const rowButtons = rowElement.querySelectorAll(".row-action-btn");
+  for (const btn of rowButtons) {
+    btn.disabled = Boolean(disabled);
+  }
+}
+
+async function clearRowTranslations(key, section, rowElement) {
+  setRowActionButtonsDisabled(rowElement, true);
+  let updatedCount = 0;
+  try {
+    for (const lang of state.languages) {
+      if (lang === "it") {
+        continue;
+      }
+      const targetField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, lang));
+      if (!targetField) {
+        continue;
+      }
+      if (String(targetField.value ?? "").trim() === "") {
+        continue;
+      }
+      targetField.value = "";
+      await window.editorApi.updateTranslation({
+        scope: state.currentScope,
+        key,
+        section,
+        lang,
+        text: "",
+      });
+      updatedCount += 1;
+    }
+    if (updatedCount > 0) {
+      setHasChanges(true);
+      showToast(`Riga ${key}: ${updatedCount} traduzioni azzerate`, "success");
+    } else {
+      showToast(`Riga ${key}: nessuna traduzione da azzerare`, "success");
+    }
+  } catch (error) {
+    showToast(`Azzera riga fallito: ${error.message}`, "error", 5000);
+  } finally {
+    refreshTranslateButtons();
+  }
+}
+
+async function copyItalianToRow(key, section, rowElement) {
+  const sourceField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, "it"));
+  const sourceText = String(sourceField?.value ?? "");
+  if (sourceText.trim() === "") {
+    showToast("Testo italiano vuoto: niente da copiare", "error");
+    return;
+  }
+
+  setRowActionButtonsDisabled(rowElement, true);
+  let updatedCount = 0;
+
+  try {
+    for (const lang of state.languages) {
+      if (lang === "it") {
+        continue;
+      }
+      const targetField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, lang));
+      if (!targetField) {
+        continue;
+      }
+      targetField.value = sourceText;
+      await window.editorApi.updateTranslation({
+        scope: state.currentScope,
+        key,
+        section,
+        lang,
+        text: sourceText,
+      });
+      updatedCount += 1;
+    }
+    if (updatedCount > 0) {
+      setHasChanges(true);
+      showToast(`Riga ${key}: IT copiato su ${updatedCount} lingue`, "success");
+    } else {
+      showToast(`Riga ${key}: nessuna lingua da aggiornare`, "success");
+    }
+  } catch (error) {
+    showToast(`Copia IT riga fallita: ${error.message}`, "error", 5000);
+  } finally {
+    refreshTranslateButtons();
+  }
+}
+
+async function retranslateRow(key, section, rowElement) {
+  if (!state.translatorEnabled) {
+    showToast("Traduzione automatica disabilitata", "error");
+    return;
+  }
+
+  const sourceField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, "it"));
+  const sourceText = String(sourceField?.value ?? "").trim();
+  if (!sourceText) {
+    showToast("Testo italiano vuoto: impossibile ritradurre la riga", "error");
+    return;
+  }
+
+  setRowActionButtonsDisabled(rowElement, true);
+  let okCount = 0;
+  let failCount = 0;
+
+  try {
+    for (const lang of state.languages) {
+      if (lang === "it") {
+        continue;
+      }
+      const targetField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, lang));
+      if (!targetField) {
+        continue;
+      }
+      try {
+        const translated = await window.editorApi.translate({
+          text: sourceText,
+          sourceLang: "it",
+          targetLang: lang,
+        });
+        targetField.value = String(translated.text ?? "");
+        await window.editorApi.updateTranslation({
+          scope: state.currentScope,
+          key,
+          section,
+          lang,
+          text: targetField.value,
+        });
+        okCount += 1;
+      } catch (error) {
+        console.error("retranslateRow error", error);
+        failCount += 1;
+      }
+    }
+
+    if (okCount > 0) {
+      setHasChanges(true);
+    }
+    if (failCount > 0) {
+      showToast(`Riga ${key}: ${okCount} ritradotte, ${failCount} errori`, "error", 5000);
+      return;
+    }
+    showToast(`Riga ${key}: ${okCount} traduzioni aggiornate`, "success");
+  } finally {
+    refreshTranslateButtons();
+  }
+}
+
+function shouldSkipTechnicalTranslation(entry, sourceText) {
+  const label = String(entry?.keyName ?? "").toLowerCase();
+  const text = String(sourceText ?? "").trim();
+  if (!text) {
+    return true;
+  }
+  if (label.includes(".js.")) {
+    return true;
+  }
+  if (text.length > 160 || text.includes("\n")) {
+    return true;
+  }
+  if (/\b(function|const|let|var|return|if|else|for|while|switch|case|try|catch|finally|new|class)\b/.test(text)) {
+    return true;
+  }
+  if (/\b(document|window|console|localStorage|sessionStorage|fetch|Promise|setTimeout|setInterval|querySelector|getElementById|addEventListener)\b|=>|===|!==|&&|\|\|/.test(text)) {
+    return true;
+  }
+  if (/<\/?[a-z][^>]*>/i.test(text)) {
+    return true;
+  }
+  if (/[.#]?[A-Za-z0-9_-]+\s*\{[^}]*\}/.test(text)) {
+    return true;
+  }
+  return false;
 }
 
 async function translateAllFieldsInCurrentScope() {
@@ -458,12 +695,17 @@ async function translateAllFieldsInCurrentScope() {
 
   const queue = [];
   let skippedAlreadyTranslated = 0;
+  let skippedTechnical = 0;
   for (const entry of state.currentEntries) {
     const key = Number(entry.key);
     const section = Number(entry.section ?? 0);
     const sourceField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, "it"));
     const sourceText = String(sourceField?.value ?? "").trim();
     if (!sourceText) {
+      continue;
+    }
+    if (shouldSkipTechnicalTranslation(entry, sourceText)) {
+      skippedTechnical += Math.max(state.languages.length - 1, 0);
       continue;
     }
 
@@ -487,8 +729,8 @@ async function translateAllFieldsInCurrentScope() {
 
   if (!queue.length) {
     showToast(
-      skippedAlreadyTranslated > 0
-        ? `Nessuna traduzione da fare: ${skippedAlreadyTranslated} campi già tradotti`
+      skippedAlreadyTranslated > 0 || skippedTechnical > 0
+        ? `Nessuna traduzione da fare: ${skippedAlreadyTranslated} già tradotti, ${skippedTechnical} tecnici ignorati`
         : "Nessun campo vuoto da tradurre nello scope corrente",
       "success"
     );
@@ -539,13 +781,16 @@ async function translateAllFieldsInCurrentScope() {
   }
   if (failCount > 0) {
     showToast(
-      `Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} ignorati, ${failCount} errori`,
+      `Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} già tradotti, ${skippedTechnical} tecnici ignorati, ${failCount} errori`,
       "error",
       5000
     );
     return;
   }
-  showToast(`Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} ignorati`, "success");
+  showToast(
+    `Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} già tradotti, ${skippedTechnical} tecnici ignorati`,
+    "success"
+  );
 }
 
 function makeFieldKey(scope, key, section, lang) {

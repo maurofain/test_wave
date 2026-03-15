@@ -9,6 +9,10 @@ TEXT_NODE_RE = re.compile(r">([^<]+)<")
 ATTR_RE = re.compile(r"\b(placeholder|title|aria-label|value)=(['\"])(.*?)\2", re.IGNORECASE)
 JS_STRING_RE = re.compile(r"([\"'])(.*?)(?<!\\)\1", re.DOTALL)
 PLACEHOLDER_RE = re.compile(r"^\{\{[0-9]{3}\}\}$")
+JS_KEYWORD_RE = re.compile(r"\b(function|const|let|var|return|if|else|for|while|switch|case|break|continue|try|catch|finally|new|class|import|export)\b")
+JS_RUNTIME_TOKEN_RE = re.compile(r"\b(document|window|console|localStorage|sessionStorage|fetch|Promise|setTimeout|setInterval|querySelector|getElementById|addEventListener)\b|=>|===|!==|&&|\|\|")
+HTML_TAG_RE = re.compile(r"</?[a-z][^>]*>", re.IGNORECASE)
+CSS_BLOCK_RE = re.compile(r"[.#]?[A-Za-z0-9_-]+\s*\{[^}]*\}")
 
 
 def should_localize_text(value: str) -> bool:
@@ -32,11 +36,23 @@ def should_localize_js_literal(value: str) -> bool:
     text = (value or "").strip()
     if not should_localize_text(text):
         return False
+    if len(text) > 160:
+        return False
+    if "\n" in text:
+        return False
     if text.startswith("http://") or text.startswith("https://") or text.startswith("/"):
         return False
     if text in {"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}:
         return False
     if text in {"Content-Type", "application/json", "application/octet-stream", "no-store", "Authorization", "Bearer"}:
+        return False
+    if JS_KEYWORD_RE.search(text):
+        return False
+    if JS_RUNTIME_TOKEN_RE.search(text):
+        return False
+    if HTML_TAG_RE.search(text):
+        return False
+    if CSS_BLOCK_RE.search(text):
         return False
     if re.fullmatch(r"[A-Za-z0-9_./:-]+", text):
         return False

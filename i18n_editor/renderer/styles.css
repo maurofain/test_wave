@@ -175,7 +175,7 @@ body {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1200px;
+  min-width: 1500px;
 }
 
 thead th {
@@ -211,7 +211,26 @@ tr.row-odd {
 }
 
 .edit-cell {
-  min-width: 240px;
+  min-width: 220px;
+  width: 220px;
+}
+
+.key-cell {
+  min-width: 70px;
+  width: 70px;
+}
+
+.name-cell {
+  min-width: 260px;
+  width: 260px;
+  max-width: 260px;
+  word-break: break-word;
+}
+
+.actions-cell {
+  min-width: 290px;
+  width: 290px;
+  white-space: nowrap;
 }
 
 .cell-editor {
@@ -257,6 +276,36 @@ tr.row-odd {
 .translate-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.row-action-btn {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.row-actions .row-action-btn + .row-action-btn {
+  margin-left: 6px;
+}
+
+th.col-id {
+  width: 70px;
+  min-width: 70px;
+}
+
+th.col-name {
+  width: 260px;
+  min-width: 260px;
+}
+
+th.col-lang {
+  width: 220px;
+  min-width: 220px;
+}
+
+th.col-actions {
+  width: 290px;
+  min-width: 290px;
 }
 
 .empty-cell {

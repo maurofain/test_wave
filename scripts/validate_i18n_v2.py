@@ -35,12 +35,19 @@ def collect_template_placeholders(www_dir: Path):
     return per_page
 
 
-def validate_catalog(catalog: dict, per_page: dict):
+def validate_catalog(catalog: dict, per_page: dict, require_all_languages: bool = False):
     errors = []
     warnings = []
 
     base_language = str(catalog.get("base_language") or "it")
     web = catalog.get("web")
+    catalog_languages = [
+        str(x).strip().lower()
+        for x in (catalog.get("languages") or [])
+        if str(x).strip()
+    ]
+    if not catalog_languages:
+        catalog_languages = ["it", "en", "fr", "de", "es"]
     if not isinstance(web, dict):
         errors.append("Campo 'web' mancante o non oggetto")
         return errors, warnings
@@ -81,6 +88,17 @@ def validate_catalog(catalog: dict, per_page: dict):
                 if not isinstance(value, str):
                     errors.append(f"Pagina '{page}' key '{key}': traduzione '{lang}' non stringa")
 
+            if require_all_languages:
+                missing_langs = [
+                    lang
+                    for lang in catalog_languages
+                    if not isinstance(text.get(lang), str) or text.get(lang) == ""
+                ]
+                if missing_langs:
+                    errors.append(
+                        f"Pagina '{page}' key '{key}': traduzioni mancanti/vuote per lingue {missing_langs}"
+                    )
+
         placeholders = per_page.get(page, set())
         json_keys = set(page_map.keys())
 
@@ -99,6 +117,11 @@ def main():
     parser = argparse.ArgumentParser(description="Valida catalogo i18n v2")
     parser.add_argument("--catalog", default="data/i18n_v2.json", help="Percorso catalogo i18n_v2.json")
     parser.add_argument("--www", default="data/www", help="Directory template HTML")
+    parser.add_argument(
+        "--require-all-languages",
+        action="store_true",
+        help="Richiede che ogni key abbia tutte le lingue definite nel catalogo",
+    )
     args = parser.parse_args()
 
     catalog_path = Path(args.catalog)
@@ -115,7 +138,7 @@ def main():
         return 1
 
     per_page = collect_template_placeholders(www_dir)
-    errors, warnings = validate_catalog(catalog, per_page)
+    errors, warnings = validate_catalog(catalog, per_page, require_all_languages=args.require_all_languages)
 
     for w in warnings:
         print(f"WARNING: {w}")

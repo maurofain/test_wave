@@ -737,13 +737,6 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
             /* accept the response we read */
             resp = tmp_resp;
             total = tmp_total;
-
-            /* If we got an ESP_ERR_HTTP_INCOMPLETE_DATA and we still have retry attempts, try again */
-            if (err == ESP_ERR_HTTP_INCOMPLETE_DATA && attempt + 1 < max_attempts) {
-                ESP_LOGW(TAG, "Incomplete chunked data received — retrying (attempt %d)", attempt + 2);
-                if (resp) { free(resp); resp = NULL; total = 0; }
-                continue;
-            }
         }
 
         /* otherwise break and use the data */

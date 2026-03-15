@@ -1,1 +1,270 @@
-function fmStorage(){const sw=document.getElementById('fm_storage_sw');return (sw&&sw.checked)?'sdcard':'spiffs';}function fmSetStatus(t){document.getElementById('fm_status').textContent=t||'';}function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}function fmSelected(){return [...document.querySelectorAll('.fm_cb:checked')].map(b=>decodeURIComponent(b.value));}function fmToggleAll(){const boxes=[...document.querySelectorAll('.fm_cb')];if(!boxes.length)return;const all=boxes.every(b=>b.checked);boxes.forEach(b=>b.checked=!all);}async function fmList(){  fmSetStatus('Caricamento...');  try{    const r=await fetch('/api/files/list?storage='+encodeURIComponent(fmStorage()));    const j=await r.json();    if(!r.ok){fmSetStatus('Errore: '+(j.error||r.status));return;}    const tb=document.getElementById('fm_list'{{030}}'';    (j.files||[]).forEach(f=>{      const tr=document.createElement('tr'{{031}}'<td><input class="fm_cb" type="checkbox" value="{{032}}"></td><td>'{{033}}'</td><td class="num">'{{034}}'</td><td><button onclick="{{035}}">Vedi</button> <button onclick="{{036}}">Scarica</button> <button class="danger" onclick="{{037}}">Elimina</button></td>';      tb.appendChild(tr);    });    const usedBytes=Number(j.used_bytes||0);    const totalBytes=Number(j.total_bytes||0);    const usedKb=(usedBytes/1024).toFixed(3);    const totalKb=totalBytes>0?(totalBytes/1024).toFixed(3):'n/d'{{038}}'Totale file: '{{039}}' | Spazio: '{{040}}' / '{{041}}' KB');  }catch(e){fmSetStatus('Errore rete: '+e);}}async function fmUpload(){  const inp=document.getElementById('fm_file');  if(!inp.files||!inp.files.length){fmSetStatus('Seleziona un file');return;}  const f=inp.files[0]; fmSetStatus('Upload '{{042}}'...');  try{    const r=await fetch('/api/files/upload?storage='{{043}}'&name='+encodeURIComponent(f.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f});    const t=await r.text();    fmSetStatus(r.ok?('Upload OK: '{{044}}'Upload KO: '+t));    if(r.ok) fmList();  }catch(e){fmSetStatus('Errore upload: '+e);}}async function fmDelete(encName){  const name=decodeURIComponent(encName);  if(!confirm('Eliminare '{{045}}'?'{{046}}'Elimino '{{045}}'...');  try{    const body=JSON.stringify({storage:fmStorage(),name:name});    const r=await fetch('/api/files/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:body});    const t=await r.text();    fmSetStatus(r.ok?('Eliminato: '{{047}}'Errore delete: '+t));    if(r.ok) fmList();  }catch(e){fmSetStatus('Errore delete: '+e);}}function fmDownload(encName){  const name=decodeURIComponent(encName);  const url='/api/files/download?storage='{{043}}'&name='{{048}}'_blank');}async function fmView(encName){  const name=decodeURIComponent(encName);  const url='/api/files/download?storage='{{043}}'&name='{{049}}'Apro '{{045}}'...');  try{    const r=await fetch(url);    if(!r.ok){fmSetStatus('Errore apertura: '+r.status);return;}    const raw=await r.text();    let shown=raw;    const lower=name.toLowerCase();    if(lower.endsWith('.json'{{050}}'.jsn')){      try{shown=JSON.stringify(JSON.parse(raw),null,2);}catch(_e){}    }    const wrap=document.getElementById('fm_view_wrap'{{051}}'fm_view_title'{{052}}'fm_view_content'{{053}}'📄 '{{054}}'block'{{038}}'Visualizzato: '+name);  }catch(e){fmSetStatus('Errore apertura: '+e);}}function fmCloseView(){  const wrap=document.getElementById('fm_view_wrap'{{055}}'fm_view_content'{{056}}'fm_view_title'{{057}}''{{058}}'Anteprima file'{{059}}'none';}function fmDownloadSelected(){  const names=fmSelected();  if(!names.length){fmSetStatus('Nessun file selezionato');return;}  names.forEach((n,i)=>setTimeout(()=>fmDownload(encodeURIComponent(n)),i*250));  fmSetStatus('Avviati download: '+names.length);}async function fmDeleteSelected(){  const names=fmSelected();  if(!names.length){fmSetStatus('Nessun file selezionato');return;}  if(!confirm('Eliminare '{{060}}' file selezionati?')) return;  let ok=0, ko=0;  for(const name of names){    try{      const body=JSON.stringify({storage:fmStorage(),name:name});      const r=await fetch('/api/files/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:body});      if(r.ok) ok++; else ko++;    }catch(e){ko++;}  }  fmSetStatus('Eliminazione completata. OK: '{{061}}' KO: '+ko);  fmList();}function fmUpdateCopyBtn(){  const btn=document.getElementById('btn_copy_to'{{062}}'sdcard'?'Copia su SPIFFS':'Copia su SD';}async function fmCopyToOther(){  const from=fmStorage();  const to=(from==='sdcard')?'spiffs':'sdcard'{{063}}'Copia img*.jpg da '{{064}}' a '{{065}}'...');  try{    const r=await fetch('/api/files/copy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from:from,to:to})});    const j=await r.json();    if(r.ok){fmSetStatus('Copia completata. Copiati: '{{066}}', errori: '+j.failed);}else{fmSetStatus('Errore copia: '+(j.error||r.status));}  }catch(e){fmSetStatus('Errore copia: '+e);}}window.addEventListener('load',function(){fmList();fmUpdateCopyBtn();});
+function fmStorage() {
+  const sw = document.getElementById("fm_storage_sw");
+  return sw && sw.checked ? "sdcard" : "spiffs";
+}
+
+function fmSetStatus(text) {
+  const el = document.getElementById("fm_status");
+  if (el) {
+    el.textContent = text || "";
+  }
+}
+
+function esc(value) {
+  return String(value || "").replace(/[&<>"]/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+  }[c]));
+}
+
+function fmSelected() {
+  return [...document.querySelectorAll(".fm_cb:checked")].map((b) => decodeURIComponent(b.value));
+}
+
+function fmToggleAll() {
+  const boxes = [...document.querySelectorAll(".fm_cb")];
+  if (!boxes.length) {
+    return;
+  }
+  const allChecked = boxes.every((b) => b.checked);
+  boxes.forEach((b) => {
+    b.checked = !allChecked;
+  });
+}
+
+async function fmList() {
+  fmSetStatus("{{030}}");
+  try {
+    const r = await fetch(`/api/files/list?storage=${encodeURIComponent(fmStorage())}`);
+    const j = await r.json();
+    if (!r.ok) {
+      fmSetStatus(`{{031}} ${j.error || r.status}`);
+      return;
+    }
+
+    const tb = document.getElementById("fm_list");
+    if (!tb) {
+      return;
+    }
+    tb.innerHTML = "";
+
+    (j.files || []).forEach((f) => {
+      const encodedName = encodeURIComponent(f.name || "");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input class="fm_cb" type="checkbox" value="${encodedName}"></td>
+        <td>${esc(f.name)}</td>
+        <td class="num">${Number(f.size || 0)}</td>
+        <td>
+          <button onclick="fmView('${encodedName}')">{{032}}</button>
+          <button onclick="fmDownload('${encodedName}')">{{033}}</button>
+          <button class="danger" onclick="fmDelete('${encodedName}')">{{034}}</button>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+
+    const usedBytes = Number(j.used_bytes || 0);
+    const totalBytes = Number(j.total_bytes || 0);
+    const usedKb = (usedBytes / 1024).toFixed(3);
+    const totalKb = totalBytes > 0 ? (totalBytes / 1024).toFixed(3) : "n/d";
+    const totalFiles = (j.files || []).length;
+    fmSetStatus(`{{035}} ${totalFiles} {{036}} ${usedKb} / ${totalKb} {{037}}`);
+  } catch (e) {
+    fmSetStatus(`{{038}} ${e}`);
+  }
+}
+
+async function fmUpload() {
+  const inp = document.getElementById("fm_file");
+  if (!inp || !inp.files || !inp.files.length) {
+    fmSetStatus("{{039}}");
+    return;
+  }
+
+  const f = inp.files[0];
+  fmSetStatus(`{{040}} ${f.name}...`);
+
+  try {
+    const r = await fetch(`/api/files/upload?storage=${encodeURIComponent(fmStorage())}&name=${encodeURIComponent(f.name)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: f,
+    });
+    const t = await r.text();
+    fmSetStatus(r.ok ? `{{041}} ${f.name}` : `{{042}} ${t}`);
+    if (r.ok) {
+      fmList();
+    }
+  } catch (e) {
+    fmSetStatus(`{{043}} ${e}`);
+  }
+}
+
+async function fmDelete(encName) {
+  const name = decodeURIComponent(encName);
+  if (!confirm(`{{044}} ${name}?`)) {
+    return;
+  }
+
+  fmSetStatus(`{{045}} ${name}...`);
+  try {
+    const r = await fetch("/api/files/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storage: fmStorage(), name }),
+    });
+    const t = await r.text();
+    fmSetStatus(r.ok ? `{{046}} ${name}` : `{{047}} ${t}`);
+    if (r.ok) {
+      fmList();
+    }
+  } catch (e) {
+    fmSetStatus(`{{047}} ${e}`);
+  }
+}
+
+function fmDownload(encName) {
+  const name = decodeURIComponent(encName);
+  const url = `/api/files/download?storage=${encodeURIComponent(fmStorage())}&name=${encodeURIComponent(name)}`;
+  window.open(url, "_blank");
+}
+
+async function fmView(encName) {
+  const name = decodeURIComponent(encName);
+  const url = `/api/files/download?storage=${encodeURIComponent(fmStorage())}&name=${encodeURIComponent(name)}`;
+  fmSetStatus(`{{048}} ${name}...`);
+
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      fmSetStatus(`{{049}} ${r.status}`);
+      return;
+    }
+
+    const raw = await r.text();
+    let shown = raw;
+    const lower = name.toLowerCase();
+    if (lower.endsWith(".json") || lower.endsWith(".jsn")) {
+      try {
+        shown = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch (_e) {
+      }
+    }
+
+    const wrap = document.getElementById("fm_view_wrap");
+    const title = document.getElementById("fm_view_title");
+    const content = document.getElementById("fm_view_content");
+    if (title) {
+      title.textContent = `📄 ${name}`;
+    }
+    if (content) {
+      content.textContent = shown;
+    }
+    if (wrap) {
+      wrap.style.display = "block";
+    }
+    fmSetStatus(`{{050}} ${name}`);
+  } catch (e) {
+    fmSetStatus(`{{049}} ${e}`);
+  }
+}
+
+function fmCloseView() {
+  const wrap = document.getElementById("fm_view_wrap");
+  const content = document.getElementById("fm_view_content");
+  const title = document.getElementById("fm_view_title");
+
+  if (content) {
+    content.textContent = "";
+  }
+  if (title) {
+    title.textContent = "{{051}}";
+  }
+  if (wrap) {
+    wrap.style.display = "none";
+  }
+}
+
+function fmDownloadSelected() {
+  const names = fmSelected();
+  if (!names.length) {
+    fmSetStatus("{{052}}");
+    return;
+  }
+
+  names.forEach((n, i) => {
+    setTimeout(() => fmDownload(encodeURIComponent(n)), i * 250);
+  });
+  fmSetStatus(`{{053}} ${names.length}`);
+}
+
+async function fmDeleteSelected() {
+  const names = fmSelected();
+  if (!names.length) {
+    fmSetStatus("{{052}}");
+    return;
+  }
+  if (!confirm(`{{044}} ${names.length} {{054}}`)) {
+    return;
+  }
+
+  let ok = 0;
+  let ko = 0;
+  for (const name of names) {
+    try {
+      const r = await fetch("/api/files/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storage: fmStorage(), name }),
+      });
+      if (r.ok) {
+        ok += 1;
+      } else {
+        ko += 1;
+      }
+    } catch (_e) {
+      ko += 1;
+    }
+  }
+
+  fmSetStatus(`{{055}} ${ok} {{056}} ${ko}`);
+  fmList();
+}
+
+function fmUpdateCopyBtn() {
+  const btn = document.getElementById("btn_copy_to");
+  if (!btn) {
+    return;
+  }
+  btn.textContent = fmStorage() === "sdcard" ? "{{057}}" : "{{058}}";
+}
+
+async function fmCopyToOther() {
+  const from = fmStorage();
+  const to = from === "sdcard" ? "spiffs" : "sdcard";
+  fmSetStatus(`{{059}} ${from} {{060}} ${to}...`);
+
+  try {
+    const r = await fetch("/api/files/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to }),
+    });
+    const j = await r.json();
+    if (r.ok) {
+      fmSetStatus(`{{061}} ${j.copied}, {{062}} ${j.failed}`);
+    } else {
+      fmSetStatus(`{{063}} ${j.error || r.status}`);
+    }
+  } catch (e) {
+    fmSetStatus(`{{063}} ${e}`);
+  }
+}
+
+window.addEventListener("load", () => {
+  fmList();
+  fmUpdateCopyBtn();
+});
