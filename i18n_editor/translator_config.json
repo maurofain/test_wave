@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "service": "ollama",
+  "service": "deepl",
   "openai": {
     "api_key": "",
     "model": "gpt-3.5-turbo",
@@ -11,8 +11,11 @@
     "project_id": ""
   },
   "deepl": {
-    "api_key": "",
-    "api_type": "free"
+    "api_key": "38ef45ea-36bc-43ac-a667-08a19667dd6e:fx",
+    "api_type": "free",
+    "min_interval_ms": 900,
+    "max_retries": 5,
+    "retry_base_ms": 700
   },
   "ollama": {
     "base_url": "http://localhost:11434",

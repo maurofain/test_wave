@@ -15,6 +15,9 @@ const DEFAULT_CONFIG = {
   deepl: {
     api_key: "",
     api_type: "free",
+    min_interval_ms: 900,
+    max_retries: 5,
+    retry_base_ms: 700,
   },
   ollama: {
     base_url: "http://localhost:11434",
@@ -88,6 +91,7 @@ class TranslatorConfigService {
 class TranslatorService {
   constructor(configService) {
     this.configService = configService;
+    this.lastDeepLRequestAt = 0;
   }
 
   async translate({ text, sourceLang, targetLang }) {
@@ -106,6 +110,9 @@ class TranslatorService {
     }
     if (service === "openai") {
       return this.translateWithOpenAI(sourceText, sourceLang, targetLang);
+    }
+    if (service === "deepl") {
+      return this.translateWithDeepL(sourceText, sourceLang, targetLang);
     }
 
     throw new Error(`Servizio di traduzione non supportato: ${service}`);
@@ -203,6 +210,120 @@ class TranslatorService {
     }
 
     return translated;
+  }
+
+  mapToDeepLLanguage(langCode, isTarget = false) {
+    const lc = String(langCode ?? "").trim().toLowerCase();
+    const sourceMap = {
+      it: "IT",
+      en: "EN",
+      de: "DE",
+      es: "ES",
+      fr: "FR",
+    };
+    const targetMap = {
+      it: "IT",
+      en: "EN",
+      de: "DE",
+      es: "ES",
+      fr: "FR",
+    };
+
+    const mapped = (isTarget ? targetMap : sourceMap)[lc];
+    if (!mapped) {
+      throw new Error(`Lingua non supportata da DeepL: ${langCode}`);
+    }
+    return mapped;
+  }
+
+  async sleep(ms) {
+    const delay = Math.max(0, Number(ms) || 0);
+    if (delay <= 0) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  parseRetryAfterMs(response) {
+    const raw = String(response?.headers?.get?.("retry-after") ?? "").trim();
+    if (!raw) {
+      return 0;
+    }
+
+    const asSeconds = Number(raw);
+    if (Number.isFinite(asSeconds) && asSeconds > 0) {
+      return Math.floor(asSeconds * 1000);
+    }
+
+    const parsedDate = Date.parse(raw);
+    if (Number.isFinite(parsedDate)) {
+      const delta = parsedDate - Date.now();
+      return delta > 0 ? delta : 0;
+    }
+
+    return 0;
+  }
+
+  async translateWithDeepL(text, sourceLang, targetLang) {
+    const config = this.configService.getConfig().deepl ?? {};
+    const apiKey = String(config.api_key ?? "").trim();
+    const apiType = String(config.api_type ?? "free").toLowerCase();
+    const minIntervalMs = Math.max(0, Number(config.min_interval_ms ?? 900));
+    const maxRetries = Math.max(0, Number(config.max_retries ?? 5));
+    const retryBaseMs = Math.max(100, Number(config.retry_base_ms ?? 700));
+
+    if (!apiKey) {
+      throw new Error("DeepL API key non configurata in translator_config.json");
+    }
+
+    const baseUrl =
+      apiType === "pro" ? "https://api.deepl.com/v2/translate" : "https://api-free.deepl.com/v2/translate";
+
+    const source = this.mapToDeepLLanguage(sourceLang, false);
+    const target = this.mapToDeepLLanguage(targetLang, true);
+
+    const body = new URLSearchParams();
+    body.set("text", text);
+    body.set("source_lang", source);
+    body.set("target_lang", target);
+
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      const elapsed = Date.now() - this.lastDeepLRequestAt;
+      if (elapsed < minIntervalMs) {
+        await this.sleep(minIntervalMs - elapsed);
+      }
+
+      const response = await fetch(baseUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `DeepL-Auth-Key ${apiKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+      });
+      this.lastDeepLRequestAt = Date.now();
+
+      if (response.ok) {
+        const payload = await response.json();
+        const translated = String(payload.translations?.[0]?.text ?? "").trim();
+        if (!translated) {
+          throw new Error("Risposta DeepL vuota");
+        }
+        return translated;
+      }
+
+      const errorText = await response.text();
+      const isLastAttempt = attempt >= maxRetries;
+      if (response.status !== 429 || isLastAttempt) {
+        throw new Error(`DeepL errore ${response.status}: ${errorText}`);
+      }
+
+      const retryAfterMs = this.parseRetryAfterMs(response);
+      const backoffMs = retryAfterMs > 0 ? retryAfterMs : retryBaseMs * Math.pow(2, attempt);
+      await this.sleep(backoffMs);
+    }
+
+    throw new Error("DeepL errore: tentativi esauriti");
   }
 }
 

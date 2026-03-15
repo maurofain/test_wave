@@ -13,223 +13,371 @@
       "001": {
         "label": "api.text.001",
         "text": {
-          "it": "API Endpoints"
+          "it": "API Endpoints",
+          "en": "API Endpoints",
+          "fr": "Points d'extrémité de l'API",
+          "de": "API-Endpunkte",
+          "es": "Puntos finales de la API"
         }
       },
       "002": {
         "label": "api.text.002",
         "text": {
-          "it": "API Endpoints ["
+          "it": "API Endpoints [",
+          "en": "API Endpoints [",
+          "fr": "Points finaux de l'API [",
+          "de": "API-Endpunkte [",
+          "es": "Puntos finales de la API ["
         }
       },
       "003": {
         "label": "api.text.003",
         "text": {
-          "it": "APP"
+          "it": "APP",
+          "en": "APP",
+          "fr": "APP",
+          "de": "APP",
+          "es": "APP"
         }
       },
       "004": {
         "label": "api.text.004",
         "text": {
-          "it": "Emulatore"
+          "it": "Emulatore",
+          "en": "Emulator",
+          "fr": "Emulateur",
+          "de": "Emulator",
+          "es": "Emulador"
         }
       },
       "005": {
         "label": "api.text.005",
         "text": {
-          "it": "🏠 Home"
+          "it": "🏠 Home",
+          "en": "🏠 Home",
+          "fr": "🏠 Accueil",
+          "de": "🏠 Startseite",
+          "es": "🏠 Inicio"
         }
       },
       "006": {
         "label": "api.text.006",
         "text": {
-          "it": "⚙️ Config"
+          "it": "⚙️ Config",
+          "en": "⚙️ Config",
+          "fr": "⚙️ Config",
+          "de": "⚙️ Konfig",
+          "es": "⚙️ Config"
         }
       },
       "007": {
         "label": "api.text.007",
         "text": {
-          "it": "🔧 Test"
+          "it": "🔧 Test",
+          "en": "🔧 Test",
+          "fr": "🔧 Test",
+          "de": "🔧 Prüfung",
+          "es": "🔧 Prueba"
         }
       },
       "008": {
         "label": "api.text.008",
         "text": {
-          "it": "📁 File"
+          "it": "📁 File",
+          "en": "📁 File",
+          "fr": "📁 Fichier",
+          "de": "📁 Datei",
+          "es": "Archivo 📁"
         }
       },
       "009": {
         "label": "api.text.009",
         "text": {
-          "it": "📋 Task"
+          "it": "📋 Task",
+          "en": "📋 Task",
+          "fr": "📋 Tâche",
+          "de": "📋 Aufgabe",
+          "es": "📋 Tarea"
         }
       },
       "010": {
         "label": "api.text.010",
         "text": {
-          "it": "📋 Log"
+          "it": "📋 Log",
+          "en": "📋 Log",
+          "fr": "📋 Log",
+          "de": "📋 Protokoll",
+          "es": "📋 Registro"
         }
       },
       "011": {
         "label": "api.text.011",
         "text": {
-          "it": "📊 Programmi"
+          "it": "📊 Programmi",
+          "en": "📊 Programs",
+          "fr": "📊 Programmes",
+          "de": "📊 Programme",
+          "es": "Programas"
         }
       },
       "012": {
         "label": "api.text.012",
         "text": {
-          "it": "🔄 OTA"
+          "it": "🔄 OTA",
+          "en": "🔄 OTA",
+          "fr": "🔄 OTA",
+          "de": "🔄 OTA",
+          "es": "🔄 OTA"
         }
       },
       "013": {
         "label": "api.text.013",
         "text": {
-          "it": "📡 API Endpoints"
+          "it": "📡 API Endpoints",
+          "en": "📡 API Endpoints",
+          "fr": "📡 Points finaux de l'API",
+          "de": "📡 API-Endpunkte",
+          "es": "📡 Puntos finales de la API"
         }
       },
       "014": {
         "label": "api.text.014",
         "text": {
-          "it": "Tutte le API sono azionabili. Per endpoint con parametri viene richiesto un popup (query o JSON)."
+          "it": "Tutte le API sono azionabili. Per endpoint con parametri viene richiesto un popup (query o JSON).",
+          "en": "All APIs are actionable. A popup (query or JSON) is required for endpoints with parameters.",
+          "fr": "Toutes les API sont utilisables. Pour les points d'accès avec paramètres, une fenêtre contextuelle (requête ou JSON) est nécessaire.",
+          "de": "Alle APIs sind funktionsfähig. Für Endpunkte mit Parametern ist ein Popup (Abfrage oder JSON) erforderlich.",
+          "es": "Todas las API son operables. Para los puntos finales con parámetros, se requiere una ventana emergente (consulta o JSON)."
         }
       },
       "015": {
         "label": "api.text.015",
         "text": {
-          "it": "Method"
+          "it": "Method",
+          "en": "Method",
+          "fr": "Méthode",
+          "de": "Methode",
+          "es": "Método"
         }
       },
       "016": {
         "label": "api.text.016",
         "text": {
-          "it": "URI"
+          "it": "URI",
+          "en": "URI",
+          "fr": "URI",
+          "de": "URI",
+          "es": "URI"
         }
       },
       "017": {
         "label": "api.text.017",
         "text": {
-          "it": "Description"
+          "it": "Description",
+          "en": "Description",
+          "fr": "Description",
+          "de": "Beschreibung",
+          "es": "Descripción"
         }
       },
       "018": {
         "label": "api.text.018",
         "text": {
-          "it": "Action"
+          "it": "Action",
+          "en": "Action",
+          "fr": "Action",
+          "de": "Aktion",
+          "es": "Acción"
         }
       },
       "019": {
         "label": "api.text.019",
         "text": {
-          "it": "GET"
+          "it": "GET",
+          "en": "GET",
+          "fr": "GET",
+          "de": "GET",
+          "es": "GET"
         }
       },
       "020": {
         "label": "api.text.020",
         "text": {
-          "it": "API index"
+          "it": "API index",
+          "en": "API index",
+          "fr": "Index de l'API",
+          "de": "API-Index",
+          "es": "Índice API"
         }
       },
       "021": {
         "label": "api.text.021",
         "text": {
-          "it": "Apri"
+          "it": "Apri",
+          "en": "Open",
+          "fr": "Ouvrir",
+          "de": "Öffnen Sie",
+          "es": "Abrir"
         }
       },
       "022": {
         "label": "api.text.022",
         "text": {
-          "it": "Device status JSON"
+          "it": "Device status JSON",
+          "en": "Device status JSON",
+          "fr": "État de l'appareil JSON",
+          "de": "Gerätestatus JSON",
+          "es": "Estado del dispositivo JSON"
         }
       },
       "023": {
         "label": "api.text.023",
         "text": {
-          "it": "Current configuration"
+          "it": "Current configuration",
+          "en": "Current configuration",
+          "fr": "Configuration actuelle",
+          "de": "Aktuelle Konfiguration",
+          "es": "Configuración actual"
         }
       },
       "024": {
         "label": "api.text.024",
         "text": {
-          "it": "UI texts"
+          "it": "UI texts",
+          "en": "UI texts",
+          "fr": "Textes de l'interface utilisateur",
+          "de": "UI-Texte",
+          "es": "Textos de interfaz"
         }
       },
       "025": {
         "label": "api.text.025",
         "text": {
-          "it": "UI languages"
+          "it": "UI languages",
+          "en": "UI languages",
+          "fr": "Langues de l'interface utilisateur",
+          "de": "UI-Sprachen",
+          "es": "Lenguajes de interfaz"
         }
       },
       "026": {
         "label": "api.text.026",
         "text": {
-          "it": "POST"
+          "it": "POST",
+          "en": "POST",
+          "fr": "POST",
+          "de": "POST",
+          "es": "POST"
         }
       },
       "027": {
         "label": "api.text.027",
         "text": {
-          "it": "Save configuration (JSON)"
+          "it": "Save configuration (JSON)",
+          "en": "Save configuration (JSON)",
+          "fr": "Sauvegarder la configuration (JSON)",
+          "de": "Konfiguration speichern (JSON)",
+          "es": "Guardar configuración (JSON)"
         }
       },
       "028": {
         "label": "api.text.028",
         "text": {
-          "it": "Invia"
+          "it": "Invia",
+          "en": "Send",
+          "fr": "Envoyer",
+          "de": "Senden Sie",
+          "es": "Enviar"
         }
       },
       "029": {
         "label": "api.text.029",
         "text": {
-          "it": "Backup configuration"
+          "it": "Backup configuration",
+          "en": "Backup configuration",
+          "fr": "Configuration de la sauvegarde",
+          "de": "Backup-Konfiguration",
+          "es": "Configuración de la copia de seguridad"
         }
       },
       "030": {
         "label": "api.text.030",
         "text": {
-          "it": "Factory reset"
+          "it": "Factory reset",
+          "en": "Factory reset",
+          "fr": "Réinitialisation d'usine",
+          "de": "Zurücksetzen auf Werkseinstellungen",
+          "es": "Restablecimiento de fábrica"
         }
       },
       "031": {
         "label": "api.text.031",
         "text": {
-          "it": "Force NTP sync"
+          "it": "Force NTP sync",
+          "en": "Force NTP sync",
+          "fr": "Forcer la synchronisation NTP",
+          "de": "NTP-Synchronisation erzwingen",
+          "es": "Forzar sincronización NTP"
         }
       },
       "032": {
         "label": "api.text.032",
         "text": {
-          "it": "File list (query: storage)"
+          "it": "File list (query: storage)",
+          "en": "File list (query: storage)",
+          "fr": "Liste des fichiers (requête : stockage)",
+          "de": "Dateiliste (Abfrage: Speicherung)",
+          "es": "Lista de archivos (consulta: almacenamiento)"
         }
       },
       "033": {
         "label": "api.text.033",
         "text": {
-          "it": "Upload raw (usa /files per body binario)"
+          "it": "Upload raw (usa /files per body binario)",
+          "en": "Upload raw (use /files for binary body)",
+          "fr": "Télécharger des données brutes (utiliser /files pour le corps binaire)",
+          "de": "Rohdaten hochladen (verwenden Sie /files für den Binärteil)",
+          "es": "Cargar raw (usar /files para el cuerpo binario)"
         }
       },
       "034": {
         "label": "api.text.034",
         "text": {
-          "it": "Delete file (JSON)"
+          "it": "Delete file (JSON)",
+          "en": "Delete file (JSON)",
+          "fr": "Supprimer le fichier (JSON)",
+          "de": "Datei löschen (JSON)",
+          "es": "Eliminar archivo (JSON)"
         }
       },
       "035": {
         "label": "api.text.035",
         "text": {
-          "it": "Download file (query)"
+          "it": "Download file (query)",
+          "en": "Download file (query)",
+          "fr": "Téléchargement de fichiers (requête)",
+          "de": "Dateidownload (Abfrage)",
+          "es": "Descarga de archivos (consulta)"
         }
       },
       "036": {
         "label": "api.text.036",
         "text": {
-          "it": "Programs table"
+          "it": "Programs table",
+          "en": "Programs table",
+          "fr": "Tableau des programmes",
+          "de": "Tabelle Programme",
+          "es": "Tabla de programas"
         }
       },
       "037": {
         "label": "api.text.037",
         "text": {
-          "it": "Save programs (JSON, feature-gated)"
+          "it": "Save programs (JSON, feature-gated)",
+          "en": "Save programs (JSON, feature-gated)",
+          "fr": "Sauvegarder les programmes (JSON, avec fonctionnalités)",
+          "de": "Programme speichern (JSON, funktionsorientiert)",
+          "es": "Guardar programas (JSON, con funciones)"
         }
       },
       "038": {
@@ -522,6 +670,336 @@
       }
     },
     "config": {
+      "100": {
+        "label": "config.text.100",
+        "text": {
+          "it": "(TAG) Porte Seriali"
+        }
+      },
+      "101": {
+        "label": "config.text.101",
+        "text": {
+          "it": "RS232 Configuration"
+        }
+      },
+      "102": {
+        "label": "config.text.102",
+        "text": {
+          "it": "RS485 Configuration"
+        }
+      },
+      "103": {
+        "label": "config.text.103",
+        "text": {
+          "it": "MDB Configuration"
+        }
+      },
+      "104": {
+        "label": "config.text.104",
+        "text": {
+          "it": "💾 Salva Configurazione"
+        }
+      },
+      "105": {
+        "label": "config.text.105",
+        "text": {
+          "it": "📥 Backup Config"
+        }
+      },
+      "106": {
+        "label": "config.text.106",
+        "text": {
+          "it": "🔄 Aggiorna Dati"
+        }
+      },
+      "107": {
+        "label": "config.text.107",
+        "text": {
+          "it": "⚠️ Reset Fabbrica"
+        }
+      },
+      "108": {
+        "label": "config.attr.108",
+        "text": {
+          "it": "es: TestWave-01"
+        }
+      },
+      "109": {
+        "label": "config.attr.109",
+        "text": {
+          "it": "es: Ceglia Carwashing"
+        }
+      },
+      "110": {
+        "label": "config.attr.110",
+        "text": {
+          "it": "it"
+        }
+      },
+      "111": {
+        "label": "config.attr.111",
+        "text": {
+          "it": "es: 45.464161"
+        }
+      },
+      "112": {
+        "label": "config.attr.112",
+        "text": {
+          "it": "es: 9.190299"
+        }
+      },
+      "113": {
+        "label": "config.attr.113",
+        "text": {
+          "it": "time.google.com"
+        }
+      },
+      "114": {
+        "label": "config.attr.114",
+        "text": {
+          "it": "pool.ntp.org"
+        }
+      },
+      "115": {
+        "label": "config.attr.115",
+        "text": {
+          "it": "AD-34-DFG-333"
+        }
+      },
+      "116": {
+        "label": "config.attr.116",
+        "text": {
+          "it": "c1ef6429c5e0f753ff24a114de6ee7d4"
+        }
+      },
+      "117": {
+        "label": "config.attr.117",
+        "text": {
+          "it": "0x1EAB"
+        }
+      },
+      "118": {
+        "label": "config.attr.118",
+        "text": {
+          "it": "0x0006"
+        }
+      },
+      "119": {
+        "label": "config.attr.119",
+        "text": {
+          "it": "0x0000"
+        }
+      },
+      "120": {
+        "label": "config.attr.120",
+        "text": {
+          "it": "Tempo transizione immagini"
+        }
+      },
+      "121": {
+        "label": "config.js.121",
+        "text": {
+          "it": "v?"
+        }
+      },
+      "122": {
+        "label": "config.js.122",
+        "text": {
+          "it": "❌ Errore:"
+        }
+      },
+      "123": {
+        "label": "config.js.123",
+        "text": {
+          "it": "Resettare ai valori di fabbrica?"
+        }
+      },
+      "124": {
+        "label": "config.js.124",
+        "text": {
+          "it": "#c0392b"
+        }
+      },
+      "125": {
+        "label": "config.js.125",
+        "text": {
+          "it": "#2c3e50"
+        }
+      },
+      "126": {
+        "label": "config.js.126",
+        "text": {
+          "it": "Invio comando pagina"
+        }
+      },
+      "127": {
+        "label": "config.js.127",
+        "text": {
+          "it": "Errore pagina"
+        }
+      },
+      "128": {
+        "label": "config.js.128",
+        "text": {
+          "it": "Errore rete comando LVGL"
+        }
+      },
+      "129": {
+        "label": "config.js.129",
+        "text": {
+          "it": "Riavviare app?"
+        }
+      },
+      "130": {
+        "label": "config.js.130",
+        "text": {
+          "it": "Invio reboot app..."
+        }
+      },
+      "131": {
+        "label": "config.js.131",
+        "text": {
+          "it": "Reboot in corso..."
+        }
+      },
+      "132": {
+        "label": "config.js.132",
+        "text": {
+          "it": "Errore reboot:"
+        }
+      },
+      "133": {
+        "label": "config.js.133",
+        "text": {
+          "it": "Errore rete reboot LVGL"
+        }
+      },
+      "134": {
+        "label": "config.js.134",
+        "text": {
+          "it": "enable_api_log update failed"
+        }
+      },
+      "135": {
+        "label": "config.js.135",
+        "text": {
+          "it": "<h2>🔐 Password boot/emulatore</h2><p style='margin:8px 0 12px 0;color:#566573;'>Modifica password richiesta per /emulator e reboot FACTORY.</p><div class='form-group'><label>Password attuale</label><input type='password' id='boot_pwd_current' placeholder='password attuale'></div><div class='form-group'><label>Nuova password</label><input type='password' id='boot_pwd_new' placeholder='min 4 caratteri'></div><div class='form-group'><label>Conferma nuova password</label><input type='password' id='boot_pwd_confirm' placeholder='ripeti password'></div><button type='button' onclick='saveBootPassword()' style='background:#8e44ad;'>💾 Salva password boot</button>"
+        }
+      },
+      "136": {
+        "label": "config.js.136",
+        "text": {
+          "it": "<label class='switch'><input type='checkbox' id='cctalk' name='cctalk'><span class='slider'></span></label><span>CCtalk</span>"
+        }
+      },
+      "137": {
+        "label": "config.js.137",
+        "text": {
+          "it": "❌ Errore aggiornamento Log TX/RX"
+        }
+      },
+      "138": {
+        "label": "config.js.138",
+        "text": {
+          "it": "cctalk log state fetch failed"
+        }
+      },
+      "139": {
+        "label": "config.js.139",
+        "text": {
+          "it": "ui languages fetch failed"
+        }
+      },
+      "140": {
+        "label": "config.js.140",
+        "text": {
+          "it": "[CONFIG] scannerCfg initialized:"
+        }
+      },
+      "141": {
+        "label": "config.js.141",
+        "text": {
+          "it": "api log state fetch failed"
+        }
+      },
+      "142": {
+        "label": "config.js.142",
+        "text": {
+          "it": "[CONFIG] scannerCfg found:"
+        }
+      },
+      "143": {
+        "label": "config.js.143",
+        "text": {
+          "it": "[CONFIG] scanner_en.checked set to:"
+        }
+      },
+      "144": {
+        "label": "config.js.144",
+        "text": {
+          "it": "[CONFIG] scannerCfg is null, setting scanner_en.checked = false"
+        }
+      },
+      "145": {
+        "label": "config.js.145",
+        "text": {
+          "it": "Password troppo corta (min 4)"
+        }
+      },
+      "146": {
+        "label": "config.js.146",
+        "text": {
+          "it": "Conferma password non valida"
+        }
+      },
+      "147": {
+        "label": "config.js.147",
+        "text": {
+          "it": "✅ Password aggiornata"
+        }
+      },
+      "148": {
+        "label": "config.js.148",
+        "text": {
+          "it": "Confermi il cambio lingua? Verranno ricaricate le tabelle di traduzione per le interfacce modificate."
+        }
+      },
+      "149": {
+        "label": "config.js.149",
+        "text": {
+          "it": "reloadLanguageTables failed"
+        }
+      },
+      "150": {
+        "label": "config.js.150",
+        "text": {
+          "it": "✅ Configurazione salvata. Lingue aggiornate!"
+        }
+      },
+      "151": {
+        "label": "config.js.151",
+        "text": {
+          "it": "✅ Configurazione salvata!"
+        }
+      },
+      "152": {
+        "label": "config.js.152",
+        "text": {
+          "it": "❌ Errore durante il salvataggio!"
+        }
+      },
+      "153": {
+        "label": "config.js.153",
+        "text": {
+          "it": "USB:Enumerate (Sperimentali)"
+        }
+      },
+      "154": {
+        "label": "config.js.154",
+        "text": {
+          "it": "USB:Restart Host (Sperimentali)"
+        }
+      },
       "001": {
         "label": "config.text.001",
         "text": {
@@ -1114,336 +1592,6 @@
         "label": "config.text.099",
         "text": {
           "it": "Configurazione fissa driver CCTalk (GPIO20/GPIO21, 9600 8N1)."
-        }
-      },
-      "100": {
-        "label": "config.text.100",
-        "text": {
-          "it": "(TAG) Porte Seriali"
-        }
-      },
-      "101": {
-        "label": "config.text.101",
-        "text": {
-          "it": "RS232 Configuration"
-        }
-      },
-      "102": {
-        "label": "config.text.102",
-        "text": {
-          "it": "RS485 Configuration"
-        }
-      },
-      "103": {
-        "label": "config.text.103",
-        "text": {
-          "it": "MDB Configuration"
-        }
-      },
-      "104": {
-        "label": "config.text.104",
-        "text": {
-          "it": "💾 Salva Configurazione"
-        }
-      },
-      "105": {
-        "label": "config.text.105",
-        "text": {
-          "it": "📥 Backup Config"
-        }
-      },
-      "106": {
-        "label": "config.text.106",
-        "text": {
-          "it": "🔄 Aggiorna Dati"
-        }
-      },
-      "107": {
-        "label": "config.text.107",
-        "text": {
-          "it": "⚠️ Reset Fabbrica"
-        }
-      },
-      "108": {
-        "label": "config.attr.108",
-        "text": {
-          "it": "es: TestWave-01"
-        }
-      },
-      "109": {
-        "label": "config.attr.109",
-        "text": {
-          "it": "es: Ceglia Carwashing"
-        }
-      },
-      "110": {
-        "label": "config.attr.110",
-        "text": {
-          "it": "it"
-        }
-      },
-      "111": {
-        "label": "config.attr.111",
-        "text": {
-          "it": "es: 45.464161"
-        }
-      },
-      "112": {
-        "label": "config.attr.112",
-        "text": {
-          "it": "es: 9.190299"
-        }
-      },
-      "113": {
-        "label": "config.attr.113",
-        "text": {
-          "it": "time.google.com"
-        }
-      },
-      "114": {
-        "label": "config.attr.114",
-        "text": {
-          "it": "pool.ntp.org"
-        }
-      },
-      "115": {
-        "label": "config.attr.115",
-        "text": {
-          "it": "AD-34-DFG-333"
-        }
-      },
-      "116": {
-        "label": "config.attr.116",
-        "text": {
-          "it": "c1ef6429c5e0f753ff24a114de6ee7d4"
-        }
-      },
-      "117": {
-        "label": "config.attr.117",
-        "text": {
-          "it": "0x1EAB"
-        }
-      },
-      "118": {
-        "label": "config.attr.118",
-        "text": {
-          "it": "0x0006"
-        }
-      },
-      "119": {
-        "label": "config.attr.119",
-        "text": {
-          "it": "0x0000"
-        }
-      },
-      "120": {
-        "label": "config.attr.120",
-        "text": {
-          "it": "Tempo transizione immagini"
-        }
-      },
-      "121": {
-        "label": "config.js.121",
-        "text": {
-          "it": "v?"
-        }
-      },
-      "122": {
-        "label": "config.js.122",
-        "text": {
-          "it": "❌ Errore:"
-        }
-      },
-      "123": {
-        "label": "config.js.123",
-        "text": {
-          "it": "Resettare ai valori di fabbrica?"
-        }
-      },
-      "124": {
-        "label": "config.js.124",
-        "text": {
-          "it": "#c0392b"
-        }
-      },
-      "125": {
-        "label": "config.js.125",
-        "text": {
-          "it": "#2c3e50"
-        }
-      },
-      "126": {
-        "label": "config.js.126",
-        "text": {
-          "it": "Invio comando pagina"
-        }
-      },
-      "127": {
-        "label": "config.js.127",
-        "text": {
-          "it": "Errore pagina"
-        }
-      },
-      "128": {
-        "label": "config.js.128",
-        "text": {
-          "it": "Errore rete comando LVGL"
-        }
-      },
-      "129": {
-        "label": "config.js.129",
-        "text": {
-          "it": "Riavviare app?"
-        }
-      },
-      "130": {
-        "label": "config.js.130",
-        "text": {
-          "it": "Invio reboot app..."
-        }
-      },
-      "131": {
-        "label": "config.js.131",
-        "text": {
-          "it": "Reboot in corso..."
-        }
-      },
-      "132": {
-        "label": "config.js.132",
-        "text": {
-          "it": "Errore reboot:"
-        }
-      },
-      "133": {
-        "label": "config.js.133",
-        "text": {
-          "it": "Errore rete reboot LVGL"
-        }
-      },
-      "134": {
-        "label": "config.js.134",
-        "text": {
-          "it": "enable_api_log update failed"
-        }
-      },
-      "135": {
-        "label": "config.js.135",
-        "text": {
-          "it": "<h2>🔐 Password boot/emulatore</h2><p style='margin:8px 0 12px 0;color:#566573;'>Modifica password richiesta per /emulator e reboot FACTORY.</p><div class='form-group'><label>Password attuale</label><input type='password' id='boot_pwd_current' placeholder='password attuale'></div><div class='form-group'><label>Nuova password</label><input type='password' id='boot_pwd_new' placeholder='min 4 caratteri'></div><div class='form-group'><label>Conferma nuova password</label><input type='password' id='boot_pwd_confirm' placeholder='ripeti password'></div><button type='button' onclick='saveBootPassword()' style='background:#8e44ad;'>💾 Salva password boot</button>"
-        }
-      },
-      "136": {
-        "label": "config.js.136",
-        "text": {
-          "it": "<label class='switch'><input type='checkbox' id='cctalk' name='cctalk'><span class='slider'></span></label><span>CCtalk</span>"
-        }
-      },
-      "137": {
-        "label": "config.js.137",
-        "text": {
-          "it": "❌ Errore aggiornamento Log TX/RX"
-        }
-      },
-      "138": {
-        "label": "config.js.138",
-        "text": {
-          "it": "cctalk log state fetch failed"
-        }
-      },
-      "139": {
-        "label": "config.js.139",
-        "text": {
-          "it": "ui languages fetch failed"
-        }
-      },
-      "140": {
-        "label": "config.js.140",
-        "text": {
-          "it": "[CONFIG] scannerCfg initialized:"
-        }
-      },
-      "141": {
-        "label": "config.js.141",
-        "text": {
-          "it": "api log state fetch failed"
-        }
-      },
-      "142": {
-        "label": "config.js.142",
-        "text": {
-          "it": "[CONFIG] scannerCfg found:"
-        }
-      },
-      "143": {
-        "label": "config.js.143",
-        "text": {
-          "it": "[CONFIG] scanner_en.checked set to:"
-        }
-      },
-      "144": {
-        "label": "config.js.144",
-        "text": {
-          "it": "[CONFIG] scannerCfg is null, setting scanner_en.checked = false"
-        }
-      },
-      "145": {
-        "label": "config.js.145",
-        "text": {
-          "it": "Password troppo corta (min 4)"
-        }
-      },
-      "146": {
-        "label": "config.js.146",
-        "text": {
-          "it": "Conferma password non valida"
-        }
-      },
-      "147": {
-        "label": "config.js.147",
-        "text": {
-          "it": "✅ Password aggiornata"
-        }
-      },
-      "148": {
-        "label": "config.js.148",
-        "text": {
-          "it": "Confermi il cambio lingua? Verranno ricaricate le tabelle di traduzione per le interfacce modificate."
-        }
-      },
-      "149": {
-        "label": "config.js.149",
-        "text": {
-          "it": "reloadLanguageTables failed"
-        }
-      },
-      "150": {
-        "label": "config.js.150",
-        "text": {
-          "it": "✅ Configurazione salvata. Lingue aggiornate!"
-        }
-      },
-      "151": {
-        "label": "config.js.151",
-        "text": {
-          "it": "✅ Configurazione salvata!"
-        }
-      },
-      "152": {
-        "label": "config.js.152",
-        "text": {
-          "it": "❌ Errore durante il salvataggio!"
-        }
-      },
-      "153": {
-        "label": "config.js.153",
-        "text": {
-          "it": "USB:Enumerate (Sperimentali)"
-        }
-      },
-      "154": {
-        "label": "config.js.154",
-        "text": {
-          "it": "USB:Restart Host (Sperimentali)"
         }
       }
     },
@@ -3932,600 +4080,6 @@
       }
     },
     "test": {
-      "001": {
-        "label": "test.text.001",
-        "text": {
-          "it": "Test Hardware"
-        }
-      },
-      "002": {
-        "label": "test.text.002",
-        "text": {
-          "it": "Test Hardware ["
-        }
-      },
-      "003": {
-        "label": "test.text.003",
-        "text": {
-          "it": "APP"
-        }
-      },
-      "004": {
-        "label": "test.text.004",
-        "text": {
-          "it": "Emulatore"
-        }
-      },
-      "005": {
-        "label": "test.text.005",
-        "text": {
-          "it": "🏠 Home"
-        }
-      },
-      "006": {
-        "label": "test.text.006",
-        "text": {
-          "it": "⚙️ Config"
-        }
-      },
-      "007": {
-        "label": "test.text.007",
-        "text": {
-          "it": "🔧 Test"
-        }
-      },
-      "008": {
-        "label": "test.text.008",
-        "text": {
-          "it": "📁 File"
-        }
-      },
-      "009": {
-        "label": "test.text.009",
-        "text": {
-          "it": "📋 Task"
-        }
-      },
-      "010": {
-        "label": "test.text.010",
-        "text": {
-          "it": "📋 Log"
-        }
-      },
-      "011": {
-        "label": "test.text.011",
-        "text": {
-          "it": "📊 Programmi"
-        }
-      },
-      "012": {
-        "label": "test.text.012",
-        "text": {
-          "it": "🔄 OTA"
-        }
-      },
-      "013": {
-        "label": "test.text.013",
-        "text": {
-          "it": "🔄 Aggiorna Pagina"
-        }
-      },
-      "014": {
-        "label": "test.text.014",
-        "text": {
-          "it": "💡 Striscia LED (WS2812)"
-        }
-      },
-      "015": {
-        "label": "test.text.015",
-        "text": {
-          "it": "(PIN 15 / GPIO 5)"
-        }
-      },
-      "016": {
-        "label": "test.text.016",
-        "text": {
-          "it": "Pattern Rainbow"
-        }
-      },
-      "017": {
-        "label": "test.text.017",
-        "text": {
-          "it": "▶️ Inizia Rainbow"
-        }
-      },
-      "018": {
-        "label": "test.text.018",
-        "text": {
-          "it": "Controllo Manuale"
-        }
-      },
-      "019": {
-        "label": "test.text.019",
-        "text": {
-          "it": "Seleziona Colore:"
-        }
-      },
-      "020": {
-        "label": "test.text.020",
-        "text": {
-          "it": "Luminosità:"
-        }
-      },
-      "021": {
-        "label": "test.text.021",
-        "text": {
-          "it": "🚀 Inizia Manuale"
-        }
-      },
-      "022": {
-        "label": "test.text.022",
-        "text": {
-          "it": "Pronto per test LED"
-        }
-      },
-      "023": {
-        "label": "test.text.023",
-        "text": {
-          "it": "🔌 I/O Expander"
-        }
-      },
-      "024": {
-        "label": "test.text.024",
-        "text": {
-          "it": "(PIN 32, 37 / I2C)"
-        }
-      },
-      "025": {
-        "label": "test.text.025",
-        "text": {
-          "it": "Blink Tutte le Uscite (1Hz)"
-        }
-      },
-      "026": {
-        "label": "test.text.026",
-        "text": {
-          "it": "▶️ Inizia Blink"
-        }
-      },
-      "027": {
-        "label": "test.text.027",
-        "text": {
-          "it": "Uscite (Chip 0x43)"
-        }
-      },
-      "028": {
-        "label": "test.text.028",
-        "text": {
-          "it": "Ingressi (Chip 0x44)"
-        }
-      },
-      "029": {
-        "label": "test.text.029",
-        "text": {
-          "it": "Pronto per test I/O Expander"
-        }
-      },
-      "030": {
-        "label": "test.text.030",
-        "text": {
-          "it": "⚡ PWM"
-        }
-      },
-      "031": {
-        "label": "test.text.031",
-        "text": {
-          "it": "(PIN 34, 38)"
-        }
-      },
-      "032": {
-        "label": "test.text.032",
-        "text": {
-          "it": "PWM1 Duty Cycle Sweep"
-        }
-      },
-      "033": {
-        "label": "test.text.033",
-        "text": {
-          "it": "▶️ Inizia Sweep"
-        }
-      },
-      "034": {
-        "label": "test.text.034",
-        "text": {
-          "it": "PWM2 Duty Cycle Sweep"
-        }
-      },
-      "035": {
-        "label": "test.text.035",
-        "text": {
-          "it": "Controllo Manuale PWM"
-        }
-      },
-      "036": {
-        "label": "test.text.036",
-        "text": {
-          "it": "Canale:"
-        }
-      },
-      "037": {
-        "label": "test.text.037",
-        "text": {
-          "it": "OUT1 (GPIO47)"
-        }
-      },
-      "038": {
-        "label": "test.text.038",
-        "text": {
-          "it": "OUT2 (GPIO48)"
-        }
-      },
-      "039": {
-        "label": "test.text.039",
-        "text": {
-          "it": "Freq (Hz):"
-        }
-      },
-      "040": {
-        "label": "test.text.040",
-        "text": {
-          "it": "Duty (%):"
-        }
-      },
-      "041": {
-        "label": "test.text.041",
-        "text": {
-          "it": "🚀 Applica"
-        }
-      },
-      "042": {
-        "label": "test.text.042",
-        "text": {
-          "it": "Pronto per test PWM"
-        }
-      },
-      "043": {
-        "label": "test.text.043",
-        "text": {
-          "it": "📡 Seriale RS232"
-        }
-      },
-      "044": {
-        "label": "test.text.044",
-        "text": {
-          "it": "(PIN 23 TX, 35 RX)"
-        }
-      },
-      "045": {
-        "label": "test.text.045",
-        "text": {
-          "it": "Test Loopback: 0x55, 0xAA, 0x01, 0x07"
-        }
-      },
-      "046": {
-        "label": "test.text.046",
-        "text": {
-          "it": "▶️ Inizia Test"
-        }
-      },
-      "047": {
-        "label": "test.text.047",
-        "text": {
-          "it": "Invia Stringa (es: \\0x55\\0xAA\\r\\n)"
-        }
-      },
-      "048": {
-        "label": "test.text.048",
-        "text": {
-          "it": "🚀 Invia"
-        }
-      },
-      "049": {
-        "label": "test.text.049",
-        "text": {
-          "it": "📋 Copia"
-        }
-      },
-      "050": {
-        "label": "test.text.050",
-        "text": {
-          "it": "Monitor:"
-        }
-      },
-      "051": {
-        "label": "test.text.051",
-        "text": {
-          "it": "HEX"
-        }
-      },
-      "052": {
-        "label": "test.text.052",
-        "text": {
-          "it": "TEXT"
-        }
-      },
-      "053": {
-        "label": "test.text.053",
-        "text": {
-          "it": "🗑️ Clear"
-        }
-      },
-      "054": {
-        "label": "test.text.054",
-        "text": {
-          "it": "📡 CCtalk"
-        }
-      },
-      "055": {
-        "label": "test.text.055",
-        "text": {
-          "it": "(9600 baud — PIN 21 RX, 20 TX)"
-        }
-      },
-      "056": {
-        "label": "test.text.056",
-        "text": {
-          "it": "Controllo sessione CCtalk"
-        }
-      },
-      "057": {
-        "label": "test.text.057",
-        "text": {
-          "it": "▶️ Start CCtalk"
-        }
-      },
-      "058": {
-        "label": "test.text.058",
-        "text": {
-          "it": "⏹️ Stop CCtalk"
-        }
-      },
-      "059": {
-        "label": "test.text.059",
-        "text": {
-          "it": "Ritenzione monete (Master Inhibit)"
-        }
-      },
-      "060": {
-        "label": "test.text.060",
-        "text": {
-          "it": "✅ Abilita"
-        }
-      },
-      "061": {
-        "label": "test.text.061",
-        "text": {
-          "it": "✅ Abilita CH1-CH2"
-        }
-      },
-      "062": {
-        "label": "test.text.062",
-        "text": {
-          "it": "🚫 Disabilita"
-        }
-      },
-      "063": {
-        "label": "test.text.063",
-        "text": {
-          "it": "Invia Pacchetto (es: 0x01 0x02)"
-        }
-      },
-      "064": {
-        "label": "test.text.064",
-        "text": {
-          "it": "Commenti"
-        }
-      },
-      "065": {
-        "label": "test.text.065",
-        "text": {
-          "it": "📡 Logging Remoto"
-        }
-      },
-      "066": {
-        "label": "test.text.066",
-        "text": {
-          "it": "Abilita log POST"
-        }
-      },
-      "067": {
-        "label": "test.attr.067",
-        "text": {
-          "it": "#ff0000"
-        }
-      },
-      "068": {
-        "label": "test.attr.068",
-        "text": {
-          "it": "\\0x55 Test..."
-        }
-      },
-      "069": {
-        "label": "test.attr.069",
-        "text": {
-          "it": "0x01 0x02..."
-        }
-      },
-      "070": {
-        "label": "test.text.070",
-        "text": {
-          "it": "📡 Seriale RS485"
-        }
-      },
-      "071": {
-        "label": "test.text.071",
-        "text": {
-          "it": "(PIN 12 A, 17 B)"
-        }
-      },
-      "072": {
-        "label": "test.text.072",
-        "text": {
-          "it": "Invia Stringa"
-        }
-      },
-      "073": {
-        "label": "test.text.073",
-        "text": {
-          "it": "🔌 Modbus RS485 — Agenti Waveshare"
-        }
-      },
-      "074": {
-        "label": "test.text.074",
-        "text": {
-          "it": "(bus RS485)"
-        }
-      },
-      "075": {
-        "label": "test.text.075",
-        "text": {
-          "it": "Scansione bus (ID range)"
-        }
-      },
-      "076": {
-        "label": "test.text.076",
-        "text": {
-          "it": "da"
-        }
-      },
-      "077": {
-        "label": "test.text.077",
-        "text": {
-          "it": "a"
-        }
-      },
-      "078": {
-        "label": "test.text.078",
-        "text": {
-          "it": "🔍 Scansiona"
-        }
-      },
-      "079": {
-        "label": "test.text.079",
-        "text": {
-          "it": "Auto-refresh (2s)"
-        }
-      },
-      "080": {
-        "label": "test.text.080",
-        "text": {
-          "it": "▶️ Avvia Auto-refresh"
-        }
-      },
-      "081": {
-        "label": "test.text.081",
-        "text": {
-          "it": "🔄 Aggiorna ora"
-        }
-      },
-      "082": {
-        "label": "test.text.082",
-        "text": {
-          "it": "Esegui Scansiona per trovare moduli sul bus."
-        }
-      },
-      "083": {
-        "label": "test.text.083",
-        "text": {
-          "it": "Pronto per test Modbus RS485"
-        }
-      },
-      "084": {
-        "label": "test.text.084",
-        "text": {
-          "it": "💾 EEPROM 24LC16"
-        }
-      },
-      "085": {
-        "label": "test.text.085",
-        "text": {
-          "it": "Indirizzo (0-2047)"
-        }
-      },
-      "086": {
-        "label": "test.text.086",
-        "text": {
-          "it": "Lunghezza (bytes)"
-        }
-      },
-      "087": {
-        "label": "test.text.087",
-        "text": {
-          "it": "Dato Byte (0-255)"
-        }
-      },
-      "088": {
-        "label": "test.text.088",
-        "text": {
-          "it": "✍️ Scrivi"
-        }
-      },
-      "089": {
-        "label": "test.text.089",
-        "text": {
-          "it": "📖 Leggi"
-        }
-      },
-      "090": {
-        "label": "test.text.090",
-        "text": {
-          "it": "📄 Leggi JSON"
-        }
-      },
-      "091": {
-        "label": "test.text.091",
-        "text": {
-          "it": "🅰 Dump ASCII"
-        }
-      },
-      "092": {
-        "label": "test.text.092",
-        "text": {
-          "it": "🅷 Dump HEX"
-        }
-      },
-      "093": {
-        "label": "test.text.093",
-        "text": {
-          "it": "Pronto per test EEPROM"
-        }
-      },
-      "094": {
-        "label": "test.text.094",
-        "text": {
-          "it": "🎰 MDB (Multi-Drop Bus)"
-        }
-      },
-      "095": {
-        "label": "test.text.095",
-        "text": {
-          "it": "(PIN 8, 11)"
-        }
-      },
-      "096": {
-        "label": "test.text.096",
-        "text": {
-          "it": "Test Loopback/Echo"
-        }
-      },
-      "097": {
-        "label": "test.text.097",
-        "text": {
-          "it": "Invia Stringa (Hex, es: 08 00)"
-        }
-      },
-      "098": {
-        "label": "test.text.098",
-        "text": {
-          "it": "Pronto per test MDB"
-        }
-      },
-      "099": {
-        "label": "test.text.099",
-        "text": {
-          "it": "🔘 GPIO Ausiliari (GPIO33)"
-        }
-      },
       "100": {
         "label": "test.text.100",
         "text": {
@@ -5568,6 +5122,600 @@
         "label": "test.js.273",
         "text": {
           "it": "+s.env.hum.toFixed(1)+"
+        }
+      },
+      "001": {
+        "label": "test.text.001",
+        "text": {
+          "it": "Test Hardware"
+        }
+      },
+      "002": {
+        "label": "test.text.002",
+        "text": {
+          "it": "Test Hardware ["
+        }
+      },
+      "003": {
+        "label": "test.text.003",
+        "text": {
+          "it": "APP"
+        }
+      },
+      "004": {
+        "label": "test.text.004",
+        "text": {
+          "it": "Emulatore"
+        }
+      },
+      "005": {
+        "label": "test.text.005",
+        "text": {
+          "it": "🏠 Home"
+        }
+      },
+      "006": {
+        "label": "test.text.006",
+        "text": {
+          "it": "⚙️ Config"
+        }
+      },
+      "007": {
+        "label": "test.text.007",
+        "text": {
+          "it": "🔧 Test"
+        }
+      },
+      "008": {
+        "label": "test.text.008",
+        "text": {
+          "it": "📁 File"
+        }
+      },
+      "009": {
+        "label": "test.text.009",
+        "text": {
+          "it": "📋 Task"
+        }
+      },
+      "010": {
+        "label": "test.text.010",
+        "text": {
+          "it": "📋 Log"
+        }
+      },
+      "011": {
+        "label": "test.text.011",
+        "text": {
+          "it": "📊 Programmi"
+        }
+      },
+      "012": {
+        "label": "test.text.012",
+        "text": {
+          "it": "🔄 OTA"
+        }
+      },
+      "013": {
+        "label": "test.text.013",
+        "text": {
+          "it": "🔄 Aggiorna Pagina"
+        }
+      },
+      "014": {
+        "label": "test.text.014",
+        "text": {
+          "it": "💡 Striscia LED (WS2812)"
+        }
+      },
+      "015": {
+        "label": "test.text.015",
+        "text": {
+          "it": "(PIN 15 / GPIO 5)"
+        }
+      },
+      "016": {
+        "label": "test.text.016",
+        "text": {
+          "it": "Pattern Rainbow"
+        }
+      },
+      "017": {
+        "label": "test.text.017",
+        "text": {
+          "it": "▶️ Inizia Rainbow"
+        }
+      },
+      "018": {
+        "label": "test.text.018",
+        "text": {
+          "it": "Controllo Manuale"
+        }
+      },
+      "019": {
+        "label": "test.text.019",
+        "text": {
+          "it": "Seleziona Colore:"
+        }
+      },
+      "020": {
+        "label": "test.text.020",
+        "text": {
+          "it": "Luminosità:"
+        }
+      },
+      "021": {
+        "label": "test.text.021",
+        "text": {
+          "it": "🚀 Inizia Manuale"
+        }
+      },
+      "022": {
+        "label": "test.text.022",
+        "text": {
+          "it": "Pronto per test LED"
+        }
+      },
+      "023": {
+        "label": "test.text.023",
+        "text": {
+          "it": "🔌 I/O Expander"
+        }
+      },
+      "024": {
+        "label": "test.text.024",
+        "text": {
+          "it": "(PIN 32, 37 / I2C)"
+        }
+      },
+      "025": {
+        "label": "test.text.025",
+        "text": {
+          "it": "Blink Tutte le Uscite (1Hz)"
+        }
+      },
+      "026": {
+        "label": "test.text.026",
+        "text": {
+          "it": "▶️ Inizia Blink"
+        }
+      },
+      "027": {
+        "label": "test.text.027",
+        "text": {
+          "it": "Uscite (Chip 0x43)"
+        }
+      },
+      "028": {
+        "label": "test.text.028",
+        "text": {
+          "it": "Ingressi (Chip 0x44)"
+        }
+      },
+      "029": {
+        "label": "test.text.029",
+        "text": {
+          "it": "Pronto per test I/O Expander"
+        }
+      },
+      "030": {
+        "label": "test.text.030",
+        "text": {
+          "it": "⚡ PWM"
+        }
+      },
+      "031": {
+        "label": "test.text.031",
+        "text": {
+          "it": "(PIN 34, 38)"
+        }
+      },
+      "032": {
+        "label": "test.text.032",
+        "text": {
+          "it": "PWM1 Duty Cycle Sweep"
+        }
+      },
+      "033": {
+        "label": "test.text.033",
+        "text": {
+          "it": "▶️ Inizia Sweep"
+        }
+      },
+      "034": {
+        "label": "test.text.034",
+        "text": {
+          "it": "PWM2 Duty Cycle Sweep"
+        }
+      },
+      "035": {
+        "label": "test.text.035",
+        "text": {
+          "it": "Controllo Manuale PWM"
+        }
+      },
+      "036": {
+        "label": "test.text.036",
+        "text": {
+          "it": "Canale:"
+        }
+      },
+      "037": {
+        "label": "test.text.037",
+        "text": {
+          "it": "OUT1 (GPIO47)"
+        }
+      },
+      "038": {
+        "label": "test.text.038",
+        "text": {
+          "it": "OUT2 (GPIO48)"
+        }
+      },
+      "039": {
+        "label": "test.text.039",
+        "text": {
+          "it": "Freq (Hz):"
+        }
+      },
+      "040": {
+        "label": "test.text.040",
+        "text": {
+          "it": "Duty (%):"
+        }
+      },
+      "041": {
+        "label": "test.text.041",
+        "text": {
+          "it": "🚀 Applica"
+        }
+      },
+      "042": {
+        "label": "test.text.042",
+        "text": {
+          "it": "Pronto per test PWM"
+        }
+      },
+      "043": {
+        "label": "test.text.043",
+        "text": {
+          "it": "📡 Seriale RS232"
+        }
+      },
+      "044": {
+        "label": "test.text.044",
+        "text": {
+          "it": "(PIN 23 TX, 35 RX)"
+        }
+      },
+      "045": {
+        "label": "test.text.045",
+        "text": {
+          "it": "Test Loopback: 0x55, 0xAA, 0x01, 0x07"
+        }
+      },
+      "046": {
+        "label": "test.text.046",
+        "text": {
+          "it": "▶️ Inizia Test"
+        }
+      },
+      "047": {
+        "label": "test.text.047",
+        "text": {
+          "it": "Invia Stringa (es: \\0x55\\0xAA\\r\\n)"
+        }
+      },
+      "048": {
+        "label": "test.text.048",
+        "text": {
+          "it": "🚀 Invia"
+        }
+      },
+      "049": {
+        "label": "test.text.049",
+        "text": {
+          "it": "📋 Copia"
+        }
+      },
+      "050": {
+        "label": "test.text.050",
+        "text": {
+          "it": "Monitor:"
+        }
+      },
+      "051": {
+        "label": "test.text.051",
+        "text": {
+          "it": "HEX"
+        }
+      },
+      "052": {
+        "label": "test.text.052",
+        "text": {
+          "it": "TEXT"
+        }
+      },
+      "053": {
+        "label": "test.text.053",
+        "text": {
+          "it": "🗑️ Clear"
+        }
+      },
+      "054": {
+        "label": "test.text.054",
+        "text": {
+          "it": "📡 CCtalk"
+        }
+      },
+      "055": {
+        "label": "test.text.055",
+        "text": {
+          "it": "(9600 baud — PIN 21 RX, 20 TX)"
+        }
+      },
+      "056": {
+        "label": "test.text.056",
+        "text": {
+          "it": "Controllo sessione CCtalk"
+        }
+      },
+      "057": {
+        "label": "test.text.057",
+        "text": {
+          "it": "▶️ Start CCtalk"
+        }
+      },
+      "058": {
+        "label": "test.text.058",
+        "text": {
+          "it": "⏹️ Stop CCtalk"
+        }
+      },
+      "059": {
+        "label": "test.text.059",
+        "text": {
+          "it": "Ritenzione monete (Master Inhibit)"
+        }
+      },
+      "060": {
+        "label": "test.text.060",
+        "text": {
+          "it": "✅ Abilita"
+        }
+      },
+      "061": {
+        "label": "test.text.061",
+        "text": {
+          "it": "✅ Abilita CH1-CH2"
+        }
+      },
+      "062": {
+        "label": "test.text.062",
+        "text": {
+          "it": "🚫 Disabilita"
+        }
+      },
+      "063": {
+        "label": "test.text.063",
+        "text": {
+          "it": "Invia Pacchetto (es: 0x01 0x02)"
+        }
+      },
+      "064": {
+        "label": "test.text.064",
+        "text": {
+          "it": "Commenti"
+        }
+      },
+      "065": {
+        "label": "test.text.065",
+        "text": {
+          "it": "📡 Logging Remoto"
+        }
+      },
+      "066": {
+        "label": "test.text.066",
+        "text": {
+          "it": "Abilita log POST"
+        }
+      },
+      "067": {
+        "label": "test.attr.067",
+        "text": {
+          "it": "#ff0000"
+        }
+      },
+      "068": {
+        "label": "test.attr.068",
+        "text": {
+          "it": "\\0x55 Test..."
+        }
+      },
+      "069": {
+        "label": "test.attr.069",
+        "text": {
+          "it": "0x01 0x02..."
+        }
+      },
+      "070": {
+        "label": "test.text.070",
+        "text": {
+          "it": "📡 Seriale RS485"
+        }
+      },
+      "071": {
+        "label": "test.text.071",
+        "text": {
+          "it": "(PIN 12 A, 17 B)"
+        }
+      },
+      "072": {
+        "label": "test.text.072",
+        "text": {
+          "it": "Invia Stringa"
+        }
+      },
+      "073": {
+        "label": "test.text.073",
+        "text": {
+          "it": "🔌 Modbus RS485 — Agenti Waveshare"
+        }
+      },
+      "074": {
+        "label": "test.text.074",
+        "text": {
+          "it": "(bus RS485)"
+        }
+      },
+      "075": {
+        "label": "test.text.075",
+        "text": {
+          "it": "Scansione bus (ID range)"
+        }
+      },
+      "076": {
+        "label": "test.text.076",
+        "text": {
+          "it": "da"
+        }
+      },
+      "077": {
+        "label": "test.text.077",
+        "text": {
+          "it": "a"
+        }
+      },
+      "078": {
+        "label": "test.text.078",
+        "text": {
+          "it": "🔍 Scansiona"
+        }
+      },
+      "079": {
+        "label": "test.text.079",
+        "text": {
+          "it": "Auto-refresh (2s)"
+        }
+      },
+      "080": {
+        "label": "test.text.080",
+        "text": {
+          "it": "▶️ Avvia Auto-refresh"
+        }
+      },
+      "081": {
+        "label": "test.text.081",
+        "text": {
+          "it": "🔄 Aggiorna ora"
+        }
+      },
+      "082": {
+        "label": "test.text.082",
+        "text": {
+          "it": "Esegui Scansiona per trovare moduli sul bus."
+        }
+      },
+      "083": {
+        "label": "test.text.083",
+        "text": {
+          "it": "Pronto per test Modbus RS485"
+        }
+      },
+      "084": {
+        "label": "test.text.084",
+        "text": {
+          "it": "💾 EEPROM 24LC16"
+        }
+      },
+      "085": {
+        "label": "test.text.085",
+        "text": {
+          "it": "Indirizzo (0-2047)"
+        }
+      },
+      "086": {
+        "label": "test.text.086",
+        "text": {
+          "it": "Lunghezza (bytes)"
+        }
+      },
+      "087": {
+        "label": "test.text.087",
+        "text": {
+          "it": "Dato Byte (0-255)"
+        }
+      },
+      "088": {
+        "label": "test.text.088",
+        "text": {
+          "it": "✍️ Scrivi"
+        }
+      },
+      "089": {
+        "label": "test.text.089",
+        "text": {
+          "it": "📖 Leggi"
+        }
+      },
+      "090": {
+        "label": "test.text.090",
+        "text": {
+          "it": "📄 Leggi JSON"
+        }
+      },
+      "091": {
+        "label": "test.text.091",
+        "text": {
+          "it": "🅰 Dump ASCII"
+        }
+      },
+      "092": {
+        "label": "test.text.092",
+        "text": {
+          "it": "🅷 Dump HEX"
+        }
+      },
+      "093": {
+        "label": "test.text.093",
+        "text": {
+          "it": "Pronto per test EEPROM"
+        }
+      },
+      "094": {
+        "label": "test.text.094",
+        "text": {
+          "it": "🎰 MDB (Multi-Drop Bus)"
+        }
+      },
+      "095": {
+        "label": "test.text.095",
+        "text": {
+          "it": "(PIN 8, 11)"
+        }
+      },
+      "096": {
+        "label": "test.text.096",
+        "text": {
+          "it": "Test Loopback/Echo"
+        }
+      },
+      "097": {
+        "label": "test.text.097",
+        "text": {
+          "it": "Invia Stringa (Hex, es: 08 00)"
+        }
+      },
+      "098": {
+        "label": "test.text.098",
+        "text": {
+          "it": "Pronto per test MDB"
+        }
+      },
+      "099": {
+        "label": "test.text.099",
+        "text": {
+          "it": "🔘 GPIO Ausiliari (GPIO33)"
         }
       }
     }

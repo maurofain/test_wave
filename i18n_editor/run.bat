@@ -32,5 +32,13 @@ if not exist node_modules\electron (
 )
 
 echo Avvio i18n Editor Electron...
-npm start
+set SANDBOX_BIN=node_modules\electron\dist\chrome-sandbox
+
+if exist "%SANDBOX_BIN%" (
+    echo Rilevato sandbox Linux in ambiente Windows/Wsl.
+    echo Avvio in modalita sviluppo con --no-sandbox.
+    npm start -- --no-sandbox
+) else (
+    npm start
+)
 pause

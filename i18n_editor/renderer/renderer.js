@@ -7,6 +7,8 @@ const state = {
   searchIndex: 0,
   hasChanges: false,
   translatorEnabled: false,
+  translateAllRunning: false,
+  currentEntries: [],
   fieldMap: new Map(),
   highlightedField: null,
 };
@@ -37,6 +39,7 @@ function cacheDom() {
   dom.searchStatus = document.getElementById("search-status");
   dom.saveBtn = document.getElementById("save-btn");
   dom.addKeyBtn = document.getElementById("add-key-btn");
+  dom.translateAllBtn = document.getElementById("translate-all-btn");
   dom.newKeyLabel = document.getElementById("new-key-label");
   dom.newKeyItText = document.getElementById("new-key-it-text");
   dom.rowsInfo = document.getElementById("rows-info");
@@ -100,6 +103,10 @@ function bindEvents() {
     } catch (error) {
       showToast(`Creazione key fallita: ${error.message}`, "error", 5000);
     }
+  });
+
+  dom.translateAllBtn.addEventListener("click", async () => {
+    await translateAllFieldsInCurrentScope();
   });
 
   dom.autoTranslateToggle.addEventListener("change", async (event) => {
@@ -184,10 +191,12 @@ async function loadScope(scopeId) {
   const payload = await window.editorApi.getScopeData(scopeId);
   state.currentScope = String(scopeId);
   dom.scopeSelect.value = String(state.currentScope);
+  state.currentEntries = payload.entries ?? [];
 
-  renderTableRows(payload.entries ?? []);
-  updateScopeMeta(payload.entries ?? []);
+  renderTableRows(state.currentEntries);
+  updateScopeMeta(state.currentEntries);
   clearFieldHighlight();
+  refreshTranslateButtons();
 }
 
 function renderTableRows(entries) {
@@ -430,8 +439,113 @@ async function translateField(key, section, targetLang, targetTextarea, button) 
 function refreshTranslateButtons() {
   const translateButtons = dom.tableBody.querySelectorAll(".translate-btn");
   for (const button of translateButtons) {
-    button.disabled = !state.translatorEnabled;
+    button.disabled = !state.translatorEnabled || state.translateAllRunning;
   }
+  if (dom.translateAllBtn) {
+    dom.translateAllBtn.disabled =
+      !state.translatorEnabled || state.translateAllRunning || !Array.isArray(state.currentEntries) || state.currentEntries.length === 0;
+  }
+}
+
+async function translateAllFieldsInCurrentScope() {
+  if (!state.translatorEnabled) {
+    showToast("Traduzione automatica disabilitata", "error");
+    return;
+  }
+  if (state.translateAllRunning) {
+    return;
+  }
+
+  const queue = [];
+  let skippedAlreadyTranslated = 0;
+  for (const entry of state.currentEntries) {
+    const key = Number(entry.key);
+    const section = Number(entry.section ?? 0);
+    const sourceField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, "it"));
+    const sourceText = String(sourceField?.value ?? "").trim();
+    if (!sourceText) {
+      continue;
+    }
+
+    for (const lang of state.languages) {
+      if (lang === "it") {
+        continue;
+      }
+      const targetField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, lang));
+      const targetText = String(targetField?.value ?? "").trim();
+      const existingText = String(entry.translations?.[lang] ?? "").trim();
+      if (!targetField) {
+        continue;
+      }
+      if (targetText || existingText) {
+        skippedAlreadyTranslated += 1;
+        continue;
+      }
+      queue.push({ key, section, lang, sourceText, targetField });
+    }
+  }
+
+  if (!queue.length) {
+    showToast(
+      skippedAlreadyTranslated > 0
+        ? `Nessuna traduzione da fare: ${skippedAlreadyTranslated} campi già tradotti`
+        : "Nessun campo vuoto da tradurre nello scope corrente",
+      "success"
+    );
+    return;
+  }
+
+  state.translateAllRunning = true;
+  const prevLabel = dom.translateAllBtn.textContent;
+  dom.translateAllBtn.textContent = `… 0/${queue.length}`;
+  refreshTranslateButtons();
+
+  let okCount = 0;
+  let failCount = 0;
+
+  try {
+    for (let i = 0; i < queue.length; i += 1) {
+      const item = queue[i];
+      dom.translateAllBtn.textContent = `… ${i + 1}/${queue.length}`;
+      try {
+        const translated = await window.editorApi.translate({
+          text: item.sourceText,
+          sourceLang: "it",
+          targetLang: item.lang,
+        });
+
+        item.targetField.value = String(translated.text ?? "");
+        await window.editorApi.updateTranslation({
+          scope: state.currentScope,
+          key: item.key,
+          section: item.section,
+          lang: item.lang,
+          text: item.targetField.value,
+        });
+        okCount += 1;
+      } catch (error) {
+        console.error("translateAll error", error);
+        failCount += 1;
+      }
+    }
+  } finally {
+    state.translateAllRunning = false;
+    dom.translateAllBtn.textContent = prevLabel;
+    refreshTranslateButtons();
+  }
+
+  if (okCount > 0) {
+    setHasChanges(true);
+  }
+  if (failCount > 0) {
+    showToast(
+      `Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} ignorati, ${failCount} errori`,
+      "error",
+      5000
+    );
+    return;
+  }
+  showToast(`Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} ignorati`, "success");
 }
 
 function makeFieldKey(scope, key, section, lang) {
