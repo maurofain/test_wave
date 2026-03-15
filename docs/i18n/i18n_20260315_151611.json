@@ -4980,20 +4980,20 @@
         "label": "programs.text.001",
         "text": {
           "it": "Tabella Programmi",
-          "en": "Program Table",
-          "fr": "Tableau du programme",
-          "de": "Programm-Tabelle",
-          "es": "Cuadro del programa"
+          "en": "Tabella Programmi",
+          "fr": "Tabella Programmi",
+          "de": "Tabella Programmi",
+          "es": "Tabella Programmi"
         }
       },
       "002": {
         "label": "programs.text.002",
         "text": {
           "it": "Tabella Programmi [",
-          "en": "Table Programs [",
-          "fr": "Programmes de table [",
-          "de": "Tabelle Programme [",
-          "es": "Programas de mesa ["
+          "en": "Tabella Programmi [",
+          "fr": "Tabella Programmi [",
+          "de": "Tabella Programmi [",
+          "es": "Tabella Programmi ["
         }
       },
       "003": {
@@ -5010,10 +5010,10 @@
         "label": "programs.text.004",
         "text": {
           "it": "Emulatore",
-          "en": "Emulator",
-          "fr": "Emulateur",
-          "de": "Emulator",
-          "es": "Emulador"
+          "en": "Emulatore",
+          "fr": "Emulatore",
+          "de": "Emulatore",
+          "es": "Emulatore"
         }
       },
       "005": {
@@ -5021,9 +5021,9 @@
         "text": {
           "it": "🏠 Home",
           "en": "🏠 Home",
-          "fr": "🏠 Accueil",
-          "de": "🏠 Startseite",
-          "es": "🏠 Inicio"
+          "fr": "🏠 Home",
+          "de": "🏠 Home",
+          "es": "🏠 Home"
         }
       },
       "006": {
@@ -5032,7 +5032,7 @@
           "it": "⚙️ Config",
           "en": "⚙️ Config",
           "fr": "⚙️ Config",
-          "de": "⚙️ Konfig",
+          "de": "⚙️ Config",
           "es": "⚙️ Config"
         }
       },
@@ -5042,8 +5042,8 @@
           "it": "🔧 Test",
           "en": "🔧 Test",
           "fr": "🔧 Test",
-          "de": "🔧 Prüfung",
-          "es": "🔧 Prueba"
+          "de": "🔧 Test",
+          "es": "🔧 Test"
         }
       },
       "008": {
@@ -5051,9 +5051,9 @@
         "text": {
           "it": "📁 File",
           "en": "📁 File",
-          "fr": "📁 Fichier",
-          "de": "📁 Datei",
-          "es": "Archivo 📁"
+          "fr": "📁 File",
+          "de": "📁 File",
+          "es": "📁 File"
         }
       },
       "009": {
@@ -5061,9 +5061,9 @@
         "text": {
           "it": "📋 Task",
           "en": "📋 Task",
-          "fr": "📋 Tâche",
-          "de": "📋 Aufgabe",
-          "es": "📋 Tarea"
+          "fr": "📋 Task",
+          "de": "📋 Task",
+          "es": "📋 Task"
         }
       },
       "010": {
@@ -5072,18 +5072,18 @@
           "it": "📋 Log",
           "en": "📋 Log",
           "fr": "📋 Log",
-          "de": "📋 Protokoll",
-          "es": "📋 Registro"
+          "de": "📋 Log",
+          "es": "📋 Log"
         }
       },
       "011": {
         "label": "programs.text.011",
         "text": {
           "it": "📊 Programmi",
-          "en": "📊 Programs",
-          "fr": "📊 Programmes",
-          "de": "📊 Programme",
-          "es": "Programas"
+          "en": "📊 Programmi",
+          "fr": "📊 Programmi",
+          "de": "📊 Programmi",
+          "es": "📊 Programmi"
         }
       },
       "012": {
@@ -5100,20 +5100,20 @@
         "label": "programs.text.013",
         "text": {
           "it": "📊 Editor Tabella Programmi (FACTORY)",
-          "en": "📊 Program Table Editor (FACTORY)",
-          "fr": "📊 Éditeur de tableaux de programmes (FACTORY)",
-          "de": "📊 Programmtabellen-Editor (FACTORY)",
-          "es": "📊 Editor de tablas de programas (FACTORY)"
+          "en": "📊 Editor Tabella Programmi (FACTORY)",
+          "fr": "📊 Editor Tabella Programmi (FACTORY)",
+          "de": "📊 Editor Tabella Programmi (FACTORY)",
+          "es": "📊 Editor Tabella Programmi (FACTORY)"
         }
       },
       "014": {
         "label": "programs.text.014",
         "text": {
           "it": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.",
-          "en": "Set name, enable, price, duration and relay mask for each program.",
-          "fr": "Définissez le nom, l'activation, le prix, la durée et le masque de relais pour chaque programme.",
-          "de": "Legen Sie für jede Sendung Name, Freigabe, Preis, Dauer und Relaismaske fest.",
-          "es": "Configure el nombre, la activación, el precio, la duración y la máscara de retransmisión de cada programa."
+          "en": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.",
+          "fr": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.",
+          "de": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.",
+          "es": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma."
         }
       },
       "015": {
@@ -5130,50 +5130,50 @@
         "label": "programs.text.016",
         "text": {
           "it": "Nome",
-          "en": "Name",
-          "fr": "Nom",
-          "de": "Name",
-          "es": "Nombre"
+          "en": "Nome",
+          "fr": "Nome",
+          "de": "Nome",
+          "es": "Nome"
         }
       },
       "017": {
         "label": "programs.text.017",
         "text": {
           "it": "Abilitato",
-          "en": "Enabled",
-          "fr": "Activé",
-          "de": "Aktiviert",
-          "es": "Activado"
+          "en": "Abilitato",
+          "fr": "Abilitato",
+          "de": "Abilitato",
+          "es": "Abilitato"
         }
       },
       "018": {
         "label": "programs.text.018",
         "text": {
           "it": "Prezzo",
-          "en": "Price",
-          "fr": "Prix",
-          "de": "Preis",
-          "es": "Precio"
+          "en": "Prezzo",
+          "fr": "Prezzo",
+          "de": "Prezzo",
+          "es": "Prezzo"
         }
       },
       "019": {
         "label": "programs.text.019",
         "text": {
           "it": "Durata (s)",
-          "en": "Duration (s)",
-          "fr": "Durée (s)",
-          "de": "Dauer (s)",
-          "es": "Duración (s)"
+          "en": "Durata (s)",
+          "fr": "Durata (s)",
+          "de": "Durata (s)",
+          "es": "Durata (s)"
         }
       },
       "020": {
         "label": "programs.text.020",
         "text": {
           "it": "Pausa Max (s)",
-          "en": "Max Pause (s)",
-          "fr": "Pause maximale (s)",
-          "de": "Maximale Pause (s)",
-          "es": "Pausa máxima (s)"
+          "en": "Pausa Max (s)",
+          "fr": "Pausa Max (s)",
+          "de": "Pausa Max (s)",
+          "es": "Pausa Max (s)"
         }
       },
       "021": {
@@ -5181,39 +5181,39 @@
         "text": {
           "it": "Relay mask",
           "en": "Relay mask",
-          "fr": "Masque de relais",
-          "de": "Relaismaske",
-          "es": "Máscara de relé"
+          "fr": "Relay mask",
+          "de": "Relay mask",
+          "es": "Relay mask"
         }
       },
       "022": {
         "label": "programs.text.022",
         "text": {
           "it": "💾 Salva tabella",
-          "en": "💾 Save table",
-          "fr": "💾 Sauvegarde de la table",
-          "de": "💾 Tabelle speichern",
-          "es": "💾 Guardar tabla"
+          "en": "💾 Salva tabella",
+          "fr": "💾 Salva tabella",
+          "de": "💾 Salva tabella",
+          "es": "💾 Salva tabella"
         }
       },
       "023": {
         "label": "programs.text.023",
         "text": {
           "it": "🔄 Ricarica",
-          "en": "🔄 Refill",
-          "fr": "🔄 Recharge",
-          "de": "🔄 Nachfüllen",
-          "es": "🔄 Recambio"
+          "en": "🔄 Ricarica",
+          "fr": "🔄 Ricarica",
+          "de": "🔄 Ricarica",
+          "es": "🔄 Ricarica"
         }
       },
       "024": {
         "label": "programs.text.024",
         "text": {
           "it": "Secondi pausa:",
-          "en": "Second break:",
-          "fr": "Deuxième pause :",
-          "de": "Zweite Pause:",
-          "es": "Segundo descanso:"
+          "en": "Secondi pausa:",
+          "fr": "Secondi pausa:",
+          "de": "Secondi pausa:",
+          "es": "Secondi pausa:"
         }
       },
       "025": {
@@ -5221,9 +5221,9 @@
         "text": {
           "it": "Set",
           "en": "Set",
-          "fr": "Set (jeu de mots)",
-          "de": "Satz",
-          "es": "Establecer"
+          "fr": "Set",
+          "de": "Set",
+          "es": "Set"
         }
       },
       "026": {
@@ -5231,7 +5231,7 @@
         "text": {
           "it": "v?",
           "en": "v?",
-          "fr": "v ?",
+          "fr": "v?",
           "de": "v?",
           "es": "v?"
         }
@@ -5250,30 +5250,30 @@
         "label": "programs.js.028",
         "text": {
           "it": "Pausa impostata a",
-          "en": "Pause set at",
-          "fr": "Pause réglée à",
-          "de": "Pause eingestellt auf",
-          "es": "Pausa fijada en"
+          "en": "Pausa impostata a",
+          "fr": "Pausa impostata a",
+          "de": "Pausa impostata a",
+          "es": "Pausa impostata a"
         }
       },
       "029": {
         "label": "programs.js.029",
         "text": {
           "it": "s per tutti i programmi",
-          "en": "s for all programs",
-          "fr": "pour tous les programmes",
-          "de": "s für alle Programme",
-          "es": "s para todos los programas"
+          "en": "s per tutti i programmi",
+          "fr": "s per tutti i programmi",
+          "de": "s per tutti i programmi",
+          "es": "s per tutti i programmi"
         }
       },
       "030": {
         "label": "programs.js.030",
         "text": {
           "it": "Tabella programmi caricata",
-          "en": "Program table loaded",
-          "fr": "Tableau des programmes chargés",
-          "de": "Geladene Programmtabelle",
-          "es": "Tabla de programas cargada"
+          "en": "Tabella programmi caricata",
+          "fr": "Tabella programmi caricata",
+          "de": "Tabella programmi caricata",
+          "es": "Tabella programmi caricata"
         }
       },
       "031": {
@@ -5312,20 +5312,20 @@
         "label": "stats.text.001",
         "text": {
           "it": "Statistiche Device",
-          "en": "Device Statistics",
-          "fr": "Statistiques sur les appareils",
-          "de": "Gerätestatistik",
-          "es": "Estadísticas de dispositivos"
+          "en": "Statistiche Device",
+          "fr": "Statistiche Device",
+          "de": "Statistiche Device",
+          "es": "Statistiche Device"
         }
       },
       "002": {
         "label": "stats.text.002",
         "text": {
           "it": "Statistiche Device [",
-          "en": "Device Statistics [",
-          "fr": "Statistiques sur les appareils [",
-          "de": "Gerätestatistik [",
-          "es": "Estadísticas de dispositivos ["
+          "en": "Statistiche Device [",
+          "fr": "Statistiche Device [",
+          "de": "Statistiche Device [",
+          "es": "Statistiche Device ["
         }
       },
       "003": {
@@ -5342,10 +5342,10 @@
         "label": "stats.text.004",
         "text": {
           "it": "Emulatore",
-          "en": "Emulator",
-          "fr": "Emulateur",
-          "de": "Emulator",
-          "es": "Emulador"
+          "en": "Emulatore",
+          "fr": "Emulatore",
+          "de": "Emulatore",
+          "es": "Emulatore"
         }
       },
       "005": {
@@ -5353,9 +5353,9 @@
         "text": {
           "it": "🏠 Home",
           "en": "🏠 Home",
-          "fr": "🏠 Accueil",
-          "de": "🏠 Startseite",
-          "es": "🏠 Inicio"
+          "fr": "🏠 Home",
+          "de": "🏠 Home",
+          "es": "🏠 Home"
         }
       },
       "006": {
@@ -5364,7 +5364,7 @@
           "it": "⚙️ Config",
           "en": "⚙️ Config",
           "fr": "⚙️ Config",
-          "de": "⚙️ Konfig",
+          "de": "⚙️ Config",
           "es": "⚙️ Config"
         }
       },
@@ -5374,8 +5374,8 @@
           "it": "🔧 Test",
           "en": "🔧 Test",
           "fr": "🔧 Test",
-          "de": "🔧 Prüfung",
-          "es": "🔧 Prueba"
+          "de": "🔧 Test",
+          "es": "🔧 Test"
         }
       },
       "008": {
@@ -5383,9 +5383,9 @@
         "text": {
           "it": "📁 File",
           "en": "📁 File",
-          "fr": "📁 Fichier",
-          "de": "📁 Datei",
-          "es": "Archivo 📁"
+          "fr": "📁 File",
+          "de": "📁 File",
+          "es": "📁 File"
         }
       },
       "009": {
@@ -5393,9 +5393,9 @@
         "text": {
           "it": "📋 Task",
           "en": "📋 Task",
-          "fr": "📋 Tâche",
-          "de": "📋 Aufgabe",
-          "es": "📋 Tarea"
+          "fr": "📋 Task",
+          "de": "📋 Task",
+          "es": "📋 Task"
         }
       },
       "010": {
@@ -5404,18 +5404,18 @@
           "it": "📋 Log",
           "en": "📋 Log",
           "fr": "📋 Log",
-          "de": "📋 Protokoll",
-          "es": "📋 Registro"
+          "de": "📋 Log",
+          "es": "📋 Log"
         }
       },
       "011": {
         "label": "stats.text.011",
         "text": {
           "it": "📊 Programmi",
-          "en": "📊 Programs",
-          "fr": "📊 Programmes",
-          "de": "📊 Programme",
-          "es": "Programas"
+          "en": "📊 Programmi",
+          "fr": "📊 Programmi",
+          "de": "📊 Programmi",
+          "es": "📊 Programmi"
         }
       },
       "012": {
@@ -5432,10 +5432,10 @@
         "label": "stats.text.013",
         "text": {
           "it": "🌐 Rete",
-          "en": "🌐 Network",
-          "fr": "🌐 Réseau",
-          "de": "🌐 Netzwerk",
-          "es": "Red 🌐"
+          "en": "🌐 Rete",
+          "fr": "🌐 Rete",
+          "de": "🌐 Rete",
+          "es": "🌐 Rete"
         }
       },
       "015": {
@@ -5453,29 +5453,29 @@
         "text": {
           "it": "SD Card",
           "en": "SD Card",
-          "fr": "Carte SD",
-          "de": "SD-Karte",
-          "es": "Tarjeta SD"
+          "fr": "SD Card",
+          "de": "SD Card",
+          "es": "SD Card"
         }
       },
       "017": {
         "label": "stats.text.017",
         "text": {
           "it": "🔌 Stato Driver",
-          "en": "🔌 Driver Status",
-          "fr": "🔌 Statut du conducteur",
-          "de": "🔌 Status des Fahrers",
-          "es": "🔌 Estado del controlador"
+          "en": "🔌 Stato Driver",
+          "fr": "🔌 Stato Driver",
+          "de": "🔌 Stato Driver",
+          "es": "🔌 Stato Driver"
         }
       },
       "018": {
         "label": "stats.text.018",
         "text": {
           "it": "️ Ambiente",
-          "en": "️ Environment",
-          "fr": "️ Environnement",
-          "de": "️ Umwelt",
-          "es": "️ Medio ambiente"
+          "en": "️ Ambiente",
+          "fr": "️ Ambiente",
+          "de": "️ Ambiente",
+          "es": "️ Ambiente"
         }
       },
       "019": {
@@ -5483,9 +5483,9 @@
         "text": {
           "it": "🎰 MDB Status",
           "en": "🎰 MDB Status",
-          "fr": "🎰 Statut de l'ODM",
-          "de": "🎰 MDB-Status",
-          "es": "🎰 Estado MDB"
+          "fr": "🎰 MDB Status",
+          "de": "🎰 MDB Status",
+          "es": "🎰 MDB Status"
         }
       },
       "020": {
@@ -5493,7 +5493,7 @@
         "text": {
           "it": "v?",
           "en": "v?",
-          "fr": "v ?",
+          "fr": "v?",
           "de": "v?",
           "es": "v?"
         }
@@ -5503,29 +5503,29 @@
         "text": {
           "it": "Status Error",
           "en": "Status Error",
-          "fr": "Erreur d'état",
-          "de": "Status Fehler",
-          "es": "Error de estado"
+          "fr": "Status Error",
+          "de": "Status Error",
+          "es": "Status Error"
         }
       },
       "022": {
         "label": "stats.js.022",
         "text": {
           "it": "Non Trovata",
-          "en": "Not Found",
-          "fr": "Non trouvé",
-          "de": "Nicht gefunden",
-          "es": "No se ha encontrado"
+          "en": "Non Trovata",
+          "fr": "Non Trovata",
+          "de": "Non Trovata",
+          "es": "Non Trovata"
         }
       },
       "023": {
         "label": "stats.js.023",
         "text": {
           "it": "Presente (Non Montata)",
-          "en": "Present (Not Mounted)",
-          "fr": "Présent (non monté)",
-          "de": "Anwesend (unmontiert)",
-          "es": "Presente (sin montar)"
+          "en": "Presente (Non Montata)",
+          "fr": "Presente (Non Montata)",
+          "de": "Presente (Non Montata)",
+          "es": "Presente (Non Montata)"
         }
       },
       "024": {

@@ -11,6 +11,7 @@ const state = {
   currentEntries: [],
   fieldMap: new Map(),
   highlightedField: null,
+  cancelTranslation: false,
 };
 
 const dom = {};
@@ -40,9 +41,23 @@ function cacheDom() {
   dom.saveBtn = document.getElementById("save-btn");
   dom.addKeyBtn = document.getElementById("add-key-btn");
   dom.translateAllBtn = document.getElementById("translate-all-btn");
+  dom.translateAllScopesBtn = document.getElementById("translate-all-scopes-btn");
   dom.newKeyLabel = document.getElementById("new-key-label");
   dom.newKeyItText = document.getElementById("new-key-it-text");
   dom.rowsInfo = document.getElementById("rows-info");
+  dom.confirmDialog = document.getElementById("confirm-dialog");
+  dom.confirmOk = document.getElementById("confirm-ok");
+  dom.confirmCancel = document.getElementById("confirm-cancel");
+  dom.progressDialog = document.getElementById("translation-progress-dialog");
+  dom.progressBar = document.getElementById("progress-bar");
+  dom.progressText = document.getElementById("progress-text");
+  dom.currentScopeLabel = document.getElementById("current-scope-label");
+  dom.currentKeyLabel = document.getElementById("current-key-label");
+  dom.currentLangLabel = document.getElementById("current-lang-label");
+  dom.currentSourceText = document.getElementById("current-source-text");
+  dom.currentTranslatedText = document.getElementById("current-translated-text");
+  dom.progressStatsText = document.getElementById("progress-stats-text");
+  dom.cancelTranslationBtn = document.getElementById("cancel-translation-btn");
   dom.tableHeadRow = document.getElementById("table-head-row");
   dom.tableBody = document.getElementById("table-body");
   dom.footerInfo = document.getElementById("footer-info");
@@ -106,7 +121,42 @@ function bindEvents() {
   });
 
   dom.translateAllBtn.addEventListener("click", async () => {
-    await translateAllFieldsInCurrentScope();
+    await translateAllFieldsInCurrentScope(false);
+  });
+
+  dom.translateAllBtn.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    showConfirmDialog();
+  });
+
+  dom.confirmOk.addEventListener("click", async () => {
+    hideConfirmDialog();
+    await translateAllFieldsInCurrentScope(true);
+  });
+
+  dom.confirmCancel.addEventListener("click", () => {
+    hideConfirmDialog();
+  });
+
+  dom.confirmDialog.addEventListener("click", (event) => {
+    if (event.target === dom.confirmDialog) {
+      hideConfirmDialog();
+    }
+  });
+
+  dom.translateAllScopesBtn.addEventListener("click", async () => {
+    await translateAllScopes(false);
+  });
+
+  dom.translateAllScopesBtn.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    showConfirmDialogAllScopes();
+  });
+
+  dom.cancelTranslationBtn.addEventListener("click", () => {
+    state.cancelTranslation = true;
+    dom.cancelTranslationBtn.disabled = true;
+    dom.cancelTranslationBtn.textContent = "⏳ Annullamento...";
   });
 
   dom.autoTranslateToggle.addEventListener("change", async (event) => {
@@ -483,6 +533,193 @@ async function translateField(key, section, targetLang, targetTextarea, button) 
   }
 }
 
+async function translateAllScopes(forceRetranslate = false) {
+  console.log("translateAllScopes called with forceRetranslate:", forceRetranslate);
+  
+  if (!state.translatorEnabled) {
+    showToast("Traduzione automatica disabilitata", "error");
+    return;
+  }
+  if (state.translateAllRunning) {
+    return;
+  }
+
+  const scopesToProcess = state.scopes.map(s => String(s.id));
+  if (!scopesToProcess.length) {
+    showToast("Nessuno scope disponibile", "error");
+    return;
+  }
+
+  state.translateAllRunning = true;
+  const prevLabel = dom.translateAllScopesBtn.textContent;
+  dom.translateAllScopesBtn.disabled = true;
+  dom.translateAllBtn.disabled = true;
+
+  let totalOk = 0;
+  let totalFail = 0;
+  let totalSkipped = 0;
+  let totalTechnical = 0;
+
+  showProgressDialog();
+
+  try {
+    for (let i = 0; i < scopesToProcess.length; i++) {
+      if (state.cancelTranslation) {
+        console.log("Translation of all scopes cancelled by user");
+        break;
+      }
+
+      const scopeId = scopesToProcess[i];
+      const scopeInfo = state.scopes.find(s => String(s.id) === scopeId);
+      const scopeLabel = scopeInfo ? scopeInfo.label : scopeId;
+      
+      dom.translateAllScopesBtn.textContent = `🌍 ${i + 1}/${scopesToProcess.length}: ${scopeLabel}`;
+      
+      // Carica lo scope
+      await loadScope(scopeId);
+      
+      // Attendi un momento per permettere il rendering
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Traduci lo scope corrente (il popup è già aperto e rimane aperto)
+      const result = await translateAllFieldsInCurrentScopeWithStats(forceRetranslate);
+      totalOk += result.okCount;
+      totalFail += result.failCount;
+      totalSkipped += result.skippedAlreadyTranslated;
+      totalTechnical += result.skippedTechnical;
+      
+      // Salva dopo ogni scope
+      await window.editorApi.saveCatalog();
+      
+      console.log(`Scope ${scopeLabel} completato: ${result.okCount} tradotti, ${result.failCount} errori`);
+    }
+  } finally {
+    hideProgressDialog();
+    state.translateAllRunning = false;
+    dom.translateAllScopesBtn.textContent = prevLabel;
+    dom.translateAllScopesBtn.disabled = false;
+    dom.translateAllBtn.disabled = false;
+    refreshTranslateButtons();
+  }
+
+  const mode = forceRetranslate ? "Ritraduzione completa" : "Traduzione tutti gli scope";
+  if (totalFail > 0) {
+    showToast(
+      `${mode}: ${totalOk} tradotti, ${totalSkipped} già tradotti, ${totalTechnical} tecnici ignorati, ${totalFail} errori`,
+      "error",
+      5000
+    );
+  } else {
+    showToast(
+      `${mode} completata: ${totalOk} tradotti${!forceRetranslate ? `, ${totalSkipped} già tradotti` : ""}, ${totalTechnical} tecnici ignorati`,
+      "success",
+      4000
+    );
+  }
+}
+
+async function translateAllFieldsInCurrentScopeWithStats(forceRetranslate = false) {
+  const queue = [];
+  let skippedAlreadyTranslated = 0;
+  let skippedTechnical = 0;
+  
+  for (const entry of state.currentEntries) {
+    const key = Number(entry.key);
+    const section = Number(entry.section ?? 0);
+    const sourceField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, "it"));
+    const sourceText = String(sourceField?.value ?? "").trim();
+    if (!sourceText) {
+      continue;
+    }
+    if (shouldSkipTechnicalTranslation(entry, sourceText)) {
+      skippedTechnical += Math.max(state.languages.length - 1, 0);
+      continue;
+    }
+
+    for (const lang of state.languages) {
+      if (lang === "it") {
+        continue;
+      }
+      const targetField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, lang));
+      const targetText = String(targetField?.value ?? "").trim();
+      const existingText = String(entry.translations?.[lang] ?? "").trim();
+      if (!targetField) {
+        continue;
+      }
+      if (!forceRetranslate && (targetText || existingText)) {
+        skippedAlreadyTranslated += 1;
+        continue;
+      }
+      const rowElement = targetField.closest("tr");
+      queue.push({ key, section, lang, sourceText, targetField, rowElement });
+    }
+  }
+
+  let okCount = 0;
+  let failCount = 0;
+
+  const scopeInfo = state.scopes.find(s => String(s.id) === String(state.currentScope));
+  const scopeLabel = scopeInfo ? scopeInfo.label : state.currentScope;
+
+  for (let i = 0; i < queue.length; i += 1) {
+    if (state.cancelTranslation) {
+      console.log("Translation cancelled by user in scope", scopeLabel);
+      break;
+    }
+
+    const item = queue[i];
+    const entry = state.currentEntries.find(e => Number(e.key) === item.key && Number(e.section ?? 0) === item.section);
+    const keyLabel = entry?.keyName || `Key ${item.key}`;
+
+    updateProgressDialog({
+      current: i + 1,
+      total: queue.length,
+      scopeLabel,
+      keyLabel,
+      lang: item.lang,
+      sourceText: item.sourceText,
+      translatedText: "Traduzione in corso...",
+      stats: { ok: okCount, fail: failCount, skipped: skippedAlreadyTranslated }
+    });
+
+    try {
+      const translated = await window.editorApi.translate({
+        text: item.sourceText,
+        sourceLang: "it",
+        targetLang: item.lang,
+      });
+
+      const translatedText = String(translated.text ?? "");
+      item.targetField.value = translatedText;
+      await window.editorApi.updateTranslation({
+        scope: state.currentScope,
+        key: item.key,
+        section: item.section,
+        lang: item.lang,
+        text: translatedText,
+      });
+      
+      updateProgressDialog({
+        current: i + 1,
+        total: queue.length,
+        scopeLabel,
+        keyLabel,
+        lang: item.lang,
+        sourceText: item.sourceText,
+        translatedText,
+        stats: { ok: okCount + 1, fail: failCount, skipped: skippedAlreadyTranslated }
+      });
+      
+      okCount += 1;
+    } catch (error) {
+      console.error("translateAll error", error);
+      failCount += 1;
+    }
+  }
+
+  return { okCount, failCount, skippedAlreadyTranslated, skippedTechnical };
+}
+
 function refreshTranslateButtons() {
   const translateButtons = dom.tableBody.querySelectorAll(".translate-btn");
   for (const button of translateButtons) {
@@ -684,12 +921,14 @@ function shouldSkipTechnicalTranslation(entry, sourceText) {
   return false;
 }
 
-async function translateAllFieldsInCurrentScope() {
+async function translateAllFieldsInCurrentScope(forceRetranslate = false, managePopup = true, manageRunningFlag = true) {
+  console.log("translateAllFieldsInCurrentScope called with forceRetranslate:", forceRetranslate, "managePopup:", managePopup, "manageRunningFlag:", manageRunningFlag);
+  
   if (!state.translatorEnabled) {
     showToast("Traduzione automatica disabilitata", "error");
     return;
   }
-  if (state.translateAllRunning) {
+  if (manageRunningFlag && state.translateAllRunning) {
     return;
   }
 
@@ -719,18 +958,25 @@ async function translateAllFieldsInCurrentScope() {
       if (!targetField) {
         continue;
       }
-      if (targetText || existingText) {
+      // Se forceRetranslate è true, aggiungi sempre alla queue
+      // Se forceRetranslate è false, salta se già tradotto
+      if (!forceRetranslate && (targetText || existingText)) {
         skippedAlreadyTranslated += 1;
         continue;
       }
-      queue.push({ key, section, lang, sourceText, targetField });
+      const rowElement = targetField.closest("tr");
+      queue.push({ key, section, lang, sourceText, targetField, rowElement });
     }
   }
+  
+  console.log("Queue length:", queue.length, "skipped:", skippedAlreadyTranslated, "technical:", skippedTechnical);
 
   if (!queue.length) {
     showToast(
       skippedAlreadyTranslated > 0 || skippedTechnical > 0
         ? `Nessuna traduzione da fare: ${skippedAlreadyTranslated} già tradotti, ${skippedTechnical} tecnici ignorati`
+        : forceRetranslate
+        ? "Nessun campo da ritradurre nello scope corrente"
         : "Nessun campo vuoto da tradurre nello scope corrente",
       "success"
     );
@@ -739,16 +985,40 @@ async function translateAllFieldsInCurrentScope() {
 
   state.translateAllRunning = true;
   const prevLabel = dom.translateAllBtn.textContent;
-  dom.translateAllBtn.textContent = `… 0/${queue.length}`;
   refreshTranslateButtons();
 
   let okCount = 0;
   let failCount = 0;
 
+  const scopeInfo = state.scopes.find(s => String(s.id) === String(state.currentScope));
+  const scopeLabel = scopeInfo ? scopeInfo.label : state.currentScope;
+
+  if (managePopup) {
+    showProgressDialog();
+  }
+
   try {
     for (let i = 0; i < queue.length; i += 1) {
+      if (state.cancelTranslation) {
+        console.log("Translation cancelled by user");
+        break;
+      }
+
       const item = queue[i];
-      dom.translateAllBtn.textContent = `… ${i + 1}/${queue.length}`;
+      const entry = state.currentEntries.find(e => Number(e.key) === item.key && Number(e.section ?? 0) === item.section);
+      const keyLabel = entry?.keyName || `Key ${item.key}`;
+
+      updateProgressDialog({
+        current: i + 1,
+        total: queue.length,
+        scopeLabel,
+        keyLabel,
+        lang: item.lang,
+        sourceText: item.sourceText,
+        translatedText: "Traduzione in corso...",
+        stats: { ok: okCount, fail: failCount, skipped: skippedAlreadyTranslated }
+      });
+
       try {
         const translated = await window.editorApi.translate({
           text: item.sourceText,
@@ -756,22 +1026,50 @@ async function translateAllFieldsInCurrentScope() {
           targetLang: item.lang,
         });
 
-        item.targetField.value = String(translated.text ?? "");
+        const translatedText = String(translated.text ?? "");
+        item.targetField.value = translatedText;
         await window.editorApi.updateTranslation({
           scope: state.currentScope,
           key: item.key,
           section: item.section,
           lang: item.lang,
-          text: item.targetField.value,
+          text: translatedText,
         });
+        
+        updateProgressDialog({
+          current: i + 1,
+          total: queue.length,
+          scopeLabel,
+          keyLabel,
+          lang: item.lang,
+          sourceText: item.sourceText,
+          translatedText,
+          stats: { ok: okCount + 1, fail: failCount, skipped: skippedAlreadyTranslated }
+        });
+        
         okCount += 1;
       } catch (error) {
         console.error("translateAll error", error);
         failCount += 1;
+        updateProgressDialog({
+          current: i + 1,
+          total: queue.length,
+          scopeLabel,
+          keyLabel,
+          lang: item.lang,
+          sourceText: item.sourceText,
+          translatedText: `ERRORE: ${error.message}`,
+          stats: { ok: okCount, fail: failCount + 1, skipped: skippedAlreadyTranslated }
+        });
       }
     }
   } finally {
-    state.translateAllRunning = false;
+    if (managePopup) {
+      hideProgressDialog();
+    }
+    if (manageRunningFlag) {
+      state.translateAllRunning = false;
+    }
     dom.translateAllBtn.textContent = prevLabel;
     refreshTranslateButtons();
   }
@@ -779,16 +1077,17 @@ async function translateAllFieldsInCurrentScope() {
   if (okCount > 0) {
     setHasChanges(true);
   }
+  const mode = forceRetranslate ? "Ritraduzione" : "Traduci tutto";
   if (failCount > 0) {
     showToast(
-      `Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} già tradotti, ${skippedTechnical} tecnici ignorati, ${failCount} errori`,
+      `${mode}: ${okCount} tradotti, ${skippedAlreadyTranslated} già tradotti, ${skippedTechnical} tecnici ignorati, ${failCount} errori`,
       "error",
       5000
     );
     return;
   }
   showToast(
-    `Traduci tutto: ${okCount} tradotti, ${skippedAlreadyTranslated} già tradotti, ${skippedTechnical} tecnici ignorati`,
+    `${mode}: ${okCount} tradotti${!forceRetranslate ? `, ${skippedAlreadyTranslated} già tradotti` : ""}, ${skippedTechnical} tecnici ignorati`,
     "success"
   );
 }
@@ -812,6 +1111,89 @@ function applyTheme(themeMode) {
 }
 
 let toastTimer = null;
+
+function showConfirmDialog() {
+  dom.confirmDialog.classList.remove("hidden");
+}
+
+function hideConfirmDialog() {
+  dom.confirmDialog.classList.add("hidden");
+}
+
+function showProgressDialog() {
+  state.cancelTranslation = false;
+  dom.cancelTranslationBtn.disabled = false;
+  dom.cancelTranslationBtn.textContent = "❌ Annulla Traduzione";
+  dom.progressBar.style.width = "0%";
+  dom.progressText.textContent = "Preparazione...";
+  dom.currentScopeLabel.textContent = "-";
+  dom.currentKeyLabel.textContent = "-";
+  dom.currentLangLabel.textContent = "-";
+  dom.currentSourceText.textContent = "-";
+  dom.currentTranslatedText.textContent = "-";
+  dom.progressStatsText.textContent = "Tradotti: 0 | Errori: 0 | Saltati: 0";
+  dom.progressDialog.classList.remove("hidden");
+}
+
+function hideProgressDialog() {
+  dom.progressDialog.classList.add("hidden");
+}
+
+function updateProgressDialog(data) {
+  const { current, total, scopeLabel, keyLabel, lang, sourceText, translatedText, stats } = data;
+  
+  const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+  dom.progressBar.style.width = `${percentage}%`;
+  dom.progressText.textContent = `${current} / ${total} (${percentage}%)`;
+  
+  if (scopeLabel) dom.currentScopeLabel.textContent = scopeLabel;
+  if (keyLabel) dom.currentKeyLabel.textContent = keyLabel;
+  if (lang) dom.currentLangLabel.textContent = lang.toUpperCase();
+  if (sourceText) dom.currentSourceText.textContent = sourceText;
+  if (translatedText) dom.currentTranslatedText.textContent = translatedText;
+  
+  if (stats) {
+    dom.progressStatsText.textContent = `Tradotti: ${stats.ok} | Errori: ${stats.fail} | Saltati: ${stats.skipped}`;
+  }
+}
+
+function showConfirmDialogAllScopes() {
+  const dialogContent = dom.confirmDialog.querySelector(".confirm-dialog-content");
+  const originalH3 = dialogContent.querySelector("h3").textContent;
+  const originalP1 = dialogContent.querySelectorAll("p")[0].innerHTML;
+  const originalP2 = dialogContent.querySelectorAll("p")[1].textContent;
+  const originalBtnText = dom.confirmOk.textContent;
+
+  dialogContent.querySelector("h3").textContent = "⚠️ Conferma Ritraduzione TUTTI GLI SCOPE";
+  dialogContent.querySelectorAll("p")[0].innerHTML = "Vuoi ritradurre <strong>TUTTI</strong> i testi di <strong>TUTTE</strong> le lingue in <strong>TUTTI GLI SCOPE</strong>, sovrascrivendo anche le traduzioni esistenti?";
+  dialogContent.querySelectorAll("p")[1].textContent = "Questa operazione può richiedere molto tempo e non può essere annullata.";
+  dom.confirmOk.textContent = "Conferma Ritraduzione Completa";
+
+  const handleOk = async () => {
+    hideConfirmDialog();
+    await translateAllScopes(true);
+    restoreDialog();
+  };
+
+  const handleCancel = () => {
+    hideConfirmDialog();
+    restoreDialog();
+  };
+
+  const restoreDialog = () => {
+    dialogContent.querySelector("h3").textContent = originalH3;
+    dialogContent.querySelectorAll("p")[0].innerHTML = originalP1;
+    dialogContent.querySelectorAll("p")[1].textContent = originalP2;
+    dom.confirmOk.textContent = originalBtnText;
+    dom.confirmOk.removeEventListener("click", handleOk);
+    dom.confirmCancel.removeEventListener("click", handleCancel);
+  };
+
+  dom.confirmOk.addEventListener("click", handleOk, { once: true });
+  dom.confirmCancel.addEventListener("click", handleCancel, { once: true });
+
+  showConfirmDialog();
+}
 
 function showToast(message, type = "success", timeout = 2500) {
   dom.toast.textContent = message;

@@ -51,6 +51,7 @@
           </div>
           <button id="add-key-btn" class="btn btn-neutral">➕ Aggiungi key</button>
           <button id="translate-all-btn" class="btn btn-neutral">🌐 Traduci tutto</button>
+          <button id="translate-all-scopes-btn" class="btn btn-neutral">🌍 Traduci tutti gli scope</button>
 
           <button id="save-btn" class="btn btn-success">💾 Salva</button>
         </div>
@@ -73,6 +74,59 @@
     </div>
 
     <div id="toast" class="toast hidden"></div>
+    
+    <div id="confirm-dialog" class="confirm-dialog hidden">
+      <div class="confirm-dialog-content">
+        <h3>⚠️ Conferma Ritraduzione</h3>
+        <p>Vuoi ritradurre <strong>TUTTI</strong> i testi di <strong>TUTTE</strong> le lingue, sovrascrivendo anche le traduzioni esistenti?</p>
+        <p class="warning-text">Questa operazione non può essere annullata.</p>
+        <div class="confirm-dialog-buttons">
+          <button id="confirm-cancel" class="btn btn-neutral">Annulla</button>
+          <button id="confirm-ok" class="btn btn-danger">Conferma Ritraduzione</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="translation-progress-dialog" class="confirm-dialog hidden">
+      <div class="translation-progress-content">
+        <h3>🌐 Traduzione in corso...</h3>
+        <div class="progress-info">
+          <div class="progress-bar-container">
+            <div id="progress-bar" class="progress-bar"></div>
+          </div>
+          <p id="progress-text" class="progress-text">Preparazione...</p>
+        </div>
+        <div class="translation-details">
+          <div class="detail-row">
+            <span class="detail-label">Scope:</span>
+            <span id="current-scope-label" class="detail-value">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Key:</span>
+            <span id="current-key-label" class="detail-value">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Lingua:</span>
+            <span id="current-lang-label" class="detail-value">-</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Testo originale:</span>
+            <div id="current-source-text" class="detail-text">-</div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Traduzione:</span>
+            <div id="current-translated-text" class="detail-text">-</div>
+          </div>
+        </div>
+        <div class="progress-stats">
+          <span id="progress-stats-text">Tradotti: 0 | Errori: 0 | Saltati: 0</span>
+        </div>
+        <div class="confirm-dialog-buttons">
+          <button id="cancel-translation-btn" class="btn btn-danger">❌ Annulla Traduzione</button>
+        </div>
+      </div>
+    </div>
+    
     <script src="renderer.js"></script>
   </body>
   </html>
