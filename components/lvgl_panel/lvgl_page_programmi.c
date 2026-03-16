@@ -158,7 +158,7 @@ static void btn_style(lv_obj_t *btn, lv_color_t bg)
 {
     lv_obj_set_style_bg_color(btn, bg, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(btn, 10, LV_PART_MAIN);
+    lv_obj_set_style_radius(btn,25, LV_PART_MAIN);
     lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
     lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(btn, 4, LV_PART_MAIN);
@@ -646,12 +646,12 @@ static void on_prog_btn(lv_event_t *e)
             ESP_LOGW(TAG, "[C] publish pause_toggle failed for pid=%u", (unsigned)pid);
         }
     } else {
-        /* Start selected program */
+        bool is_switch = has_snap && (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED);
         fsm_input_event_t ev = {
             .from = AGN_ID_LVGL,
             .to = {AGN_ID_FSM},
             .action = ACTION_ID_PROGRAM_SELECTED,
-            .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
+            .type = is_switch ? FSM_INPUT_EVENT_PROGRAM_SWITCH : FSM_INPUT_EVENT_PROGRAM_SELECTED,
             .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
             .value_i32 = entry ? (int32_t)entry->price_units : (int32_t)pid,
             .value_u32 = entry ? (uint32_t)entry->pause_max_suspend_sec * 1000U : 0,
@@ -661,7 +661,7 @@ static void on_prog_btn(lv_event_t *e)
         };
         if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
         if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            ESP_LOGW(TAG, "[C] publish program selected failed for pid=%u", (unsigned)pid);
+            ESP_LOGW(TAG, "[C] publish program %s failed for pid=%u", is_switch ? "switch" : "selected", (unsigned)pid);
         } else {
             s_active_prog = pid;
         }
@@ -902,7 +902,7 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_bg_opa(s_stop_btn, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_stop_btn, 2, LV_PART_MAIN);
     lv_obj_set_style_border_color(s_stop_btn, lv_color_make(0xFF, 0x80, 0x80), LV_PART_MAIN);
-    lv_obj_set_style_radius(s_stop_btn, 8, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_stop_btn, 25, LV_PART_MAIN);
     lv_obj_set_style_pad_all(s_stop_btn, 0, LV_PART_MAIN);
     lv_obj_add_flag(s_stop_btn, LV_OBJ_FLAG_HIDDEN);  /* Nascondi inizialmente */
 

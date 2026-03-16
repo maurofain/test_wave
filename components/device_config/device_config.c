@@ -804,6 +804,7 @@ static void _set_defaults(device_config_t *config)
     config->timeouts.idle_before_ads_ms = 60000;    // Default 60s prima di mostrare ads
     config->timeouts.ad_rotation_ms = 30000;         // Default 30s per rotazione slide (tempo cambio slide)
     config->timeouts.credit_reset_timeout_ms = 300000; // Default 5min per reset crediti
+    config->display.ads_enabled = true;
 
     // Default testi UI / lingua
     strncpy(config->ui.user_language, UI_LANG_DEFAULT, sizeof(config->ui.user_language) - 1);
@@ -1309,6 +1310,8 @@ esp_err_t device_config_load(device_config_t *config)
                     if (enabled) config->display.enabled = cJSON_IsTrue(enabled);
                     cJSON *bright = cJSON_GetObjectItem(disp_obj, "brt"); if (!bright) bright = cJSON_GetObjectItem(disp_obj, "lcd_brightness");
                     if (bright) config->display.lcd_brightness = (uint8_t)bright->valueint;
+                    cJSON *ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_en"); if (!ads_enabled) ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_enabled");
+                    if (ads_enabled) config->display.ads_enabled = cJSON_IsTrue(ads_enabled);
                 }
 
                 // Analisi config Seriali (RS232, RS485, MDB)
@@ -1590,6 +1593,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON *disp_obj = cJSON_CreateObject();
     cJSON_AddBoolToObject(disp_obj, "en", config->display.enabled);
     cJSON_AddNumberToObject(disp_obj, "brt", config->display.lcd_brightness);
+    cJSON_AddBoolToObject(disp_obj, "ads_en", config->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", disp_obj);
 
     // Seriale RS232

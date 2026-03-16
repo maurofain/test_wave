@@ -1143,6 +1143,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON *display = cJSON_CreateObject();
     cJSON_AddBoolToObject(display, "en", cfg->display.enabled);
     cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
+    cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", display);
 
     // RS232
@@ -1232,6 +1233,9 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON *timeouts = cJSON_CreateObject();
     cJSON_AddNumberToObject(timeouts, "t_prg", cfg->timeouts.exit_programs_ms);
     cJSON_AddNumberToObject(timeouts, "t_lang", cfg->timeouts.exit_language_ms);
+    cJSON_AddNumberToObject(timeouts, "idle_before_ads_ms", cfg->timeouts.idle_before_ads_ms);
+    cJSON_AddNumberToObject(timeouts, "ad_rotation_ms", cfg->timeouts.ad_rotation_ms);
+    cJSON_AddNumberToObject(timeouts, "credit_reset_timeout_ms", cfg->timeouts.credit_reset_timeout_ms);
     cJSON_AddItemToObject(root, "timeouts", timeouts);
 
     // UI multilingua
@@ -1457,6 +1461,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON *display = cJSON_CreateObject();
     cJSON_AddBoolToObject(display, "en", cfg->display.enabled);
     cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
+    cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", display);
 
     // RS232
@@ -1753,6 +1758,11 @@ esp_err_t api_config_save(httpd_req_t *req)
                 web_ui_add_log("WARN", "DISPLAY", "Display disabilitato: ignorata richiesta luminosità");
             }
         }
+        cJSON *ads_enabled = cJSON_GetObjectItem(display_obj, "ads_en");
+        if (!ads_enabled) ads_enabled = cJSON_GetObjectItem(display_obj, "ads_enabled");
+        if (ads_enabled) {
+            cfg->display.ads_enabled = cJSON_IsTrue(ads_enabled);
+        }
     }
 
     cJSON *gpios_obj = cJSON_GetObjectItem(root, "gpios");
@@ -1958,6 +1968,12 @@ esp_err_t api_config_save(httpd_req_t *req)
     if (cfg->timeouts.exit_programs_ms > 600000U) cfg->timeouts.exit_programs_ms = 600000U;
     if (cfg->timeouts.exit_language_ms < 1000U)  cfg->timeouts.exit_language_ms = 1000U;
     if (cfg->timeouts.exit_language_ms > 600000U) cfg->timeouts.exit_language_ms = 600000U;
+    if (cfg->timeouts.idle_before_ads_ms < 1000U) cfg->timeouts.idle_before_ads_ms = 1000U;
+    if (cfg->timeouts.idle_before_ads_ms > 600000U) cfg->timeouts.idle_before_ads_ms = 600000U;
+    if (cfg->timeouts.ad_rotation_ms < 1000U) cfg->timeouts.ad_rotation_ms = 1000U;
+    if (cfg->timeouts.ad_rotation_ms > 60000U) cfg->timeouts.ad_rotation_ms = 60000U;
+    if (cfg->timeouts.credit_reset_timeout_ms < 1000U) cfg->timeouts.credit_reset_timeout_ms = 1000U;
+    if (cfg->timeouts.credit_reset_timeout_ms > 3600000U) cfg->timeouts.credit_reset_timeout_ms = 3600000U;
 
     // UI multilingua
     cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");

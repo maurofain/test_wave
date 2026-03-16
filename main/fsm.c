@@ -15,6 +15,8 @@ static const char *TAG = "FSM_MB";
 #define FSM_DEFAULT_SPLASH_TIMEOUT_MS (30000U)
 #define FSM_DEFAULT_PAUSE_MAX_MS (60000U)
 #define FSM_DEFAULT_EVENT_QUEUE_LEN (32U)
+#define FSM_DEFAULT_AD_ROTATION_MS (30000U)
+#define FSM_DEFAULT_CREDIT_RESET_TIMEOUT_MS (300000U)
 
 /* mailbox-based event bus replaces the old FreeRTOS queue */
 static SemaphoreHandle_t s_fsm_pending_lock = NULL;
@@ -41,6 +43,111 @@ static SemaphoreHandle_t s_mb_mutex = NULL;
 static SemaphoreHandle_t s_mb_signal = NULL;
 
 static uint32_t to_mask_from_event(const fsm_input_event_t *e);
+static void fsm_reset_runtime_locked(fsm_ctx_t *ctx);
+static void fsm_close_session(fsm_ctx_t *ctx, bool clear_credit);
+static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source);
+static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source);
+static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost);
+static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx);
+
+static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
+{
+    if (!ctx) {
+        return;
+    }
+    ctx->program_running = false;
+    ctx->running_elapsed_ms = 0;
+    ctx->pause_elapsed_ms = 0;
+    ctx->pause_limit_reached = false;
+    ctx->running_target_ms = 0;
+    ctx->running_price_units = 0;
+    memset(ctx->running_program_name, 0, sizeof(ctx->running_program_name));
+    ctx->inactivity_ms = 0;
+}
+
+static void fsm_close_session(fsm_ctx_t *ctx, bool clear_credit)
+{
+    if (!ctx) {
+        return;
+    }
+    fsm_reset_runtime_locked(ctx);
+    if (clear_credit) {
+        ctx->credit_cents = 0;
+        ctx->ecd_coins = 0;
+        ctx->vcd_coins = 0;
+        ctx->ecd_used  = 0;
+        ctx->vcd_used  = 0;
+    }
+    ctx->session_mode = FSM_SESSION_MODE_NONE;
+    ctx->session_source = FSM_SESSION_SOURCE_NONE;
+    ctx->allow_additional_payments = false;
+    ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_CREDIT;
+}
+
+static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source)
+{
+    if (!ctx) {
+        return;
+    }
+    ctx->session_source = source;
+    ctx->session_mode = FSM_SESSION_MODE_OPEN_PAYMENTS;
+    ctx->allow_additional_payments = true;
+    if (ctx->state == FSM_STATE_IDLE || ctx->state == FSM_STATE_ADS) {
+        ctx->state = FSM_STATE_CREDIT;
+        ctx->inactivity_ms = 0;
+    }
+}
+
+static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source)
+{
+    if (!ctx) {
+        return;
+    }
+    ctx->session_source = source;
+    ctx->session_mode = FSM_SESSION_MODE_VIRTUAL_LOCKED;
+    ctx->allow_additional_payments = false;
+    if (ctx->state == FSM_STATE_IDLE || ctx->state == FSM_STATE_ADS) {
+        ctx->state = FSM_STATE_CREDIT;
+        ctx->inactivity_ms = 0;
+    }
+}
+
+static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
+{
+    if (!ctx || cost <= 0 || ctx->credit_cents < cost) {
+        return false;
+    }
+    int32_t f_ecd = (ctx->ecd_coins >= cost) ? cost : ctx->ecd_coins;
+    int32_t f_vcd = cost - f_ecd;
+    if (f_vcd > ctx->vcd_coins) {
+        return false;
+    }
+    ctx->ecd_coins    -= f_ecd;
+    ctx->vcd_coins    -= f_vcd;
+    ctx->ecd_used     += f_ecd;
+    ctx->vcd_used     += f_vcd;
+    ctx->credit_cents -= cost;
+    ESP_LOGI(TAG, "[USE_COIN] cost=%ld from_ecd=%ld from_vcd=%ld ecd_rem=%ld vcd_rem=%ld credit=%ld",
+             (long)cost, (long)f_ecd, (long)f_vcd,
+             (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+    return true;
+}
+
+static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
+{
+    if (!ctx || ctx->running_price_units <= 0) {
+        return false;
+    }
+    if (!fsm_try_charge_program_cycle(ctx, ctx->running_price_units)) {
+        return false;
+    }
+    ctx->running_elapsed_ms = 0;
+    ctx->pause_elapsed_ms = 0;
+    ctx->pause_limit_reached = false;
+    ctx->program_running = true;
+    fsm_append_message("Rinnovo automatico programma");
+    return true;
+}
 
 
 /**
@@ -188,6 +295,8 @@ void fsm_init(fsm_ctx_t *ctx)
     }
 
     ctx->state = FSM_STATE_IDLE;
+    ctx->session_source = FSM_SESSION_SOURCE_NONE;
+    ctx->session_mode = FSM_SESSION_MODE_NONE;
     ctx->credit_cents = 0;
     ctx->ecd_coins = 0;
     ctx->vcd_coins = 0;
@@ -203,6 +312,10 @@ void fsm_init(fsm_ctx_t *ctx)
     memset(ctx->running_program_name, 0, sizeof(ctx->running_program_name));
     ctx->inactivity_ms = 0;
     ctx->splash_screen_time_ms = FSM_DEFAULT_SPLASH_TIMEOUT_MS;
+    ctx->ads_rotation_ms = FSM_DEFAULT_AD_ROTATION_MS;
+    ctx->credit_reset_timeout_ms = FSM_DEFAULT_CREDIT_RESET_TIMEOUT_MS;
+    ctx->ads_enabled = true;
+    ctx->allow_additional_payments = false;
 }
 
 
@@ -241,11 +354,10 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
 
     switch (ctx->state) {
         case FSM_STATE_IDLE:
+        case FSM_STATE_ADS:
             if (event == FSM_EVENT_USER_ACTIVITY || event == FSM_EVENT_PAYMENT_ACCEPTED) {
                 ctx->state = FSM_STATE_CREDIT;
-                ctx->running_elapsed_ms = 0;
-                ctx->pause_elapsed_ms = 0;
-                ctx->pause_limit_reached = false;
+                fsm_reset_runtime_locked(ctx);
                 ctx->inactivity_ms = 0;
             }
             break;
@@ -259,12 +371,20 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_TIMEOUT) {
-                /* splash timeout: ritorna ad IDLE ma conserva il credito.  Il
-                 * credito evc rimane finché non viene speso da un programma;
-                 * il vcd viene azzerato solo dalla rimozione tessera (gestita
-                 * altrove), quindi non lo tocchiamo qui. */
-                ctx->state = FSM_STATE_IDLE;
-                ctx->inactivity_ms = 0;
+                if (ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                    fsm_close_session(ctx, true);
+                } else if (ctx->ecd_coins > 0) {
+                    ctx->credit_cents -= ctx->ecd_coins;
+                    if (ctx->credit_cents < 0) ctx->credit_cents = 0;
+                    ctx->ecd_coins = 0;
+                    if (ctx->credit_cents == 0 && ctx->vcd_coins == 0) {
+                        fsm_close_session(ctx, true);
+                    } else {
+                        ctx->inactivity_ms = 0;
+                    }
+                } else {
+                    fsm_close_session(ctx, true);
+                }
             } else if (event == FSM_EVENT_PAYMENT_ACCEPTED) {
                 ctx->inactivity_ms = 0;
             }
@@ -278,15 +398,12 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_PROGRAM_STOP || event == FSM_EVENT_CREDIT_ENDED) {
-                ctx->state = FSM_STATE_CREDIT;
-                ctx->program_running = false;
-                ctx->running_elapsed_ms = 0;
-                ctx->pause_elapsed_ms = 0;
-                ctx->pause_limit_reached = false;
-                ctx->running_target_ms = 0;
-                ctx->running_price_units = 0;
-                memset(ctx->running_program_name, 0, sizeof(ctx->running_program_name));
-                ctx->inactivity_ms = 0;
+                fsm_reset_runtime_locked(ctx);
+                if (ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                    fsm_close_session(ctx, true);
+                } else {
+                    ctx->state = FSM_STATE_CREDIT;
+                }
             }
             break;
 
@@ -298,15 +415,12 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_PROGRAM_STOP || event == FSM_EVENT_CREDIT_ENDED) {
-                ctx->state = FSM_STATE_CREDIT;
-                ctx->program_running = false;
-                ctx->running_elapsed_ms = 0;
-                ctx->pause_elapsed_ms = 0;
-                ctx->pause_limit_reached = false;
-                ctx->running_target_ms = 0;
-                ctx->running_price_units = 0;
-                memset(ctx->running_program_name, 0, sizeof(ctx->running_program_name));
-                ctx->inactivity_ms = 0;
+                fsm_reset_runtime_locked(ctx);
+                if (ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                    fsm_close_session(ctx, true);
+                } else {
+                    ctx->state = FSM_STATE_CREDIT;
+                }
             }
             break;
 
@@ -360,14 +474,22 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
     switch (etype) {
         case FSM_INPUT_EVENT_USER_ACTIVITY:
         case FSM_INPUT_EVENT_TOUCH:
+            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_TOUCH);
+            return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
+
         case FSM_INPUT_EVENT_KEY:
+            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_KEY);
+            return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
+
         case FSM_INPUT_EVENT_QR_SCANNED:
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_COIN:
-        case FSM_INPUT_EVENT_TOKEN:
-        case FSM_INPUT_EVENT_QR_CREDIT:
-            /* ecd: monete, gettoni, QR — credito definitivo non rimborsabile */
+            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
+            if (!ctx->allow_additional_payments && ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                fsm_append_message("Pagamento aggiuntivo non consentito");
+                return false;
+            }
             if (event->value_i32 > 0) {
                 ctx->ecd_coins    += event->value_i32;
                 ctx->credit_cents += event->value_i32;
@@ -376,16 +498,41 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
-        case FSM_INPUT_EVENT_CARD_CREDIT: {
-            /* vcd: tessera — virtuale; il 1° coin addebitato → ecd, resto → vcd */
+        case FSM_INPUT_EVENT_TOKEN:
+            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (event->value_i32 > 0) {
-                int32_t ecd_add = (event->value_i32 >= 1) ? 1 : 0;
-                int32_t vcd_add = event->value_i32 - ecd_add;
-                ctx->ecd_coins    += ecd_add;
-                if (vcd_add > 0) ctx->vcd_coins += vcd_add;
+                ctx->ecd_coins    += event->value_i32;
                 ctx->credit_cents += event->value_i32;
-                ESP_LOGI(TAG, "[ADD_COIN] type=vcd value=%ld ecd=%ld vcd=%ld credit=%ld",
-                         (long)event->value_i32, (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+            }
+            return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
+
+        case FSM_INPUT_EVENT_QR_CREDIT:
+            if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
+                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                fsm_append_message("Pagamento aggiuntivo non consentito");
+                return false;
+            }
+            fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_QR);
+            if (event->value_i32 > 0) {
+                ctx->vcd_coins    += event->value_i32;
+                ctx->credit_cents += event->value_i32;
+                ESP_LOGI(TAG, "[ADD_COIN] type=qr_vcd value=%ld vcd=%ld credit=%ld",
+                         (long)event->value_i32, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+            }
+            return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
+
+        case FSM_INPUT_EVENT_CARD_CREDIT: {
+            if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
+                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                fsm_append_message("Pagamento aggiuntivo non consentito");
+                return false;
+            }
+            fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_CARD);
+            if (event->value_i32 > 0) {
+                ctx->vcd_coins    += event->value_i32;
+                ctx->credit_cents += event->value_i32;
+                ESP_LOGI(TAG, "[ADD_COIN] type=vcd value=%ld vcd=%ld credit=%ld",
+                         (long)event->value_i32, (long)ctx->vcd_coins, (long)ctx->credit_cents);
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
         }
@@ -417,18 +564,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                     return false;
                 }
                 {
-                    /* Scala prima da ecd, poi da vcd se ecd insufficiente */
-                    int32_t cost  = ctx->running_price_units;
-                    int32_t f_ecd = (ctx->ecd_coins >= cost) ? cost : ctx->ecd_coins;
-                    int32_t f_vcd = cost - f_ecd;
-                    ctx->ecd_coins    -= f_ecd;
-                    ctx->vcd_coins    -= f_vcd;
-                    ctx->ecd_used     += f_ecd;
-                    ctx->vcd_used     += f_vcd;
-                    ctx->credit_cents -= cost;
-                    ESP_LOGI(TAG, "[USE_COIN] cost=%ld from_ecd=%ld from_vcd=%ld ecd_rem=%ld vcd_rem=%ld credit=%ld",
-                             (long)cost, (long)f_ecd, (long)f_vcd,
-                             (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+                    if (!fsm_try_charge_program_cycle(ctx, ctx->running_price_units)) {
+                        fsm_append_message("Credito insufficiente per avvio programma");
+                        return false;
+                    }
                 }
             }
 
@@ -524,11 +663,9 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
     if (ctx->state == FSM_STATE_RUNNING) {
         ctx->running_elapsed_ms += elapsed_ms;
         if (ctx->running_target_ms > 0 && ctx->running_elapsed_ms >= ctx->running_target_ms) {
-            char msg[FSM_EVENT_TEXT_MAX_LEN] = {0};
-            snprintf(msg, sizeof(msg), "Addebito %ld su %.24s",
-                     (long)ctx->running_price_units,
-                     ctx->running_program_name[0] ? ctx->running_program_name : "programma");
-            fsm_append_message(msg);
+            if (fsm_try_autorenew_running_program(ctx)) {
+                return false;
+            }
             return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_STOP);
         }
     } else if (ctx->state == FSM_STATE_PAUSED) {
@@ -536,10 +673,8 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
             ctx->pause_elapsed_ms += elapsed_ms;
             if (ctx->pause_elapsed_ms >= ctx->pause_max_ms) {
                 ctx->pause_limit_reached = true;
-                /* #5 fix: pausa scaduta → ripresa automatica così il credito
-                 * torna a scalare (si rientra in RUNNING). */
-                fsm_append_message("Pausa scaduta: ripresa automatica");
-                return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_RESUME);
+                fsm_append_message("Pausa scaduta: stop programma");
+                return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_STOP);
             }
         }
     }
@@ -556,6 +691,8 @@ const char *fsm_state_to_string(fsm_state_t state)
     switch (state) {
         case FSM_STATE_IDLE:
             return "idle";
+        case FSM_STATE_ADS:
+            return "ads";
         case FSM_STATE_CREDIT:
             return "credit";
         case FSM_STATE_RUNNING:

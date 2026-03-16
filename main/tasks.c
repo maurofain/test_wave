@@ -396,6 +396,20 @@ static void fsm_task(void *arg)
     task_param_t *param = (task_param_t *)arg;
     fsm_ctx_t fsm;
     fsm_init(&fsm);
+    device_config_t *cfg = device_config_get();
+    if (cfg) {
+        if (cfg->timeouts.exit_programs_ms > 0U) {
+            fsm.splash_screen_time_ms = cfg->timeouts.exit_programs_ms;
+        }
+        if (cfg->timeouts.ad_rotation_ms > 0U) {
+            fsm.ads_rotation_ms = cfg->timeouts.ad_rotation_ms;
+        }
+        if (cfg->timeouts.credit_reset_timeout_ms > 0U) {
+            fsm.credit_reset_timeout_ms = cfg->timeouts.credit_reset_timeout_ms;
+        }
+        fsm.ads_enabled = cfg->display.ads_enabled;
+        fsm.state = fsm.ads_enabled ? FSM_STATE_ADS : FSM_STATE_CREDIT;
+    }
     fsm_apply_language_return_timeout(&fsm);
     TickType_t prev_tick = xTaskGetTickCount();
 
@@ -406,6 +420,13 @@ static void fsm_task(void *arg)
     }
 
     ESP_LOGI(TAG, "[FSM] Task started in state=%s", fsm_state_to_string(fsm.state));
+    if (cfg && cfg->display.enabled) {
+        if (fsm.state == FSM_STATE_ADS) {
+            lvgl_panel_show_ads_page();
+        } else {
+            lvgl_panel_show_main_page();
+        }
+    }
     fsm_runtime_publish(&fsm);
 
     /* contatore per il log "alive" ogni 10 secondi */
@@ -461,13 +482,14 @@ static void fsm_task(void *arg)
             fsm_append_message("Programma terminato: reset relay/schermata");
         }
 
-        if (state_before == FSM_STATE_CREDIT && fsm.state == FSM_STATE_IDLE) {
-            device_config_t *cfg = device_config_get();
-            if (cfg && cfg->display.enabled) {
-                lvgl_panel_show_language_select();
-                ESP_LOGI(TAG, "[M] Timeout inattività: ritorno alla scelta lingua");
-            } else {
-                ESP_LOGI(TAG, "[M] Timeout inattività: display disabilitato, pagina lingua non mostrata");
+        if ((state_before != fsm.state) && cfg && cfg->display.enabled) {
+            if (fsm.state == FSM_STATE_ADS) {
+                lvgl_panel_show_ads_page();
+            } else if (fsm.state == FSM_STATE_CREDIT &&
+                       (state_before == FSM_STATE_ADS ||
+                        state_before == FSM_STATE_RUNNING ||
+                        state_before == FSM_STATE_PAUSED)) {
+                lvgl_panel_show_main_page();
             }
         }
 

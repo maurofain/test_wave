@@ -11,6 +11,9 @@
 #include "bsp/esp32_p4_nano.h"
 #include "esp_heap_caps.h"
 #include "tjpgd.h"    /* header privato LVGL: managed_components/lvgl__lvgl/src/libs/tjpgd/ */
+#include "fsm.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 /* Font GoogleSans per pagina ads */
 extern const lv_font_t GoogleSans70;
@@ -341,7 +344,14 @@ static void ad_carousel_timer_cb(lv_timer_t *timer)
 static void switch_from_ads_async(void *arg)
 {
     (void)arg;
-    lvgl_page_main_show();  /* [C] "Seleziona lavaggio" → pagina programmi */
+    fsm_input_event_t ev = {
+        .from = AGN_ID_LVGL,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_USER_ACTIVITY,
+        .type = FSM_INPUT_EVENT_TOUCH,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+    };
+    (void)fsm_event_publish(&ev, pdMS_TO_TICKS(20));
 }
 
 static void ads_flag_async(void *arg)

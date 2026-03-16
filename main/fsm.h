@@ -4,17 +4,32 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "freertos/FreeRTOS.h"
-#include "fsm.h"
 
 #define FSM_EVENT_TEXT_MAX_LEN (64U)
 
 typedef enum {
     FSM_STATE_IDLE = 0,
+    FSM_STATE_ADS,
     FSM_STATE_CREDIT,
     FSM_STATE_RUNNING,
     FSM_STATE_PAUSED,
     FSM_STATE_LVGL_PAGES_TEST,
 } fsm_state_t;
+
+typedef enum {
+    FSM_SESSION_SOURCE_NONE = 0,
+    FSM_SESSION_SOURCE_TOUCH,
+    FSM_SESSION_SOURCE_KEY,
+    FSM_SESSION_SOURCE_COIN,
+    FSM_SESSION_SOURCE_QR,
+    FSM_SESSION_SOURCE_CARD,
+} fsm_session_source_t;
+
+typedef enum {
+    FSM_SESSION_MODE_NONE = 0,
+    FSM_SESSION_MODE_OPEN_PAYMENTS,
+    FSM_SESSION_MODE_VIRTUAL_LOCKED,
+} fsm_session_mode_t;
 
 typedef enum {
     FSM_EVENT_NONE = 0,
@@ -204,6 +219,8 @@ typedef struct {
 
 typedef struct {
     fsm_state_t state;
+    fsm_session_source_t session_source;
+    fsm_session_mode_t session_mode;
     int32_t credit_cents;
     int32_t ecd_coins;          /* credito effettivo (monete+QR), definitivo */
     int32_t vcd_coins;          /* credito virtuale (tessera), scalato alla selezione */
@@ -219,6 +236,10 @@ typedef struct {
     char running_program_name[FSM_EVENT_TEXT_MAX_LEN];
     uint32_t inactivity_ms;
     uint32_t splash_screen_time_ms;
+    uint32_t ads_rotation_ms;
+    uint32_t credit_reset_timeout_ms;
+    bool ads_enabled;
+    bool allow_additional_payments;
 } fsm_ctx_t;
 
 void fsm_init(fsm_ctx_t *ctx);
