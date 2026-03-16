@@ -1,6 +1,7 @@
 #include "lvgl_panel_pages.h"
 #include "lvgl_page_chrome.h"
 
+#include "device_config.h"
 #include "lvgl.h"
 #include "esp_log.h"
 
@@ -48,14 +49,18 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
     lv_obj_align(ico, LV_ALIGN_CENTER, 0, -120);
 
     lv_obj_t *lbl = lv_label_create(scr);
-    lv_label_set_text(lbl, "Fuori servizio");
+    char out_of_service_title[64] = {0};
+    device_config_get_ui_text_scoped("lvgl", "out_of_service_title", "Fuori servizio", out_of_service_title, sizeof(out_of_service_title));
+    lv_label_set_text(lbl, out_of_service_title);
     lv_obj_set_style_text_font(lbl, &GoogleSans50, LV_PART_MAIN);
     lv_obj_set_style_text_color(lbl, lv_color_make(0xFF, 0xFF, 0xFF), LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -40);
 
     char sub[96] = {0};
-    snprintf(sub, sizeof(sub), "Reboot consecutivi: %lu\nContattare l'assistenza", (unsigned long)reboots);
+    char out_of_service_body[96] = {0};
+    device_config_get_ui_text_scoped("lvgl", "out_of_service_body", "Reboot consecutivi: %lu\nContattare l'assistenza", out_of_service_body, sizeof(out_of_service_body));
+    snprintf(sub, sizeof(sub), out_of_service_body, (unsigned long)reboots);
 
     lv_obj_t *sub_lbl = lv_label_create(scr);
     lv_label_set_text(sub_lbl, sub);

@@ -1031,15 +1031,26 @@ modbus_read_end:
                 }
 
                 if (monitor_ready) {
-                    esp_err_t start_err = cctalk_driver_start_acceptor();
-                    if (start_err != ESP_OK) {
-                        serial_test_push_monitor_action("CCTALK", "START errore sequenza gettoniera");
-                        snprintf(response, sizeof(response), "{\"error\":\"Avvio gettoniera fallito: %s\"}", esp_err_to_name(start_err));
+                    /* Publish start request to CCTALK agent instead of direct call */
+                    fsm_input_event_t ev = {
+                        .from = AGN_ID_WEB_UI,
+                        .to = {AGN_ID_CCTALK},
+                        .action = ACTION_ID_CCTALK_START,
+                        .type = FSM_INPUT_EVENT_NONE,
+                        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+                        .value_i32 = (int32_t)cctalk_addr,
+                        .value_u32 = 0,
+                        .aux_u32 = 0,
+                        .text = {0},
+                    };
+                    if (!fsm_event_publish(&ev, pdMS_TO_TICKS(50))) {
+                        serial_test_push_monitor_action("CCTALK", "START publish fallito");
+                        snprintf(response, sizeof(response), "{\"error\":\"Coda eventi piena, publish fallito\"}");
                     } else {
                         char addr_msg[48] = {0};
                         snprintf(addr_msg, sizeof(addr_msg), "ADDR 0x%02X", (unsigned)cctalk_addr);
                         serial_test_push_monitor_action("CCTALK", addr_msg);
-                        serial_test_push_monitor_action("CCTALK", "START ok");
+                        serial_test_push_monitor_action("CCTALK", "START event published");
                         if (own_task) {
                             snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk avviato (task locale)\"}");
                         } else {
@@ -1052,7 +1063,18 @@ modbus_read_end:
     } else if (strcmp(test_name, "cctalk_stop") == 0) {
         serial_test_push_monitor_action("CCTALK", "STOP richiesta");
 
-        esp_err_t stop_err = cctalk_driver_stop_acceptor();
+        /* Publish stop request to CCTALK agent instead of direct call */
+        fsm_input_event_t ev = {
+            .from = AGN_ID_WEB_UI,
+            .to = {AGN_ID_CCTALK},
+            .action = ACTION_ID_CCTALK_STOP,
+            .type = FSM_INPUT_EVENT_NONE,
+            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+            .value_i32 = 0,
+            .value_u32 = 0,
+            .aux_u32 = 0,
+            .text = {0},
+        };
 
         if (s_cctalk_test_handle && s_cctalk_test_owned) {
             vTaskDelete(s_cctalk_test_handle);
@@ -1065,15 +1087,12 @@ modbus_read_end:
             serial_test_push_monitor_action("CCTALK", "STOP monitor sganciato");
         }
 
-        if (stop_err == ESP_OK) {
-            serial_test_push_monitor_action("CCTALK", "STOP ok");
-            snprintf(response, sizeof(response), "{\"message\":\"Gettoniera CCtalk disabilitata\"}");
-        } else if (stop_err == ESP_ERR_INVALID_STATE) {
-            serial_test_push_monitor_action("CCTALK", "STOP non attivo");
-            snprintf(response, sizeof(response), "{\"message\":\"Test CCtalk non attivo\"}");
+        if (!fsm_event_publish(&ev, pdMS_TO_TICKS(50))) {
+            serial_test_push_monitor_action("CCTALK", "STOP publish fallito");
+            snprintf(response, sizeof(response), "{\"error\":\"Coda eventi piena, publish fallito\"}");
         } else {
-            serial_test_push_monitor_action("CCTALK", "STOP errore sequenza gettoniera");
-            snprintf(response, sizeof(response), "{\"error\":\"Stop gettoniera fallito: %s\"}", esp_err_to_name(stop_err));
+            serial_test_push_monitor_action("CCTALK", "STOP event published");
+            snprintf(response, sizeof(response), "{\"message\":\"Gettoniera CCtalk stop event published\"}");
         }
     } else if (strcmp(test_name, "cctalk_retention_on") == 0 ||
                strcmp(test_name, "cctalk_retention_off") == 0) {
@@ -1141,55 +1160,25 @@ modbus_read_end:
         uint8_t cctalk_addr = get_cctalk_address_configured();
         serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 richiesta");
 
-        esp_err_t rs232_err = rs232_init();
-        if (rs232_err != ESP_OK) {
-            snprintf(response, sizeof(response),
-                     "{\"error\":\"Init RS232 fallita: %s\"}",
-                     esp_err_to_name(rs232_err));
+        /* Publish mask update event to CCTALK agent instead of direct HW calls */
+        fsm_input_event_t ev = {
+            .from = AGN_ID_WEB_UI,
+            .to = {AGN_ID_CCTALK},
+            .action = ACTION_ID_CCTALK_MASK,
+            .type = FSM_INPUT_EVENT_NONE,
+            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+            .value_i32 = (int32_t)cctalk_addr,
+            .value_u32 = ((uint32_t)mask_high << 8) | (uint32_t)mask_low,
+            .aux_u32 = 0,
+            .text = {0},
+        };
+
+        if (!fsm_event_publish(&ev, pdMS_TO_TICKS(50))) {
+            serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 publish fallito");
+            snprintf(response, sizeof(response), "{\"error\":\"Coda eventi piena, publish fallito\"}");
         } else {
-            esp_err_t cctalk_err = cctalk_driver_init();
-            if (cctalk_err != ESP_OK) {
-                snprintf(response, sizeof(response),
-                         "{\"error\":\"Init CCtalk fallita: %s\"}",
-                         esp_err_to_name(cctalk_err));
-            } else {
-                bool master_std_ok = cctalk_modify_master_inhibit_std(cctalk_addr,
-                                                                      true,
-                                                                      CCTALK_WEB_CMD_TIMEOUT_MS);
-                bool mask_ok = false;
-                if (master_std_ok) {
-                    mask_ok = cctalk_modify_inhibit_status(cctalk_addr,
-                                                           mask_low,
-                                                           mask_high,
-                                                           CCTALK_WEB_CMD_TIMEOUT_MS);
-                }
-
-                if (!master_std_ok || !mask_ok) {
-                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 FAIL");
-                    snprintf(response, sizeof(response),
-                             "{\"error\":\"Comando abilita CH1-CH2 fallito\"}");
-                } else {
-                    uint8_t read_low = 0;
-                    uint8_t read_high = 0;
-                    bool status_ok = cctalk_request_inhibit_status(cctalk_addr,
-                                                                   &read_low,
-                                                                   &read_high,
-                                                                   CCTALK_WEB_CMD_TIMEOUT_MS);
-
-                    serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 ok");
-                    if (status_ok) {
-                        snprintf(response, sizeof(response),
-                                 "{\"message\":\"Abilitazione CH1-CH2 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
-                                 (unsigned)read_low,
-                                 (unsigned)read_high);
-                    } else {
-                        snprintf(response, sizeof(response),
-                                 "{\"message\":\"Abilitazione CH1-CH2 attiva\",\"mask_low\":%u,\"mask_high\":%u}",
-                                 (unsigned)mask_low,
-                                 (unsigned)mask_high);
-                    }
-                }
-            }
+            serial_test_push_monitor_action("CCTALK", "ABILITA CH1-CH2 event published");
+            snprintf(response, sizeof(response), "{\"message\":\"Abilitazione CH1-CH2 richiesta pubblicata\"}");
         }
     }
 

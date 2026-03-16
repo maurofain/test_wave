@@ -4300,16 +4300,6 @@
           "es": "🧩 Estado del servicio"
         }
       },
-      "034": {
-        "label": "index.text.034",
-        "text": {
-          "it": "Caricamento...",
-          "en": "Loading...",
-          "fr": "Chargement...",
-          "de": "Wird geladen...",
-          "es": "Cargando..."
-        }
-      },
       "035": {
         "label": "index.text.035",
         "text": {
@@ -4801,26 +4791,6 @@
           "de": "v?",
           "es": "v?"
         }
-      },
-      "026": {
-        "label": "logs.text.026",
-        "text": {
-          "it": "📜 Log",
-          "en": "📜 Log",
-          "fr": "📜 Journal",
-          "de": "📜 Protokoll",
-          "es": "📜 Registro"
-        }
-      },
-      "027": {
-        "label": "logs.text.027",
-        "text": {
-          "it": "Caricamento log...",
-          "en": "Loading logs...",
-          "fr": "Chargement des journaux...",
-          "de": "Protokolle werden geladen...",
-          "es": "Cargando registros..."
-        }
       }
     },
     "ota": {
@@ -5002,16 +4972,6 @@
           "fr": "❌ Erreur de réseau",
           "de": "❌ Netzwerkfehler",
           "es": "❌ Error de red"
-        }
-      },
-      "019": {
-        "label": "ota.text.019",
-        "text": {
-          "it": "0%",
-          "en": "0%",
-          "fr": "0%",
-          "de": "0%",
-          "es": "0%"
         }
       }
     },
@@ -5345,26 +5305,6 @@
           "de": "Errore salvataggio:",
           "es": "Errore salvataggio:"
         }
-      },
-      "034": {
-        "label": "programs.text.034",
-        "text": {
-          "it": "📋 Programmi",
-          "en": "📋 Programs",
-          "fr": "📋 Programmes",
-          "de": "📋 Programme",
-          "es": "📋 Programas"
-        }
-      },
-      "035": {
-        "label": "programs.text.035",
-        "text": {
-          "it": "Caricamento programmi...",
-          "en": "Loading programs...",
-          "fr": "Chargement des programmes...",
-          "de": "Programme werden geladen...",
-          "es": "Cargando programas..."
-        }
       }
     },
     "stats": {
@@ -5596,26 +5536,6 @@
           "fr": "MB (",
           "de": "MB (",
           "es": "MB ("
-        }
-      },
-      "025": {
-        "label": "stats.text.025",
-        "text": {
-          "it": "🖥️ Sistema",
-          "en": "🖥️ System",
-          "fr": "🖥️ Système",
-          "de": "🖥️ System",
-          "es": "🖥️ Sistema"
-        }
-      },
-      "026": {
-        "label": "stats.text.026",
-        "text": {
-          "it": "Caricamento statistiche...",
-          "en": "Loading statistics...",
-          "fr": "Chargement des statistiques...",
-          "de": "Statistiken werden geladen...",
-          "es": "Cargando estadísticas..."
         }
       }
     },
@@ -7480,116 +7400,6 @@
         "fr": "Programme 10",
         "de": "Programm 10",
         "es": "Programa 10"
-      }
-    },
-    "program_confirm_cancel": {
-      "legacyId": "2.811",
-      "label": "lvgl.program.confirm_cancel",
-      "text": {
-        "it": "Conferma annullamento",
-        "en": "Confirm cancellation",
-        "fr": "Confirmer l'annulation",
-        "de": "Abbruch bestätigen",
-        "es": "Confirmar cancelación"
-      }
-    },
-    "program_stop": {
-      "legacyId": "2.812",
-      "label": "lvgl.program.stop",
-      "text": {
-        "it": "STOP",
-        "en": "STOP",
-        "fr": "STOP",
-        "de": "STOP",
-        "es": "STOP"
-      }
-    },
-    "program_suspend": {
-      "legacyId": "2.813",
-      "label": "lvgl.program.suspend",
-      "text": {
-        "it": "Sospendi",
-        "en": "Suspend",
-        "fr": "Suspendre",
-        "de": "Aussetzen",
-        "es": "Suspender"
-      }
-    },
-    "program_zero": {
-      "legacyId": "2.814",
-      "label": "lvgl.program.zero",
-      "text": {
-        "it": "0",
-        "en": "0",
-        "fr": "0",
-        "de": "0",
-        "es": "0"
-      }
-    },
-    "program_empty": {
-      "legacyId": "2.815",
-      "label": "lvgl.program.empty",
-      "text": {
-        "it": "",
-        "en": "",
-        "fr": "",
-        "de": "",
-        "es": ""
-      }
-    },
-    "brand_name": {
-      "legacyId": "2.816",
-      "label": "lvgl.brand.name",
-      "text": {
-        "it": "MicroHard",
-        "en": "MicroHard",
-        "fr": "MicroHard",
-        "de": "MicroHard",
-        "es": "MicroHard"
-      }
-    },
-    "boot_init_starting": {
-      "legacyId": "2.817",
-      "label": "lvgl.boot.init_starting",
-      "text": {
-        "it": "Init: avvio...",
-        "en": "Init: starting...",
-        "fr": "Init : démarrage...",
-        "de": "Init: Start...",
-        "es": "Init: inicio..."
-      }
-    },
-    "ads_select_wash": {
-      "legacyId": "2.818",
-      "label": "lvgl.ads.select_wash",
-      "text": {
-        "it": "Seleziona lavaggio",
-        "en": "Select wash",
-        "fr": "Sélectionner lavage",
-        "de": "Waschgang wählen",
-        "es": "Seleccionar lavado"
-      }
-    },
-    "ads_no_error": {
-      "legacyId": "2.819",
-      "label": "lvgl.ads.no_error",
-      "text": {
-        "it": "Nessun errore",
-        "en": "No error",
-        "fr": "Aucune erreur",
-        "de": "Kein Fehler",
-        "es": "Sin error"
-      }
-    },
-    "language_select_title": {
-      "legacyId": "2.820",
-      "label": "lvgl.language.select_title",
-      "text": {
-        "it": "Seleziona lingua",
-        "en": "Select language",
-        "fr": "Sélectionner la langue",
-        "de": "Sprache auswählen",
-        "es": "Seleccionar idioma"
       }
     }
   }

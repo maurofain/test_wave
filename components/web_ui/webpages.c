@@ -285,9 +285,12 @@ static char *expand_js_include_markers(const char *html, const char *full_path, 
             continue;
         }
 
-        if (!append_chunk(&out, &out_size, &out_cap, "<script>", 8) ||
+        /* Inline JS with try/catch wrapper to avoid a single script error breaking the whole page when i18n placeholders are missing */
+        const char *script_prefix = "<script>try{";
+        const char *script_suffix = "}catch(e){console.error('inlined_js_error',e);}</script>";
+        if (!append_chunk(&out, &out_size, &out_cap, script_prefix, strlen(script_prefix)) ||
             !append_chunk(&out, &out_size, &out_cap, js_body, js_len) ||
-            !append_chunk(&out, &out_size, &out_cap, "</script>", 9)) {
+            !append_chunk(&out, &out_size, &out_cap, script_suffix, strlen(script_suffix))) {
             free(js_body);
             free(out);
             return NULL;
@@ -531,6 +534,18 @@ static esp_err_t send_html_localized_cached(httpd_req_t *req, const char *full_p
     if (!extract_page_name(relative_path, page_name, sizeof(page_name))) {
         free(expanded_html);
         return ESP_ERR_INVALID_ARG;
+    }
+
+    /* If the i18n catalog is not available at the moment, avoid trying to localize
+     * (which would remove placeholders and could be cached); instead send the
+     * expanded HTML (with JS inlined) directly so the page still runs, and do not cache it.
+     */
+    if (!i18n_v2_root_get()) {
+        ESP_LOGW(TAG, "[C] i18n_v2.json not available; sending expanded HTML without localization");
+        httpd_resp_set_type(req, "text/html; charset=utf-8");
+        esp_err_t r = httpd_resp_send(req, expanded_html, (ssize_t)expanded_len);
+        free(expanded_html);
+        return r;
     }
 
     size_t localized_len = 0;

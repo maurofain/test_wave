@@ -482,7 +482,9 @@ void lvgl_page_ads_show(void)
     lv_obj_add_event_cb(sel_btn, on_select_btn, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *sel_lbl = lv_label_create(sel_btn);
-    lv_label_set_text(sel_lbl, "Seleziona lavaggio");
+    char select_wash[64] = {0};
+    device_config_get_ui_text_scoped("lvgl", "ads_select_wash", "Seleziona lavaggio", select_wash, sizeof(select_wash));
+    lv_label_set_text(sel_lbl, select_wash);
     lv_obj_set_style_text_color(sel_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(sel_lbl, &GoogleSans50, LV_PART_MAIN);
     lv_obj_center(sel_lbl);
@@ -499,7 +501,9 @@ void lvgl_page_ads_show(void)
     lv_obj_remove_flag(err_box, LV_OBJ_FLAG_SCROLLABLE);
 
     s_error_lbl = lv_label_create(err_box);
-    lv_label_set_text(s_error_lbl, s_error_msg[0] ? s_error_msg : "Nessun errore");
+    char no_error[64] = {0};
+    device_config_get_ui_text_scoped("lvgl", "ads_no_error", "Nessun errore", no_error, sizeof(no_error));
+    lv_label_set_text(s_error_lbl, s_error_msg[0] ? s_error_msg : no_error);
     lv_obj_set_style_text_color(s_error_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_error_lbl, &GoogleSans40, LV_PART_MAIN);
     lv_label_set_long_mode(s_error_lbl, LV_LABEL_LONG_DOT);
@@ -534,7 +538,9 @@ void lvgl_page_ads_set_error_message(const char *msg)
     s_error_msg[sizeof(s_error_msg) - 1] = '\0';
 
     if (s_error_lbl && lv_obj_is_valid(s_error_lbl)) {
-        lv_label_set_text(s_error_lbl, s_error_msg[0] ? s_error_msg : "Nessun errore");
+        char no_error[64] = {0};
+        device_config_get_ui_text_scoped("lvgl", "ads_no_error", "Nessun errore", no_error, sizeof(no_error));
+        lv_label_set_text(s_error_lbl, s_error_msg[0] ? s_error_msg : no_error);
     }
 }
 

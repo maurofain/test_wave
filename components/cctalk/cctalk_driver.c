@@ -567,7 +567,68 @@ static void cctalk_poll_once(void)
 void cctalk_task_run(void *arg)
 {
     (void)arg;
+
+    /* Ensure mailbox is ready for receiving control events */
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGW(TAG, "[C] fsm_event_queue_init failed or not ready; continuing");
+    }
+
     while (1) {
+        /* Non‑blocking check for control messages directed to CCTALK */
+        fsm_input_event_t ev;
+        if (fsm_event_receive(&ev, AGN_ID_CCTALK, 0)) {
+            if (ev.action == ACTION_ID_CCTALK_START) {
+                serial_test_push_monitor_action("CCTALK", "START event received");
+                esp_err_t start_err = cctalk_driver_start_acceptor();
+                if (start_err != ESP_OK) {
+                    char msg[80];
+                    snprintf(msg, sizeof(msg), "START failed: %s", esp_err_to_name(start_err));
+                    serial_test_push_monitor_action("CCTALK", msg);
+                } else {
+                    serial_test_push_monitor_action("CCTALK", "START ok");
+                }
+            } else if (ev.action == ACTION_ID_CCTALK_STOP) {
+                serial_test_push_monitor_action("CCTALK", "STOP event received");
+                esp_err_t stop_err = cctalk_driver_stop_acceptor();
+                if (stop_err != ESP_OK) {
+                    char msg[80];
+                    snprintf(msg, sizeof(msg), "STOP failed: %s", esp_err_to_name(stop_err));
+                    serial_test_push_monitor_action("CCTALK", msg);
+                } else {
+                    serial_test_push_monitor_action("CCTALK", "STOP ok");
+                }
+            } else if (ev.action == ACTION_ID_CCTALK_MASK) {
+                uint32_t mask = ev.value_u32;
+                uint8_t mask_low = (uint8_t)(mask & 0xFFU);
+                uint8_t mask_high = (uint8_t)((mask >> 8) & 0xFFU);
+                uint8_t addr = (ev.value_i32 != 0) ? (uint8_t)ev.value_i32 : cctalk_get_acceptor_addr();
+                char msg[96];
+                snprintf(msg, sizeof(msg), "MASK event addr=0x%02X low=0x%02X high=0x%02X", (unsigned)addr, (unsigned)mask_low, (unsigned)mask_high);
+                serial_test_push_monitor_action("CCTALK", msg);
+
+                /* Ensure driver initialized in driver context before sending commands */
+                esp_err_t init_err = cctalk_driver_init();
+                if (init_err != ESP_OK) {
+                    char failmsg[80];
+                    snprintf(failmsg, sizeof(failmsg), "MASK init fail: %s", esp_err_to_name(init_err));
+                    serial_test_push_monitor_action("CCTALK", failmsg);
+                } else {
+                    /* Try to set master inhibit (standard) to enabled before applying mask */
+                    if (!cctalk_modify_master_inhibit_std(addr, true, CCTALK_CMD_TIMEOUT_MS)) {
+                        serial_test_push_monitor_action("CCTALK", "MASK master_inhibit_std fail");
+                    }
+
+                    if (!cctalk_modify_inhibit_status(addr, mask_low, mask_high, CCTALK_CMD_TIMEOUT_MS)) {
+                        char failmsg[80];
+                        snprintf(failmsg, sizeof(failmsg), "MASK failed addr=0x%02X", (unsigned)addr);
+                        serial_test_push_monitor_action("CCTALK", failmsg);
+                    } else {
+                        serial_test_push_monitor_action("CCTALK", "MASK ok");
+                    }
+                }
+            }
+        }
+
         if (cctalk_driver_is_acceptor_enabled()) {
             // Passo 4: Ciclo di lettura crediti (comando 229 - Read Buffered Credit)
             cctalk_poll_once();
@@ -839,8 +900,36 @@ bool cctalk_driver_is_acceptor_enabled(void)
 void cctalk_task_run(void *arg)
 {
     (void)arg;
-    /* Mockup: CCtalk disabilitato — task in attesa indefinita */
+
+    /* Ensure mailbox is ready for receiving control events */
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGW(TAG, "[C] fsm_event_queue_init failed or not ready (mock); continuing");
+    }
+
     while (1) {
+        /* Non‑blocking check for control messages directed to CCTALK */
+        fsm_input_event_t ev;
+        if (fsm_event_receive(&ev, AGN_ID_CCTALK, 0)) {
+            if (ev.action == ACTION_ID_CCTALK_START) {
+                serial_test_push_monitor_action("CCTALK", "[MOCK] START event received");
+                (void)cctalk_driver_start_acceptor();
+                serial_test_push_monitor_action("CCTALK", "[MOCK] START ok");
+            } else if (ev.action == ACTION_ID_CCTALK_STOP) {
+                serial_test_push_monitor_action("CCTALK", "[MOCK] STOP event received");
+                (void)cctalk_driver_stop_acceptor();
+                serial_test_push_monitor_action("CCTALK", "[MOCK] STOP ok");
+            } else if (ev.action == ACTION_ID_CCTALK_MASK) {
+                uint32_t mask = ev.value_u32;
+                uint8_t mask_low = (uint8_t)(mask & 0xFFU);
+                uint8_t mask_high = (uint8_t)((mask >> 8) & 0xFFU);
+                char msg[96];
+                snprintf(msg, sizeof(msg), "[MOCK] MASK event low=0x%02X high=0x%02X", (unsigned)mask_low, (unsigned)mask_high);
+                serial_test_push_monitor_action("CCTALK", msg);
+                /* Mock: do not call hardware functions, just acknowledge */
+                serial_test_push_monitor_action("CCTALK", "[MOCK] MASK ok");
+            }
+        }
+
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }

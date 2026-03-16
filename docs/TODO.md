@@ -6,8 +6,8 @@
 
 1. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
-
-2. Piano test endpoint e funzioni
+2. file da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
+3. Piano test endpoint e funzioni
 
 ​	Strutturare i test in 4 livelli:
 - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido

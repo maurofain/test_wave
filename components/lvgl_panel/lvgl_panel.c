@@ -109,7 +109,9 @@ static void panel_show_boot_logo_screen(void)
     if (!logo_drawn) {
         ESP_LOGW(TAG, "[C] Logo non visualizzato, uso fallback testuale");
         lv_obj_t *logo_lbl = lv_label_create(scr);
-        lv_label_set_text(logo_lbl, "MicroHard");
+        char brand_name[32] = {0};
+        device_config_get_ui_text_scoped("lvgl", "brand_name", "MicroHard", brand_name, sizeof(brand_name));
+        lv_label_set_text(logo_lbl, brand_name);
         lv_obj_set_style_text_color(logo_lbl, COL_WHITE, LV_PART_MAIN);
         lv_obj_set_style_text_font(logo_lbl, &GoogleSans70, LV_PART_MAIN);
         lv_obj_align(logo_lbl, LV_ALIGN_CENTER, 0, 0);
@@ -117,7 +119,9 @@ static void panel_show_boot_logo_screen(void)
 
     s_init_status_label = lv_label_create(scr);
     lv_label_set_long_mode(s_init_status_label, LV_LABEL_LONG_WRAP);
-    lv_label_set_text(s_init_status_label, "Init: avvio...");
+    char init_starting[64] = {0};
+    device_config_get_ui_text_scoped("lvgl", "boot_init_starting", "Init: avvio...", init_starting, sizeof(init_starting));
+    lv_label_set_text(s_init_status_label, init_starting);
     lv_obj_set_width(s_init_status_label, LV_PCT(100));
     lv_obj_set_style_text_align(s_init_status_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_init_status_label, &GoogleSans35, LV_PART_MAIN);

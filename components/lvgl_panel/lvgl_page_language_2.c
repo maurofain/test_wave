@@ -228,7 +228,9 @@ void lvgl_page_language_2_show(void (*return_cb)(void))
     }
 
     lv_obj_t *title = lv_label_create(scr);
-    lv_label_set_text(title, "Seleziona lingua");
+    char select_language[64] = {0};
+    device_config_get_ui_text_scoped("lvgl", "language_select_title", "Seleziona lingua", select_language, sizeof(select_language));
+    lv_label_set_text(title, select_language);
     lv_obj_set_style_text_color(title, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(title, FONT_TITLE, LV_PART_MAIN);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 78, 210);

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "freertos/FreeRTOS.h"
+#include "fsm.h"
 
 #define FSM_EVENT_TEXT_MAX_LEN (64U)
 
@@ -101,6 +102,9 @@ typedef enum {
     ACTION_ID_CCTALK_TX_DATA,     /* data transmitted on CCtalk */
     ACTION_ID_CCTALK_CONFIG,      /* configuration change */
     ACTION_ID_CCTALK_RESET,       /* reset command */
+    ACTION_ID_CCTALK_START,       /* start acceptor sequence */
+    ACTION_ID_CCTALK_STOP,        /* stop acceptor sequence */
+    ACTION_ID_CCTALK_MASK,        /* set per-channel mask via value_u32 (low=LSB, high=next byte) */
 
     ACTION_ID_RS232_RX_DATA,
     ACTION_ID_RS232_TX_DATA,

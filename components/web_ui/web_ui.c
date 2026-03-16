@@ -837,11 +837,9 @@ esp_err_t config_page_handler(httpd_req_t *req)
 #if WEB_UI_USE_EMBEDDED_PAGES == 0
     return webpages_send_external_or_error(req, "config.html", "text/html; charset=utf-8");
 #else
-    esp_err_t ext_page_ret = webpages_try_send_external(req, "config.html", "text/html; charset=utf-8");
-    if (ext_page_ret == ESP_OK) {
-        return ESP_OK;
-    }
-
+    /* La pagina /config è lunga e mantiene logica JS aggiornata.
+     * Non permettiamo override da storage esterno perché file obsoleti
+     * mostravano solo poche sezioni. */
     ESP_LOGI(TAG, "[C] GET /config");
     const bool config_read_only = !web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS);
     
