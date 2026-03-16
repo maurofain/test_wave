@@ -81,7 +81,7 @@ ipcMain.handle("editor:update-translation", async (_event, payload) => {
 
   const ok = i18nService.updateTranslation(
     String(payload.scope),
-    Number(payload.key),
+    payload.key,
     Number(payload.section ?? 0),
     String(payload.lang),
     String(payload.text ?? "")
@@ -111,9 +111,10 @@ ipcMain.handle("editor:search", async (_event, searchText) => {
   };
 });
 
-ipcMain.handle("editor:save", async () => {
+ipcMain.handle("editor:save", async (_event, opts) => {
   ensureDataLoaded();
-  return i18nService.saveAllFiles();
+  const createBackup = Boolean(opts && opts.createBackup);
+  return i18nService.saveAllFiles(createBackup);
 });
 
 ipcMain.handle("editor:set-translator-enabled", async (_event, enabled) => {

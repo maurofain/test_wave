@@ -37,9 +37,14 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [ ] Il tasto Stop deve apparire solo a programma avviato
 [ ] il caricamento delle immagini per lo slideshow segue questo ordine: se ci sono file imgxx.jpg in SPIFFS vanno caricate da SPIFFS, se non ci sono in SPIFFS le cerchiamo in SDCARD. se non ci sono in SDCARD saltiamo la pagina pubblicità e passiamo direttamente a scelta programmi
 [ ] Font da utilizzare : pagina ads : testo nome impianto GoogleSans70, Selezione lavaggio GoogleSans50, messaggio errore GoogleSans40
-Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
-Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
-------------------
+[X]Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
+[X]Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
+
+[ ] Far eseguire le funzioni tra moduli diversi (ad esempio un comando cctalk lanciato da una funzione lvgl) tramite la coda messaggi e non con chiamate dirette. Verificare il codice attuale se sono implementate funzioni che fanno chiamate a scope diversi e creare un'elenco con la descrizione di ogni operazione trans-scope
+[ ] al termine della schermata di init con il logo va effettuato l'invio della sequenza CCTALK cctalk_driver_start_acceptor()
+[ ]-definire la maschera di attivazione dei relays in Programmi mediante più gruppi di editbox da 4 caratteri  ciascuno (accettano 0 o 1 - 4 caratteri obbligatori fillati con trailing-zeroes) in base al numero di porte di out disponibili. a sx degli editbox ci sarà l'indicazione del numero relauys (1-4, 5-12, ecc.)  1 relays 1-4 sono quelli sulla MH1001,  i successi gruppi di 8 sulle schede waveshare RS485 in modbus. Formattare gli editbox su più righe nella stessa DIV (1 riga per device)
+[ ] Utiulizzare i testi delle chiavi program_name_* peer la compilazione dei nomi dei programmi, ed aggiungere in /programs la scelta della lingua 
+-----------------
 ## refactor i18n: ristrutturiamo tutta la localizzazione
 - La lingua di riferimento è l'italiano
 - separiamo la parte web dalla parte lvgl

@@ -1,5 +1,5 @@
 - il progetto gestisce 2 modalità di esecuzione: APP e FACTORY, compilate da base codice unica (`main/`) tramite flag `COMPILE_APP` in `main/app_version.h`. Le partizioni restano separate per OTA sicuro.
-- La app è multilingua e carica la tabella stringhe dai file in SPIFFS i18n_XX.json dove XX è il cofice lingua. Ogni tsto che appare nell'interfaccia web o nel pannello touch va tabellata
+- La app è multilingua e carica tutte le stringhe da un unico catalogo `/spiffs/i18n_v2.json` (costruito da `data/i18n_v2.json`). Ogni testo che appare nell'interfaccia web o nel pannello touch deve avere l'entry corrispondente nel catalogo con `scope`, `key` e `legacyId` coerenti.
 - per il sourcing di ESP-IDF si può usare get_idf 
 - per analizzare il funzionamento di idfc chiamare 'idfc -h'
 - per la compilazione usare `idfc -b`, flash `idfc -f`, per flash solo factory `idfc -ff`, per monitor `idfc -m`, per la sola partizione SPIFFS `idfc -fs`

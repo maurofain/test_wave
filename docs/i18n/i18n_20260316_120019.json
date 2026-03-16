@@ -7255,7 +7255,7 @@
         "it": "Credito",
         "en": "Credit",
         "fr": "Crédit",
-        "de": "Kredit",
+        "de": "Guthaben",
         "es": "Crédito"
       }
     },
@@ -7264,10 +7264,10 @@
       "label": "lvgl.panel.elapsed_fmt",
       "text": {
         "it": "Secondi   %s",
-        "en": "Seconds %s",
-        "fr": "Secondes %s",
-        "de": "Sekunden %s",
-        "es": "Segundos %s"
+        "en": "Seconds   %s",
+        "fr": "Secondes   %s",
+        "de": "Sekunden   %s",
+        "es": "Segundos   %s"
       }
     },
     "pause_fmt": {

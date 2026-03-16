@@ -41,7 +41,7 @@ function cacheDom() {
   dom.saveBtn = document.getElementById("save-btn");
   dom.addKeyBtn = document.getElementById("add-key-btn");
   dom.translateAllBtn = document.getElementById("translate-all-btn");
-  dom.translateAllScopesBtn = document.getElementById("translate-all-scopes-btn");
+  // dom.translateAllScopesBtn removed: functionality merged into translateAllBtn (Ctrl+click / Ctrl+right-click)
   dom.newKeyLabel = document.getElementById("new-key-label");
   dom.newKeyItText = document.getElementById("new-key-it-text");
   dom.rowsInfo = document.getElementById("rows-info");
@@ -86,7 +86,8 @@ function bindEvents() {
     const result = await window.editorApi.save();
     if (result.success) {
       setHasChanges(false);
-      showToast(`Salvataggio completato. Backup: ${result.backupFile}`, "success");
+      const msg = result.backupFile ? `Salvataggio completato. Backup: ${result.backupFile}` : `Salvataggio completato.`;
+      showToast(msg, "success");
       return;
     }
     showToast(result.error ?? "Errore durante il salvataggio", "error", 5000);
@@ -120,20 +121,26 @@ function bindEvents() {
     }
   });
 
-  dom.translateAllBtn.addEventListener("click", async () => {
-    await translateAllFieldsInCurrentScope(false);
+  // Click: translate current scope; Ctrl+Click: translate all scopes
+  dom.translateAllBtn.addEventListener("click", async (event) => {
+    if (event.ctrlKey) {
+      await translateAllScopes(false);
+    } else {
+      await translateAllFieldsInCurrentScope(false);
+    }
   });
 
+  // Right-click (context menu): confirm retranslate. Ctrl+Right-click => confirm retranslate ALL scopes
   dom.translateAllBtn.addEventListener("contextmenu", (event) => {
     event.preventDefault();
-    showConfirmDialog();
+    if (event.ctrlKey) {
+      showConfirmDialogAllScopes();
+    } else {
+      showConfirmDialog();
+    }
   });
 
-  dom.confirmOk.addEventListener("click", async () => {
-    hideConfirmDialog();
-    await translateAllFieldsInCurrentScope(true);
-  });
-
+  // Confirm handlers: confirm action is attached dynamically by showConfirmDialog/showConfirmDialogAllScopes
   dom.confirmCancel.addEventListener("click", () => {
     hideConfirmDialog();
   });
@@ -142,15 +149,6 @@ function bindEvents() {
     if (event.target === dom.confirmDialog) {
       hideConfirmDialog();
     }
-  });
-
-  dom.translateAllScopesBtn.addEventListener("click", async () => {
-    await translateAllScopes(false);
-  });
-
-  dom.translateAllScopesBtn.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-    showConfirmDialogAllScopes();
   });
 
   dom.cancelTranslationBtn.addEventListener("click", () => {
@@ -551,8 +549,8 @@ async function translateAllScopes(forceRetranslate = false) {
   }
 
   state.translateAllRunning = true;
-  const prevLabel = dom.translateAllScopesBtn.textContent;
-  dom.translateAllScopesBtn.disabled = true;
+  const prevLabel = dom.translateAllBtn.textContent;
+  // show progress on the single button
   dom.translateAllBtn.disabled = true;
 
   let totalOk = 0;
@@ -573,7 +571,7 @@ async function translateAllScopes(forceRetranslate = false) {
       const scopeInfo = state.scopes.find(s => String(s.id) === scopeId);
       const scopeLabel = scopeInfo ? scopeInfo.label : scopeId;
       
-      dom.translateAllScopesBtn.textContent = `🌍 ${i + 1}/${scopesToProcess.length}: ${scopeLabel}`;
+      dom.translateAllBtn.textContent = `🌍 ${i + 1}/${scopesToProcess.length}: ${scopeLabel}`;
       
       // Carica lo scope
       await loadScope(scopeId);
@@ -588,18 +586,31 @@ async function translateAllScopes(forceRetranslate = false) {
       totalSkipped += result.skippedAlreadyTranslated;
       totalTechnical += result.skippedTechnical;
       
-      // Salva dopo ogni scope
-      await window.editorApi.saveCatalog();
-      
       console.log(`Scope ${scopeLabel} completato: ${result.okCount} tradotti, ${result.failCount} errori`);
     }
   } finally {
     hideProgressDialog();
     state.translateAllRunning = false;
-    dom.translateAllScopesBtn.textContent = prevLabel;
-    dom.translateAllScopesBtn.disabled = false;
+    dom.translateAllBtn.textContent = prevLabel;
     dom.translateAllBtn.disabled = false;
     refreshTranslateButtons();
+  }
+
+  // Salva una sola volta alla fine della traduzione di tutti gli scope
+  try {
+    // create backup only for the final save of the full-scope translation
+    const saveResult = await window.editorApi.save({ createBackup: true });
+    if (saveResult && saveResult.success) {
+      // clear unsaved-changes flag so window can be closed
+      setHasChanges(false);
+      const msg = saveResult.backupFile ? `Salvataggio completato. Backup: ${saveResult.backupFile}` : `Salvataggio completato.`;
+      showToast(msg, "success");
+    } else {
+      showToast(saveResult?.error ?? "Salvataggio finale fallito", "error");
+    }
+  } catch (e) {
+    console.error('Errore durante salvataggio finale:', e);
+    showToast('Errore durante il salvataggio finale', 'error');
   }
 
   const mode = forceRetranslate ? "Ritraduzione completa" : "Traduzione tutti gli scope";
@@ -624,7 +635,7 @@ async function translateAllFieldsInCurrentScopeWithStats(forceRetranslate = fals
   let skippedTechnical = 0;
   
   for (const entry of state.currentEntries) {
-    const key = Number(entry.key);
+    const key = entry.key; // preserve original type (string or number) to support lvgl keys
     const section = Number(entry.section ?? 0);
     const sourceField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, "it"));
     const sourceText = String(sourceField?.value ?? "").trim();
@@ -668,7 +679,7 @@ async function translateAllFieldsInCurrentScopeWithStats(forceRetranslate = fals
     }
 
     const item = queue[i];
-    const entry = state.currentEntries.find(e => Number(e.key) === item.key && Number(e.section ?? 0) === item.section);
+    const entry = state.currentEntries.find(e => String(e.key) === String(item.key) && Number(e.section ?? 0) === Number(item.section ?? 0));
     const keyLabel = entry?.keyName || `Key ${item.key}`;
 
     updateProgressDialog({
@@ -936,7 +947,7 @@ async function translateAllFieldsInCurrentScope(forceRetranslate = false, manage
   let skippedAlreadyTranslated = 0;
   let skippedTechnical = 0;
   for (const entry of state.currentEntries) {
-    const key = Number(entry.key);
+    const key = entry.key; // preserve original type (string or number) to support lvgl keys
     const section = Number(entry.section ?? 0);
     const sourceField = state.fieldMap.get(makeFieldKey(state.currentScope, key, section, "it"));
     const sourceText = String(sourceField?.value ?? "").trim();
@@ -1005,7 +1016,7 @@ async function translateAllFieldsInCurrentScope(forceRetranslate = false, manage
       }
 
       const item = queue[i];
-      const entry = state.currentEntries.find(e => Number(e.key) === item.key && Number(e.section ?? 0) === item.section);
+      const entry = state.currentEntries.find(e => String(e.key) === String(item.key) && Number(e.section ?? 0) === Number(item.section ?? 0));
       const keyLabel = entry?.keyName || `Key ${item.key}`;
 
       updateProgressDialog({
@@ -1094,7 +1105,8 @@ async function translateAllFieldsInCurrentScope(forceRetranslate = false, manage
 
 function makeFieldKey(scope, key, section, lang) {
   const scopePart = String(scope ?? "");
-  return `${scopePart}:${Number(key)}:${Number(section ?? 0)}:${lang}`;
+  const keyPart = isNaN(Number(key)) ? String(key) : String(Number(key));
+  return `${scopePart}:${keyPart}:${Number(section ?? 0)}:${lang}`;
 }
 
 function restoreTheme() {
@@ -1113,6 +1125,12 @@ function applyTheme(themeMode) {
 let toastTimer = null;
 
 function showConfirmDialog() {
+  // Attach a one-time confirm handler for retranslation of current scope
+  const handleOk = async () => {
+    hideConfirmDialog();
+    await translateAllFieldsInCurrentScope(true);
+  };
+  dom.confirmOk.addEventListener("click", handleOk, { once: true });
   dom.confirmDialog.classList.remove("hidden");
 }
 

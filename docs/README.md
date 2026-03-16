@@ -169,12 +169,12 @@ Decisione corrente:
 - OTA over plain HTTP is allowed by default for lab convenience; change to HTTPS in production and provide the server certificate in Kconfig.
 
 ## Regola testi UI (multilingua)
-- Tutti i testi mostrati all'utente (Web UI e LVGL) devono essere generati tramite tabella i18n su SPIFFS, con file per lingua: `/spiffs/i18n_<lang>.json`.
-- Formato record obbligatorio: `{ "lang": "it", "scope": "nav", "key": "home", "text": "Home" }`.
-- `key` deve essere univoca all'interno dello stesso `scope`.
-- Evitare nuove stringhe hardcoded nelle pagine: usare `scope+key` con fallback minimo.
-- Ogni nuova stringa UI aggiunta nel codice deve essere contestualmente tabellata nel set IT in `data/i18n_it.json`.
-- Lingua corrente: `device_config.ui.language` (solo selezione lingua; i testi non sono salvati in NVS/EEPROM).
+- Tutti i testi mostrati all'utente (Web UI e LVGL) provengono dal catalogo unico `/spiffs/i18n_v2.json`, generato a partire da `data/i18n_v2.json` durante il build.
+- Ogni entry deve avere `scope`, `key`, `legacyId` e la matrice `text.<lang>` completa (almeno `it`).
+- `key` è univoca nello scope e segue la numerazione a tre cifre (`001..999`).
+- Evitare nuove stringhe hardcoded: usare sempre `device_config_get_ui_text_scoped()` o i placeholder HTML che il runtime sostituisce via tabella PSRAM.
+- Aggiornare `data/i18n_v2.json` per qualsiasi nuova stringa e far girare `scripts/validate_i18n_v2.py` prima del commit.
+- `device_config.ui.user_language` e `device_config.ui.backend_language` stabiliscono rispettivamente lingua LVGL e Web.
 
 ## Documentazione Hardware
 Per note specifiche su limitazioni hardware e pinout, vedi [docs/NOTES_HW.md](docs/NOTES_HW.md).

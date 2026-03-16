@@ -369,12 +369,12 @@ Nota:
 
 ## Checklist operativa (lista esatta interventi)
 
-1. definire contratto placeholder `{{NNN}}`
-2. censire stringhe localizzabili da HTML/JS
-3. generare catalogo i18n v2 con `label`
-4. sostituire testi template con placeholder
+1. definire contratto placeholder `{{NNN}}` ✅
+2. censire stringhe localizzabili da HTML/JS ✅
+3. generare catalogo i18n v2 con `label` ✅
+4. sostituire testi template con placeholder ✅
 5. separare JS in moduli
-6. implementare builder pagine in PSRAM
+6. implementare builder pagine in PSRAM ✅
 7. adattare page handler a cache PSRAM
 8. gestire invalidazione/rebuild su cambio lingua
 9. deprecare runtime i18n web legacy

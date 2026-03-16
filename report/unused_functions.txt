@@ -1,0 +1,674 @@
+  - Interrupt — ./main/fsm.c:693  
+   - Machine — ./main/tasks.c:387  
+   - REALE — ./main/tasks.c:139  
+   - backend — ./main/tasks.c:1007  
+   - cJSON_ArrayForEach — ./main/tasks.c:1565  
+   - esp_lcd_new_panel_ili9881c — ./.upstream_esp_lcd_ili9881c.c:77  
+   - find_esp32_ip — ./udp_bridge.py:14  
+   - fmCloseView — ./data/www/js/files_03.js:175  
+   - fmDownloadSelected — ./data/www/js/files_03.js:191  
+   - fmToggleAll — ./data/www/js/files_03.js:26  
+   - get_translator — ./i18n_editor/legacy_py/translator_config.py:201  
+   - parse_state — ./main/tasks.c:1495 (static)  
+   - preventivo — ./main/tasks.c:1175  
+   - scheletro — ./main/tasks.c:206  
+   - test_usb_host_cdc — ./tests/usb_host_cdc_acm/pytest_usb_host_cdc.py:16
+
+
+Total function-like symbols found: 308
+Candidates with 0 external references (heuristic): 15
+Skipped files due to errors or path-length: 0
+
+Function: Interrupt Total occurrences: 1
+  def: ./main/fsm.c:693 * Questa funzione viene utilizzata per pubblicare un evento all'interno di un contesto di Service Routine Interrupt (ISR).
+------------------------------------------------------------
+Function: Machine Total occurrences: 1
+  def: ./main/tasks.c:387 * @brief Gestisce il task del Finite State Machine (FSM).
+------------------------------------------------------------
+Function: REALE Total occurrences: 1
+  def: ./main/tasks.c:139 * ws2812_task — implementazione REALE (hardware WS2812/RMT)
+------------------------------------------------------------
+Function: backend Total occurrences: 1
+  def: ./main/tasks.c:1007 * Riceve barcode scanner da mailbox FSM, interroga il backend (`getcustomers`) e
+------------------------------------------------------------
+Function: cJSON_ArrayForEach Total occurrences: 1
+  def: ./main/tasks.c:1565 cJSON_ArrayForEach(obj, arr) {
+------------------------------------------------------------
+Function: esp_lcd_new_panel_ili9881c Total occurrences: 1
+  def: ./.upstream_esp_lcd_ili9881c.c:77 esp_err_t esp_lcd_new_panel_ili9881c(const esp_lcd_panel_io_handle_t io, const esp_lcd_panel_dev_config_t *panel_dev_config,
+------------------------------------------------------------
+Function: find_esp32_ip Total occurrences: 1
+  def: ./udp_bridge.py:14 def find_esp32_ip():
+------------------------------------------------------------
+Function: fmCloseView Total occurrences: 1
+  def: ./data/www/js/files_03.js:175 function fmCloseView() {
+------------------------------------------------------------
+Function: fmDownloadSelected Total occurrences: 1
+  def: ./data/www/js/files_03.js:191 function fmDownloadSelected() {
+------------------------------------------------------------
+Function: fmToggleAll Total occurrences: 1
+  def: ./data/www/js/files_03.js:26 function fmToggleAll() {
+------------------------------------------------------------
+Function: get_translator Total occurrences: 1
+  def: ./i18n_editor/legacy_py/translator_config.py:201 def get_translator(config: TranslatorConfig) -> TranslatorService:
+------------------------------------------------------------
+Function: parse_state Total occurrences: 1
+  def: ./main/tasks.c:1495 static task_state_t parse_state(const char *s, task_state_t def)
+------------------------------------------------------------
+Function: preventivo Total occurrences: 1
+  def: ./main/tasks.c:1175 /* Wrapper SD monitor: non richiede init hardware preventivo (il task configura
+------------------------------------------------------------
+Function: scheletro Total occurrences: 1
+  def: ./main/tasks.c:206 // Task scheletro (solo struttura, logica da implementare)
+------------------------------------------------------------
+Function: test_usb_host_cdc Total occurrences: 1
+  def: ./tests/usb_host_cdc_acm/pytest_usb_host_cdc.py:16 def test_usb_host_cdc(dut: Tuple[IdfDut, IdfDut]) -> None:
+------------------------------------------------------------
+
+Functions with 1-2 external references (review): 209
+Function: COREDUMP_MIN_FREE_MARGIN_BYTES ref_count: 1 total: 2
+  def: ./main/init.c:221 #define COREDUMP_MIN_FREE_MARGIN_BYTES (64 * 1024)
+----------------------------------------
+Function: ESP_IDF_VERSION_VAL ref_count: 1 total: 5
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:201 #else // ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 3, 0)
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:220 #endif // ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 3, 0)
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:835 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0) // This fix is only available in usb managed component now
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:870 #endif // ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+----------------------------------------
+Function: MOCK ref_count: 1 total: 2
+  def: ./main/tasks.c:184 * ws2812_task — implementazione MOCK (nessun hardware)
+----------------------------------------
+Function: _best_effort_translate ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:246 def _best_effort_translate(text: str, lang: str, translator: _Translator) -> str:
+----------------------------------------
+Function: _build_lang_records ref_count: 1 total: 2
+  def: ./scripts/generate_i18n_json_from_header.py:231 def _build_lang_records(entries: List[Entry], lang: str) -> List[Dict[str, object]]:
+----------------------------------------
+Function: _build_map ref_count: 1 total: 2
+  def: ./scripts/generate_i18n_json_from_header.py:207 def _build_map(entries: List[Entry]) -> Dict[str, Dict[str, str]]:
+----------------------------------------
+Function: _build_models ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:255 def _build_models(
+----------------------------------------
+Function: _build_scope_index ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/i18n_manager.py:144 def _build_scope_index(self):
+----------------------------------------
+Function: _builder ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:314 def _builder(constants: dict[str, str], _args: argparse.Namespace) -> str:
+----------------------------------------
+Function: _c_escape ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:152 def _c_escape(text: str) -> str:
+----------------------------------------
+Function: _create_main_panel ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:274 def _create_main_panel(self) -> ft.Column:
+----------------------------------------
+Function: _create_top_panel ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:168 def _create_top_panel(self) -> ft.Container:
+----------------------------------------
+Function: _ensure ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:96 def _ensure(self):
+----------------------------------------
+Function: _extract_unique_scopes_from_reference ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/i18n_manager.py:182 def _extract_unique_scopes_from_reference(self) -> List[int]:
+----------------------------------------
+Function: _get_palette ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:92 def _get_palette(self):
+----------------------------------------
+Function: _init_ui ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:152 def _init_ui(self):
+----------------------------------------
+Function: _load_language_records ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:220 def _load_language_records(data_dir: Path, lang: str) -> Dict[EntryKey, str]:
+----------------------------------------
+Function: _load_map ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:197 def _load_map(data_dir: Path, lang_hint: str) -> Tuple[Dict[int, str], Dict[int, str], Path]:
+----------------------------------------
+Function: _on_auto_translate_changed ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:515 def _on_auto_translate_changed(self, e):
+----------------------------------------
+Function: _on_exit ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:547 def _on_exit(self, e):
+----------------------------------------
+Function: _on_next_match ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:509 def _on_next_match(self, e):
+----------------------------------------
+Function: _on_prev_match ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:503 def _on_prev_match(self, e):
+----------------------------------------
+Function: _on_save ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:533 def _on_save(self, e):
+----------------------------------------
+Function: _on_scope_changed ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:440 def _on_scope_changed(self, e):
+----------------------------------------
+Function: _on_text_changed ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:448 def _on_text_changed(self, scope: int, key: int, section: int, lang: str, e):
+----------------------------------------
+Function: _on_theme_changed ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:522 def _on_theme_changed(self, e):
+----------------------------------------
+Function: _on_translate ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:528 def _on_translate(self, scope: int, key: int, section: int, lang: str, e):
+----------------------------------------
+Function: _parse_entries ref_count: 1 total: 2
+  def: ./scripts/generate_i18n_json_from_header.py:109 def _parse_entries(header_text: str, lang_codes: List[str]) -> List[Entry]:
+----------------------------------------
+Function: _parse_entries_from_comment_block ref_count: 1 total: 2
+  def: ./scripts/generate_i18n_json_from_header.py:117 def _parse_entries_from_comment_block(header_text: str, lang_codes: List[str]) -> Optional[List[Entry]]:
+----------------------------------------
+Function: _parse_entries_from_legacy_array ref_count: 1 total: 2
+  def: ./scripts/generate_i18n_json_from_header.py:170 def _parse_entries_from_legacy_array(header_text: str, lang_codes: List[str]) -> List[Entry]:
+----------------------------------------
+Function: _parse_lang_codes ref_count: 1 total: 2
+  def: ./scripts/generate_i18n_json_from_header.py:97 def _parse_lang_codes(header_text: str) -> List[str]:
+----------------------------------------
+Function: _render_header ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:302 def _render_header(models: List[EntryModel], lang_order: List[str], map_file: Path) -> str:
+----------------------------------------
+Function: _render_models_comment_block ref_count: 1 total: 2
+  def: ./scripts/generate_language_models.py:169 def _render_models_comment_block(models: List[EntryModel], lang_order: List[str]) -> List[str]:
+----------------------------------------
+Function: _show_success ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main.py:580 def _show_success(self, message: str):
+----------------------------------------
+Function: _split_utf8_sections ref_count: 1 total: 2
+  def: ./scripts/generate_i18n_json_from_header.py:65 def _split_utf8_sections(text: str, max_bytes: int = 31) -> List[str]:
+----------------------------------------
+Function: analyze_functions ref_count: 1 total: 2
+  def: ./scripts/find_c_files.py:56 def analyze_functions(file_path):
+----------------------------------------
+Function: app_main ref_count: 1 total: 2
+  def: ./main/main.c:243 void app_main(void)
+----------------------------------------
+Function: apply_post_boot_log_policy ref_count: 1 total: 2
+  def: ./main/main.c:83 static void apply_post_boot_log_policy(void)
+----------------------------------------
+Function: bindEvents ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:67 function bindEvents() {
+----------------------------------------
+Function: build_config_body ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:359 def build_config_body(constants: dict[str, str], args: argparse.Namespace) -> str:
+----------------------------------------
+Function: build_deviceactivity_url ref_count: 1 total: 2
+  def: ./main/init.c:390 static void build_deviceactivity_url(char *out, size_t out_len, const char *base_url)
+----------------------------------------
+Function: build_file_text ref_count: 1 total: 2
+  def: ./scripts/generate_language_flags.py:70 def build_file_text(data_dir: Path, size: Tuple[int, int]) -> str:
+----------------------------------------
+Function: build_head ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:269 def build_head(
+----------------------------------------
+Function: build_home_body ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:320 def build_home_body(constants: dict[str, str], args: argparse.Namespace) -> str:
+----------------------------------------
+Function: cacheDom ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:31 function cacheDom() {
+----------------------------------------
+Function: collect_if0_disabled_lines ref_count: 1 total: 2
+  def: ./scripts/find_c_files.py:14 def collect_if0_disabled_lines(lines):
+----------------------------------------
+Function: collect_template_placeholders ref_count: 1 total: 2
+  def: ./scripts/validate_i18n_v2.py:16 def collect_template_placeholders(www_dir: Path):
+----------------------------------------
+Function: compare_language ref_count: 1 total: 2
+  def: ./scripts/compare_i18n.py:41 def compare_language(lang):
+----------------------------------------
+Function: compute_password_from_date_mm_yyyy_dd ref_count: 1 total: 2
+  def: ./scripts/login_test.py:47 def compute_password_from_date_mm_yyyy_dd(date_mm_yyyy_dd: str, serial: str) -> str:
+----------------------------------------
+Function: count_lines ref_count: 1 total: 2
+  def: ./scripts/find_c_files.py:46 def count_lines(file_path):
+----------------------------------------
+Function: delete_phy ref_count: 1 total: 3
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:196 static void delete_phy(void)
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:219 static void delete_phy(void) {}
+----------------------------------------
+Function: emit_rgb565a8_array ref_count: 1 total: 2
+  def: ./scripts/generate_language_flags.py:32 def emit_rgb565a8_array(name: str, img_path: Path, size: Tuple[int, int]) -> str:
+----------------------------------------
+Function: ensure_page_catalog ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:70 def ensure_page_catalog(catalog: dict, page: str):
+----------------------------------------
+Function: esc ref_count: 1 total: 2
+  def: ./data/www/js/files_03.js:13 function esc(value) {
+----------------------------------------
+Function: eth_event_handler ref_count: 1 total: 2
+  def: ./main/init.c:1127 static void eth_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+----------------------------------------
+Function: eth_init_internal ref_count: 1 total: 2
+  def: ./main/init.c:1196 static esp_eth_handle_t eth_init_internal(void)
+----------------------------------------
+Function: extract_for_file ref_count: 1 total: 2
+  def: ./scripts/extract_inline_js_v2.py:9 def extract_for_file(html_path: Path, js_dir: Path):
+----------------------------------------
+Function: extract_string_constants ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:234 def extract_string_constants(source: str) -> dict[str, str]:
+----------------------------------------
+Function: fit_and_crop ref_count: 1 total: 2
+  def: ./scripts/generate_slideshow_images.py:20 def fit_and_crop(image, target_width, target_height):
+----------------------------------------
+Function: fmUpdateCopyBtn ref_count: 1 total: 2
+  def: ./data/www/js/files_03.js:237 function fmUpdateCopyBtn() {
+----------------------------------------
+Function: fsm_enter_lvgl_pages_test ref_count: 1 total: 2
+  def: ./main/fsm.c:87 bool fsm_enter_lvgl_pages_test(void)
+----------------------------------------
+Function: fsm_exit_lvgl_pages_test ref_count: 1 total: 2
+  def: ./main/fsm.c:96 bool fsm_exit_lvgl_pages_test(void)
+----------------------------------------
+Function: fsm_get_language_return_timeout_ms ref_count: 1 total: 2
+  def: ./main/tasks.c:63 static uint32_t fsm_get_language_return_timeout_ms(void)
+----------------------------------------
+Function: fsm_pending_messages_copy ref_count: 1 total: 2
+  def: ./main/fsm.c:899 size_t fsm_pending_messages_copy(char out[][FSM_EVENT_TEXT_MAX_LEN], size_t max_count)
+----------------------------------------
+Function: fsm_pending_push ref_count: 1 total: 3
+  def: ./main/fsm.c:154 static void fsm_pending_push(const fsm_input_event_t *event)
+  def: ./main/fsm.c:715 /* BUG3 fix: NON chiamare fsm_pending_push() da ISR */
+----------------------------------------
+Function: get_doxygen_comment ref_count: 1 total: 2
+  def: ./scripts/dgen.py:12 def get_doxygen_comment(func_sig, index, total, filename):
+----------------------------------------
+Function: get_key_name ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/i18n_manager.py:90 def get_key_name(self, key_id: int) -> str:
+----------------------------------------
+Function: get_scope_name ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/i18n_manager.py:86 def get_scope_name(self, scope_id: int) -> str:
+----------------------------------------
+Function: get_service ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/translator_config.py:76 def get_service(self) -> str:
+----------------------------------------
+Function: goToNextMatch ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:472 function goToNextMatch() {
+----------------------------------------
+Function: goToPreviousMatch ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:465 function goToPreviousMatch() {
+----------------------------------------
+Function: group_compact ref_count: 1 total: 2
+  def: ./scripts/compare_i18n.py:22 def group_compact(records):
+----------------------------------------
+Function: has_sd_free_space ref_count: 1 total: 2
+  def: ./main/init.c:528 static bool has_sd_free_space(size_t bytes_needed)
+----------------------------------------
+Function: init_agent_error_code_text ref_count: 1 total: 2
+  def: ./main/init.c:198 const char *init_agent_error_code_text(init_agent_error_code_t code)
+----------------------------------------
+Function: init_agent_status_get_table ref_count: 1 total: 2
+  def: ./main/init.c:190 const init_agent_status_t *init_agent_status_get_table(size_t *out_count)
+----------------------------------------
+Function: init_agent_status_update_error_counter ref_count: 1 total: 2
+  def: ./main/init.c:136 static void init_agent_status_update_error_counter(void)
+----------------------------------------
+Function: init_display_lvgl_minimal ref_count: 1 total: 2
+  def: ./main/init.c:1372 static esp_err_t init_display_lvgl_minimal(void)
+----------------------------------------
+Function: install_phy ref_count: 1 total: 3
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:183 static bool install_phy(void)
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:213 static bool install_phy(void)
+----------------------------------------
+Function: invalido ref_count: 1 total: 2
+  def: ./main/init.c:584 /* Header invalido (tipico dopo cambio layout): pulizia silenziosa e skip */
+----------------------------------------
+Function: ip_event_handler ref_count: 1 total: 2
+  def: ./main/init.c:1043 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+----------------------------------------
+Function: load_config ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/translator_config.py:46 def load_config(self):
+----------------------------------------
+Function: load_id_name_map ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/i18n_manager.py:47 def load_id_name_map(self, map_file_path: str) -> bool:
+----------------------------------------
+Function: log_partitions ref_count: 1 total: 2
+  def: ./main/init.c:906 static void log_partitions(void)
+----------------------------------------
+Function: lvgl_task ref_count: 1 total: 2
+  def: ./main/tasks.c:577 static void lvgl_task(void *arg)
+----------------------------------------
+Function: main_cctalk_init_task ref_count: 1 total: 2
+  def: ./main/main.c:213 static void main_cctalk_init_task(void *pv)
+----------------------------------------
+Function: main_cctalk_send_initialization_sequence_async ref_count: 1 total: 2
+  def: ./main/main.c:220 void main_cctalk_send_initialization_sequence_async(void)
+----------------------------------------
+Function: make_change_handler ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main_simple.py:71 def make_change_handler(s, k, l):
+----------------------------------------
+Function: maybe_force_crash_at_boot ref_count: 1 total: 2
+  def: ./main/main.c:106 static void maybe_force_crash_at_boot(void)
+----------------------------------------
+Function: mdb_task ref_count: 1 total: 2
+  def: ./main/tasks.c:358 static void mdb_task(void *arg)
+----------------------------------------
+Function: migrate_html ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:125 def migrate_html(content: str, page: str, page_map: dict):
+----------------------------------------
+Function: minify_json_file ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:449 def minify_json_file(file_path: Path) -> bool:
+----------------------------------------
+Function: mm_yyyy_dd_from_iso ref_count: 1 total: 2
+  def: ./scripts/login_test.py:53 def mm_yyyy_dd_from_iso(iso_dt: str) -> str:
+----------------------------------------
+Function: next_key ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:62 def next_key(page_map: dict) -> str:
+----------------------------------------
+Function: normalize_barcode_text ref_count: 1 total: 2
+  def: ./main/tasks.c:899 static void normalize_barcode_text(const char *input, char *output, size_t output_len)
+----------------------------------------
+Function: ntp_sync_callback ref_count: 1 total: 2
+  def: ./main/init.c:923 static void ntp_sync_callback(struct timeval *tv)
+----------------------------------------
+Function: onTextChanged ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:406 function onTextChanged(payload) {
+----------------------------------------
+Function: on_exit ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main_simple.py:155 def on_exit():
+----------------------------------------
+Function: on_next ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main_simple.py:136 def on_next():
+----------------------------------------
+Function: on_prev ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main_simple.py:130 def on_prev():
+----------------------------------------
+Function: on_save ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/main_simple.py:142 def on_save():
+----------------------------------------
+Function: page_specs ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:366 def page_specs() -> list[PageSpec]:
+----------------------------------------
+Function: parse_c_string_literal ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:210 def parse_c_string_literal(source: str, index: int) -> tuple[str, int]:
+----------------------------------------
+Function: parse_selected_pages ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:486 def parse_selected_pages(raw_pages: str) -> set[str]:
+----------------------------------------
+Function: point ref_count: 1 total: 2
+  def: ./main/init.c:1946 * disponibili nel sistema, come le reti access point (AP), le reti di accesso
+----------------------------------------
+Function: print_stats ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/validator.py:87 def print_stats(self):
+----------------------------------------
+Function: print_validation ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/validator.py:108 def print_validation(self):
+----------------------------------------
+Function: process_image ref_count: 1 total: 2
+  def: ./scripts/generate_slideshow_images.py:48 def process_image(source_path, target_path):
+----------------------------------------
+Function: process_json_files ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:467 def process_json_files(data_dir: Path) -> int:
+----------------------------------------
+Function: process_script_segment ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:114 def process_script_segment(script_content: str, page: str, page_map: dict):
+----------------------------------------
+Function: process_single_file ref_count: 1 total: 2
+  def: ./scripts/dgen.py:47 def process_single_file(filepath, analyze_only=False):
+----------------------------------------
+Function: publish_qr_credit_event ref_count: 1 total: 2
+  def: ./main/tasks.c:930 static void publish_qr_credit_event(const char *barcode, int32_t ecd_amount)
+----------------------------------------
+Function: pwm_task ref_count: 1 total: 2
+  def: ./main/tasks.c:376 static void pwm_task(void *arg)
+----------------------------------------
+Function: read_app_version ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:119 def read_app_version(source_path: Path) -> tuple[str, str]:
+----------------------------------------
+Function: reconstruct_from_group ref_count: 1 total: 2
+  def: ./scripts/compare_i18n.py:37 def reconstruct_from_group(group):
+----------------------------------------
+Function: renderScopeOptions ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:205 function renderScopeOptions() {
+----------------------------------------
+Function: renderTableHeader ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:222 function renderTableHeader() {
+----------------------------------------
+Function: renderTableRows ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:261 function renderTableRows(entries) {
+----------------------------------------
+Function: repl ref_count: 1 total: 2
+  def: ./scripts/extract_inline_js_v2.py:15 def repl(match):
+----------------------------------------
+Function: repl_attr ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:101 def repl_attr(match):
+----------------------------------------
+Function: repl_js_string ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:115 def repl_js_string(match):
+----------------------------------------
+Function: repl_text ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:91 def repl_text(match):
+----------------------------------------
+Function: restoreTheme ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:1100 function restoreTheme() {
+----------------------------------------
+Function: save_config ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/translator_config.py:56 def save_config(self):
+----------------------------------------
+Function: scanner_cooldown_is_active ref_count: 1 total: 2
+  def: ./main/tasks.c:652 static bool scanner_cooldown_is_active(TickType_t now)
+----------------------------------------
+Function: scanner_cooldown_tick ref_count: 1 total: 2
+  def: ./main/tasks.c:664 static void scanner_cooldown_tick(void)
+----------------------------------------
+Function: scanner_extract_clean_barcode ref_count: 1 total: 2
+  def: ./main/tasks.c:740 static bool scanner_extract_clean_barcode(const char *raw_barcode, char *clean_barcode, size_t clean_len)
+----------------------------------------
+Function: scanner_get_cooldown_ms ref_count: 1 total: 2
+  def: ./main/tasks.c:632 static uint32_t scanner_get_cooldown_ms(void)
+----------------------------------------
+Function: scanner_on_barcode_cb ref_count: 1 total: 2
+  def: ./main/tasks.c:841 static void scanner_on_barcode_cb(const char *barcode)
+----------------------------------------
+Function: set_enabled ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/translator_config.py:84 def set_enabled(self, enabled: bool):
+----------------------------------------
+Function: should_localize_js_literal ref_count: 1 total: 2
+  def: ./scripts/migrate_i18n_v2_page.py:35 def should_localize_js_literal(value: str) -> bool:
+----------------------------------------
+Function: showConfirmDialogAllScopes ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:1160 function showConfirmDialogAllScopes() {
+----------------------------------------
+Function: skip_ws_and_comments ref_count: 1 total: 2
+  def: ./scripts/export_embedded_pages.py:187 def skip_ws_and_comments(source: str, index: int) -> int:
+----------------------------------------
+Function: sospendere ref_count: 1 total: 2
+  def: ./.upstream_esp_lcd_ili9881c.c:690 * @param [in] sleep Flag booleano che indica se sospendere (true) o risvegliare (false) il display.
+----------------------------------------
+Function: split_text_by_bytes ref_count: 1 total: 2
+  def: ./scripts/convert_i18n_compact.py:9 def split_text_by_bytes(s, max_bytes):
+----------------------------------------
+Function: std ref_count: 1 total: 2
+  def: ./main/main.c:190 // Comando 3: Modify Master Inhibit std (header 228 / 0xE4)
+----------------------------------------
+Function: suspend_tx_task ref_count: 1 total: 2
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:1095 static void suspend_tx_task(void *arg)
+----------------------------------------
+Function: task_create ref_count: 1 total: 2
+  def: ./main/tasks.c:131 static BaseType_t task_create(task_param_t *t)
+----------------------------------------
+Function: tasks_apply_n_run ref_count: 1 total: 2
+  def: ./main/tasks.c:1689 void tasks_apply_n_run(void)
+----------------------------------------
+Function: tasks_get_humidity ref_count: 1 total: 2
+  def: ./main/tasks.c:120 float tasks_get_humidity(void) { return s_humidity; }
+----------------------------------------
+Function: tasks_get_temperature ref_count: 1 total: 2
+  def: ./main/tasks.c:113 float tasks_get_temperature(void) { return s_temperature; }
+----------------------------------------
+Function: transfer_coredump_flash_to_sd ref_count: 1 total: 2
+  def: ./main/init.c:559 static esp_err_t transfer_coredump_flash_to_sd(void)
+----------------------------------------
+Function: try_send_pending_crash_record ref_count: 1 total: 2
+  def: ./main/init.c:424 static esp_err_t try_send_pending_crash_record(void)
+----------------------------------------
+Function: tx_task ref_count: 1 total: 2
+  def: ./tests/usb_host_cdc_acm/main/test_cdc_acm_host.cpp:491 static void tx_task(void *arg)
+----------------------------------------
+Function: updateFooter ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:402 function updateFooter() {
+----------------------------------------
+Function: updateScopeMeta ref_count: 1 total: 2
+  def: ./i18n_editor/renderer/renderer.js:396 function updateScopeMeta(entries) {
+----------------------------------------
+Function: update_boot_reboot_guard ref_count: 1 total: 2
+  def: ./main/init.c:259 static esp_err_t update_boot_reboot_guard(void)
+----------------------------------------
+Function: update_crash_pending_record ref_count: 1 total: 2
+  def: ./main/init.c:341 static esp_err_t update_crash_pending_record(void)
+----------------------------------------
+Function: usb_scanner_task_wrapper ref_count: 1 total: 2
+  def: ./main/tasks.c:1132 static void usb_scanner_task_wrapper(void *arg)
+----------------------------------------
+Function: validate_all ref_count: 1 total: 2
+  def: ./i18n_editor/legacy_py/validator.py:17 def validate_all(self) -> dict:
+----------------------------------------
+Function: validate_catalog ref_count: 1 total: 2
+  def: ./scripts/validate_i18n_v2.py:38 def validate_catalog(catalog: dict, per_page: dict, require_all_languages: bool = False):
+----------------------------------------
+Function: wildcardToRegExp ref_count: 1 total: 2
+  def: ./data/www/js/logs_03.js:3 function wildcardToRegExp(pat){ if(!pat) return null; var specials='^$.*+?()[]{}|/\\'; var s=''; for(var i=0;i<pat.length;i++){ var ch=pat[i]; s += (specials.indexOf(ch)!==-1 ? ('\\'+ch) : ch); } s = s.split('\\*').join('.*').split('\\?').join('.'); try{ return new RegExp(s, 'i'); }catch(e){console.error('Invalid filter',e); return null;} }
+----------------------------------------
+Function: write_functions_report ref_count: 1 total: 2
+  def: ./scripts/find_c_files.py:123 def write_functions_report(file_path, functions):
+----------------------------------------
+Function: _deep_merge ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/translator_config.py:68 def _deep_merge(self, base: dict, override: dict):
+----------------------------------------
+Function: _on_search ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/main.py:458 def _on_search(self, e=None):
+----------------------------------------
+Function: _read_json ref_count: 2 total: 3
+  def: ./scripts/generate_language_models.py:147 def _read_json(path: Path):
+----------------------------------------
+Function: _render_layout ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/main.py:110 def _render_layout(self):
+----------------------------------------
+Function: _update_scope_entries_info ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/main.py:98 def _update_scope_entries_info(self):
+----------------------------------------
+Function: _update_title ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/main.py:591 def _update_title(self):
+----------------------------------------
+Function: applyTheme ref_count: 2 total: 3
+  def: ./i18n_editor/renderer/renderer.js:1105 function applyTheme(themeMode) {
+----------------------------------------
+Function: build_table ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/main_simple.py:31 def build_table():
+----------------------------------------
+Function: clearFieldHighlight ref_count: 2 total: 3
+  def: ./i18n_editor/renderer/renderer.js:479 function clearFieldHighlight() {
+----------------------------------------
+Function: createWindow ref_count: 2 total: 3
+  def: ./i18n_editor/electron/main.js:30 function createWindow() {
+----------------------------------------
+Function: extract_placeholders ref_count: 2 total: 3
+  def: ./scripts/validate_i18n_v2.py:12 def extract_placeholders(text: str):
+----------------------------------------
+Function: first ref_count: 2 total: 3
+  def: ./main/tasks.c:423 /* #6 fix: receive first (blocca fino a period_ticks = 100ms), poi
+----------------------------------------
+Function: fmDownload ref_count: 2 total: 3
+  def: ./data/www/js/files_03.js:129 function fmDownload(encName) {
+----------------------------------------
+Function: fmSelected ref_count: 2 total: 3
+  def: ./data/www/js/files_03.js:22 function fmSelected() {
+----------------------------------------
+Function: fsm_apply_language_return_timeout ref_count: 2 total: 3
+  def: ./main/tasks.c:88 static void fsm_apply_language_return_timeout(fsm_ctx_t *fsm)
+----------------------------------------
+Function: fsm_handle_input_event ref_count: 2 total: 3
+  def: ./main/fsm.c:334 bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
+----------------------------------------
+Function: fsm_init ref_count: 2 total: 3
+  def: ./main/fsm.c:184 void fsm_init(fsm_ctx_t *ctx)
+----------------------------------------
+Function: fsm_pending_push_text_locked ref_count: 2 total: 3
+  def: ./main/fsm.c:130 static void fsm_pending_push_text_locked(const char *message)
+----------------------------------------
+Function: fsm_publish_control_event ref_count: 2 total: 3
+  def: ./main/fsm.c:75 static bool fsm_publish_control_event(fsm_event_t ev)
+----------------------------------------
+Function: fsm_runtime_snapshot ref_count: 2 total: 3
+  def: ./main/fsm.c:953 bool fsm_runtime_snapshot(fsm_ctx_t *out_ctx)
+----------------------------------------
+Function: get_language_name ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/i18n_manager.py:298 def get_language_name(self, lang_code: str) -> str:
+----------------------------------------
+Function: get_scope_label ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/i18n_manager.py:94 def get_scope_label(self, scope_id: int) -> str:
+----------------------------------------
+Function: handleCancel ref_count: 2 total: 3
+  def: ./i18n_editor/renderer/renderer.js:1178 const handleCancel = () => {
+----------------------------------------
+Function: handleOk ref_count: 2 total: 3
+  def: ./i18n_editor/renderer/renderer.js:1172 const handleOk = async () => {
+----------------------------------------
+Function: has_doxygen_already ref_count: 2 total: 3
+  def: ./scripts/dgen.py:37 def has_doxygen_already(content, match_start):
+----------------------------------------
+Function: hideProgressDialog ref_count: 2 total: 3
+  def: ./i18n_editor/renderer/renderer.js:1138 function hideProgressDialog() {
+----------------------------------------
+Function: initCollapsibleSections ref_count: 2 total: 3
+  def: ./data/www/js/config_04.js:3 function initCollapsibleSections(){
+----------------------------------------
+Function: init_agent_status_reset_defaults ref_count: 2 total: 3
+  def: ./main/init.c:157 void init_agent_status_reset_defaults(void)
+----------------------------------------
+Function: init_event_loop ref_count: 2 total: 3
+  def: ./main/init.c:1167 static esp_err_t init_event_loop(void)
+----------------------------------------
+Function: init_get_consecutive_reboots ref_count: 2 total: 3
+  def: ./main/init.c:2083 uint32_t init_get_consecutive_reboots(void)
+----------------------------------------
+Function: init_i2c_and_io_expander ref_count: 2 total: 3
+  def: ./main/init.c:1973 void init_i2c_and_io_expander(void) {
+----------------------------------------
+Function: init_is_error_lock_active ref_count: 2 total: 3
+  def: ./main/init.c:2072 bool init_is_error_lock_active(void)
+----------------------------------------
+Function: init_mark_boot_completed ref_count: 2 total: 3
+  def: ./main/init.c:2098 esp_err_t init_mark_boot_completed(void)
+----------------------------------------
+Function: init_mark_forced_crash_request ref_count: 2 total: 3
+  def: ./main/init.c:2135 esp_err_t init_mark_forced_crash_request(void)
+----------------------------------------
+Function: init_sync_ntp ref_count: 2 total: 3
+  def: ./main/init.c:998 esp_err_t init_sync_ntp(void)
+----------------------------------------
+Function: is_enabled ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/translator_config.py:80 def is_enabled(self) -> bool:
+----------------------------------------
+Function: on_search ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/main_simple.py:99 def on_search():
+----------------------------------------
+Function: panel_ili9881c_del ref_count: 2 total: 3
+  def: ./.upstream_esp_lcd_ili9881c.c:411 static esp_err_t panel_ili9881c_del(esp_lcd_panel_t *panel)
+----------------------------------------
+Function: panel_ili9881c_init ref_count: 2 total: 3
+  def: ./.upstream_esp_lcd_ili9881c.c:436 static esp_err_t panel_ili9881c_init(esp_lcd_panel_t *panel)
+----------------------------------------
+Function: panel_ili9881c_invert_color ref_count: 2 total: 3
+  def: ./.upstream_esp_lcd_ili9881c.c:594 static esp_err_t panel_ili9881c_invert_color(esp_lcd_panel_t *panel, bool invert_color_data)
+----------------------------------------
+Function: panel_ili9881c_mirror ref_count: 2 total: 3
+  def: ./.upstream_esp_lcd_ili9881c.c:624 static esp_err_t panel_ili9881c_mirror(esp_lcd_panel_t *panel, bool mirror_x, bool mirror_y)
+----------------------------------------
+Function: panel_ili9881c_reset ref_count: 2 total: 3
+  def: ./.upstream_esp_lcd_ili9881c.c:564 static esp_err_t panel_ili9881c_reset(esp_lcd_panel_t *panel)
+----------------------------------------
+Function: process_non_script_segment ref_count: 2 total: 3
+  def: ./scripts/migrate_i18n_v2_page.py:90 def process_non_script_segment(segment: str, page: str, page_map: dict):
+----------------------------------------
+Function: publish_program_payment_event ref_count: 2 total: 3
+  def: ./main/tasks.c:967 static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event)
+----------------------------------------
+Function: reale ref_count: 2 total: 3
+  def: ./main/fsm.c:752 * bloccato il destinatario reale (effetto osservato: eventi QR vecchi
+----------------------------------------
+Function: restoreDialog ref_count: 2 total: 3
+  def: ./i18n_editor/renderer/renderer.js:1183 const restoreDialog = () => {
+----------------------------------------
+Function: save_all_files ref_count: 2 total: 3
+  def: ./i18n_editor/legacy_py/i18n_manager.py:237 def save_all_files(self) -> Tuple[bool, str]:
+----------------------------------------
+Function: scanner_cooldown_task ref_count: 2 total: 3
+  def: ./main/tasks.c:718 static void scanner_cooldown_task(void *arg)
+----------------------------------------

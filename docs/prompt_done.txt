@@ -1,0 +1,26 @@
+[X]all'avvio della app, dopo la connessione alla rete ethernet , verificahiamo che l'interfaccia cctalk sia abilitata ed inviamo la sequenza di inizializzazione:
+.02.00.01.FE.FF/.01.00.02.00.FD
+.02.02.01.E7.FF.FF.16/.01.00.02.00.FD
+.02.01.01.E4.01.17/.01.00.02.00.FD
+.02.00.01.E6.17/.01.02.02.00.FF.FF.FD
+Ripetiamo la sequeza prima di ogni caricamento della pagina programmi
+[X]saltiamo la schermata con le lingue e passiamo direttamente alla scelta programmi, mettiamo in alto a dx la bandiera della lingua corrente (default italiano)  e se premuta attiviamo la pagina scelta lingua. In base alla lingra scelta cambiamo la bandierina in alto a dx. dopo il periodo di inattività con la FSM in stato 2 azeriamno i crediti CVD e ECD (se monete/gettoni non utilizzati vengono egualmente azzerati) e ritorniamo alla lingua italiana. dopo un altro tempo di attesa in scelta programmi (defaulto 60sec ed editabile in /config/timeouts)usciamo ad una pagina pubblicità dove mostriamo delle immagini (di dimensione non predefinita e visualizzate centrate su sfondo nero) nominate img01.jpg, img02.jpg a rotazione con intervallo di 30 secondi (editabile in /config/timeouts) e che su tocco dello schermo passa alla schermata programmi
+
+[X]La bandierina in se è troppo piccola, va raddoppita in x e y, il bordo va raddoppiato in orizzontale come schermata di timeout non appare lo slideshow ma la scelta lingue, che deve apparire solo alla pression della bandiera
+
+[X]Crea uno stato nella FSM chiamato LVGL_PAGES_TEST per permettere la visualizzazione delle grafiche delle varie pagine senza l'operatività di pulsanti o altri elementi grafici. Entrando in questo stato vanno fermati i task delle periferiche ws2812 io_expander sht40 rs232 rs485 mdb pwm usb_scanner cctalk 
+poi crea in /config sez. Display una serie di tasti per forzare la visualizzazione do ogni pagina lvgl implementata e un tasto REBOOT per resettare la App. alla pressione di un tasto relativo ad una pagina metti la FSM in stato LVGL_PAGES_TEST permettendo di passare ad altre pagine grafiche fino alla richiesta del RESET
+
+[X]nel log indica con evidenza il cambio di stato della PSM racchiudendo il messaggio tra due righe con *
+
+[V]all'attivazione della pagina programmi inviamo una sequenza CCTALK come quella inviata dal tasto /test/cctalk -> Abilita (Start CCTALK)
+[X] La bandierina della lingua selezionata (in alto a dx) va inclusa assieme a ora e cerchietti e va abbassata di 30px
+[X] Ti carico l'immagine della nuova scheda scelta programmi da creare in un file lvgl_page_programmi.c : non c'è più la barra che scende con il passare del tempo in zona centrale ma sopra la zona che mostra i crediti, e cambia colore quando mancano 15 secondi alla fine del programma
+[V] La creazione dei pulsanti in lvgl_page_programmi deve prevedere un numero variabile di opzioni : 1,2,3,4,5, 6, 8, 10 .Nel caso da 1 a 5 i button saranno a piena largezza dividendo lo spazio verticale contenuti in un object che usa tutto lo spazio orizzontale e verticale sotto il contatore crediti, per le opzioni successive si passerà a 2 colonne con suddivisione dello spazio in verticale. Il numero dei pulsanti viene scelto con una combo in /config sez. Identità. In questa sezione mettiamo anche due input per le coordinate geografiche della posizione dell'impianto
+[X] nella pagina logo non deve apparire lo header con ora  e bandierina. Nella scelta lingue c'e una bandiera che si sovrappone a quella nello header
+[X] Rigenera le immagini delle bandierine con la trasparenza con LV_IMG_CF_TRUE_COLOR_ALPHA
+[X} implementiamo la possibilità di scegliere  posizione ca cui caricare le immagini pubblilcitarie su SPIFFS  e su SDCARD tramite uno switch che mettiamo in Identità. In Identità impostiamo i campi su 2 colonne, mettiamo lo switch 'Images on' nell'ultima riga. Nel file manager mettiamo un button primadi [Scarica tutto] con nome [copia su X] dove X è la destinazione non attulamente visualizzata
+[X] la sequenza delle pagine è : Init con logo > pubblicità con tasto per scelta programmi e bandierina per passare a scelta lingua - dopo scelta lingua (o timeour 60 secondi) si ritorna alla pagina su cui si è premuta la bandierina - da scelta programmi si ritorna a pubblicità dopo timeout inayyività 60 secondi
+[X]Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
+[X]Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
+

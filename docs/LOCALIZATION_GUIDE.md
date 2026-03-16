@@ -4,7 +4,7 @@ Guida aggiornata al funzionamento reale del progetto `test_wave`, con distinzion
 
 ## 1) Modello dati e sorgenti
 
-- File traduzioni: `/spiffs/i18n_<lang>.json` (+ map opzionale `i18n_<lang>.map.json`).
+- Catalogo traduzioni: unico file `/spiffs/i18n_v2.json` generato da `data/i18n_v2.json` (niente più file per lingua o map separate).
 - Config UI: `ui.user_language` e `ui.backend_language`.
 - Compatibilità: `ui_language` è mantenuto e mappato a `ui.user_language`.
 - API centrale lookup testo: `device_config_get_ui_text_scoped(scope, key, fallback, out, out_len)`.
@@ -17,7 +17,7 @@ Guida aggiornata al funzionamento reale del progetto `test_wave`, con distinzion
 2. `send_i18n_runtime_script(req)`:
    - legge la lingua con `device_config_get_ui_backend_language()`;
    - calcola lo scope pagina con `i18n_scope_for_uri()`;
-   - carica record via `device_config_get_ui_texts_records_json(lang)`;
+   - carica i record costruiti on-the-fly da `device_config_get_ui_texts_records_json(lang)` partendo dal catalogo v2;
    - filtra per scope con `filter_i18n_records_json_for_scope()`;
    - crea tabella runtime con fallback italiano tramite `build_i18n_table_json()`;
    - usa cache tramite `i18n_cache_get()` / `i18n_cache_put()`.
@@ -41,7 +41,7 @@ Di seguito l’elenco completo delle funzioni coinvolte direttamente nella compo
 ### 3.1 Device config / lookup
 
 - `device_config_get_ui_text_scoped(...)`
-- `device_config_get_ui_texts_records_json(const char *language)`
+- `device_config_get_ui_texts_records_json(const char *language)` (builder dal catalogo v2)
 - `device_config_get_ui_user_language(void)`
 - `device_config_get_ui_backend_language(void)`
 - `device_config_get_ui_language(void)` *(getter compatibilità legacy)*
@@ -99,7 +99,7 @@ Il percorso attivo usa esclusivamente:
 
 ## 6) Regola operativa per nuove stringhe
 
-Ogni testo mostrato in Web UI o LVGL deve essere tabellato in `i18n_<lang>.json` con scope corretto (`nav`, `header`, `lvgl`, `p_config`, `p_runtime`, `p_emulator`, ecc.) e recuperato tramite API i18n, evitando stringhe hardcoded nei renderer.
+Ogni testo mostrato in Web UI o LVGL deve essere censito in `data/i18n_v2.json` (sezione `web` o `lvgl`) con scope corretto (`nav`, `header`, `lvgl`, `p_config`, `p_runtime`, `p_emulator`, ecc.) e recuperato tramite API i18n, evitando stringhe hardcoded nei renderer.
 
 ## 7) Esempio reale: localizzazione stringa nella Home Web
 

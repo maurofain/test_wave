@@ -2,9 +2,9 @@
 
 ## Obiettivo
 Implementare una base multilingua con:
-- tabella record strutturata (`lang`, `scope`, `key`, `text`),
-- storage esclusivo su SPIFFS,
-- un file per lingua (`/spiffs/i18n_<lang>.json`),
+- catalogo strutturato (`scope`, `key`, `legacyId`, `text.<lang>`),
+- storage esclusivo su SPIFFS tramite **unico file** `/spiffs/i18n_v2.json`,
+- builder runtime che produce i record legacy per PSRAM/Web a partire dal catalogo,
 - recupero centralizzato testi per `scope+key`.
 
 ## Architettura implementata
@@ -23,24 +23,37 @@ La sezione `ui` in `device_config_t` mantiene la lingua corrente:
 
 - `ui.language` (es. `it`, `en`)
 
-Le stringhe sono salvate in file lingua su SPIFFS come array di record.
+Le stringhe risiedono nel catalogo JSON `data/i18n_v2.json`, poi copiato su SPIFFS come `/spiffs/i18n_v2.json` durante il build.
 
-### Esempio struttura logica (file `/spiffs/i18n_it.json`)
+### Estratto catalogo v2
 ```json
-[ 
-  {"lang":"it","scope":"nav","key":"home","text":"Home"},
-  {"lang":"it","scope":"nav","key":"config","text":"Config"},
-  {"lang":"it","scope":"lvgl","key":"time_not_available","text":"Ora non disponibile"}
-]
+{
+  "web": {
+    "nav": {
+      "001": {
+        "label": "nav.home",
+        "legacyId": { "scope": 1, "key": 1 },
+        "text": {"it": "Home", "en": "Home"}
+      }
+    }
+  },
+  "lvgl": {
+    "001": {
+      "label": "lvgl.time_not_available",
+      "legacyId": { "scope": 9, "key": 15 },
+      "text": {"it": "Ora non disponibile", "en": "Time unavailable"}
+    }
+  }
+}
 ```
 
 ## Persistenza
 La tabella i18n è salvata solo su SPIFFS:
-- file per lingua: `/spiffs/i18n_<lang>.json`
+- catalogo unico `/spiffs/i18n_v2.json`
 - nessuna persistenza testi in NVS/EEPROM
 
 Regola manutentiva obbligatoria:
-- ogni nuova stringa UI inserita nel codice deve essere aggiunta anche nel set IT (`data/i18n_it.json`) prima del merge.
+- ogni nuova stringa UI inserita nel codice deve essere aggiunta in `data/i18n_v2.json` (sezione corretta) prima del merge.
 
 NVS/EEPROM continuano a gestire solo `ui.language` (lingua selezionata).
 
@@ -62,7 +75,7 @@ NVS/EEPROM continuano a gestire solo `ui.language` (lingua selezionata).
 In `device_config`:
 - `device_config_get_ui_language()`
 - `device_config_get_ui_texts_records_json(language)`
-- `device_config_set_ui_texts_records_json(language, records_json)`
+- `device_config_set_ui_texts_records_json(language, records_json)` *(solo per import legacy)*
 - `device_config_get_ui_text_scoped(scope, key, fallback, out, out_len)`
 
 `device_config_get_ui_text_scoped(...)`:
@@ -83,7 +96,7 @@ Chiavi attualmente usate in header/navbar/LVGL:
 1. Client legge configurazione (`GET /api/config` oppure `GET /api/ui/texts`).
 2. Client modifica `ui.language` e/o `ui.records`.
 3. Client salva con `POST /api/config/save`.
-4. I record sono persistiti nel file SPIFFS della lingua.
+4. Il backend ricostruisce i record dalla cache PSRAM/catalogo e aggiorna `i18n_v2.json` (se previsto dallo strumento) oppure solo la lingua selezionata.
 
 ## Note e limiti attuali
 - Il modello record è pronto e persistente su SPIFFS per lingua.

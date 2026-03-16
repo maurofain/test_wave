@@ -109,6 +109,7 @@ class I18nService {
     }
     this.entriesByScope = new Map();
 
+    // Build entries for web scopes (numeric 001..999 keys)
     for (const scope of this.scopes) {
       const pageEntries = web[scope];
       const rows = [];
@@ -136,6 +137,38 @@ class I18nService {
       rows.sort((a, b) => Number(a.keyCode) - Number(b.keyCode));
       this.entriesByScope.set(scope, rows);
     }
+
+    // Build entries for lvgl (alphanumeric keys)
+    const lvglEntries = this.catalog?.lvgl ?? {};
+    const lvglKeys = Object.keys(lvglEntries ?? {});
+    if (lvglKeys.length > 0) {
+      if (!this.scopes.includes("lvgl")) {
+        this.scopes.push("lvgl");
+      }
+      const rows = [];
+      for (const [keyName, entry] of Object.entries(lvglEntries ?? {})) {
+        if (!entry || typeof entry !== "object") {
+          continue;
+        }
+        const textObj = entry.text && typeof entry.text === "object" ? entry.text : entry;
+        const translations = {};
+        for (const lang of this.languages) {
+          translations[lang] = String(textObj[lang] ?? "");
+        }
+
+        rows.push({
+          scope: "lvgl",
+          key: keyName,
+          keyCode: String(keyName),
+          section: 0,
+          keyName: String(entry.label ?? keyName),
+          translations,
+        });
+      }
+
+      rows.sort((a, b) => a.keyCode.localeCompare(b.keyCode));
+      this.entriesByScope.set("lvgl", rows);
+    }
   }
 
   discoverWebScopes() {
@@ -161,6 +194,27 @@ class I18nService {
 
   updateTranslation(scope, key, _section, lang, text) {
     const s = String(scope);
+    // Special handling for lvgl keys (alphanumeric keys at top-level)
+    if (s === "lvgl") {
+      const k = String(key);
+      if (!this.catalog?.lvgl?.[k]) {
+        return false;
+      }
+      const entry = this.catalog.lvgl[k];
+      // support both formats: either entry.text = { it:..., en:... } or entry = { it:..., en:... }
+      if (entry.text && typeof entry.text === "object") {
+        entry.text[String(lang)] = String(text ?? "");
+      } else if (typeof entry === "object") {
+        entry[String(lang)] = String(text ?? "");
+      } else {
+        // unexpected format
+        this.catalog.lvgl[k] = { text: { [String(lang)]: String(text ?? "") } };
+      }
+      this.buildScopeIndex();
+      return true;
+    }
+
+    // Default: web scopes with numeric 3-digit keys
     const k = String(Number(key)).padStart(3, "0");
     if (!this.catalog?.web?.[s]?.[k]) {
       return false;
@@ -206,18 +260,36 @@ class I18nService {
     throw new Error(`Scope ${s} pieno: nessuna key libera tra 001..999`);
   }
 
-  saveAllFiles() {
+  saveAllFiles(createBackup = false) {
     const timestamp = this.getTimestamp();
     const backupFilename = `i18n_${timestamp}.json`;
-    const backupPath = path.join(this.dataDir, backupFilename);
+
+    // Save backup in ../docs/i18n relative to dataDir when requested
+    const backupDir = path.join(this.dataDir, "..", "docs", "i18n");
+    const backupPath = path.join(backupDir, backupFilename);
 
     try {
       this.catalog.languages = this.languages;
-      fs.writeFileSync(backupPath, JSON.stringify(this.catalog, null, 2), "utf-8");
+
+      if (createBackup) {
+        try {
+          if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+          }
+          // write backup (previous version) to docs/i18n
+          fs.writeFileSync(backupPath, JSON.stringify(this.catalog, null, 2), "utf-8");
+        } catch (e) {
+          // ignore backup errors but continue to save current catalog
+          console.error('Unable to write backup to docs/i18n:', e.message);
+        }
+      }
+
+      // write current catalog to original location
       fs.writeFileSync(this.catalogPath, JSON.stringify(this.catalog, null, 2), "utf-8");
+
       return {
         success: true,
-        backupFile: backupFilename,
+        backupFile: createBackup ? backupPath : null,
       };
     } catch (error) {
       return {

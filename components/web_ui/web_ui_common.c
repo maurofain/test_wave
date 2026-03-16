@@ -77,9 +77,6 @@ static void ps_free(void *p)
 }
 
 #define I18N_CACHE_MAX_ENTRIES 8
-#ifndef WEB_UI_I18N_RUNTIME_SCRIPT_ENABLED
-#define WEB_UI_I18N_RUNTIME_SCRIPT_ENABLED 0
-#endif
 
 typedef struct
 {
@@ -225,12 +222,7 @@ static char *dup_cstr(const char *src)
 /**
  * @brief Determina lo scope i18n per un particolare URI
  *
- * L'URI viene confrontato con alcuni prefissi noti ("/config", "/logs", "/test"
- * ecc.) per stabilire quale gruppo di traduzioni utilizzare. Questo aiuta a
- * generare il file javascript delle stringhe solo per la pagina richiesta.
- *
- * @param uri URI della richiesta HTTP
- * @return nome dello scope i18n (es. "p_runtime", "p_logs")
+ * L'URI viene confrontato con alcuni prefissi noti per selezionare lo scope.
  */
 static const char *i18n_scope_for_uri(const char *uri)
 {
@@ -387,6 +379,7 @@ void web_ui_i18n_cache_invalidate(void)
     webpages_localized_cache_invalidate();
 }
 
+
 /*
  * Load full i18n dictionary for a language into PSRAM as an array of
  * `i18n_record_t`-compatible records. Caller must free with
@@ -397,7 +390,9 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     if (!language)
     {
         if (out_count)
+        {
             *out_count = 0;
+        }
         return NULL;
     }
 
@@ -405,7 +400,9 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     if (!json)
     {
         if (out_count)
+        {
             *out_count = 0;
+        }
         return NULL;
     }
 
@@ -414,18 +411,24 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     if (!root || !cJSON_IsArray(root))
     {
         if (root)
+        {
             cJSON_Delete(root);
+        }
         if (out_count)
+        {
             *out_count = 0;
+        }
         return NULL;
     }
 
-    int total = cJSON_GetArraySize(root);
+    const int total = cJSON_GetArraySize(root);
     if (total <= 0)
     {
         cJSON_Delete(root);
         if (out_count)
+        {
             *out_count = 0;
+        }
         return NULL;
     }
 
@@ -434,7 +437,9 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     {
         cJSON_Delete(root);
         if (out_count)
+        {
             *out_count = 0;
+        }
         return NULL;
     }
 
@@ -445,47 +450,30 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     cJSON_ArrayForEach(item, root)
     {
         if (!cJSON_IsObject(item))
+        {
             continue;
+        }
 
         uint8_t scope_id = 0;
         uint16_t key_id = 0;
         uint8_t section = 0;
         const char *text = NULL;
 
-        cJSON *j_scope_id = cJSON_GetObjectItemCaseSensitive(item, "scope_id");
-        cJSON *j_key_id = cJSON_GetObjectItemCaseSensitive(item, "key_id");
+        cJSON *j_scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
+        cJSON *j_key = cJSON_GetObjectItemCaseSensitive(item, "key");
         cJSON *j_section = cJSON_GetObjectItemCaseSensitive(item, "section");
-        cJSON *j_section_old = cJSON_GetObjectItemCaseSensitive(item, "section");
 
-        if (cJSON_IsNumber(j_scope_id))
+        if (cJSON_IsNumber(j_scope))
         {
-            scope_id = (uint8_t)j_scope_id->valueint;
+            scope_id = (uint8_t)j_scope->valueint;
         }
-        else
+        if (cJSON_IsNumber(j_key))
         {
-            cJSON *j_scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
-            if (cJSON_IsNumber(j_scope))
-                scope_id = (uint8_t)j_scope->valueint;
+            key_id = (uint16_t)j_key->valueint;
         }
-
-        if (cJSON_IsNumber(j_key_id))
-        {
-            key_id = (uint16_t)j_key_id->valueint;
-        }
-        else
-        {
-            cJSON *j_key = cJSON_GetObjectItemCaseSensitive(item, "key");
-            if (cJSON_IsNumber(j_key))
-                key_id = (uint16_t)j_key->valueint;
-        }
-
         if (cJSON_IsNumber(j_section))
         {
             section = (uint8_t)j_section->valueint;
-        }
-        else if (cJSON_IsNumber(j_section_old))
-        {
-            section = (uint8_t)j_section_old->valueint;
         }
 
         cJSON *j_text = cJSON_GetObjectItemCaseSensitive(item, "text");
@@ -959,7 +947,6 @@ static char *escape_script_end_tag(const char *src)
     strcpy(dst, in);
     return out;
 }
-
 
 /**
  * @brief Invia uno script di runtime internazionale tramite HTTP.

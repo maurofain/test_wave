@@ -7253,10 +7253,10 @@
       "label": "lvgl.panel.credit_label",
       "text": {
         "it": "Credito",
-        "en": "Credit",
-        "fr": "Crédit",
-        "de": "Kredit",
-        "es": "Crédito"
+        "en": "",
+        "fr": "",
+        "de": "",
+        "es": ""
       }
     },
     "elapsed_fmt": {
@@ -7264,10 +7264,10 @@
       "label": "lvgl.panel.elapsed_fmt",
       "text": {
         "it": "Secondi   %s",
-        "en": "Seconds %s",
-        "fr": "Secondes %s",
-        "de": "Sekunden %s",
-        "es": "Segundos %s"
+        "en": "",
+        "fr": "",
+        "de": "",
+        "es": ""
       }
     },
     "pause_fmt": {

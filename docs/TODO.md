@@ -339,6 +339,19 @@ scope_name = i18n_scope_name(scope->valueint);
 
 ---
 
+### C. Implementazione i18n_v2
+
+1. **Placeholder contract** — applicare e validare il pattern `{{NNN}}` nei template (`data/www/*.html` e JS associati), introducendo il check regex in validatore/build. ✅
+2. **Censimento stringhe** — inventariare tutti i testi localizzabili per pagina/scope e assegnare le chiavi numeriche (`001..999`) con relative `label` semantiche. ✅
+3. **Catalogo sorgente** — consolidare `data/i18n_v2.json`, garantendo `text.it` obbligatorio, label conformi e tool di validazione automatica. ✅
+4. **Refactor template/JS** — sostituire i testi con placeholder, estrarre gli script inline in `data/www/js/` e mantenere coerenza con il catalogo tramite validatore. ✅
+5. **Builder PSRAM** — sviluppare il modulo che carica template da SPIFFS, sostituisce i placeholder secondo la lingua backend e mantiene cache delle pagine localizzate in PSRAM (boot + cambio lingua). ✅
+6. **Backend i18n** — adattare `device_config`/API per consumare il catalogo v2 (conversione verso record legacy o nuovo lookup) e aggiornare `_ensure_default_i18n_it_file()`/pipeline SPIFFS.
+7. **Tooling & editor** — estendere `i18n_editor`, aggiungere script CLI di conversione e validatore build-time che confronta template, catalogo e lingue disponibili. ✅
+8. **Migrazione & rollout** — migrare progressivamente le pagine (index → config → test …), rimuovere il runtime i18n legacy, aggiornare documentazione e checklist QA/benchmark.
+
+---
+
 ## 🐛 ERRORI NOTI
 
 ### Task Watchdog — IDLE0 CPU0

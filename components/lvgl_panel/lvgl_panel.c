@@ -2,6 +2,7 @@
 #include "lvgl_panel_pages.h"
 #include "lvgl_page_chrome.h"
 #include "init.h"
+#include "device_config.h"
 
 #include "lvgl.h"
 #include "bsp/esp32_p4_nano.h"
@@ -10,12 +11,17 @@
 #include "freertos/FreeRTOS.h"
 
 #include <stdio.h>
+#include <string.h>
 
 extern const lv_font_t GoogleSans70;
 extern const lv_font_t GoogleSans35;
 
 static const char *TAG = "lvgl_panel";
 static lv_obj_t *s_init_status_label = NULL;
+static char s_lvgl_i18n_lang[8] = {0};
+
+/* Forward declaration from web_ui_common.c to avoid pulling the entire header. */
+esp_err_t web_ui_i18n_load_language_psram(const char *language);
 
 #define COL_BG    lv_color_make(0x1a, 0x1a, 0x2e)
 #define COL_BOOT_BG lv_color_make(0x00, 0x00, 0x00)
@@ -126,8 +132,41 @@ static void panel_show_boot_logo_screen(void)
  *  
  *  @return Nessun valore di ritorno.
  */
+static bool lvgl_panel_load_i18n_dictionary(const char *lang)
+{
+    const char *requested = lang;
+    if (!requested || strlen(requested) != 2) {
+        requested = "it";
+    }
+
+    if (strncmp(s_lvgl_i18n_lang, requested, sizeof(s_lvgl_i18n_lang)) == 0) {
+        return true;
+    }
+
+    if (web_ui_i18n_load_language_psram(requested) == ESP_OK) {
+        strncpy(s_lvgl_i18n_lang, requested, sizeof(s_lvgl_i18n_lang) - 1);
+        s_lvgl_i18n_lang[sizeof(s_lvgl_i18n_lang) - 1] = '\0';
+        ESP_LOGI(TAG, "[C] Dizionario LVGL caricato in PSRAM per lingua '%s'", requested);
+        return true;
+    }
+
+    if (strcmp(requested, "it") != 0 && web_ui_i18n_load_language_psram("it") == ESP_OK) {
+        strncpy(s_lvgl_i18n_lang, "it", sizeof(s_lvgl_i18n_lang) - 1);
+        s_lvgl_i18n_lang[sizeof(s_lvgl_i18n_lang) - 1] = '\0';
+        ESP_LOGW(TAG, "[C] Lingua '%s' non disponibile, uso fallback 'it'", requested);
+        return true;
+    }
+
+    ESP_LOGE(TAG, "[C] Impossibile caricare il dizionario LVGL (lang='%s')", requested);
+    return false;
+}
+
 void lvgl_panel_show(void)
 {
+    const char *lang = device_config_get_ui_user_language();
+    if (!lvgl_panel_load_i18n_dictionary(lang)) {
+        ESP_LOGW(TAG, "[C] Continuo senza dizionario LVGL in PSRAM (fallback testo)");
+    }
     lvgl_panel_show_boot_logo();
 }
 

@@ -231,6 +231,34 @@ void main_cctalk_send_initialization_sequence_async(void)
     }
 }
 
+/* Background task used to start the CCTalk acceptor without blocking UI */
+static void main_cctalk_start_acceptor_task(void *pv)
+{
+    (void)pv;
+    esp_err_t start_err = cctalk_driver_start_acceptor();
+    if (start_err != ESP_OK) {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " cctalk_driver_start_acceptor failed: %s", esp_err_to_name(start_err));
+    } else {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " cctalk_driver_start_acceptor OK");
+    }
+    vTaskDelete(NULL);
+}
+
+/* Asynchronous wrapper to start cctalk acceptor after boot UI is ready */
+void main_cctalk_start_acceptor_async(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] start acceptor async skip (disabilitato da config)");
+        return;
+    }
+
+    BaseType_t r = xTaskCreate(main_cctalk_start_acceptor_task, "cctalk_start", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
+    if (r != pdPASS) {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Creazione task start acceptor CCTalk fallita");
+    }
+}
+
 
 /**
  * @brief Funzione principale dell'applicazione.
@@ -351,7 +379,7 @@ void app_main(void)
 
     if (cfg && cfg->display.enabled) {
         /* [M] Show ads slideshow at boot, then transition to main by touch or timeout */
-        main_cctalk_send_initialization_sequence();
+        main_cctalk_start_acceptor_async();
         lvgl_panel_show_ads_page();  /* [M] usa lock + preload imagini fuori lock */
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: slideshow pubblicitario attivato");
     } else {

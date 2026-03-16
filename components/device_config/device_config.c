@@ -9,7 +9,6 @@
 char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id);
 #include "esp_log.h"
 #include "esp_check.h"
-#include "nvs_flash.h"
 #include "nvs.h"
 #include "cJSON.h"
 #include "esp_rom_crc.h"
@@ -25,6 +24,7 @@ char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id);
 static const char *TAG = "DEVICE_CFG";
 static const char *NVS_NAMESPACE = "device_config";
 static const char *UI_LANG_DEFAULT = "it";
+static const char *I18N_V2_FILE_PATH = "/spiffs/i18n_v2.json";
 #define DEVICE_CFG_MODBUS_MAX_POINTS 64
 #define DEVICE_CFG_SERIAL_BAUD_MIN 300
 #define DEVICE_CFG_SERIAL_BAUD_MAX 3000000
@@ -168,20 +168,6 @@ static void _parse_serial_cfg_json(cJSON *serial_obj,
     }
 }
 
-static const char *UI_TEXTS_DEFAULT_IT_JSON =
-    "["
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"home\",\"text\":\"Home\"},"
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"config\",\"text\":\"Config\"},"
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"stats\",\"text\":\"Statistiche\"},"
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"tasks\",\"text\":\"Task\"},"
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"logs\",\"text\":\"Log\"},"
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"test\",\"text\":\"Test\"},"
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"ota\",\"text\":\"OTA\"},"
-    "{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"emulator\",\"text\":\"Emulatore\"},"
-    "{\"lang\":\"it\",\"scope\":\"header\",\"key\":\"time_not_set\",\"text\":\"Ora non impostata\"},"
-    "{\"lang\":\"it\",\"scope\":\"lvgl\",\"key\":\"time_not_available\",\"text\":\"Ora non disponibile\"}"
-    "]";
-
 #define EEPROM_MAGIC 0x57415645 // "WAVE"
 #define EEPROM_HEADER_ADDR 0
 
@@ -200,6 +186,11 @@ static device_config_t s_config = {0};
 static bool s_initialized = false;
 
 static const char *_effective_lang(const char *language);
+static cJSON *s_i18n_v2_root = NULL;
+static cJSON *_i18n_v2_build_records_for_language(const char *language);
+static const char *_i18n_v2_entry_pick_text(cJSON *entry, const char *lang);
+static void _i18n_v2_append_entry(cJSON *array, cJSON *entry, const char *lang);
+static void _i18n_v2_clear_cache(void);
 
 static cJSON *s_i18n_lookup_cache = NULL;
 static char s_i18n_lookup_lang[8] = {0};
@@ -302,17 +293,12 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
 
     _i18n_lookup_cache_clear();
 
-    char *records_json = device_config_get_ui_texts_records_json(lang);
-    if (!records_json) {
-        return ESP_ERR_NO_MEM;
+    const char *lang_or_default = (lang && lang[0]) ? lang : UI_LANG_DEFAULT;
+    cJSON *records = _i18n_v2_build_records_for_language(lang_or_default);
+    if (!records && strcmp(lang_or_default, UI_LANG_DEFAULT) != 0) {
+        records = _i18n_v2_build_records_for_language(UI_LANG_DEFAULT);
     }
-
-    cJSON *records = cJSON_Parse(records_json);
-    free(records_json);
-    if (!records || !cJSON_IsArray(records)) {
-        if (records) {
-            cJSON_Delete(records);
-        }
+    if (!records) {
         return ESP_FAIL;
     }
 
@@ -382,12 +368,6 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
         snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope->valuestring, key->valuestring);
 
         _append_json_text(aggregated, scoped_key, text->valuestring);
-        if (!cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key)) {
-            cJSON_AddStringToObject(aggregated_scope, scoped_key, scope->valuestring);
-        }
-        if (!cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key)) {
-            cJSON_AddStringToObject(aggregated_key, scoped_key, key->valuestring);
-        }
     }
 
     cJSON *entry = NULL;
@@ -404,29 +384,13 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
         if (dot && dot[1] != '\0') {
             _add_lookup_mapping_if_missing(table, dot + 1, value);
         }
-
-        cJSON *scope_text = cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key);
-        cJSON *key_text = cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key);
-        if (cJSON_IsString(scope_text) && scope_text->valuestring &&
-            cJSON_IsString(key_text) && key_text->valuestring) {
-            char textual_scoped_key[128] = {0};
-            snprintf(textual_scoped_key,
-                     sizeof(textual_scoped_key),
-                     "%s.%s",
-                     scope_text->valuestring,
-                     key_text->valuestring);
-            _add_lookup_mapping_if_missing(table, textual_scoped_key, value);
-            _add_lookup_mapping_if_missing(table, key_text->valuestring, value);
-        }
     }
 
     cJSON_Delete(records);
     cJSON_Delete(aggregated);
-    cJSON_Delete(aggregated_scope);
-    cJSON_Delete(aggregated_key);
 
     s_i18n_lookup_cache = table;
-    strncpy(s_i18n_lookup_lang, lang, sizeof(s_i18n_lookup_lang) - 1);
+    strncpy(s_i18n_lookup_lang, lang_or_default, sizeof(s_i18n_lookup_lang) - 1);
     s_i18n_lookup_lang[sizeof(s_i18n_lookup_lang) - 1] = '\0';
     return ESP_OK;
 }
@@ -467,113 +431,14 @@ static const char *_effective_lang(const char *language)
  *
  * @return void
  */
-static void _build_i18n_path(const char *language, char *out, size_t out_len)
+static char *_read_text_file(const char *path, size_t *out_len)
 {
-    snprintf(out, out_len, "/spiffs/i18n_%s.json", _effective_lang(language));
-}
-
-
-/**
- * @brief Controlla se la stringa JSON rappresenta una serie di record i18n validi.
- * 
- * @param [in] records_json Puntatore alla stringa JSON contenente i record i18n.
- * @return true Se la stringa JSON rappresenta una serie di record i18n validi.
- * @return false Altrimenti.
- */
-static bool _is_valid_i18n_records_json(const char *records_json)
-{
-    if (!records_json) {
-        return false;
+    if (out_len) {
+        *out_len = 0;
     }
-
-    cJSON *root = cJSON_Parse(records_json);
-    if (!root || !cJSON_IsArray(root)) {
-        if (root) {
-            cJSON_Delete(root);
-        }
-        return false;
+    if (!path) {
+        return NULL;
     }
-
-    bool valid = true;
-    cJSON *item = NULL;
-    cJSON_ArrayForEach(item, root) {
-        if (!cJSON_IsObject(item)) {
-            valid = false;
-            break;
-        }
-        cJSON *scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
-        cJSON *key = cJSON_GetObjectItemCaseSensitive(item, "key");
-        cJSON *section = cJSON_GetObjectItemCaseSensitive(item, "section");
-        cJSON *text = cJSON_GetObjectItemCaseSensitive(item, "text");
-
-        if (!cJSON_IsString(text) || !text->valuestring) {
-            valid = false;
-            break;
-        }
-
-        bool numeric_schema = cJSON_IsNumber(scope) && cJSON_IsNumber(key);
-        bool legacy_schema = cJSON_IsString(scope) && scope->valuestring &&
-                             cJSON_IsString(key) && key->valuestring;
-        if (!numeric_schema && !legacy_schema) {
-            valid = false;
-            break;
-        }
-
-        if (numeric_schema) {
-            if (scope->valueint <= 0 || key->valueint <= 0) {
-                valid = false;
-                break;
-            }
-            if (section && !cJSON_IsNumber(section)) {
-                valid = false;
-                break;
-            }
-        }
-    }
-
-    cJSON_Delete(root);
-    return valid;
-}
-
-
-/**
- * @brief Scrive i record di traduzione in un file.
- * 
- * @param [in] language Codice ISO 639-1 del linguaggio.
- * @param [in] records_json Stringa JSON contenente i record di traduzione.
- * @return esp_err_t Errore generato dalla funzione.
- */
-static esp_err_t _write_i18n_file(const char *language, const char *records_json)
-{
-    if (!_is_iso2_lang(language) || !_is_valid_i18n_records_json(records_json)) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    char path[64] = {0};
-    _build_i18n_path(language, path, sizeof(path));
-
-    FILE *file = fopen(path, "w");
-    if (!file) {
-        ESP_LOGE(TAG, "[I18N] Impossibile aprire %s in scrittura", path);
-        return ESP_FAIL;
-    }
-
-    size_t len = strlen(records_json);
-    size_t written = fwrite(records_json, 1, len, file);
-    fclose(file);
-
-    if (written != len) {
-        ESP_LOGE(TAG, "[I18N] Scrittura incompleta su %s", path);
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
-}
-
-static char *_read_i18n_file(const char *language)
-{
-    char path[64] = {0};
-    _build_i18n_path(language, path, sizeof(path));
 
     FILE *file = fopen(path, "r");
     if (!file) {
@@ -581,56 +446,223 @@ static char *_read_i18n_file(const char *language)
     }
 
     fseek(file, 0, SEEK_END);
-    long size = ftell(file);
+    long sz = ftell(file);
     fseek(file, 0, SEEK_SET);
-    if (size <= 0) {
+    if (sz <= 0) {
         fclose(file);
         return NULL;
     }
 
-    char *buffer = malloc((size_t)size + 1);
+    char *buffer = malloc((size_t)sz + 1);
     if (!buffer) {
         fclose(file);
         return NULL;
     }
 
-    size_t read = fread(buffer, 1, (size_t)size, file);
+    size_t read = fread(buffer, 1, (size_t)sz, file);
     fclose(file);
-    if (read != (size_t)size) {
-        free(buffer);
-        return NULL;
-    }
-    buffer[size] = '\0';
-
-    if (!_is_valid_i18n_records_json(buffer)) {
+    if (read != (size_t)sz) {
         free(buffer);
         return NULL;
     }
 
+    buffer[sz] = '\0';
+    if (out_len) {
+        *out_len = (size_t)sz;
+    }
     return buffer;
 }
 
-
-/**
- * @brief Assicura che il file di traduzione in italiano sia presente.
- *
- * Questa funzione controlla se il file di traduzione in italiano esiste e, se non lo fa,
- * lo crea con i valori di default.
- *
- * @param [in/out] Nessun parametro specifico.
- * @return Nessun valore di ritorno.
- */
-static void _ensure_default_i18n_it_file(void)
+static cJSON *_i18n_v2_root_get(void)
 {
-    char *existing = _read_i18n_file(UI_LANG_DEFAULT);
-    if (existing) {
-        free(existing);
+    if (s_i18n_v2_root) {
+        return s_i18n_v2_root;
+    }
+
+    size_t sz = 0;
+    char *json = _read_text_file(I18N_V2_FILE_PATH, &sz);
+    if (!json || sz == 0) {
+        if (json) {
+            free(json);
+        }
+        ESP_LOGE(TAG, "[I18N_V2] Impossibile leggere %s", I18N_V2_FILE_PATH);
+        return NULL;
+    }
+
+    cJSON *root = cJSON_Parse(json);
+    free(json);
+    if (!root || !cJSON_IsObject(root)) {
+        ESP_LOGE(TAG, "[I18N_V2] JSON invalido in %s", I18N_V2_FILE_PATH);
+        if (root) {
+            cJSON_Delete(root);
+        }
+        return NULL;
+    }
+
+    s_i18n_v2_root = root;
+    return s_i18n_v2_root;
+}
+
+static void _i18n_v2_clear_cache(void)
+{
+    if (s_i18n_v2_root) {
+        cJSON_Delete(s_i18n_v2_root);
+        s_i18n_v2_root = NULL;
+    }
+}
+
+static bool _legacy_id_parse(const char *legacy_id, int *out_scope, int *out_key)
+{
+    if (!legacy_id || !out_scope || !out_key) {
+        return false;
+    }
+
+    int scope = 0;
+    int key = 0;
+    if (sscanf(legacy_id, "%d.%d", &scope, &key) != 2) {
+        return false;
+    }
+    if (scope <= 0 || key <= 0) {
+        return false;
+    }
+
+    *out_scope = scope;
+    *out_key = key;
+    return true;
+}
+
+static cJSON *_build_record_object(int scope_id, int key_id, const char *text)
+{
+    if (scope_id <= 0 || key_id <= 0 || !text) {
+        return NULL;
+    }
+
+    cJSON *obj = cJSON_CreateObject();
+    if (!obj) {
+        return NULL;
+    }
+
+    cJSON_AddNumberToObject(obj, "scope", scope_id);
+    cJSON_AddNumberToObject(obj, "key", key_id);
+    cJSON_AddNumberToObject(obj, "section", 0);
+    cJSON_AddStringToObject(obj, "text", text);
+    return obj;
+}
+
+static void _records_append_or_free(cJSON *array, cJSON *obj)
+{
+    if (!array || !obj) {
+        if (obj) {
+            cJSON_Delete(obj);
+        }
         return;
     }
-    esp_err_t err = _write_i18n_file(UI_LANG_DEFAULT, UI_TEXTS_DEFAULT_IT_JSON);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "[I18N] Creazione default i18n it fallita: %s", esp_err_to_name(err));
+
+    if (!cJSON_IsArray(array)) {
+        cJSON_Delete(obj);
+        return;
     }
+
+    cJSON_AddItemToArray(array, obj);
+}
+
+static const char *_i18n_v2_entry_pick_text(cJSON *entry, const char *lang)
+{
+    if (!entry || !cJSON_IsObject(entry)) {
+        return NULL;
+    }
+
+    cJSON *legacy = cJSON_GetObjectItemCaseSensitive(entry, "legacyId");
+    if (!cJSON_IsString(legacy) || !legacy->valuestring) {
+        return NULL;
+    }
+
+    cJSON *text_obj = cJSON_GetObjectItemCaseSensitive(entry, "text");
+    if (!cJSON_IsObject(text_obj)) {
+        return NULL;
+    }
+
+    cJSON *lang_item = cJSON_GetObjectItemCaseSensitive(text_obj, lang);
+    if (cJSON_IsString(lang_item) && lang_item->valuestring && lang_item->valuestring[0]) {
+        return lang_item->valuestring;
+    }
+
+    cJSON *fallback_it = cJSON_GetObjectItemCaseSensitive(text_obj, UI_LANG_DEFAULT);
+    if (cJSON_IsString(fallback_it) && fallback_it->valuestring) {
+        return fallback_it->valuestring;
+    }
+    return NULL;
+}
+
+static void _i18n_v2_append_entry(cJSON *array, cJSON *entry, const char *lang)
+{
+    if (!array) {
+        return;
+    }
+    if (!entry || !cJSON_IsObject(entry)) {
+        return;
+    }
+
+    cJSON *legacy = cJSON_GetObjectItemCaseSensitive(entry, "legacyId");
+    if (!cJSON_IsString(legacy) || !legacy->valuestring) {
+        return;
+    }
+
+    int scope_id = 0;
+    int key_id = 0;
+    if (!_legacy_id_parse(legacy->valuestring, &scope_id, &key_id)) {
+        return;
+    }
+
+    const char *text = _i18n_v2_entry_pick_text(entry, lang);
+    if (!text) {
+        return;
+    }
+
+    cJSON *record = _build_record_object(scope_id, key_id, text);
+    _records_append_or_free(array, record);
+}
+
+static cJSON *_i18n_v2_build_records_for_language(const char *language)
+{
+    const char *lang = _effective_lang(language);
+    cJSON *root = _i18n_v2_root_get();
+    if (!root || !lang) {
+        return NULL;
+    }
+
+    cJSON *web = cJSON_GetObjectItemCaseSensitive(root, "web");
+    cJSON *lvgl = cJSON_GetObjectItemCaseSensitive(root, "lvgl");
+    if (!cJSON_IsObject(web) && !cJSON_IsObject(lvgl)) {
+        return NULL;
+    }
+
+    cJSON *array = cJSON_CreateArray();
+    if (!array) {
+        return NULL;
+    }
+
+    if (cJSON_IsObject(web)) {
+        cJSON *page = NULL;
+        cJSON_ArrayForEach(page, web) {
+            if (!cJSON_IsObject(page)) {
+                continue;
+            }
+            cJSON *entry = NULL;
+            cJSON_ArrayForEach(entry, page) {
+                _i18n_v2_append_entry(array, entry, lang);
+            }
+        }
+    }
+
+    if (cJSON_IsObject(lvgl)) {
+        cJSON *entry = NULL;
+        cJSON_ArrayForEach(entry, lvgl) {
+            _i18n_v2_append_entry(array, entry, lang);
+        }
+    }
+
+    return array;
 }
 
 // Configurazione predefinita
@@ -1002,16 +1034,6 @@ esp_err_t device_config_init(void)
     esp_err_t err = device_config_load(&s_config);
     if (err != ESP_OK) {
         return err;
-    }
-
-    _ensure_default_i18n_it_file();
-
-    char *startup_i18n = _read_i18n_file(s_config.ui.user_language);
-    if (startup_i18n) {
-        ESP_LOGI(TAG, "[I18N] Tabella lingua user '%s' caricata da SPIFFS all'avvio", _effective_lang(s_config.ui.user_language));
-        free(startup_i18n);
-    } else {
-        ESP_LOGW(TAG, "[I18N] Tabella lingua user '%s' non disponibile all'avvio, uso fallback IT", _effective_lang(s_config.ui.user_language));
     }
 
     if (_i18n_lookup_cache_build_for_lang(s_config.ui.user_language) == ESP_OK) {
@@ -1761,6 +1783,7 @@ esp_err_t device_config_reset_defaults(void)
 void device_config_reboot_factory(void)
 {
     const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
+    _i18n_v2_clear_cache();
     if (factory) {
         ESP_LOGI(TAG, "Impostazione partizione di boot: FACTORY");
         esp_err_t err = esp_ota_set_boot_partition(factory);
@@ -1911,22 +1934,13 @@ const char* device_config_get_ui_backend_language(void)
  */
 char* device_config_get_ui_texts_records_json(const char *language)
 {
-    _ensure_default_i18n_it_file();
-
-    const char *lang = _effective_lang(language);
-    char *json = _read_i18n_file(lang);
-    if (json) {
-        return json;
+    cJSON *records = _i18n_v2_build_records_for_language(language);
+    if (!records) {
+        return NULL;
     }
-
-    if (strcmp(lang, UI_LANG_DEFAULT) != 0) {
-        json = _read_i18n_file(UI_LANG_DEFAULT);
-        if (json) {
-            return json;
-        }
-    }
-
-    return strdup(UI_TEXTS_DEFAULT_IT_JSON);
+    char *json = cJSON_PrintUnformatted(records);
+    cJSON_Delete(records);
+    return json;
 }
 
 
@@ -1940,11 +1954,9 @@ char* device_config_get_ui_texts_records_json(const char *language)
  */
 esp_err_t device_config_set_ui_texts_records_json(const char *language, const char *records_json)
 {
-    esp_err_t ret = _write_i18n_file(language, records_json);
-    if (ret == ESP_OK) {
-        _i18n_lookup_cache_clear();
-    }
-    return ret;
+    (void)language;
+    (void)records_json;
+    return ESP_ERR_NOT_SUPPORTED;
 }
 
 
