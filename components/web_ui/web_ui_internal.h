@@ -8,7 +8,7 @@
 #include <stdbool.h>
 
 #ifndef WEB_UI_USE_EMBEDDED_PAGES
-#define WEB_UI_USE_EMBEDDED_PAGES 1
+#define WEB_UI_USE_EMBEDDED_PAGES 0
 #endif
 
 /* I18n compact record stored in PSRAM

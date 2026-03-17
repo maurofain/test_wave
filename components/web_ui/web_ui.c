@@ -516,15 +516,16 @@ void uart_test_task(void *arg) {
     while(1) {
         for (int i=0; i<4; i++) {
             // Invio tramite componente serial_test per avere visibilità anche del TX nel monitor
+            ESP_LOGI(TAG,"Invio test RS485");
             serial_test_send_uart(port, seq_hex[i]);
             
             // Monitoraggio ricezione per circa 1 secondo tra un invio e l'altro
-            for (int j=0; j<10; j++) { 
+            for (int j=0; j<10; j++) { /* j<10*/
                 // serial_test_read_uart ha un timeout interno di 50ms e logga automaticamente in HEX (prefix RX<)
                 if (serial_test_read_uart(port, rx_buf, sizeof(rx_buf), &rx_len) == ESP_OK) {
                     ESP_LOGD(TAG, "UART %d ricevuti %d bytes", port, (int)rx_len);
                 }
-                vTaskDelay(pdMS_TO_TICKS(50)); 
+                vTaskDelay(pdMS_TO_TICKS(50)); /*MF*/
             }
         }
     }

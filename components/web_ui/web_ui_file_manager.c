@@ -345,6 +345,7 @@ esp_err_t api_files_download_get(httpd_req_t *req)
 {
     char storage[16] = {0};
     char name[128] = {0};
+    char inline_mode[8] = {0};
     if (get_query_value(req, "storage", storage, sizeof(storage)) != ESP_OK ||
         get_query_value(req, "name", name, sizeof(name)) != ESP_OK) {
         httpd_resp_set_status(req, "400 Bad Request");
@@ -373,10 +374,16 @@ esp_err_t api_files_download_get(httpd_req_t *req)
         return httpd_resp_sendstr(req, "open_failed");
     }
 
-    httpd_resp_set_type(req, "application/octet-stream");
-    char cd[196];
-    snprintf(cd, sizeof(cd), "attachment; filename=\"%s\"", name);
-    httpd_resp_set_hdr(req, "Content-Disposition", cd);
+    bool inline_requested = (get_query_value(req, "inline", inline_mode, sizeof(inline_mode)) == ESP_OK &&
+                             strcmp(inline_mode, "1") == 0);
+    if (inline_requested) {
+        httpd_resp_set_type(req, "text/plain; charset=utf-8");
+    } else {
+        httpd_resp_set_type(req, "application/octet-stream");
+        char cd[196];
+        snprintf(cd, sizeof(cd), "attachment; filename=\"%s\"", name);
+        httpd_resp_set_hdr(req, "Content-Disposition", cd);
+    }
 
     char buf[1024];
     size_t n = 0;

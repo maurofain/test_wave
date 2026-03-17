@@ -1,7 +1,7 @@
-[ ] Correggere i JS di /config
+[ ] Correggere i JS e/o gli html di /config per visualizzare tutte le sezioni abilitate (ad esempio i/o expander)
 [ ] ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
 All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
-
+[ ] Dopo l'inserimento della moneta ritorna alla schermata ads e poi lingue
 [ ]Controlla lo logica della FSM : 
 - all'avvio deve inizializzare tutto l'hardware e sincronizzarsi con il server remoto e NTP : va introdotto un nuovo stato FSM_STATE_INIT
 - poi deve passare in attesa di presenza cliente (tramite tocco del touch) mostrando lo slideshow nel riquadro centrale della pagina con il tasto con il tasto Selezione Lavaggio e il messaggio di errore opzionale in basso : va introdotto un nuovo stato FSM_STATE_SLIDESHOW
@@ -9,7 +9,7 @@ All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la 
 [ ] La gestione della striscia LED deve prevedere che ci sono 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione), con una effetto da definire per la situazione di IDLE, durante il run segue aumenta a partire dal primo led ad accedndere sezioni di verde, al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane completamente accesa lampeggioante a 2hz in colore porpora fino a che la macchina ritorna in IDLE o viene premuto qualsiasi funzione sui tasti o touch che la portano a spegnersi
 [ ] va aggiunto un parametro in /config -> Timeouts con la percentuale di ciclo eseguito per passare alla segnalazione di PreFineCiclo: un numero intero 0-99 che esprime la peercentuale del tempo rimanente per la fine  
 [V] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => a PreFineCiclo% i tutti i pulsanti , il bordo dell'area crediti, la barra di progressione e la barra led diventanono porpora 
-
+[ ] nell'esecuzione del programma al raggiungimento 
 [*] Il tasto Stop deve apparire solo a programma avviato, il tasto programma selezionato deve cambiare il titolo in "Sospendi" se premuto durante l'esecuzione e alla pressione successiva (riavvio da sospensione) rimettere il nome del programma.
 [ ] i pulsanti programma devono cambiare colore al raggiungimento del 70%
 [ ] il caricamento delle immagini per lo slideshow segue questo ordine: se ci sono file imgxx.jpg in SPIFFS vanno caricate da SPIFFS, se non ci sono in SPIFFS le cerchiamo in SDCARD. se non ci sono in SDCARD saltiamo la pagina pubblicità e passiamo direttamente a scelta programmi
@@ -17,7 +17,7 @@ All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la 
 
 [ ] Far eseguire le funzioni tra moduli diversi (ad esempio un comando cctalk lanciato da una funzione lvgl) tramite la coda messaggi e non con chiamate dirette. Verificare il codice attuale se sono implementate funzioni che fanno chiamate a scope diversi e creare un'elenco con la descrizione di ogni operazione trans-scope
 [ ] al termine della schermata di init con il logo va effettuato l'invio della sequenza CCTALK cctalk_driver_start_acceptor()
-[ ]-definire la maschera di attivazione dei relays in Programmi mediante più gruppi di editbox da 4 caratteri  ciascuno (accettano 0 o 1 - 4 caratteri obbligatori fillati con trailing-zeroes) in base al numero di porte di out disponibili. a sx degli editbox ci sarà l'indicazione del numero relauys (1-4, 5-12, ecc.)  1 relays 1-4 sono quelli sulla MH1001,  i successi gruppi di 8 sulle schede waveshare RS485 in modbus. Formattare gli editbox su più righe nella stessa DIV (1 riga per device)
+[ ]-definire la maschera di attivazione dei relays nelle righe dei programmi in /config/programs mediante più gruppi di editbox da 4 caratteri  ciascuno (accettano 0 o 1 - 4 caratteri obbligatori fillati con trailing-zeroes) in base al numero di porte di out disponibili. a sx degli editbox ci sarà l'indicazione del numero relauys (1-4, 5-12, ecc.)  1 relays 1-4 sono quelli sulla MH1001,  i successi gruppi di 8 sulle schede waveshare RS485 in modbus. Formattare gli editbox su più righe nella stessa DIV (1 riga per device)
 [ ] Utilizzare i testi delle chiavi program_name_* peer la compilazione dei nomi dei programmi, ed aggiungere in /programs la scelta della lingua 
 [ ] Spostare la voce Abilita log POST da /test alla sezione Remote Logging di /config
 -----------------

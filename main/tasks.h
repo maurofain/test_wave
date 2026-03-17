@@ -24,6 +24,7 @@ typedef struct {
 } task_param_t;
 
 void tasks_start_all(void);
+bool tasks_start_named(const char *name);
 void tasks_load_config(const char *path);
 void tasks_apply_n_run(void);
 void tasks_set_touchscreen_handle(void *handle);

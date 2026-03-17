@@ -421,9 +421,7 @@ static void fsm_task(void *arg)
 
     ESP_LOGI(TAG, "[FSM] Task started in state=%s", fsm_state_to_string(fsm.state));
     if (cfg && cfg->display.enabled) {
-        if (fsm.state == FSM_STATE_ADS) {
-            lvgl_panel_show_ads_page();
-        } else {
+        if (fsm.state != FSM_STATE_ADS) {
             lvgl_panel_show_main_page();
         }
     }
@@ -1316,7 +1314,7 @@ static task_param_t s_tasks[] = {
         .period_ticks = pdMS_TO_TICKS(100),
         .task_fn = fsm_task,
         .stack_words = 32768,                 /* RISC-V: 32KB; logica FSM + ESP_LOG + cJSON */
-        .stack_caps = MALLOC_CAP_SPIRAM,
+        .stack_caps = MALLOC_CAP_INTERNAL,
         .arg = NULL,
         .handle = NULL,
     },
@@ -1666,6 +1664,10 @@ void tasks_start_all(void)
     tasks_set_state_idle_for_mocks();
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
+        if (strcmp(t->name, "fsm") == 0) {
+            ESP_LOGI(TAG, "[M] Task saltato %s (avvio differito post-bootstrap UI)", t->name);
+            continue;
+        }
         // Rispetta la configurazione di display: se headless salta lvgl/touchscreen
         if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0) && !device_config_get()->display.enabled) {
             ESP_LOGI(TAG, "[M] Task saltato %s (display disabilitato da config)", t->name);
@@ -1698,6 +1700,54 @@ void tasks_start_all(void)
     }
 }
 
+bool tasks_start_named(const char *name)
+{
+    if (!name || name[0] == '\0') {
+        return false;
+    }
+
+    task_param_t *t = find_task_by_name(name);
+    if (!t) {
+        ESP_LOGW(TAG, "[M] Task %s non trovata", name);
+        return false;
+    }
+    if (t->handle != NULL) {
+        ESP_LOGI(TAG, "[M] Task %s già avviata", name);
+        return true;
+    }
+    if (t->state != TASK_STATE_RUN) {
+        ESP_LOGW(TAG, "[M] Task %s non avviata (stato=%d)", name, (int)t->state);
+        return false;
+    }
+    if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0) &&
+        !device_config_get()->display.enabled) {
+        ESP_LOGW(TAG, "[M] Task %s non avviata (display disabilitato da config)", name);
+        return false;
+    }
+    if (strcmp(t->name, "io_expander") == 0 && !device_config_get()->sensors.io_expander_enabled) {
+        ESP_LOGW(TAG, "[M] Task %s non avviata (I/O expander disabilitato)", name);
+        return false;
+    }
+    if (strcmp(t->name, "touchscreen") == 0 && t->arg == NULL) {
+        ESP_LOGW(TAG, "[M] Task %s non avviata (touch handle non disponibile)", name);
+        return false;
+    }
+
+    if (t->arg == NULL && strcmp(t->name, "touchscreen") != 0) {
+        t->arg = t;
+    }
+
+    ESP_LOGI(TAG, "[M] Avvio differito task %s (stack=%lu words)...",
+             t->name, (unsigned long)t->stack_words);
+    BaseType_t res = task_create(t);
+    if (res != pdPASS) {
+        ESP_LOGE(TAG, "[M] Fallimento avvio task %s (stack=%lu caps=0x%lx)",
+                 t->name, (unsigned long)t->stack_words, (unsigned long)t->stack_caps);
+        return false;
+    }
+
+    return true;
+}
 
 /** @brief Esegue tutte le attività pianificate e le esegue.
  * 

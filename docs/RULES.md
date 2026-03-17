@@ -4,7 +4,7 @@
 - per le compilazioni di verifica usare 'get_if && idfc -b',per flash completo `idfc -f`, per flash solo factory `idfc -ff`, per monitor `idfc -m`, per la sola partizione SPIFFS `idfc -fs`
 - i flag di idfc si possono concatenare
 - per analizzare il funzionamento di idfc chiamare 'idfc -h'
-- le modifiche alle pagine HTML vanno eseguite nel file sorgente `components/web_ui/webpages_embedded.c` e poi propagate ai file HTML eseguendo lo script `scripts/export_embedded_pages.py`; non modificare mai i file HTML in `data/www/` o `build/exported_www_subset/` direttamente.
+- le modifiche alle pagine HTML/CSS/JS vanno eseguite **direttamente** nei file in `data/www/`. Dopo le modifiche, eseguire solo il flash SPIFFS con `idfc -fs` (2-3 secondi) senza ricompilare il firmware. Il codice JS deve essere salvato in file separati in `data/www/js/`. Non usare più `webpages_embedded.c` né lo script `export_embedded_pages.py`.
 - va gestito un blocco per la generazione del codice che deve inibire la modifica di funzioni marcate con //DO_NOT_MODIFY o di sezioni di codice racchiuse tra //DO_NOT_MODIFY and //DO_NOT_MODIFY_END : io indicherò l'operazione con `fai DNM a <file>` o `fai DNME a <file>`
 - Il markup/JS generato per le pagine ` /config ` e ` / ` (home) deve essere sempre racchiuso tra i marcatori `/* DO_NOT_MODIFY_START: <page> */` e `/* DO_NOT_MODIFY_END: <page> */` per impedire modifiche automatiche.
 - l'esecuzione degli script deve avvenire col path `/home/mauro/Progetti/0.Clienti/MicroHard/scripts`

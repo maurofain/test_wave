@@ -417,11 +417,6 @@ void lvgl_page_ads_show(void)
         s_ad_rotation_ms = cfg->timeouts.ad_rotation_ms;
     }
 
-    /* Carica e decodifica immagini in PSRAM se non già pronte */
-    if (s_image_count == 0) {
-        load_ad_images();
-    }
-
     if (s_image_count == 0) {
         ESP_LOGW(TAG, "[C] Nessuna immagine disponibile, ritorno alla pagina principale");
         lvgl_page_main_show();
@@ -548,9 +543,13 @@ void lvgl_page_ads_set_error_message(const char *msg)
     s_error_msg[sizeof(s_error_msg) - 1] = '\0';
 
     if (s_error_lbl && lv_obj_is_valid(s_error_lbl)) {
-        char no_error[64] = {0};
-        device_config_get_ui_text_scoped("lvgl", "ads_no_error", "Nessun errore", no_error, sizeof(no_error));
-        lv_label_set_text(s_error_lbl, s_error_msg[0] ? s_error_msg : no_error);
+        if (s_error_msg[0]) {
+            lv_label_set_text(s_error_lbl, s_error_msg);
+            lv_obj_clear_flag(s_error_lbl, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_label_set_text(s_error_lbl, "");
+            lv_obj_add_flag(s_error_lbl, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 }
 

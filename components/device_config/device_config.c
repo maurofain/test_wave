@@ -1580,6 +1580,9 @@ char* device_config_to_json(const device_config_t *config)
     cJSON *timeouts_obj = cJSON_CreateObject();
     cJSON_AddNumberToObject(timeouts_obj, "t_prg", config->timeouts.exit_programs_ms);
     cJSON_AddNumberToObject(timeouts_obj, "t_lang", config->timeouts.exit_language_ms);
+    cJSON_AddNumberToObject(timeouts_obj, "idle_before_ads_ms", config->timeouts.idle_before_ads_ms);
+    cJSON_AddNumberToObject(timeouts_obj, "ad_rotation_ms", config->timeouts.ad_rotation_ms);
+    cJSON_AddNumberToObject(timeouts_obj, "credit_reset_timeout_ms", config->timeouts.credit_reset_timeout_ms);
     cJSON_AddItemToObject(root, "timeouts", timeouts_obj);
 
     // MDB

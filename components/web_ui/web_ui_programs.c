@@ -24,6 +24,7 @@
 static web_ui_program_table_t s_program_table;
 static web_ui_virtual_relay_state_t s_virtual_relays[WEB_UI_VIRTUAL_RELAY_MAX + 1];
 static bool s_initialized = false;
+static bool s_storage_loaded = false;
 
 /**
  * @brief Salva la tabella dei programmi su SPIFFS
@@ -135,8 +136,16 @@ static void programs_init_defaults(void)
 
     memset(s_virtual_relays, 0, sizeof(s_virtual_relays));
     s_initialized = true;
+}
 
-    programs_try_load_from_storage();
+esp_err_t web_ui_program_table_init(void)
+{
+    programs_init_defaults();
+    if (!s_storage_loaded) {
+        programs_try_load_from_storage();
+        s_storage_loaded = true;
+    }
+    return ESP_OK;
 }
 
 /**

@@ -11,6 +11,7 @@ static const char *TAG = "lvgl_page_oos";
 
 extern const lv_font_t GoogleSans35;
 extern const lv_font_t GoogleSans50;
+extern const lv_font_t GoogleSans140;
 
 
 /**
@@ -43,8 +44,8 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
     // lvgl_page_chrome_add(scr);
 
     lv_obj_t *ico = lv_label_create(scr);
-    lv_label_set_text(ico, LV_SYMBOL_WARNING);
-    lv_obj_set_style_text_font(ico, &GoogleSans50, LV_PART_MAIN);
+    lv_label_set_text(ico, "!");
+    lv_obj_set_style_text_font(ico, &GoogleSans140, LV_PART_MAIN);
     lv_obj_set_style_text_color(ico, lv_color_make(0xFF, 0xCC, 0x00), LV_PART_MAIN);
     lv_obj_align(ico, LV_ALIGN_CENTER, 0, -120);
 

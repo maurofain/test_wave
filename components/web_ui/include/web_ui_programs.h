@@ -41,6 +41,7 @@ typedef struct {
  * @brief Ottiene la tabella programmi corrente
  */
 const web_ui_program_table_t *web_ui_program_table_get(void);
+esp_err_t web_ui_program_table_init(void);
 #/**
  * @brief Serializza la tabella programmi in JSON (allocato)
  */

@@ -295,9 +295,6 @@ void lvgl_panel_show_main_page(void)
 
 void lvgl_panel_show_ads_page(void)
 {
-    /* [C] Pre-carica le immagini SPIFFS fuori dal lock LVGL per non bloccare il rendering */
-    lvgl_page_ads_preload_images();
-
     if (!bsp_display_lock(0)) {
         ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_ads_page");
         return;

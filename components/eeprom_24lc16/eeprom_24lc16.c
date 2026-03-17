@@ -75,6 +75,11 @@ static esp_err_t detect_eeprom_address(i2c_master_bus_handle_t bus, uint8_t *det
 }
 
 esp_err_t eeprom_24lc16_init(void) {
+#if F_EEPROM == 1
+    ESP_LOGW(TAG, "[M] EEPROM mock disabled (F_EEPROM=1)");
+    s_eeprom_available = false;
+    return ESP_OK;
+#endif
     ESP_LOGI("INIT", "[M] EEPROM init: INIZIO funzione");
     ESP_LOGI(TAG, "[M] EEPROM init: INIZIO funzione");
     
@@ -202,10 +207,18 @@ esp_err_t eeprom_24lc16_init(void) {
 }
 
 bool eeprom_24lc16_is_available(void) {
+#if F_EEPROM == 1
+    return false;
+#endif
     return s_eeprom_available;
 }
 
 
+ #if F_EEPROM == 1
+esp_err_t eeprom_24lc16_read(uint16_t address, uint8_t *buffer, size_t length) {
+    return ESP_ERR_NOT_SUPPORTED;
+}
+#else
 esp_err_t eeprom_24lc16_read(uint16_t address, uint8_t *buffer, size_t length) {
     if (!s_eeprom_available) return ESP_ERR_INVALID_STATE;
     if (length > 0 && buffer == NULL) return ESP_ERR_INVALID_ARG;
@@ -238,8 +251,14 @@ esp_err_t eeprom_24lc16_read(uint16_t address, uint8_t *buffer, size_t length) {
 
     return ESP_OK;
 }
+#endif
 
 
+#if F_EEPROM == 1
+esp_err_t eeprom_24lc16_write(uint16_t address, const uint8_t *buffer, size_t length) {
+    return ESP_ERR_NOT_SUPPORTED;
+}
+#else
 esp_err_t eeprom_24lc16_write(uint16_t address, const uint8_t *buffer, size_t length) {
     if (!s_eeprom_available) return ESP_ERR_INVALID_STATE;
     if (length > 0 && buffer == NULL) return ESP_ERR_INVALID_ARG;
@@ -282,6 +301,7 @@ esp_err_t eeprom_24lc16_write(uint16_t address, const uint8_t *buffer, size_t le
 
     return ESP_OK;
 }
+#endif
 
 
 esp_err_t eeprom_24lc16_read_byte(uint16_t address, uint8_t *val) {

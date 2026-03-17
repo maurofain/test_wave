@@ -12,6 +12,7 @@
 #include "device_config.h"
 #include "error_log.h"
 #include "eeprom_24lc16.h"
+#include "web_ui_programs.h"
 /// @brief Abilita l'invio dei log a un server remoto via HTTP per debug.
 bool send_http_log = false;
 /// @brief Abilita il dump dei log CCTalk in seriale per debug.
@@ -344,6 +345,7 @@ void app_main(void)
     apply_post_boot_log_policy();
 
     tasks_load_config("/spiffs/tasks.json");
+    web_ui_program_table_init();
     tasks_start_all();
     if (BOOT_COUNTER_RESET_DELAYED)
     {
@@ -380,10 +382,15 @@ void app_main(void)
     if (cfg && cfg->display.enabled) {
         /* [M] Show ads slideshow at boot, then transition to main by touch or timeout */
         main_cctalk_start_acceptor_async();
+        lvgl_page_ads_preload_images();
         lvgl_panel_show_ads_page();  /* [M] usa lock + preload imagini fuori lock */
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: slideshow pubblicitario attivato");
     } else {
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto slideshow");
+    }
+
+    if (!tasks_start_named("fsm")) {
+        ESP_LOGE(TAG, LOG_CTX_PREFIX " impossibile avviare task FSM dopo bootstrap UI");
     }
 
     esp_err_t boot_done_ret = init_mark_boot_completed();
