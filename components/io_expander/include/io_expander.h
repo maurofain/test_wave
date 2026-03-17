@@ -13,6 +13,12 @@ extern uint8_t io_input_state;
 esp_err_t io_expander_init(void);
 
 /**
+ * @brief Imposta il flag di abilitazione dell'IO expander basato sulla configurazione
+ * @param enabled True se abilitato, false se disabilitato
+ */
+void io_expander_set_config_enabled(bool enabled);
+
+/**
  * @brief Imposta un pin di uscita specifico
  * @param pin Numero del pin (0-7)
  * @param value 0 o 1

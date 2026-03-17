@@ -28,6 +28,19 @@ static const char *TAG = "IO_EXP";
 uint8_t io_output_state = 0x00;
 uint8_t io_input_state = 0x00;
 
+// Flag globale per indicare se l'IO expander è abilitato in configurazione
+// Impostato dall'esterno (init.c) dopo aver letto la configurazione
+static bool s_io_expander_config_enabled = true;
+
+/**
+ * @brief Imposta il flag di abilitazione dell'IO expander basato sulla configurazione
+ * @param enabled True se abilitato, false se disabilitato
+ */
+void io_expander_set_config_enabled(bool enabled) {
+    s_io_expander_config_enabled = enabled;
+    ESP_LOGI(TAG, "[C] IO expander config enabled: %s", enabled ? "true" : "false");
+}
+
 #if DNA_IO_EXPANDER == 0  /* implementazioni reali — escluse se mockup attivo */
 
 static i2c_master_dev_handle_t io_out_dev, io_in_dev;
@@ -146,6 +159,11 @@ esp_err_t io_expander_init(void) {
         return ESP_OK;
     }
 
+if (!s_io_expander_config_enabled) {
+    ESP_LOGI(TAG, "[C] IO expander disabilitato da configurazione, inizializzazione saltata");
+    return ESP_ERR_INVALID_STATE;
+}
+
     esp_err_t ret;
     i2c_master_bus_handle_t bus = NULL;
     for (int attempt = 0; attempt < 2; attempt++) {
@@ -234,6 +252,13 @@ void io_set_pin(int pin, int value) {
  *  @note La funzione inizializza il espander I/O se non è già pronto.
  */
 void io_set_port(uint8_t val) {
+    // Verifica se l'IO expander è abilitato in configurazione
+    if (!s_io_expander_config_enabled) {
+        ESP_LOGD(TAG, "[C] io_set_port(0x%02X) ignorato: IO expander disabilitato da config", val);
+        io_output_state = val;
+        return;
+    }
+
     if (!s_io_exp_ready) {
         if (io_expander_init() != ESP_OK) {
             return;

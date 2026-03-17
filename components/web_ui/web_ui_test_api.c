@@ -800,6 +800,7 @@ modbus_read_end:
     /* POST body (optional): {"id_min":1,"id_max":16}                       */
     /* ------------------------------------------------------------------ */
     else if (strcmp(test_name, "modbus/scan") == 0) {
+        ESP_LOGI(TAG, "[C] POST /api/test/modbus/scan");
         uint8_t id_min = 1;
         uint8_t id_max = 16;
 
@@ -822,6 +823,7 @@ modbus_read_end:
         }
         if (id_max < id_min) { id_max = id_min; }
 
+        ESP_LOGI(TAG, "[C] Scansione Modbus slave ID da %u a %u", (unsigned)id_min, (unsigned)id_max);
         esp_err_t init_err = modbus_relay_init();
         if (init_err != ESP_OK) {
             snprintf(response, sizeof(response),
@@ -846,10 +848,32 @@ modbus_read_end:
                                 (unsigned)id_min, (unsigned)id_max);
 
                 bool first = true;
+                
+                // Prima prova scansione broadcast (ID 0)
+                ESP_LOGI(TAG, "[C] Probe broadcast ID 0...");
+                uint8_t probe_bc[1] = {0};
+                esp_err_t probe_bc_err = modbus_relay_read_coils(0, relay_start, 1, probe_bc, sizeof(probe_bc));
+                if (probe_bc_err == ESP_OK) {
+                    ESP_LOGI(TAG, "[C] Broadcast ID 0 risponde OK");
+                    pos += snprintf(scan_out + pos, scan_cap - pos,
+                                    "{\"slave_id\":0,\"relay_count\":%u,\"input_count\":%u,"
+                                    "\"relay_start\":%u,\"input_start\":%u,\"broadcast\":true}",
+                                    (unsigned)relay_count,
+                                    (unsigned)input_count,
+                                    (unsigned)relay_start,
+                                    (unsigned)input_start);
+                    first = false;
+                } else {
+                    ESP_LOGD(TAG, "[C] Broadcast ID 0 non risponde");
+                }
+                
+                // Poi scansione range richiesto
                 for (uint8_t sid = id_min; sid <= id_max; ++sid) {
+                    ESP_LOGI(TAG, "[C] Probe slave ID %u...", (unsigned)sid);
                     uint8_t probe[1] = {0};
                     esp_err_t probe_err = modbus_relay_read_coils(sid, relay_start, 1, probe, sizeof(probe));
                     if (probe_err == ESP_OK) {
+                        ESP_LOGI(TAG, "[C] Slave ID %u risponde OK", (unsigned)sid);
                         pos += snprintf(scan_out + pos, scan_cap - pos,
                                         "%s{\"slave_id\":%u,\"relay_count\":%u,\"input_count\":%u,"
                                         "\"relay_start\":%u,\"input_start\":%u}",
@@ -869,6 +893,66 @@ modbus_read_end:
                 esp_err_t ret = httpd_resp_send(req, scan_out, strlen(scan_out));
                 free(scan_out);
                 return ret;
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* modbus/read_inputs — read discrete inputs for slave ID 1            */
+    /* POST body: {}  (fissa slave_id=1 per test Waveshare)                 */
+    /* ------------------------------------------------------------------ */
+    else if (strcmp(test_name, "modbus/read_inputs") == 0) {
+        ESP_LOGI(TAG, "[C] POST /api/test/modbus/read_inputs");
+        
+        // Fissa slave_id=1 per test Waveshare
+        uint8_t slave_id = 1;
+        device_config_t *cfg = device_config_get();
+        uint16_t input_start = cfg ? cfg->modbus.input_start : 0;
+        uint16_t input_count = cfg ? cfg->modbus.input_count : 8;
+        if (input_count > MODBUS_RELAY_MAX_POINTS) input_count = MODBUS_RELAY_MAX_POINTS;
+
+        esp_err_t init_err = modbus_relay_init();
+        if (init_err != ESP_OK) {
+            snprintf(response, sizeof(response),
+                     "{\"status\":\"error\",\"error\":\"Init Modbus fallita\",\"err\":\"%s\"}",
+                     esp_err_to_name(init_err));
+        } else {
+            uint8_t input_bits[MODBUS_RELAY_MAX_BYTES] = {0};
+
+            ESP_LOGI(TAG, "[C] Reading %u discrete inputs from slave %u (start=%u)", 
+                     input_count, slave_id, input_start);
+            
+            esp_err_t err_di = modbus_relay_read_discrete_inputs(slave_id, input_start, input_count,
+                                                                  input_bits, sizeof(input_bits));
+
+            if (err_di == ESP_OK) {
+                // Converti bit array a string di 0/1 per facile visualizzazione
+                char input_str[MODBUS_RELAY_MAX_POINTS + 1] = {0};
+                for (uint16_t i = 0; i < input_count; i++) {
+                    uint8_t byte_idx = i / 8;
+                    uint8_t bit_idx = i % 8;
+                    input_str[i] = (input_bits[byte_idx] & (1 << bit_idx)) ? '1' : '0';
+                }
+                input_str[input_count] = '\0';
+
+                // Crea anche hexdump per debug
+                char hex_str[64] = {0};
+                size_t byte_count = (input_count + 7) / 8;
+                for (size_t i = 0; i < byte_count && i < 8; i++) {
+                    snprintf(hex_str + (i * 3), sizeof(hex_str) - (i * 3), "%02X ", input_bits[i]);
+                }
+
+                snprintf(response, sizeof(response),
+                         "{\"status\":\"ok\",\"slave_id\":%u,\"input_count\":%u,\"input_start\":%u,"
+                         "\"inputs\":\"%s\",\"hex\":\"%s\"}",
+                         slave_id, input_count, input_start, input_str, hex_str);
+                
+                ESP_LOGI(TAG, "[C] Inputs read OK: %s (%s)", input_str, hex_str);
+            } else {
+                snprintf(response, sizeof(response),
+                         "{\"status\":\"error\",\"error\":\"Read discrete inputs fallita\",\"err\":\"%s\"}",
+                         esp_err_to_name(err_di));
+                ESP_LOGE(TAG, "[C] Read discrete inputs failed: %s", esp_err_to_name(err_di));
             }
         }
     }

@@ -29,6 +29,8 @@
 #define MODBUS_RELAY_DEFAULT_POINTS 8U
 #define MODBUS_RELAY_MAX_RETRIES 5U
 
+esp_err_t rs485_deinit(void);
+
 typedef struct {
     bool initialized;
     bool running;
@@ -139,8 +141,8 @@ static uart_parity_t map_parity(int parity)
 
 static esp_err_t start_locked(void)
 {
-    if (s_ctx.running) {
-        return ESP_OK;
+    if (s_ctx.running && s_ctx.handler != NULL) {
+        return ESP_OK; // Già in esecuzione con handler valido
     }
 
     device_config_t *cfg = device_config_get();
@@ -158,6 +160,22 @@ static esp_err_t start_locked(void)
         }
     };
 
+    esp_err_t release_err = rs485_deinit();
+    if (release_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] rs485_deinit prima di Modbus: %s", esp_err_to_name(release_err));
+    }
+
+    // Configura i pin UART per Modbus (DE su RTS)
+    esp_err_t pin_err = uart_set_pin(CONFIG_APP_RS485_UART_PORT, 
+                                   CONFIG_APP_RS485_TX_GPIO,
+                                   CONFIG_APP_RS485_RX_GPIO, 
+                                   CONFIG_APP_RS485_DE_GPIO,
+                                   UART_PIN_NO_CHANGE);
+    if (pin_err != ESP_OK) {
+        ESP_LOGE(TAG, "[C] uart_set_pin per Modbus fallita: %s", esp_err_to_name(pin_err));
+        return pin_err;
+    }
+
     void *handler = NULL;
     esp_err_t err = mbc_master_create_serial(&comm, &handler);
     if (err != ESP_OK) {
@@ -173,6 +191,9 @@ static esp_err_t start_locked(void)
         s_ctx.status.last_error = (int32_t)err;
         return err;
     }
+
+    // Attendi stabilizzazione del controller Modbus
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     s_ctx.handler = handler;
     s_ctx.initialized = true;
@@ -203,6 +224,17 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
         return ESP_ERR_INVALID_ARG;
     }
 
+    // Log dettagliato sullo stato
+    ESP_LOGD(TAG, "[C] Modbus state check: handler=%p, running=%s", 
+             s_ctx.handler, s_ctx.running ? "true" : "false");
+
+    // Verifica che l'handler sia valido
+    if (!s_ctx.handler || !s_ctx.running) {
+        ESP_LOGE(TAG, "[C] Modbus invalid state: handler=%p, running=%s", 
+                 s_ctx.handler, s_ctx.running ? "true" : "false");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     device_config_t *cfg = device_config_get();
     uint8_t retries = 0;
     if (cfg) {
@@ -211,15 +243,48 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
 
     esp_err_t last_err = ESP_FAIL;
     for (uint8_t attempt = 0; attempt <= retries; ++attempt) {
+        // Log pacchetto in uscita
+        ESP_LOGI(TAG, "[C] Modbus TX attempt %u/%u: slave=%u cmd=0x%02X start=%u size=%u", 
+                 attempt + 1, retries + 1, request->slave_addr, request->command, 
+                 request->reg_start, request->reg_size);
+        
         last_err = mbc_master_send_request(s_ctx.handler, request, data_ptr);
+        
         if (last_err == ESP_OK) {
+            // Log pacchetto ricevuto (se presente)
+            if (data_ptr && request->command == MB_FUNC_READ_COILS) {
+                uint8_t *bytes = (uint8_t*)data_ptr;
+                size_t byte_count = bits_to_bytes(request->reg_size);
+                ESP_LOGI(TAG, "[C] Modbus RX OK: %zu bytes", byte_count);
+                
+                // Hexdump manuale
+                char hex_str[64] = {0};
+                for (size_t i = 0; i < byte_count && i < 16; i++) {
+                    snprintf(hex_str + (i * 3), sizeof(hex_str) - (i * 3), "%02X ", bytes[i]);
+                }
+                ESP_LOGI(TAG, "[C] RX Data: %s", hex_str);
+            } else if (data_ptr) {
+                ESP_LOGI(TAG, "[C] Modbus RX OK");
+                uint8_t *bytes = (uint8_t*)data_ptr;
+                char hex_str[32] = {0};
+                for (int i = 0; i < 4 && i < 8; i++) {
+                    snprintf(hex_str + (i * 3), sizeof(hex_str) - (i * 3), "%02X ", bytes[i]);
+                }
+                ESP_LOGI(TAG, "[C] RX Data: %s", hex_str);
+            }
             return ESP_OK;
+        } else {
+            ESP_LOGW(TAG, "[C] Modbus TX attempt %u failed: %s (handler=%p)", 
+                     attempt + 1, esp_err_to_name(last_err), s_ctx.handler);
         }
+        
         if (attempt < retries) {
             vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 
+    ESP_LOGE(TAG, "[C] Modbus failed after %u attempts, last error: %s", 
+             retries + 1, esp_err_to_name(last_err));
     return last_err;
 }
 
