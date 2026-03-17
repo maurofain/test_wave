@@ -139,6 +139,47 @@ static uart_parity_t map_parity(int parity)
     return UART_PARITY_DISABLE;
 }
 
+// Aggiungo monitor UART a basso livello per debug
+static void uart_monitor_task(void *arg)
+{
+    uart_port_t uart_num = (uart_port_t)CONFIG_APP_RS485_UART_PORT;
+    static uint8_t data[256];  // Static per evitare stack overflow
+    
+    ESP_LOGI(TAG, "[C] Monitor UART attivo su porta %u", uart_num);
+    
+    while (1) {
+        int len = uart_read_bytes(uart_num, data, sizeof(data), pdMS_TO_TICKS(100));
+        if (len > 0) {
+            ESP_LOGI(TAG, "[C] UART RX %d bytes:", len);
+            
+            // Log esadecimale semplificato per evitare stack overflow
+            if (len <= 32) {
+                char hex_str[128] = {0};
+                for (int i = 0; i < len; i++) {
+                    int pos = i * 3;
+                    if (pos < sizeof(hex_str) - 4) {
+                        snprintf(hex_str + pos, sizeof(hex_str) - pos, "%02X ", data[i]);
+                    }
+                }
+                ESP_LOGI(TAG, "[C] RX: %s", hex_str);
+            } else {
+                // Per pacchetti lunghi, log solo i primi 16 byte
+                char hex_str[64] = {0};
+                for (int i = 0; i < 16; i++) {
+                    int pos = i * 3;
+                    if (pos < sizeof(hex_str) - 4) {
+                        snprintf(hex_str + pos, sizeof(hex_str) - pos, "%02X ", data[i]);
+                    }
+                }
+                ESP_LOGI(TAG, "[C] RX (first 16): %s... (+%d bytes)", hex_str, len - 16);
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));  // Aumento delay per ridurre CPU usage
+    }
+    
+    vTaskDelete(NULL);
+}
+
 static esp_err_t start_locked(void)
 {
     if (s_ctx.running && s_ctx.handler != NULL) {
@@ -184,6 +225,21 @@ static esp_err_t start_locked(void)
         return err;
     }
 
+    // Imposta una descriptor table valida per Read Discrete Inputs
+    mb_parameter_descriptor_t descriptor = {
+        .param_key = "discrete_inputs",
+        .param_type = 1,  // U8 type
+        .param_size = 8,  // 8 discrete inputs (bits)
+        .param_units = 0   // None units
+    };
+    
+    err = mbc_master_set_descriptor(handler, &descriptor, 1);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] mbc_master_set_descriptor fallita: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "[C] Descriptor table configurata per discrete_inputs (size=8)");
+    }
+
     err = mbc_master_start(handler);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "[C] mbc_master_start fallita: %s", esp_err_to_name(err));
@@ -194,6 +250,8 @@ static esp_err_t start_locked(void)
 
     // Attendi stabilizzazione del controller Modbus
     vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGI(TAG, "[C] Monitor UART disabilitato per non interferire con Modbus controller");
 
     s_ctx.handler = handler;
     s_ctx.initialized = true;
@@ -228,11 +286,15 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
     ESP_LOGD(TAG, "[C] Modbus state check: handler=%p, running=%s", 
              s_ctx.handler, s_ctx.running ? "true" : "false");
 
-    // Verifica che l'handler sia valido
+    // Se handler invalido, prova a reinizializzare
     if (!s_ctx.handler || !s_ctx.running) {
-        ESP_LOGE(TAG, "[C] Modbus invalid state: handler=%p, running=%s", 
-                 s_ctx.handler, s_ctx.running ? "true" : "false");
-        return ESP_ERR_INVALID_STATE;
+        ESP_LOGW(TAG, "[C] Modbus handler invalido, tentativo reinizializzazione...");
+        esp_err_t reinit_err = start_locked();
+        if (reinit_err != ESP_OK) {
+            ESP_LOGE(TAG, "[C] Reinizializzazione Modbus fallita: %s", esp_err_to_name(reinit_err));
+            return ESP_ERR_INVALID_STATE;
+        }
+        ESP_LOGI(TAG, "[C] Modbus reinizializzato con successo");
     }
 
     device_config_t *cfg = device_config_get();
@@ -247,6 +309,12 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
         ESP_LOGI(TAG, "[C] Modbus TX attempt %u/%u: slave=%u cmd=0x%02X start=%u size=%u", 
                  attempt + 1, retries + 1, request->slave_addr, request->command, 
                  request->reg_start, request->reg_size);
+        
+        // Verifica handler prima di ogni tentativo
+        if (!s_ctx.handler || !s_ctx.running) {
+            ESP_LOGE(TAG, "[C] Handler diventato invalido durante tentativi");
+            return ESP_ERR_INVALID_STATE;
+        }
         
         last_err = mbc_master_send_request(s_ctx.handler, request, data_ptr);
         
@@ -276,6 +344,35 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
         } else {
             ESP_LOGW(TAG, "[C] Modbus TX attempt %u failed: %s (handler=%p)", 
                      attempt + 1, esp_err_to_name(last_err), s_ctx.handler);
+            
+            // Se INVALID_STATE, forza deallocazione e reinizializza per il prossimo tentativo
+            if (last_err == ESP_ERR_INVALID_STATE && attempt < retries) {
+                ESP_LOGW(TAG, "[C] INVALID_STATE rilevato, dealloco e reinizializzo per tentativo %u", attempt + 2);
+                
+                // Forza deallocazione dell'handler esistente
+                if (s_ctx.handler) {
+                    ESP_LOGD(TAG, "[C] Deallocazione handler esistente: %p", s_ctx.handler);
+                    esp_err_t destroy_err = mbc_master_delete(s_ctx.handler);
+                    if (destroy_err != ESP_OK) {
+                        ESP_LOGW(TAG, "[C] mbc_master_delete fallita: %s", esp_err_to_name(destroy_err));
+                    }
+                    s_ctx.handler = NULL;
+                }
+                
+                // Resetta stato
+                s_ctx.running = false;
+                s_ctx.initialized = false;
+                s_ctx.status.running = false;
+                s_ctx.status.initialized = false;
+                
+                // Reinizializza
+                esp_err_t reinit_err = start_locked();
+                if (reinit_err != ESP_OK) {
+                    ESP_LOGE(TAG, "[C] Reinizializzazione fallita durante retry: %s", esp_err_to_name(reinit_err));
+                    break;
+                }
+                ESP_LOGI(TAG, "[C] Reinizializzazione completata, nuovo handler: %p", s_ctx.handler);
+            }
         }
         
         if (attempt < retries) {
