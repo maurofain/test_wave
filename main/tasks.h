@@ -30,5 +30,7 @@ void tasks_apply_n_run(void);
 void tasks_set_touchscreen_handle(void *handle);
 float tasks_get_temperature(void);
 float tasks_get_humidity(void);
+bool tasks_publish_key_event(void);
+bool tasks_publish_card_credit_event(int32_t vcd_amount_cents, const char *source_tag);
 void tasks_suspend_peripherals_for_lvgl_test(void);
 void tasks_resume_peripherals_after_lvgl_test(void);

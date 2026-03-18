@@ -226,6 +226,66 @@ static void set_program_label_text(lv_obj_t *label, uint8_t pid)
     lv_label_set_text(label, target_text);
 }
 
+static bool program_is_active_for_snapshot(const web_ui_program_entry_t *entry, const fsm_ctx_t *snap)
+{
+    if (!entry || !snap) {
+        return false;
+    }
+
+    if ((snap->state != FSM_STATE_RUNNING && snap->state != FSM_STATE_PAUSED) ||
+        snap->running_program_name[0] == '\0') {
+        return false;
+    }
+
+    if (entry->name[0] == '\0') {
+        return false;
+    }
+
+    return (strcmp(entry->name, snap->running_program_name) == 0);
+}
+
+static bool program_is_clickable_for_snapshot(const web_ui_program_entry_t *entry, const fsm_ctx_t *snap)
+{
+    if (!entry || !entry->enabled || !snap) {
+        return false;
+    }
+
+    if (snap->state == FSM_STATE_RUNNING || snap->state == FSM_STATE_PAUSED) {
+        return true;
+    }
+
+    if (snap->state == FSM_STATE_CREDIT) {
+        return (snap->credit_cents >= (int32_t)entry->price_units);
+    }
+
+    return false;
+}
+
+static void clear_all_program_relays(void)
+{
+    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
+        if (web_ui_virtual_relay_control(relay, false, 0) != ESP_OK) {
+            ESP_LOGW(TAG, "[C] clear relay failed relay=%u", (unsigned)relay);
+        }
+    }
+}
+
+static void apply_program_relays(const web_ui_program_entry_t *entry)
+{
+    if (!entry) {
+        return;
+    }
+
+    uint32_t duration_ms = (uint32_t)entry->duration_sec * 1000U;
+    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
+        bool on = ((entry->relay_mask & (1U << (relay - 1))) != 0U);
+        uint32_t relay_duration = on ? duration_ms : 0U;
+        if (web_ui_virtual_relay_control(relay, on, relay_duration) != ESP_OK) {
+            ESP_LOGW(TAG, "[C] apply relay failed relay=%u on=%d", (unsigned)relay, (int)on);
+        }
+    }
+}
+
 /**
  * @brief Aggiorna i pulsanti del programma in base allo stato corrente del contesto del finite state machine.
  *
@@ -234,20 +294,20 @@ static void set_program_label_text(lv_obj_t *label, uint8_t pid)
  */
 static void refresh_prog_buttons(const fsm_ctx_t *snap)
 {
-    (void)snap; // Suppress unused parameter warning
-    
     for (int i = 0; i < PROG_COUNT; i++)
     {
         lv_obj_t *btn = s_prog_btns[i];
         if (!btn) continue;
 
+        const web_ui_program_entry_t *entry = find_program_entry((uint8_t)(i + 1));
+
         if (s_prog_lbls[i])
         {
             set_program_label_text(s_prog_lbls[i], (uint8_t)(i + 1));
         }
-        
-        bool is_active = false;
-        bool can_click = true;
+
+        bool is_active = program_is_active_for_snapshot(entry, snap);
+        bool can_click = program_is_clickable_for_snapshot(entry, snap);
         
         // Update button state only if changed
         if (!s_btn_state_valid[i] || s_btn_last_active[i] != is_active || s_btn_last_clickable[i] != can_click)
@@ -269,6 +329,7 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             } else if (!can_click && s_btn_last_clickable[i]) {
                 lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
             }
+            s_btn_last_active[i] = is_active;
             s_btn_last_clickable[i] = can_click;
         }
 
@@ -617,9 +678,26 @@ static void on_prog_btn(lv_event_t *e)
 
     uint8_t pid = ud->prog_id;
     const web_ui_program_entry_t *entry = find_program_entry(pid);
+    if (!entry) {
+        ESP_LOGW(TAG, "[C] Programma non trovato pid=%u", (unsigned)pid);
+        return;
+    }
+
+    if (!entry->enabled) {
+        ESP_LOGI(TAG, "[C] Programma disabilitato pid=%u", (unsigned)pid);
+        return;
+    }
 
     fsm_ctx_t snap = {0};
     bool has_snap = fsm_runtime_snapshot(&snap);
+    if (has_snap && snap.state == FSM_STATE_CREDIT && snap.credit_cents < (int32_t)entry->price_units) {
+        ESP_LOGI(TAG, "[C] Credito insufficiente pid=%u credit=%ld price=%u",
+                 (unsigned)pid,
+                 (long)snap.credit_cents,
+                 (unsigned)entry->price_units);
+        return;
+    }
+
     bool is_active = false;
     if (has_snap && (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED) && entry && entry->name[0] != '\0') {
         if (strcmp(entry->name, snap.running_program_name) == 0) {
@@ -650,8 +728,10 @@ static void on_prog_btn(lv_event_t *e)
             /* Toggle local suspended state and update label */
             s_prog_suspended[idx] = !s_prog_suspended[idx];
             if (s_prog_suspended[idx]) {
+                clear_all_program_relays();
                 if (s_prog_lbls[idx]) lv_label_set_text(s_prog_lbls[idx], "Sospendi");
             } else {
+                apply_program_relays(entry);
                 if (s_prog_lbls[idx]) set_program_label_text(s_prog_lbls[idx], pid);
             }
         } else {
@@ -675,6 +755,7 @@ static void on_prog_btn(lv_event_t *e)
         if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
             ESP_LOGW(TAG, "[C] publish program %s failed for pid=%u", is_switch ? "switch" : "selected", (unsigned)pid);
         } else {
+            apply_program_relays(entry);
             s_active_prog = pid;
         }
     }
@@ -734,7 +815,11 @@ static void on_stop_btn(lv_event_t *e)
             const web_ui_program_entry_t *entry = find_program_entry(pid);
             if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
         }
-        (void)fsm_event_publish(&ev, pdMS_TO_TICKS(20));
+        if (fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
+            clear_all_program_relays();
+        } else {
+            ESP_LOGW(TAG, "[C] publish pause_toggle from stop failed for pid=%u", (unsigned)pid);
+        }
     } else {
         /* Second press: confirm cancellation => publish STOP */
         s_stop_confirm = false;
@@ -758,6 +843,9 @@ static void on_stop_btn(lv_event_t *e)
         }
         if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
             ESP_LOGW(TAG, "[C] publish program stop/cancel failed for pid=%u", (unsigned)pid);
+        } else {
+            s_stop_pressed = true;
+            clear_all_program_relays();
         }
     }
 }
@@ -1326,7 +1414,8 @@ void lvgl_page_main_show(void)
     
     build_prog_buttons();
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_prog_buttons completed");
-    
+
+    lvgl_page_chrome_set_flag_callback(on_lang_btn, NULL);
     lvgl_page_chrome_add(scr);
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added");
 

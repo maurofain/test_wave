@@ -139,6 +139,16 @@ static uart_parity_t map_parity(int parity)
     return UART_PARITY_DISABLE;
 }
 
+static uart_word_length_t map_data_bits(int data_bits)
+{
+    return (data_bits == 7) ? UART_DATA_7_BITS : UART_DATA_8_BITS;
+}
+
+static uart_stop_bits_t map_stop_bits(int stop_bits)
+{
+    return (stop_bits == 2) ? UART_STOP_BITS_2 : UART_STOP_BITS_1;
+}
+
 // Aggiungo monitor UART a basso livello per debug
 static void uart_monitor_task(void *arg)
 {
@@ -196,7 +206,10 @@ static esp_err_t start_locked(void)
             .mode = MB_RTU,
             .uid = clamp_slave_id(cfg->modbus.slave_id),
             .port = (uart_port_t)CONFIG_APP_RS485_UART_PORT,
+            .response_tout_ms = (cfg->modbus.timeout_ms > 0U) ? (uint32_t)cfg->modbus.timeout_ms : 200U,
             .baudrate = (cfg->rs485.baud_rate > 0) ? (uint32_t)cfg->rs485.baud_rate : 9600U,
+            .data_bits = map_data_bits(cfg->rs485.data_bits),
+            .stop_bits = map_stop_bits(cfg->rs485.stop_bits),
             .parity = map_parity(cfg->rs485.parity),
         }
     };
@@ -225,24 +238,17 @@ static esp_err_t start_locked(void)
         return err;
     }
 
-    // Imposta una descriptor table valida per Read Discrete Inputs
-    mb_parameter_descriptor_t descriptor = {
-        .param_key = "discrete_inputs",
-        .param_type = 1,  // U8 type
-        .param_size = 8,  // 8 discrete inputs (bits)
-        .param_units = 0   // None units
-    };
-    
-    err = mbc_master_set_descriptor(handler, &descriptor, 1);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "[C] mbc_master_set_descriptor fallita: %s", esp_err_to_name(err));
-    } else {
-        ESP_LOGI(TAG, "[C] Descriptor table configurata per discrete_inputs (size=8)");
-    }
-
     err = mbc_master_start(handler);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "[C] mbc_master_start fallita: %s", esp_err_to_name(err));
+        (void)mbc_master_delete(handler);
+        s_ctx.status.last_error = (int32_t)err;
+        return err;
+    }
+
+    err = uart_set_mode(CONFIG_APP_RS485_UART_PORT, UART_MODE_RS485_HALF_DUPLEX);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "[C] uart_set_mode RS485 half-duplex fallita: %s", esp_err_to_name(err));
         (void)mbc_master_delete(handler);
         s_ctx.status.last_error = (int32_t)err;
         return err;

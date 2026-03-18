@@ -686,6 +686,9 @@ modbus_read_end:
                     }
 
                     cJSON *state_obj = cJSON_GetObjectItem(root, "state");
+                    if (!state_obj) {
+                        state_obj = cJSON_GetObjectItem(root, "value");
+                    }
                     if (state_obj) {
                         if (cJSON_IsBool(state_obj)) {
                             state = cJSON_IsTrue(state_obj);
@@ -744,8 +747,11 @@ modbus_read_end:
                     }
 
                     cJSON *states = cJSON_GetObjectItem(root, "states");
+                    if (!states) {
+                        states = cJSON_GetObjectItem(root, "coils");
+                    }
                     if (!states || !cJSON_IsArray(states)) {
-                        snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Campo 'states' non valido\"}");
+                        snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"Campo 'states/coils' non valido\"}");
                     } else {
                         uint8_t packed[MODBUS_RELAY_MAX_BYTES] = {0};
                         uint16_t count = 0;
@@ -848,26 +854,8 @@ modbus_read_end:
                                 (unsigned)id_min, (unsigned)id_max);
 
                 bool first = true;
-                
-                // Prima prova scansione broadcast (ID 0)
-                ESP_LOGI(TAG, "[C] Probe broadcast ID 0...");
-                uint8_t probe_bc[1] = {0};
-                esp_err_t probe_bc_err = modbus_relay_read_coils(0, relay_start, 1, probe_bc, sizeof(probe_bc));
-                if (probe_bc_err == ESP_OK) {
-                    ESP_LOGI(TAG, "[C] Broadcast ID 0 risponde OK");
-                    pos += snprintf(scan_out + pos, scan_cap - pos,
-                                    "{\"slave_id\":0,\"relay_count\":%u,\"input_count\":%u,"
-                                    "\"relay_start\":%u,\"input_start\":%u,\"broadcast\":true}",
-                                    (unsigned)relay_count,
-                                    (unsigned)input_count,
-                                    (unsigned)relay_start,
-                                    (unsigned)input_start);
-                    first = false;
-                } else {
-                    ESP_LOGD(TAG, "[C] Broadcast ID 0 non risponde");
-                }
-                
-                // Poi scansione range richiesto
+
+                // Scansione range richiesto (no broadcast: letture su ID 0 non valide Modbus)
                 for (uint8_t sid = id_min; sid <= id_max; ++sid) {
                     ESP_LOGI(TAG, "[C] Probe slave ID %u...", (unsigned)sid);
                     uint8_t probe[1] = {0};
@@ -898,18 +886,40 @@ modbus_read_end:
     }
 
     /* ------------------------------------------------------------------ */
-    /* modbus/read_inputs — read discrete inputs for slave ID 1            */
-    /* POST body: {}  (fissa slave_id=1 per test Waveshare)                 */
+    /* modbus/read_inputs — read discrete inputs                            */
+    /* POST body (optional): {"slave_id":1,"input_start":0,"input_count":8} */
     /* ------------------------------------------------------------------ */
     else if (strcmp(test_name, "modbus/read_inputs") == 0) {
         ESP_LOGI(TAG, "[C] POST /api/test/modbus/read_inputs");
-        
-        // Fissa slave_id=1 per test Waveshare
-        uint8_t slave_id = 1;
+
         device_config_t *cfg = device_config_get();
+        uint8_t slave_id = cfg ? clamp_u8_value(cfg->modbus.slave_id, 1, 247) : 1;
         uint16_t input_start = cfg ? cfg->modbus.input_start : 0;
         uint16_t input_count = cfg ? cfg->modbus.input_count : 8;
         if (input_count > MODBUS_RELAY_MAX_POINTS) input_count = MODBUS_RELAY_MAX_POINTS;
+
+        char body[128] = {0};
+        int body_len = httpd_req_recv(req, body, sizeof(body) - 1);
+        if (body_len > 0) {
+            body[body_len] = '\0';
+            cJSON *root = cJSON_Parse(body);
+            if (root) {
+                cJSON *jsid = cJSON_GetObjectItem(root, "slave_id");
+                cJSON *jstart = cJSON_GetObjectItem(root, "input_start");
+                cJSON *jcount = cJSON_GetObjectItem(root, "input_count");
+
+                if (cJSON_IsNumber(jsid) && jsid->valueint >= 1) {
+                    slave_id = clamp_u8_value(jsid->valueint, 1, 247);
+                }
+                if (cJSON_IsNumber(jstart) && jstart->valueint >= 0) {
+                    input_start = clamp_u16_value(jstart->valueint, 0, 65535);
+                }
+                if (cJSON_IsNumber(jcount) && jcount->valueint >= 1) {
+                    input_count = clamp_u16_value(jcount->valueint, 1, MODBUS_RELAY_MAX_POINTS);
+                }
+                cJSON_Delete(root);
+            }
+        }
 
         esp_err_t init_err = modbus_relay_init();
         if (init_err != ESP_OK) {
@@ -918,12 +928,28 @@ modbus_read_end:
                      esp_err_to_name(init_err));
         } else {
             uint8_t input_bits[MODBUS_RELAY_MAX_BYTES] = {0};
+            bool used_coil_fallback = false;
 
             ESP_LOGI(TAG, "[C] Reading %u discrete inputs from slave %u (start=%u)", 
                      input_count, slave_id, input_start);
             
             esp_err_t err_di = modbus_relay_read_discrete_inputs(slave_id, input_start, input_count,
                                                                   input_bits, sizeof(input_bits));
+
+            if (err_di == ESP_ERR_INVALID_RESPONSE) {
+                ESP_LOGW(TAG, "[C] Read DI fallita con invalid response, provo fallback read_coils");
+                esp_err_t fb_err = modbus_relay_read_coils(slave_id,
+                                                           input_start,
+                                                           input_count,
+                                                           input_bits,
+                                                           sizeof(input_bits));
+                if (fb_err == ESP_OK) {
+                    err_di = ESP_OK;
+                    used_coil_fallback = true;
+                } else {
+                    ESP_LOGW(TAG, "[C] Fallback read_coils fallito: %s", esp_err_to_name(fb_err));
+                }
+            }
 
             if (err_di == ESP_OK) {
                 // Converti bit array a string di 0/1 per facile visualizzazione
@@ -943,11 +969,19 @@ modbus_read_end:
                 }
 
                 snprintf(response, sizeof(response),
-                         "{\"status\":\"ok\",\"slave_id\":%u,\"input_count\":%u,\"input_start\":%u,"
+                         "{\"status\":\"ok\",\"slave_id\":%u,\"input_count\":%u,\"input_start\":%u,\"source\":\"%s\","
                          "\"inputs\":\"%s\",\"hex\":\"%s\"}",
-                         slave_id, input_count, input_start, input_str, hex_str);
+                         slave_id,
+                         input_count,
+                         input_start,
+                         used_coil_fallback ? "coils_fallback" : "discrete_inputs",
+                         input_str,
+                         hex_str);
                 
-                ESP_LOGI(TAG, "[C] Inputs read OK: %s (%s)", input_str, hex_str);
+                ESP_LOGI(TAG, "[C] Inputs read OK (%s): %s (%s)",
+                         used_coil_fallback ? "coils_fallback" : "discrete_inputs",
+                         input_str,
+                         hex_str);
             } else {
                 snprintf(response, sizeof(response),
                          "{\"status\":\"error\",\"error\":\"Read discrete inputs fallita\",\"err\":\"%s\"}",

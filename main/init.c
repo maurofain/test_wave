@@ -137,12 +137,15 @@ static init_agent_status_t s_agent_status_table[] = {
  * @param [in/out] Non applicabile per questa funzione.
  * @return Non applicabile per questa funzione.
  */
-static void init_agent_status_update_error_counter(void) {
+static void init_agent_status_update_error_counter(void)
+{
   int32_t error_count = 0;
   const size_t count =
       sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
-  for (size_t i = 1; i < count; ++i) {
-    if (s_agent_status_table[i].state == 0) {
+  for (size_t i = 1; i < count; ++i)
+  {
+    if (s_agent_status_table[i].state == 0)
+    {
       error_count++;
     }
   }
@@ -158,10 +161,12 @@ static void init_agent_status_update_error_counter(void) {
  *
  * @return Niente.
  */
-void init_agent_status_reset_defaults(void) {
+void init_agent_status_reset_defaults(void)
+{
   const size_t count =
       sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
-  for (size_t i = 1; i < count; ++i) {
+  for (size_t i = 1; i < count; ++i)
+  {
     s_agent_status_table[i].state = 1;
     s_agent_status_table[i].error_code = INIT_AGENT_ERR_NOT_EVALUATED;
   }
@@ -178,11 +183,14 @@ void init_agent_status_reset_defaults(void) {
  * @return Nessun valore di ritorno.
  */
 void init_agent_status_set(int32_t agn_value, int32_t state,
-                           init_agent_error_code_t error_code) {
+                           init_agent_error_code_t error_code)
+{
   const size_t count =
       sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
-  for (size_t i = 1; i < count; ++i) {
-    if (s_agent_status_table[i].agn_value == agn_value) {
+  for (size_t i = 1; i < count; ++i)
+  {
+    if (s_agent_status_table[i].agn_value == agn_value)
+    {
       s_agent_status_table[i].state = state;
       s_agent_status_table[i].error_code = (int32_t)error_code;
       init_agent_status_update_error_counter();
@@ -191,15 +199,19 @@ void init_agent_status_set(int32_t agn_value, int32_t state,
   }
 }
 
-const init_agent_status_t *init_agent_status_get_table(size_t *out_count) {
-  if (out_count) {
+const init_agent_status_t *init_agent_status_get_table(size_t *out_count)
+{
+  if (out_count)
+  {
     *out_count = sizeof(s_agent_status_table) / sizeof(s_agent_status_table[0]);
   }
   return s_agent_status_table;
 }
 
-const char *init_agent_error_code_text(init_agent_error_code_t code) {
-  switch (code) {
+const char *init_agent_error_code_text(init_agent_error_code_t code)
+{
+  switch (code)
+  {
   case INIT_AGENT_ERR_NONE:
     return "none";
   case INIT_AGENT_ERR_NOT_EVALUATED:
@@ -242,8 +254,10 @@ const char *init_agent_error_code_text(init_agent_error_code_t code) {
  * @return true se il motivo del reset è un motivo di reset non pulito, false
  * altrimenti.
  */
-static bool is_unclean_reset_reason(esp_reset_reason_t reason) {
-  switch (reason) {
+static bool is_unclean_reset_reason(esp_reset_reason_t reason)
+{
+  switch (reason)
+  {
   case ESP_RST_PANIC:
   case ESP_RST_INT_WDT:
   case ESP_RST_TASK_WDT:
@@ -266,10 +280,12 @@ static bool is_unclean_reset_reason(esp_reset_reason_t reason) {
  *         - ESP_OK: Operazione riuscita.
  *         - ESP_FAIL: Operazione non riuscita.
  */
-static esp_err_t update_boot_reboot_guard(void) {
+static esp_err_t update_boot_reboot_guard(void)
+{
   nvs_handle_t handle;
   esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] Apertura NVS boot guard fallita: %s",
              esp_err_to_name(ret));
     return ret;
@@ -278,7 +294,8 @@ static esp_err_t update_boot_reboot_guard(void) {
   uint32_t consecutive = 0;
   uint32_t force_crash = 0;
   ret = nvs_get_u32(handle, BOOT_GUARD_KEY_CONSEC, &consecutive);
-  if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND) {
+  if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND)
+  {
     ESP_LOGE(TAG, "[M] Lettura counter reboot fallita: %s",
              esp_err_to_name(ret));
     nvs_close(handle);
@@ -286,7 +303,8 @@ static esp_err_t update_boot_reboot_guard(void) {
   }
 
   ret = nvs_get_u32(handle, BOOT_GUARD_KEY_FORCE_CRASH, &force_crash);
-  if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND) {
+  if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND)
+  {
     ESP_LOGE(TAG, "[M] Lettura marker force_crash fallita: %s",
              esp_err_to_name(ret));
     nvs_close(handle);
@@ -294,22 +312,28 @@ static esp_err_t update_boot_reboot_guard(void) {
   }
 
   esp_reset_reason_t reason = esp_reset_reason();
-  if (is_unclean_reset_reason(reason) || (force_crash == 1)) {
+  if (is_unclean_reset_reason(reason) || (force_crash == 1))
+  {
     consecutive++;
-  } else {
+  }
+  else
+  {
     consecutive = 0;
   }
 
   ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CONSEC, consecutive);
-  if (ret == ESP_OK && force_crash == 1) {
+  if (ret == ESP_OK && force_crash == 1)
+  {
     ret = nvs_set_u32(handle, BOOT_GUARD_KEY_FORCE_CRASH, 0);
   }
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     ret = nvs_commit(handle);
   }
   nvs_close(handle);
 
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] Salvataggio counter reboot fallito: %s",
              esp_err_to_name(ret));
     return ret;
@@ -324,7 +348,8 @@ static esp_err_t update_boot_reboot_guard(void) {
            (int)reason, (unsigned long)force_crash,
            (unsigned long)s_consecutive_reboots, BOOT_GUARD_REBOOT_LIMIT);
 
-  if (s_error_lock_active) {
+  if (s_error_lock_active)
+  {
     ESP_LOGE(TAG, "[M] ERROR_LOCK attivo: troppi reboot consecutivi");
   }
 
@@ -340,30 +365,36 @@ static esp_err_t update_boot_reboot_guard(void) {
  * @retval ESP_OK Se l'operazione ha successo.
  * @retval ESP_FAIL Se l'operazione ha fallito.
  */
-static esp_err_t update_crash_pending_record(void) {
+static esp_err_t update_crash_pending_record(void)
+{
   esp_reset_reason_t reason = esp_reset_reason();
-  if (!is_unclean_reset_reason(reason)) {
+  if (!is_unclean_reset_reason(reason))
+  {
     return ESP_OK;
   }
 
   nvs_handle_t handle;
   esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] [C] apertura NVS crash record fallita: %s",
              esp_err_to_name(ret));
     return ret;
   }
 
   ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CRASH_PENDING, 1);
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CRASH_REASON, (uint32_t)reason);
   }
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     ret = nvs_commit(handle);
   }
   nvs_close(handle);
 
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     ESP_LOGW(TAG, "[M] [C] crash pending registrato: reason=%d", (int)reason);
   }
   return ret;
@@ -386,19 +417,25 @@ static esp_err_t update_crash_pending_record(void) {
  * @return Niente.
  */
 static void build_deviceactivity_url(char *out, size_t out_len,
-                                     const char *base_url) {
-  if (!out || out_len == 0) {
+                                     const char *base_url)
+{
+  if (!out || out_len == 0)
+  {
     return;
   }
   out[0] = '\0';
-  if (!base_url || base_url[0] == '\0') {
+  if (!base_url || base_url[0] == '\0')
+  {
     return;
   }
 
   size_t bl = strlen(base_url);
-  if (bl > 0 && base_url[bl - 1] == '/') {
+  if (bl > 0 && base_url[bl - 1] == '/')
+  {
     snprintf(out, out_len, "%sapi/deviceactivity", base_url);
-  } else {
+  }
+  else
+  {
     snprintf(out, out_len, "%s/api/deviceactivity", base_url);
   }
 }
@@ -414,14 +451,16 @@ static void build_deviceactivity_url(char *out, size_t out_len,
  * @return esp_err_t - Codice di errore che indica il successo o la causa
  * dell'errore.
  */
-static esp_err_t try_send_pending_crash_record(void) {
+static esp_err_t try_send_pending_crash_record(void)
+{
 #if DNA_SERVER_POST
   ESP_LOGW(TAG, "[M] [C] preboot crash send disabilitato da DNA_SERVER_POST");
   return ESP_OK;
 #else
   nvs_handle_t handle;
   esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] [C] apertura NVS preboot send fallita: %s",
              esp_err_to_name(ret));
     return ret;
@@ -430,7 +469,8 @@ static esp_err_t try_send_pending_crash_record(void) {
   uint32_t pending = 0;
   uint32_t crash_reason = 0;
   if (nvs_get_u32(handle, BOOT_GUARD_KEY_CRASH_PENDING, &pending) != ESP_OK ||
-      pending == 0) {
+      pending == 0)
+  {
     nvs_close(handle);
     return ESP_OK;
   }
@@ -439,14 +479,16 @@ static esp_err_t try_send_pending_crash_record(void) {
   nvs_close(handle);
 
   device_config_t *cfg = device_config_get();
-  if (!cfg || !cfg->server.enabled || cfg->server.url[0] == '\0') {
+  if (!cfg || !cfg->server.enabled || cfg->server.url[0] == '\0')
+  {
     ESP_LOGW(TAG, "[M] [C] preboot crash send saltato: server non configurato");
     return ESP_OK;
   }
 
   char url[192];
   build_deviceactivity_url(url, sizeof(url), cfg->server.url);
-  if (url[0] == '\0') {
+  if (url[0] == '\0')
+  {
     ESP_LOGW(TAG, "[M] [C] preboot crash send saltato: URL non valida");
     return ESP_OK;
   }
@@ -465,7 +507,8 @@ static esp_err_t try_send_pending_crash_record(void) {
   };
 
   esp_http_client_handle_t client = esp_http_client_init(&http_cfg);
-  if (!client) {
+  if (!client)
+  {
     ESP_LOGE(TAG, "[M] [C] preboot crash send: client init fallita");
     return ESP_FAIL;
   }
@@ -477,16 +520,20 @@ static esp_err_t try_send_pending_crash_record(void) {
   int status = esp_http_client_get_status_code(client);
   esp_http_client_cleanup(client);
 
-  if (http_ret == ESP_OK && status >= 200 && status < 300) {
+  if (http_ret == ESP_OK && status >= 200 && status < 300)
+  {
     ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
       ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CRASH_PENDING, 0);
-      if (ret == ESP_OK) {
+      if (ret == ESP_OK)
+      {
         ret = nvs_commit(handle);
       }
       nvs_close(handle);
     }
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
       ESP_LOGI(TAG,
                "[M] [C] preboot crash send OK (status=%d), pending cleared",
                status);
@@ -494,10 +541,13 @@ static esp_err_t try_send_pending_crash_record(void) {
     return ret;
   }
 
-  if (http_ret == ESP_ERR_HTTP_CONNECT) {
+  if (http_ret == ESP_ERR_HTTP_CONNECT)
+  {
     ESP_LOGD(TAG, "[M] [C] preboot crash send fallito per rete non pronta, "
                   "riprovo dopo (pending mantenuto)");
-  } else {
+  }
+  else
+  {
     ESP_LOGW(TAG,
              "[M] [C] preboot crash send fallito (err=%s status=%d), pending "
              "mantenuto",
@@ -514,14 +564,17 @@ static esp_err_t try_send_pending_crash_record(void) {
  * @return true Se la scheda SD ha spazio libero sufficiente.
  * @return false Se la scheda SD non ha spazio libero sufficiente.
  */
-static bool has_sd_free_space(size_t bytes_needed) {
-  if (!sd_card_is_mounted()) {
+static bool has_sd_free_space(size_t bytes_needed)
+{
+  if (!sd_card_is_mounted())
+  {
     return false;
   }
 
   uint64_t total_kb = sd_card_get_total_size();
   uint64_t used_kb = sd_card_get_used_size();
-  if (total_kb <= used_kb) {
+  if (total_kb <= used_kb)
+  {
     return false;
   }
 
@@ -543,10 +596,12 @@ static bool has_sd_free_space(size_t bytes_needed) {
  * - ESP_FAIL: Operazione fallita.
  * - Altri errori specifici: errore generico.
  */
-static esp_err_t transfer_coredump_flash_to_sd(void) {
+static esp_err_t transfer_coredump_flash_to_sd(void)
+{
   const esp_partition_t *core_part = esp_partition_find_first(
       ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
-  if (!core_part) {
+  if (!core_part)
+  {
     ESP_LOGI(
         TAG,
         "[M] [C] partizione coredump assente: skip trasferimento coredump");
@@ -555,19 +610,22 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
 
   uint32_t raw_size = 0;
   esp_err_t err = esp_partition_read(core_part, 0, &raw_size, sizeof(raw_size));
-  if (err != ESP_OK) {
+  if (err != ESP_OK)
+  {
     ESP_LOGW(TAG, "[M] [C] lettura header coredump fallita: %s",
              esp_err_to_name(err));
     return ESP_OK;
   }
 
   /* Partizione vergine/non usata: nessun coredump disponibile */
-  if (raw_size == 0xFFFFFFFF || raw_size == 0) {
+  if (raw_size == 0xFFFFFFFF || raw_size == 0)
+  {
     return ESP_OK;
   }
 
   /* Header invalido (tipico dopo cambio layout): pulizia silenziosa e skip */
-  if (raw_size < sizeof(uint32_t) || raw_size > core_part->size) {
+  if (raw_size < sizeof(uint32_t) || raw_size > core_part->size)
+  {
     ESP_LOGW(TAG,
              "[M] [C] header coredump invalido (size=%lu, part_size=%lu): "
              "pulizia partizione",
@@ -579,33 +637,39 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
   size_t image_addr = 0;
   size_t image_size = 0;
   err = esp_core_dump_image_get(&image_addr, &image_size);
-  if (err == ESP_ERR_NOT_FOUND) {
+  if (err == ESP_ERR_NOT_FOUND)
+  {
     return ESP_OK;
   }
-  if (err != ESP_OK) {
+  if (err != ESP_OK)
+  {
     ESP_LOGW(TAG, "[M] [C] core dump non disponibile: %s",
              esp_err_to_name(err));
     return ESP_OK;
   }
 
-  if (!sd_card_is_mounted()) {
+  if (!sd_card_is_mounted())
+  {
     ESP_LOGW(TAG, "[M] [C] SD non montata: coredump mantenuto in partizione");
     return ESP_OK;
   }
 
-  if (!has_sd_free_space(image_size)) {
+  if (!has_sd_free_space(image_size))
+  {
     ESP_LOGW(TAG, "[M] [C] spazio SD insufficiente per coredump (%u byte)",
              (unsigned)image_size);
     return ESP_OK;
   }
 
-  if (image_addr < core_part->address) {
+  if (image_addr < core_part->address)
+  {
     ESP_LOGW(TAG, "[M] [C] indirizzo coredump non valido");
     return ESP_OK;
   }
 
   size_t part_offset = image_addr - core_part->address;
-  if ((part_offset + image_size) > core_part->size) {
+  if ((part_offset + image_size) > core_part->size)
+  {
     ESP_LOGW(TAG, "[M] [C] size coredump oltre i limiti partizione");
     return ESP_OK;
   }
@@ -622,21 +686,25 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
            APP_VERSION);
 
   FILE *out = sd_card_fopen(dst_path, "wb");
-  if (!out) {
+  if (!out)
+  {
     ESP_LOGE(TAG, "[M] [C] creazione file coredump su SD fallita");
     return ESP_OK;
   }
 
   uint8_t buf[1024];
   size_t written = 0;
-  while (written < image_size) {
+  while (written < image_size)
+  {
     size_t chunk = image_size - written;
-    if (chunk > sizeof(buf)) {
+    if (chunk > sizeof(buf))
+    {
       chunk = sizeof(buf);
     }
 
     err = esp_partition_read(core_part, part_offset + written, buf, chunk);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
       sd_card_fclose(out);
       remove(dst_path);
       ESP_LOGE(TAG, "[M] [C] lettura coredump da flash fallita: %s",
@@ -644,7 +712,8 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
       return ESP_OK;
     }
 
-    if (sd_card_fwrite(out, buf, chunk) != chunk) {
+    if (sd_card_fwrite(out, buf, chunk) != chunk)
+    {
       sd_card_fclose(out);
       remove(dst_path);
       ESP_LOGE(TAG, "[M] [C] copia coredump flash->SD fallita");
@@ -663,7 +732,8 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
            APP_VERSION);
 
   FILE *report = sd_card_fopen(report_path, "w");
-  if (report) {
+  if (report)
+  {
     char report_buf[512];
     int report_len;
     report_len = snprintf(report_buf, sizeof(report_buf),
@@ -685,7 +755,8 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH && CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF
     char panic_reason[200] = {0};
     if (esp_core_dump_get_panic_reason(panic_reason, sizeof(panic_reason)) ==
-        ESP_OK) {
+        ESP_OK)
+    {
       report_len = snprintf(report_buf, sizeof(report_buf), "panic_reason=%s\n",
                             panic_reason);
       if (report_len > 0)
@@ -697,7 +768,8 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
   }
 
   err = esp_core_dump_image_erase();
-  if (err != ESP_OK) {
+  if (err != ESP_OK)
+  {
     ESP_LOGW(TAG,
              "[M] [C] coredump scritto su SD ma erase partizione fallita: %s",
              esp_err_to_name(err));
@@ -728,16 +800,19 @@ static esp_err_t transfer_coredump_flash_to_sd(void) {
  * Questa funzione elenca tutte le entry di configurazione presenti nel
  * namespace NVS. Non accetta parametri di input. Non restituisce alcun valore.
  */
-static void nvs_list_entries(void) {
+static void nvs_list_entries(void)
+{
   nvs_iterator_t it = NULL;
   esp_err_t ret = nvs_entry_find(NULL, NULL, NVS_TYPE_ANY, &it);
 
-  if (ret == ESP_ERR_NVS_NOT_FOUND) {
+  if (ret == ESP_ERR_NVS_NOT_FOUND)
+  {
     ESP_LOGI(TAG, "=== NVS vuota (no entries) ===");
     return;
   }
 
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGW(TAG, "Avviso lettura NVS: %s (verranno usate le defaults)",
              esp_err_to_name(ret));
     return;
@@ -746,7 +821,8 @@ static void nvs_list_entries(void) {
   ESP_LOGI(TAG, "=== Elenco NVS Entries ===");
   int count = 0;
 
-  while (it != NULL) {
+  while (it != NULL)
+  {
     nvs_entry_info_t info;
     nvs_entry_info(it, &info);
     count++;
@@ -771,10 +847,12 @@ static void nvs_list_entries(void) {
  *         - ESP_OK: Inizializzazione avvenuta con successo.
  *         - ESP_FAIL: Inizializzazione fallita.
  */
-static esp_err_t init_nvs(void) {
+static esp_err_t init_nvs(void)
+{
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
-      ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
     ESP_ERROR_CHECK(nvs_flash_erase());
     ret = nvs_flash_init();
   }
@@ -797,7 +875,8 @@ static esp_err_t init_nvs(void) {
  * - ESP_OK: Inizializzazione avvenuta con successo.
  * - ESP_FAIL: Inizializzazione fallita.
  */
-static esp_err_t init_spiffs(void) {
+static esp_err_t init_spiffs(void)
+{
   esp_vfs_spiffs_conf_t conf = {
       .base_path = "/spiffs",
       .partition_label = "storage",
@@ -805,31 +884,38 @@ static esp_err_t init_spiffs(void) {
       .format_if_mount_failed = false,
   };
   esp_err_t ret = esp_vfs_spiffs_register(&conf);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] Montaggio SPIFFS fallito: %s", esp_err_to_name(ret));
     return ret;
   }
   size_t total = 0, used = 0;
-  if (esp_spiffs_info(conf.partition_label, &total, &used) == ESP_OK) {
+  if (esp_spiffs_info(conf.partition_label, &total, &used) == ESP_OK)
+  {
     ESP_LOGI(TAG, "[M] SPIFFS montato: totale=%u, usato=%u", (unsigned)total,
              (unsigned)used);
   }
 
   // Elenca file in SPIFFS
   DIR *dir = opendir("/spiffs");
-  if (dir) {
+  if (dir)
+  {
     ESP_LOGI(TAG, "[M] === Elenco file SPIFFS ===");
     struct dirent *entry;
     int file_count = 0;
-    while ((entry = readdir(dir)) != NULL) {
+    while ((entry = readdir(dir)) != NULL)
+    {
       file_count++;
       char filepath[300];
       snprintf(filepath, sizeof(filepath), "/spiffs/%s", entry->d_name);
       struct stat st;
-      if (stat(filepath, &st) == 0) {
+      if (stat(filepath, &st) == 0)
+      {
         ESP_LOGI(TAG, "[M]   [%d] %s (%ld bytes)", file_count, entry->d_name,
                  st.st_size);
-      } else {
+      }
+      else
+      {
         ESP_LOGI(TAG, "[M]   [%d] %s", file_count, entry->d_name);
       }
     }
@@ -839,12 +925,15 @@ static esp_err_t init_spiffs(void) {
 
   // Logga la dimensione di tasks.json
   FILE *f = fopen("/spiffs/tasks.json", "r");
-  if (f) {
+  if (f)
+  {
     fseek(f, 0, SEEK_END);
     long fsz = ftell(f);
     fclose(f);
     ESP_LOGI(TAG, "[M] tasks.json presente: %ld byte", fsz);
-  } else {
+  }
+  else
+  {
     ESP_LOGW(TAG, "[M] File tasks.json non trovato");
   }
 
@@ -859,7 +948,8 @@ static esp_err_t init_spiffs(void) {
  *
  * @return void Non restituisce alcun valore.
  */
-static void log_partitions(void) {
+static void log_partitions(void)
+{
   const esp_partition_t *running = esp_ota_get_running_partition();
   const esp_partition_t *boot = esp_ota_get_boot_partition();
   ESP_LOGI(TAG, "[M] Partizione in esecuzione: %s (tipo %d, sottotipo %d)",
@@ -879,20 +969,25 @@ static void log_partitions(void) {
  * @param tv Puntatore al tempo sincronizzato.
  * @return Nessun valore di ritorno.
  */
-static inline void init_lvgl_status_log(const char *text) {
-  if (s_display_ready && text && text[0] != '\0') {
+static inline void init_lvgl_status_log(const char *text)
+{
+  if (s_display_ready && text && text[0] != '\0')
+  {
     device_config_t *cfg = device_config_get();
-    if (cfg->display.enabled) {
+    if (cfg->display.enabled)
+    {
       lvgl_panel_set_init_status(text);
     }
   }
 }
 
-static void ntp_sync_callback(struct timeval *tv) {
+static void ntp_sync_callback(struct timeval *tv)
+{
   device_config_t *cfg = device_config_get();
 
   // Applica l'offset del fuso orario
-  if (cfg->ntp.timezone_offset != 0) {
+  if (cfg->ntp.timezone_offset != 0)
+  {
     // Regola l'ora aggiungendo l'offset (in secondi)
     tv->tv_sec += (cfg->ntp.timezone_offset * 3600);
     settimeofday(tv, NULL);
@@ -929,7 +1024,8 @@ static bool s_sntp_initialized = false; /* [C] Flag: init_sntp() già chiamato *
  *
  * @return Nessun valore di ritorno.
  */
-static void init_sntp(void) {
+static void init_sntp(void)
+{
   device_config_t *cfg = device_config_get();
 
   ESP_LOGI(TAG, "[NTP] Initializing SNTP with servers: %s, %s",
@@ -970,10 +1066,12 @@ static void init_sntp(void) {
  *         - ESP_OK: operazione riuscita
  *         - ESP_FAIL: operazione fallita
  */
-esp_err_t init_sync_ntp(void) {
+esp_err_t init_sync_ntp(void)
+{
   device_config_t *cfg = device_config_get();
 
-  if (!cfg->ntp_enabled) {
+  if (!cfg->ntp_enabled)
+  {
     ESP_LOGW(TAG, "[NTP] NTP is disabled in configuration");
     return ESP_FAIL;
   }
@@ -982,7 +1080,8 @@ esp_err_t init_sync_ntp(void) {
 
   // Se SNTP non è mai stato inizializzato (es. ip_event non ricevuto),
   // inizializza ora
-  if (!s_sntp_initialized) {
+  if (!s_sntp_initialized)
+  {
     ESP_LOGW(TAG, "[NTP] SNTP non ancora inizializzato — eseguo init");
     init_sntp();
     ESP_LOGI(TAG, "[NTP] Richiesta inviata — completamento in background");
@@ -991,7 +1090,8 @@ esp_err_t init_sync_ntp(void) {
 
   // Controlla se già sincronizzato
   sntp_sync_status_t status = sntp_get_sync_status();
-  if (status == SNTP_SYNC_STATUS_COMPLETED) {
+  if (status == SNTP_SYNC_STATUS_COMPLETED)
+  {
     ESP_LOGI(TAG, "[NTP] Ora già sincronizzata, skip restart");
     return ESP_OK;
   }
@@ -1018,15 +1118,20 @@ esp_err_t init_sync_ntp(void) {
  * @param event_data Dati dell'evento.
  */
 static void ip_event_handler(void *arg, esp_event_base_t event_base,
-                             int32_t event_id, void *event_data) {
+                             int32_t event_id, void *event_data)
+{
   (void)arg;
   if ((event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) ||
-      (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP)) {
-    if (event_id == IP_EVENT_STA_GOT_IP) {
+      (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP))
+  {
+    if (event_id == IP_EVENT_STA_GOT_IP)
+    {
       ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
       ESP_LOGI(TAG, "[M] STA Wi-Fi ha ottenuto IP: %s",
                ip4addr_ntoa((const ip4_addr_t *)&event->ip_info.ip));
-    } else if (event_id == IP_EVENT_ETH_GOT_IP) {
+    }
+    else if (event_id == IP_EVENT_ETH_GOT_IP)
+    {
       ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
       const esp_netif_ip_info_t *ip_info = &event->ip_info;
       ESP_LOGI(TAG, "[M] Ethernet ha ottenuto l'indirizzo IP");
@@ -1036,37 +1141,48 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
       ESP_LOGI(TAG, "[M] ETH GATEWAY:" IPSTR, IP2STR(&ip_info->gw));
       ESP_LOGI(TAG, "[M] ~~~~~~~~~~~");
 
-      if (s_netif_eth) {
+      if (s_netif_eth)
+      {
         struct netif *lwip_netif =
             (struct netif *)esp_netif_get_netif_impl(s_netif_eth);
-        if (lwip_netif) {
+        if (lwip_netif)
+        {
           etharp_gratuitous(lwip_netif);
           ESP_LOGI(TAG, "[M] Gratuitous ARP inviato");
           ESP_LOGI(TAG, "[M] Post-ARP: ntp_enabled=%d free_heap=%u",
                    (int)device_config_get()->ntp_enabled,
                    (unsigned)esp_get_free_heap_size());
-        } else {
+        }
+        else
+        {
           ESP_LOGW(TAG, "[M] Post-ARP: lwip_netif NULL (impossibile inviare "
                         "gratuitous ARP)");
         }
-      } else {
+      }
+      else
+      {
         ESP_LOGW(TAG, "[M] Post-ARP: s_netif_eth NULL");
       }
 
       /* init_sntp() usa solo esp_sntp_* non-bloccanti: sicuro nell'event
        * handler */
-      if (device_config_get()->ntp_enabled) {
+      if (device_config_get()->ntp_enabled)
+      {
         ESP_LOGI(TAG, "[M] [NTP] Avvio SNTP (IP disponibile)");
         init_sntp();
-      } else {
+      }
+      else
+      {
         ESP_LOGI(TAG, "[M] [NTP] NTP disabilitato da config");
       }
     }
 
-    if (!s_http_services_initial_token_done) {
+    if (!s_http_services_initial_token_done)
+    {
       s_http_services_initial_token_done = true;
 
-      if (!http_services_is_remote_enabled()) {
+      if (!http_services_is_remote_enabled())
+      {
         init_agent_status_set(AGN_ID_HTTP_SERVICES, 1,
                               INIT_AGENT_ERR_DISABLED_BY_CONFIG);
         ESP_LOGI(TAG, "[M] [HTTP_SVC] Login iniziale token saltato: server "
@@ -1077,10 +1193,13 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
       ESP_LOGI(TAG,
                "[M] [HTTP_SVC] Avvio login iniziale token (IP disponibile)");
       esp_err_t hs_sync_err = http_services_sync_runtime_state(true);
-      if (hs_sync_err == ESP_OK && http_services_is_remote_online()) {
+      if (hs_sync_err == ESP_OK && http_services_is_remote_online())
+      {
         init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_NONE);
         ESP_LOGI(TAG, "[M] [HTTP_SVC] Login iniziale token completato");
-      } else {
+      }
+      else
+      {
         init_agent_status_set(AGN_ID_HTTP_SERVICES, 0,
                               INIT_AGENT_ERR_REMOTE_LOGIN_FAILED);
         ESP_LOGW(TAG, "[M] [HTTP_SVC] Login iniziale token fallito: %s",
@@ -1102,10 +1221,13 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
  * @param event_data Dati associati all'evento Ethernet.
  */
 static void eth_event_handler(void *arg, esp_event_base_t event_base,
-                              int32_t event_id, void *event_data) {
+                              int32_t event_id, void *event_data)
+{
   (void)arg;
-  switch (event_id) {
-  case ETHERNET_EVENT_CONNECTED: {
+  switch (event_id)
+  {
+  case ETHERNET_EVENT_CONNECTED:
+  {
     uint8_t mac_addr[6] = {0};
     esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
     esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
@@ -1113,7 +1235,8 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
     ESP_LOGI(TAG, "[M] Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
              mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4],
              mac_addr[5]);
-  } break;
+  }
+  break;
   case ETHERNET_EVENT_DISCONNECTED:
     ESP_LOGW(TAG, "[M] Collegamento Ethernet inattivo");
     break;
@@ -1138,19 +1261,22 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
  *         - ESP_OK: inizializzazione avvenuta con successo.
  *         - ESP_FAIL: inizializzazione fallita.
  */
-static esp_err_t init_event_loop(void) {
+static esp_err_t init_event_loop(void)
+{
   // Nota: esp_netif_init() e esp_event_loop_create_default() vengono chiamati
   // in start_ethernet() DOPO aver inizializzato il driver Ethernet, come
   // nell'esempio funzionante Inizializza sempre netif/event loop prima di
   // eventuali socket (HTTP server, etc.) per evitare assert lwIP "Invalid mbox"
   // se Ethernet è disabilitato/non avviato.
   esp_err_t ret = esp_netif_init();
-  if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+  if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+  {
     return ret;
   }
 
   ret = esp_event_loop_create_default();
-  if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+  if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
+  {
     return ret;
   }
 
@@ -1165,7 +1291,8 @@ static esp_err_t init_event_loop(void) {
  *
  * @return esp_eth_handle_t Handle interno per l'ethernet.
  */
-static esp_eth_handle_t eth_init_internal(void) {
+static esp_eth_handle_t eth_init_internal(void)
+{
   esp_err_t ret __attribute__((unused)) = ESP_OK;
   // Inizializza le config comuni MAC e PHY ai valori di default
   // Nota: Il reset PHY viene gestito automaticamente dal driver quando
@@ -1196,13 +1323,16 @@ static esp_eth_handle_t eth_init_internal(void) {
 
   return eth_handle;
 err:
-  if (eth_handle != NULL) {
+  if (eth_handle != NULL)
+  {
     esp_eth_driver_uninstall(eth_handle);
   }
-  if (mac != NULL) {
+  if (mac != NULL)
+  {
     mac->del(mac);
   }
-  if (phy != NULL) {
+  if (phy != NULL)
+  {
     phy->del(phy);
   }
   return NULL;
@@ -1217,12 +1347,14 @@ err:
  *         - ESP_OK: Operazione riuscita.
  *         - ESP_FAIL: Operazione fallita.
  */
-static esp_err_t start_ethernet(void) {
+static esp_err_t start_ethernet(void)
+{
 #if CONFIG_APP_ETH_ENABLED
   esp_err_t ret = ESP_OK;
 
   // Check for GPIO conflicts
-  if (CONFIG_APP_ETH_MDC_GPIO == CONFIG_APP_MDB_RX_GPIO) {
+  if (CONFIG_APP_ETH_MDC_GPIO == CONFIG_APP_MDB_RX_GPIO)
+  {
     ESP_LOGW(TAG,
              "[M] ATTENZIONE: Conflitto GPIO! ETH_MDC_GPIO (%d) e MDB_RX_GPIO "
              "(%d) usano lo stesso pin",
@@ -1237,7 +1369,8 @@ static esp_err_t start_ethernet(void) {
 
   // Inizializza il driver Ethernet ai valori di default e installalo
   esp_eth_handle_t eth_handle = eth_init_internal();
-  if (!eth_handle) {
+  if (!eth_handle)
+  {
     ESP_LOGE(TAG, "[M] Installazione driver Ethernet fallita");
     return ESP_FAIL;
   }
@@ -1252,7 +1385,8 @@ static esp_err_t start_ethernet(void) {
   // (come nell'esempio funzionante)
   esp_netif_config_t netif_cfg = ESP_NETIF_DEFAULT_ETH();
   s_netif_eth = esp_netif_new(&netif_cfg);
-  if (!s_netif_eth) {
+  if (!s_netif_eth)
+  {
     ESP_LOGE(TAG, "[M] Impossibile allocare Ethernet netif");
     esp_eth_driver_uninstall(eth_handle);
     return ESP_FAIL;
@@ -1283,7 +1417,8 @@ static esp_err_t start_ethernet(void) {
   ESP_LOGI(TAG, "[M] EXIT from ip_event_handlers");
   // Applica configurazione IP statica se DHCP è disabilitato
   device_config_t *cfg = device_config_get();
-  if (!cfg->eth.dhcp_enabled && strlen(cfg->eth.ip) > 0) {
+  if (!cfg->eth.dhcp_enabled && strlen(cfg->eth.ip) > 0)
+  {
     esp_netif_dhcpc_stop(s_netif_eth);
     esp_netif_ip_info_t ip_info;
     ip_info.ip.addr = ipaddr_addr(cfg->eth.ip);
@@ -1293,18 +1428,24 @@ static esp_err_t start_ethernet(void) {
 
     // Imposta i server DNS quando si usa IP statico
     esp_netif_dns_info_t dns_info;
-    if (strlen(cfg->eth.dns1) > 0) {
+    if (strlen(cfg->eth.dns1) > 0)
+    {
       dns_info.ip.u_addr.ip4.addr = ipaddr_addr(cfg->eth.dns1);
-    } else {
+    }
+    else
+    {
       dns_info.ip.u_addr.ip4.addr =
           ipaddr_addr("8.8.8.8"); // Google DNS default
     }
     dns_info.ip.type = ESP_IPADDR_TYPE_V4;
     esp_netif_set_dns_info(s_netif_eth, ESP_NETIF_DNS_MAIN, &dns_info);
 
-    if (strlen(cfg->eth.dns2) > 0) {
+    if (strlen(cfg->eth.dns2) > 0)
+    {
       dns_info.ip.u_addr.ip4.addr = ipaddr_addr(cfg->eth.dns2);
-    } else {
+    }
+    else
+    {
       dns_info.ip.u_addr.ip4.addr =
           ipaddr_addr("8.8.4.4"); // Google DNS secondary default
     }
@@ -1317,7 +1458,8 @@ static esp_err_t start_ethernet(void) {
 
   // Start Ethernet driver (come nel progetto factory)
   ret = esp_eth_start(eth_handle);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] Avvio Ethernet fallito: %s", esp_err_to_name(ret));
     esp_eth_del_netif_glue(glue);
     esp_eth_driver_uninstall(eth_handle);
@@ -1349,7 +1491,8 @@ static esp_err_t start_ethernet(void) {
  * - ESP_OK: Inizializzazione avvenuta con successo.
  * - ESP_FAIL: Inizializzazione fallita.
  */
-static esp_err_t init_display_lvgl_minimal(void) {
+static esp_err_t init_display_lvgl_minimal(void)
+{
   ESP_LOGI(TAG, "Heap before display init:");
   ESP_LOGI(
       TAG, "  INTERNAL free: %u",
@@ -1378,7 +1521,8 @@ static esp_err_t init_display_lvgl_minimal(void) {
   cfg.lvgl_port_cfg.task_stack = 32768;
 
   lv_display_t *disp = bsp_display_start_with_config(&cfg);
-  if (!disp) {
+  if (!disp)
+  {
     return ESP_FAIL;
   }
 
@@ -1399,17 +1543,22 @@ static esp_err_t init_display_lvgl_minimal(void) {
 
   // Luminosità: non fatale — schermo visibile è prioritario rispetto alla
   // brightness corretta
-  if (bsp_display_brightness_init() != ESP_OK) {
+  if (bsp_display_brightness_init() != ESP_OK)
+  {
     ESP_LOGW(TAG,
              "[M] brightness_init fallita: backlight potrebbe restare fisso");
-  } else {
+  }
+  else
+  {
     device_config_t *device_cfg = device_config_get();
     uint8_t brightness = device_cfg->display.lcd_brightness;
-    if (brightness == 0) {
+    if (brightness == 0)
+    {
       ESP_LOGW(TAG, "[M] lcd_brightness=0 in config, forzo 80%%");
       brightness = 80;
     }
-    if (bsp_display_brightness_set(brightness) != ESP_OK) {
+    if (bsp_display_brightness_set(brightness) != ESP_OK)
+    {
       ESP_LOGW(TAG, "[M] brightness_set(%u) fallita", (unsigned)brightness);
     }
     ESP_LOGI(TAG, "[M] Luminosità display: %u%%", (unsigned)brightness);
@@ -1426,14 +1575,19 @@ static esp_err_t init_display_lvgl_minimal(void) {
       .dummy = NULL,
   };
   esp_err_t touch_ret = bsp_touch_new(&touch_cfg, &s_touch_handle);
-  if (touch_ret != ESP_OK) {
+  if (touch_ret != ESP_OK)
+  {
     ESP_LOGW(TAG, "[M] Touch init fallita (%s): display operativo senza touch",
              esp_err_to_name(touch_ret));
     s_touch_handle = NULL;
-  } else if (s_touch_handle) {
+  }
+  else if (s_touch_handle)
+  {
     ESP_LOGI(TAG, "[M] Touch handle inizializzato: %p", s_touch_handle);
     tasks_set_touchscreen_handle(s_touch_handle);
-  } else {
+  }
+  else
+  {
     ESP_LOGW(TAG, "[M] Touch handle è NULL dopo init");
   }
 
@@ -1452,14 +1606,16 @@ static esp_err_t init_display_lvgl_minimal(void) {
  * - ESP_OK: Inizializzazione avvenuta con successo.
  * - ESP_FAIL: Inizializzazione fallita.
  */
-esp_err_t init_run_display_only(void) {
+esp_err_t init_run_display_only(void)
+{
 #if defined(DNA_LVGL) && (DNA_LVGL == 1)
   ESP_LOGI(TAG, "[M] init_run_display_only: DNA_LVGL mock attivo, display non "
                 "disponibile");
   return ESP_ERR_NOT_SUPPORTED;
 #else
   device_config_t *cfg = device_config_get();
-  if (!cfg || !cfg->display.enabled) {
+  if (!cfg || !cfg->display.enabled)
+  {
     ESP_LOGI(TAG, "[M] init_run_display_only: display disabilitato da config");
     return ESP_ERR_INVALID_STATE;
   }
@@ -1473,14 +1629,14 @@ esp_err_t init_run_display_only(void) {
    * USB host. */
   cfg_disp.lvgl_port_cfg.task_stack = 32768;
   lv_display_t *disp = bsp_display_start_with_config(&cfg_disp);
-  if (!disp) {
-    ESP_LOGE(
-        TAG,
-        "[M] init_run_display_only: bsp_display_start_with_config fallito");
+  if (!disp)
+  {
+    ESP_LOGE(TAG, "[M] init_run_display_only: bsp_display_start_with_config fallito");
     return ESP_FAIL;
   }
   bsp_display_rotate(disp, LV_DISPLAY_ROTATION_0);
-  if (bsp_display_brightness_init() == ESP_OK) {
+  if (bsp_display_brightness_init() == ESP_OK)
+  {
     bsp_display_brightness_set(cfg->display.lcd_brightness);
   }
   ESP_LOGI(TAG,
@@ -1504,7 +1660,8 @@ static void generic_i2c_diagnostic_scan(i2c_master_bus_handle_t bus,
  * - ESP_OK: Operazione completata con successo.
  * - ESP_FAIL: Operazione fallita.
  */
-esp_err_t init_run_factory(void) {
+esp_err_t init_run_factory(void)
+{
   init_agent_status_reset_defaults();
   s_http_services_initial_token_done = false;
 
@@ -1548,14 +1705,17 @@ esp_err_t init_run_factory(void) {
 #if !defined(DNA_REMOTE_LOGGING) || (DNA_REMOTE_LOGGING == 0)
   {
     esp_err_t rl_ret = remote_logging_init();
-    if (rl_ret != ESP_OK) {
+    if (rl_ret != ESP_OK)
+    {
       ESP_LOGW(TAG,
                "[M] remote_logging_init early failed (%s), continuo senza "
                "remote logs",
                esp_err_to_name(rl_ret));
       init_agent_status_set(AGN_ID_REMOTE_LOGGING, 0,
                             INIT_AGENT_ERR_INIT_FAILED);
-    } else {
+    }
+    else
+    {
       ESP_LOGI(TAG,
                "[M] remote_logging early init attivo (log pre-rete catturati)");
       init_agent_status_set(AGN_ID_REMOTE_LOGGING, 1, INIT_AGENT_ERR_NONE);
@@ -1574,7 +1734,8 @@ esp_err_t init_run_factory(void) {
    * send an event before the daemon task had started and our old init
    * reentrant logic would reset the mailbox repeatedly.
    */
-  if (!fsm_event_queue_init(0)) {
+  if (!fsm_event_queue_init(0))
+  {
     init_agent_status_set(AGN_ID_FSM, 0, INIT_AGENT_ERR_INIT_FAILED);
     return ESP_FAIL;
   }
@@ -1583,7 +1744,8 @@ esp_err_t init_run_factory(void) {
   // Tentativo rapido pre-boot di invio crash (best-effort, timeout corto)
   ESP_ERROR_CHECK(try_send_pending_crash_record());
 
-  if (s_error_lock_active) {
+  if (s_error_lock_active)
+  {
     return ESP_ERR_INVALID_STATE;
   }
 
@@ -1609,7 +1771,8 @@ esp_err_t init_run_factory(void) {
 
 #if FORCE_VIDEO_DISABLED
   /* Override runtime: blocca ogni inizializzazione video in questa build */
-  if (cfg->display.enabled) {
+  if (cfg->display.enabled)
+  {
     ESP_LOGW(TAG,
              "[M] FORCE_VIDEO_DISABLED attivo: disabilito display da runtime");
   }
@@ -1618,27 +1781,36 @@ esp_err_t init_run_factory(void) {
 
   s_display_ready = false;
 
-  if (cfg->display.enabled) {
+  if (cfg->display.enabled)
+  {
     esp_err_t disp_ret = init_display_lvgl_minimal();
-    if (disp_ret != ESP_OK) {
+    if (disp_ret != ESP_OK)
+    {
       ESP_LOGW(TAG, "[M] Display/LVGL init failed: %s",
                esp_err_to_name(disp_ret));
       init_agent_status_set(AGN_ID_LVGL, 0, INIT_AGENT_ERR_INIT_FAILED);
       init_agent_status_set(AGN_ID_WAVESHARE_LCD, 0,
                             INIT_AGENT_ERR_INIT_FAILED);
       init_agent_status_set(AGN_ID_TOUCH, 0, INIT_AGENT_ERR_INIT_FAILED);
-    } else {
+    }
+    else
+    {
       init_agent_status_set(AGN_ID_LVGL, 1, INIT_AGENT_ERR_NONE);
       init_agent_status_set(AGN_ID_WAVESHARE_LCD, 1, INIT_AGENT_ERR_NONE);
-      if (s_touch_handle) {
+      if (s_touch_handle)
+      {
         init_agent_status_set(AGN_ID_TOUCH, 1, INIT_AGENT_ERR_NONE);
-      } else {
+      }
+      else
+      {
         init_agent_status_set(AGN_ID_TOUCH, 0, INIT_AGENT_ERR_INIT_FAILED);
       }
       s_display_ready = true;
       init_lvgl_status_log("Init: display e touch pronti");
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "[M] Display disabilitato da config: salto init LVGL/display "
                   "(modalità headless)");
     init_agent_status_set(AGN_ID_LVGL, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
@@ -1647,23 +1819,30 @@ esp_err_t init_run_factory(void) {
     init_agent_status_set(AGN_ID_TOUCH, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
-  if (http_services_is_remote_enabled()) {
+  if (http_services_is_remote_enabled())
+  {
     init_agent_status_set(AGN_ID_HTTP_SERVICES, 1,
                           INIT_AGENT_ERR_NETWORK_NO_IP);
-  } else {
+  }
+  else
+  {
     init_agent_status_set(AGN_ID_HTTP_SERVICES, 1,
                           INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
   // Ethernet - continua anche se fallisce
   init_lvgl_status_log("Init: inizializzazione rete");
-  if (cfg->eth.enabled) {
+  if (cfg->eth.enabled)
+  {
     esp_err_t eth_ret =
         start_ethernet(); // TODO: aggiornare start_ethernet per usare cfg
-    if (eth_ret != ESP_OK) {
+    if (eth_ret != ESP_OK)
+    {
       ESP_LOGW(TAG, "[M] Ethernet non disponibile, continuo senza");
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "[M] Ethernet disabilitato da config");
   }
 
@@ -1674,7 +1853,8 @@ esp_err_t init_run_factory(void) {
   // Inizializza e avvia Web UI (Server + Handler)
   init_lvgl_status_log("Init: avvio Web UI");
   esp_err_t web_ret = web_ui_init();
-  if (web_ret != ESP_OK) {
+  if (web_ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] web_ui_init fallita: %s", esp_err_to_name(web_ret));
     init_agent_status_set(AGN_ID_WEB_UI, 0, INIT_AGENT_ERR_INIT_FAILED);
     return web_ret;
@@ -1687,7 +1867,8 @@ esp_err_t init_run_factory(void) {
   // Carica la tabella activity da SPIFFS (solo build APP)
   init_lvgl_status_log("Init: caricamento activity");
   esp_err_t activity_ret = device_activity_init();
-  if (activity_ret != ESP_OK) {
+  if (activity_ret != ESP_OK)
+  {
     init_agent_status_set(AGN_ID_DEVICE_ACTIVITY, 0,
                           INIT_AGENT_ERR_INIT_FAILED);
     return activity_ret;
@@ -1699,15 +1880,17 @@ esp_err_t init_run_factory(void) {
   if (cfg->display.enabled)
     lvgl_panel_set_init_status("Init: periferiche hardware");
   init_lvgl_status_log("Init: periferiche hardware");
-  
+
   // Imposta flag abilitazione IO expander prima di qualsiasi operazione
   io_expander_set_config_enabled(cfg->sensors.io_expander_enabled);
-  
-  if (cfg->sensors.io_expander_enabled) {
+
+  if (cfg->sensors.io_expander_enabled)
+  {
     // La porta I2C è già inizializzata sopra (BSP o legacy), io_expander_init
     // la riutilizzerà
     esp_err_t exp_ret = io_expander_init();
-    if (exp_ret != ESP_OK) {
+    if (exp_ret != ESP_OK)
+    {
       ESP_LOGW(TAG,
                "[M] I/O Expander non disponibile o errore (%s): proseguo senza "
                "bloccare l'esecuzione",
@@ -1715,35 +1898,45 @@ esp_err_t init_run_factory(void) {
       cfg->sensors.io_expander_enabled = false;
       init_agent_status_set(AGN_ID_IO_EXPANDER, 0, INIT_AGENT_ERR_INIT_FAILED);
     }
-    if (exp_ret == ESP_OK) {
+    if (exp_ret == ESP_OK)
+    {
       init_agent_status_set(AGN_ID_IO_EXPANDER, 1, INIT_AGENT_ERR_NONE);
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "I/O Expander disabilitato da config");
     init_agent_status_set(AGN_ID_IO_EXPANDER, 1,
                           INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
-  if (cfg->sensors.led_enabled) {
+  if (cfg->sensors.led_enabled)
+  {
     esp_err_t led_ret = led_init();
-    if (led_ret != ESP_OK) {
-      ESP_LOGE(TAG,
-               "[M] Inizializzazione LED fallita (%s): periferica disabilitata "
-               "a runtime",
+    if (led_ret != ESP_OK)
+    {
+      ESP_LOGE(TAG, "[M] Inizializzazione LED fallita (%s): periferica disabilitata "
+                    "a runtime",
                esp_err_to_name(led_ret));
       cfg->sensors.led_enabled = false;
       init_agent_status_set(AGN_ID_LED, 0, INIT_AGENT_ERR_INIT_FAILED);
-    } else {
+    }
+    else
+    {
       init_agent_status_set(AGN_ID_LED, 1, INIT_AGENT_ERR_NONE);
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "LED Strip disabilitato da config");
     init_agent_status_set(AGN_ID_LED, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
-  if (cfg->sensors.rs232_enabled) {
+  if (cfg->sensors.rs232_enabled)
+  {
     esp_err_t rs232_ret = rs232_init();
-    if (rs232_ret != ESP_OK) {
+    if (rs232_ret != ESP_OK)
+    {
       ESP_LOGE(TAG,
                "[M] Inizializzazione RS232 fallita (%s): periferica "
                "disabilitata a runtime",
@@ -1751,73 +1944,97 @@ esp_err_t init_run_factory(void) {
       cfg->sensors.rs232_enabled = false;
       init_agent_status_set(AGN_ID_RS232, 0, INIT_AGENT_ERR_INIT_FAILED);
       init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_DEPENDENCY_FAILED);
-    } else {
+    }
+    else
+    {
       init_agent_status_set(AGN_ID_RS232, 1, INIT_AGENT_ERR_NONE);
       /* Avvia anche il driver CCtalk (se presente) che usa la stessa UART
        * fisica */
       esp_err_t cctalk_ret = cctalk_driver_init();
-      if (cctalk_ret != ESP_OK) {
+      if (cctalk_ret != ESP_OK)
+      {
         ESP_LOGW(TAG, "CCTALK driver non avviato: %s",
                  esp_err_to_name(cctalk_ret));
         init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_INIT_FAILED);
-      } else {
+      }
+      else
+      {
         init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_NONE);
       }
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "UART RS232 disabilitato da config");
     init_agent_status_set(AGN_ID_RS232, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
-  if (cfg->sensors.rs485_enabled) {
-    if (cfg->modbus.enabled) {
+  if (cfg->sensors.rs485_enabled)
+  {
+    if (cfg->modbus.enabled)
+    {
       ESP_LOGI(
           TAG,
           "[M] RS485 gestita da Modbus: init UART differita al task rs485");
       init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_NONE);
-    } else {
+    }
+    else
+    {
       esp_err_t rs485_ret = rs485_init();
-      if (rs485_ret != ESP_OK) {
+      if (rs485_ret != ESP_OK)
+      {
         ESP_LOGE(TAG,
                  "[M] Inizializzazione RS485 fallita (%s): periferica "
                  "disabilitata a runtime",
                  esp_err_to_name(rs485_ret));
         cfg->sensors.rs485_enabled = false;
         init_agent_status_set(AGN_ID_RS485, 0, INIT_AGENT_ERR_INIT_FAILED);
-      } else {
+      }
+      else
+      {
         init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_NONE);
       }
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "UART RS485 disabilitato da config");
     init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
-  if (cfg->sensors.mdb_enabled) {
+  if (cfg->sensors.mdb_enabled)
+  {
     /* mdb_init() inizializza solo l'hardware UART.
      * Il task di polling (mdb_engine) è avviato da tasks_start_all() via
      * s_tasks[]. */
     esp_err_t mdb_ret = mdb_init();
 
-    if (mdb_ret != ESP_OK) {
+    if (mdb_ret != ESP_OK)
+    {
       ESP_LOGE(TAG,
                "[M] Inizializzazione MDB fallita (%s): periferica disabilitata "
                "a runtime",
                esp_err_to_name(mdb_ret));
       cfg->sensors.mdb_enabled = false;
       init_agent_status_set(AGN_ID_MDB, 0, INIT_AGENT_ERR_INIT_FAILED);
-    } else {
+    }
+    else
+    {
       init_agent_status_set(AGN_ID_MDB, 1, INIT_AGENT_ERR_NONE);
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "MDB Engine disabilitato da config");
     init_agent_status_set(AGN_ID_MDB, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
-  if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled) {
+  if (cfg->sensors.pwm1_enabled || cfg->sensors.pwm2_enabled)
+  {
     esp_err_t pwm_ret = pwm_init();
-    if (pwm_ret != ESP_OK) {
+    if (pwm_ret != ESP_OK)
+    {
       ESP_LOGE(TAG,
                "[M] Inizializzazione PWM fallita (%s): PWM1/PWM2 disabilitati "
                "a runtime",
@@ -1826,7 +2043,9 @@ esp_err_t init_run_factory(void) {
       cfg->sensors.pwm2_enabled = false;
       init_agent_status_set(AGN_ID_PWM1, 0, INIT_AGENT_ERR_INIT_FAILED);
       init_agent_status_set(AGN_ID_PWM2, 0, INIT_AGENT_ERR_INIT_FAILED);
-    } else {
+    }
+    else
+    {
       init_agent_status_set(AGN_ID_PWM1, 1,
                             cfg->sensors.pwm1_enabled
                                 ? INIT_AGENT_ERR_NONE
@@ -1836,23 +2055,31 @@ esp_err_t init_run_factory(void) {
                                 ? INIT_AGENT_ERR_NONE
                                 : INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "PWM Hardware disabilitato da config");
     init_agent_status_set(AGN_ID_PWM1, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     init_agent_status_set(AGN_ID_PWM2, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
-  if (cfg->sensors.temperature_enabled) {
+  if (cfg->sensors.temperature_enabled)
+  {
     esp_err_t sht_ret = sht40_init();
-    if (sht_ret != ESP_OK) {
+    if (sht_ret != ESP_OK)
+    {
       ESP_LOGE(TAG, "[M] Inizializzazione SHT40 fallita! Sensore temperatura "
                     "disabilitato a runtime");
       cfg->sensors.temperature_enabled = false;
       init_agent_status_set(AGN_ID_SHT40, 0, INIT_AGENT_ERR_INIT_FAILED);
-    } else {
+    }
+    else
+    {
       init_agent_status_set(AGN_ID_SHT40, 1, INIT_AGENT_ERR_NONE);
     }
-  } else {
+  }
+  else
+  {
     init_agent_status_set(AGN_ID_SHT40, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 
@@ -1860,20 +2087,26 @@ esp_err_t init_run_factory(void) {
    * (sd_monitor_wrapper). sd_card_init_monitor() è mantenuta per
    * retrocompatibilità ma è ora una no-op. */
 
-  if (cfg->sensors.sd_card_enabled) {
+  if (cfg->sensors.sd_card_enabled)
+  {
     esp_err_t sd_ret = sd_card_mount();
-    if (sd_ret != ESP_OK) {
+    if (sd_ret != ESP_OK)
+    {
       ESP_LOGE(TAG,
                "[M] Inizializzazione SD Card fallita (%s): periferica "
                "disabilitata a runtime",
                esp_err_to_name(sd_ret));
       cfg->sensors.sd_card_enabled = false;
       init_agent_status_set(AGN_ID_SD_CARD, 0, INIT_AGENT_ERR_INIT_FAILED);
-    } else {
+    }
+    else
+    {
       (void)transfer_coredump_flash_to_sd();
       init_agent_status_set(AGN_ID_SD_CARD, 1, INIT_AGENT_ERR_NONE);
     }
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "[M] SD Card disabilitata da config");
     init_agent_status_set(AGN_ID_SD_CARD, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
@@ -1895,7 +2128,8 @@ esp_err_t init_run_factory(void) {
  */
 static void generic_i2c_diagnostic_scan(i2c_master_bus_handle_t bus,
                                         const char *bus_name,
-                                        int timeout_ticks) {
+                                        int timeout_ticks)
+{
   // Usa un flag statico per eseguire una sola volta (basato sul bus_name)
   static bool s_bsp_scanned = false;
   static bool s_periph_scanned = false;
@@ -1904,30 +2138,37 @@ static void generic_i2c_diagnostic_scan(i2c_master_bus_handle_t bus,
   bool *scan_flag =
       (strstr(bus_name, "BSP") != NULL) ? &s_bsp_scanned : &s_periph_scanned;
 
-  if (*scan_flag) {
+  if (*scan_flag)
+  {
     return; // Già scansionato una volta
   }
   *scan_flag = true;
 
-  if (bus == NULL) {
-    ESP_LOGE(TAG, "[C][I2C-DIAG] bus %s non disponibile", bus_name);
+  if (bus == NULL)
+  {
+    ESP_LOGI(TAG, "[C][I2C-DIAG] bus %s non disponibile", bus_name);
     return;
   }
 
-  ESP_LOGE(TAG, "[C][I2C-DIAG] scan I2C %s (indirizzo 0x03-0x77)", bus_name);
+  ESP_LOGI(TAG, "[C][I2C-DIAG] scan I2C %s (indirizzo 0x03-0x77)", bus_name);
   int found = 0;
-  for (uint8_t addr = 0x03; addr < 0x78; addr++) {
+  for (uint8_t addr = 0x03; addr < 0x78; addr++)
+  {
     esp_err_t probe_ret = i2c_master_probe(bus, addr, timeout_ticks);
-    if (probe_ret == ESP_OK) {
-      ESP_LOGE(TAG, "[C][I2C-DIAG] trovato device @0x%02X", addr);
+    if (probe_ret == ESP_OK)
+    {
+      ESP_LOGI(TAG, "[C][I2C-DIAG] trovato device @0x%02X", addr);
       found++;
     }
   }
 
-  if (found == 0) {
-    ESP_LOGE(TAG, "[C][I2C-DIAG] Nessun device trovato su %s", bus_name);
-  } else {
-    ESP_LOGE(TAG, "[C][I2C-DIAG] totale device trovati: %d", found);
+  if (found == 0)
+  {
+    ESP_LOGI(TAG, "[C][I2C-DIAG] Nessun device trovato su %s", bus_name);
+  }
+  else
+  {
+    ESP_LOGI(TAG, "[C][I2C-DIAG] totale device trovati: %d", found);
   }
 }
 
@@ -1952,7 +2193,8 @@ led_strip_handle_t init_get_ws2812_handle(void) { return led_get_handle(); }
  *
  * @return Nessun valore di ritorno.
  */
-void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth) {
+void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
+{
   if (ap)
     *ap = s_netif_ap;
   if (sta)
@@ -1969,16 +2211,20 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth) {
  *  @param [in] Nessun parametro di input.
  *  @return Nessun valore di ritorno.
  */
-void init_i2c_and_io_expander(void) {
+void init_i2c_and_io_expander(void)
+{
 #if defined(CONFIG_BSP_I2C_NUM)
   ESP_LOGI(TAG,
            "[M] [I2C] Avvio init bus I2C BSP Monitor (port=%d SDA=%d SCL=%d)",
            BSP_I2C_NUM, BSP_I2C_SDA, BSP_I2C_SCL);
   esp_err_t i2c_ret = bsp_i2c_init();
-  if (i2c_ret != ESP_OK) {
+  if (i2c_ret != ESP_OK)
+  {
     ESP_LOGW(TAG, "[M] [I2C] Init bus I2C BSP fallita: %s",
              esp_err_to_name(i2c_ret));
-  } else {
+  }
+  else
+  {
     ESP_LOGI(TAG, "[M] [I2C] Bus I2C BSP inizializzato correttamente");
   }
 #else
@@ -2005,7 +2251,8 @@ void init_i2c_and_io_expander(void) {
   init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NONE);
 
   esp_err_t exp_ret = io_expander_init();
-  if (exp_ret != ESP_OK) {
+  if (exp_ret != ESP_OK)
+  {
     ESP_LOGW(TAG,
              "[M] [IOX] I/O Expander non disponibile o errore (%s): proseguo "
              "senza bloccare l'esecuzione",
@@ -2103,22 +2350,26 @@ uint32_t init_get_consecutive_reboots(void) { return s_consecutive_reboots; }
  *         - ESP_OK: operazione riuscita
  *         - ESP_FAIL: operazione fallita
  */
-esp_err_t init_mark_boot_completed(void) {
+esp_err_t init_mark_boot_completed(void)
+{
   nvs_handle_t handle;
   esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] [C] apertura NVS boot_completed fallita: %s",
              esp_err_to_name(ret));
     return ret;
   }
 
   ret = nvs_set_u32(handle, BOOT_GUARD_KEY_CONSEC, 0);
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     ret = nvs_commit(handle);
   }
   nvs_close(handle);
 
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     s_consecutive_reboots = 0;
     s_error_lock_active = false;
     ESP_LOGI(TAG,
@@ -2138,22 +2389,26 @@ esp_err_t init_mark_boot_completed(void) {
  * @return esp_err_t - Codice di errore che indica il successo o la fallita
  * dell'operazione.
  */
-esp_err_t init_mark_forced_crash_request(void) {
+esp_err_t init_mark_forced_crash_request(void)
+{
   nvs_handle_t handle;
   esp_err_t ret = nvs_open(BOOT_GUARD_NAMESPACE, NVS_READWRITE, &handle);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(TAG, "[M] [C] apertura NVS force_crash fallita: %s",
              esp_err_to_name(ret));
     return ret;
   }
 
   ret = nvs_set_u32(handle, BOOT_GUARD_KEY_FORCE_CRASH, 1);
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     ret = nvs_commit(handle);
   }
   nvs_close(handle);
 
-  if (ret == ESP_OK) {
+  if (ret == ESP_OK)
+  {
     ESP_LOGW(TAG, "[M] [C] marker force_crash registrato");
   }
   return ret;

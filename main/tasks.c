@@ -119,6 +119,91 @@ float tasks_get_temperature(void) { return s_temperature; }
  */
 float tasks_get_humidity(void) { return s_humidity; }
 
+/**
+ * @brief Pubblica un evento KEY verso la FSM.
+ *
+ * Hook da richiamare quando verrà implementato il pulsante fisico dedicato.
+ *
+ * @return true se l'evento è stato accodato correttamente.
+ * @return false se la coda FSM non è pronta o piena.
+ */
+bool tasks_publish_key_event(void)
+{
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGW(TAG, "[M] Hook pulsante: coda FSM non disponibile");
+        return false;
+    }
+
+    fsm_input_event_t ev = {
+        .from = AGN_ID_AUX_GPIO,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_USER_ACTIVITY,
+        .type = FSM_INPUT_EVENT_KEY,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .text = {0},
+    };
+
+    if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
+        ESP_LOGW(TAG, "[M] Hook pulsante: publish evento KEY fallito");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "[M] Hook pulsante: evento KEY pubblicato");
+    return true;
+}
+
+/**
+ * @brief Pubblica un evento CARD_CREDIT verso la FSM.
+ *
+ * Hook da usare per integrazione futura del lettore chip card/MDB cashless.
+ *
+ * @param vcd_amount_cents Credito virtuale da accreditare (centesimi).
+ * @param source_tag Etichetta sorgente opzionale per tracciabilità.
+ * @return true se l'evento è stato accodato correttamente.
+ * @return false se input non valido o coda non disponibile.
+ */
+bool tasks_publish_card_credit_event(int32_t vcd_amount_cents, const char *source_tag)
+{
+    if (vcd_amount_cents <= 0) {
+        ESP_LOGW(TAG, "[M] Hook card: importo non valido (%ld)", (long)vcd_amount_cents);
+        return false;
+    }
+
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGW(TAG, "[M] Hook card: coda FSM non disponibile");
+        return false;
+    }
+
+    fsm_input_event_t ev = {
+        .from = AGN_ID_MDB,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_PAYMENT_ACCEPTED,
+        .type = FSM_INPUT_EVENT_CARD_CREDIT,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = vcd_amount_cents,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .text = {0},
+    };
+
+    if (source_tag && source_tag[0] != '\0') {
+        strncpy(ev.text, source_tag, sizeof(ev.text) - 1);
+    } else {
+        strncpy(ev.text, "card_credit_hook", sizeof(ev.text) - 1);
+    }
+
+    if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
+        ESP_LOGW(TAG, "[M] Hook card: publish CARD_CREDIT fallito");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "[M] Hook card: CARD_CREDIT pubblicato (%ld)", (long)vcd_amount_cents);
+    return true;
+}
+
 /* Wrapper: crea il task allocando lo stack in DRAM interna o PSRAM
  * in base al campo stack_caps del descrittore. */
 

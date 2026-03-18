@@ -96,6 +96,58 @@ static bool _json_read_int(cJSON *obj, const char *primary_key, const char *lega
 
 
 /**
+ * @brief Legge un booleano da JSON accettando formati bool/numero/stringa.
+ *
+ * Se il campo non è presente mantiene il valore corrente, evitando reset
+ * involontari a false durante il parsing di file parziali o legacy.
+ *
+ * @param [in] obj Oggetto JSON sorgente.
+ * @param [in] primary_key Chiave principale.
+ * @param [in] legacy_key Chiave legacy opzionale (può essere NULL).
+ * @param [in] current_value Valore corrente/fallback.
+ * @return bool Valore letto o fallback.
+ */
+static bool _json_read_bool(cJSON *obj,
+                            const char *primary_key,
+                            const char *legacy_key,
+                            bool current_value)
+{
+    if (!obj || !primary_key) {
+        return current_value;
+    }
+
+    cJSON *item = cJSON_GetObjectItem(obj, primary_key);
+    if (!item && legacy_key) {
+        item = cJSON_GetObjectItem(obj, legacy_key);
+    }
+    if (!item) {
+        return current_value;
+    }
+
+    if (cJSON_IsBool(item)) {
+        return cJSON_IsTrue(item);
+    }
+    if (cJSON_IsNumber(item)) {
+        return item->valuedouble != 0.0;
+    }
+    if (cJSON_IsString(item) && item->valuestring) {
+        if ((strcmp(item->valuestring, "true") == 0) ||
+            (strcmp(item->valuestring, "TRUE") == 0) ||
+            (strcmp(item->valuestring, "1") == 0)) {
+            return true;
+        }
+        if ((strcmp(item->valuestring, "false") == 0) ||
+            (strcmp(item->valuestring, "FALSE") == 0) ||
+            (strcmp(item->valuestring, "0") == 0)) {
+            return false;
+        }
+    }
+
+    return current_value;
+}
+
+
+/**
  * @brief Restituisce il valore se nel range, altrimenti il default.
  *
  * @param [in] value Valore da validare.
@@ -872,7 +924,7 @@ static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
     // Scrivi dati subito dopo l'header
     wr_err = eeprom_24lc16_write(EEPROM_HEADER_ADDR + sizeof(header), (const uint8_t *)json_str, header.length);
     if (wr_err != ESP_OK) {
-        ESP_LOGE(TAG,
+        ESP_LOGI(TAG,
                  "[C] Scrittura JSON EEPROM fallita (len=%lu, err=%s)",
                  (unsigned long)header.length,
                  esp_err_to_name(wr_err));
@@ -918,7 +970,7 @@ static char* _read_from_eeprom(bool *out_modified)
 
     uint32_t c_crc = _calculate_crc(json_str);
     if (c_crc != header.crc) {
-        ESP_LOGE(TAG, "[C] Errore CRC EEPROM: calc=0x%08lX, saved=0x%08lX", (unsigned long)c_crc, (unsigned long)header.crc);
+        ESP_LOGI(TAG, "[C] Errore CRC EEPROM: calc=0x%08lX, saved=0x%08lX", (unsigned long)c_crc, (unsigned long)header.crc);
         free(json_str);
         return NULL;
     }
@@ -1220,32 +1272,74 @@ esp_err_t device_config_load(device_config_t *config)
                 // Analisi config Sensori
                 cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
                 if (sensors_obj) {
-                    cJSON *_io = cJSON_GetObjectItem(sensors_obj, "io_exp"); if (!_io) _io = cJSON_GetObjectItem(sensors_obj, "io_expander_enabled");
-                    config->sensors.io_expander_enabled = cJSON_IsTrue(_io);
-                    cJSON *_temp = cJSON_GetObjectItem(sensors_obj, "temp"); if (!_temp) _temp = cJSON_GetObjectItem(sensors_obj, "temperature_enabled");
-                    config->sensors.temperature_enabled = cJSON_IsTrue(_temp);
-                    cJSON *_led = cJSON_GetObjectItem(sensors_obj, "led"); if (!_led) _led = cJSON_GetObjectItem(sensors_obj, "led_enabled");
-                    config->sensors.led_enabled = cJSON_IsTrue(_led);
+                    config->sensors.io_expander_enabled = _json_read_bool(
+                        sensors_obj,
+                        "io_exp",
+                        "io_expander_enabled",
+                        config->sensors.io_expander_enabled);
+
+                    config->sensors.temperature_enabled = _json_read_bool(
+                        sensors_obj,
+                        "temp",
+                        "temperature_enabled",
+                        config->sensors.temperature_enabled);
+
+                    config->sensors.led_enabled = _json_read_bool(
+                        sensors_obj,
+                        "led",
+                        "led_enabled",
+                        config->sensors.led_enabled);
+
                     cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_n"); if (!lc) lc = cJSON_GetObjectItem(sensors_obj, "led_count");
                     if (lc) config->sensors.led_count = (uint32_t)lc->valueint;
-                    cJSON *_r232 = cJSON_GetObjectItem(sensors_obj, "rs232"); if (!_r232) _r232 = cJSON_GetObjectItem(sensors_obj, "rs232_enabled");
-                    config->sensors.rs232_enabled = cJSON_IsTrue(_r232);
-                    cJSON *_r485 = cJSON_GetObjectItem(sensors_obj, "rs485"); if (!_r485) _r485 = cJSON_GetObjectItem(sensors_obj, "rs485_enabled");
-                    config->sensors.rs485_enabled = cJSON_IsTrue(_r485);
-                    cJSON *_mdb = cJSON_GetObjectItem(sensors_obj, "mdb"); if (!_mdb) _mdb = cJSON_GetObjectItem(sensors_obj, "mdb_enabled");
-                    config->sensors.mdb_enabled = cJSON_IsTrue(_mdb);
-                    cJSON *_cct = cJSON_GetObjectItem(sensors_obj, "cctalk"); if (!_cct) _cct = cJSON_GetObjectItem(sensors_obj, "cctalk_enabled");
-                    config->sensors.cctalk_enabled = cJSON_IsTrue(_cct);
-                    cJSON *eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom"); if (!eeprom_enabled) eeprom_enabled = cJSON_GetObjectItem(sensors_obj, "eeprom_enabled");
-                    if (eeprom_enabled) {
-                        config->sensors.eeprom_enabled = cJSON_IsTrue(eeprom_enabled);
-                    }
-                    cJSON *_pwm1 = cJSON_GetObjectItem(sensors_obj, "pwm1"); if (!_pwm1) _pwm1 = cJSON_GetObjectItem(sensors_obj, "pwm1_enabled");
-                    config->sensors.pwm1_enabled = cJSON_IsTrue(_pwm1);
-                    cJSON *_pwm2 = cJSON_GetObjectItem(sensors_obj, "pwm2"); if (!_pwm2) _pwm2 = cJSON_GetObjectItem(sensors_obj, "pwm2_enabled");
-                    config->sensors.pwm2_enabled = cJSON_IsTrue(_pwm2);
-                    cJSON *_sd = cJSON_GetObjectItem(sensors_obj, "sd"); if (!_sd) _sd = cJSON_GetObjectItem(sensors_obj, "sd_card_enabled");
-                    config->sensors.sd_card_enabled = cJSON_IsTrue(_sd);
+
+                    config->sensors.rs232_enabled = _json_read_bool(
+                        sensors_obj,
+                        "rs232",
+                        "rs232_enabled",
+                        config->sensors.rs232_enabled);
+
+                    config->sensors.rs485_enabled = _json_read_bool(
+                        sensors_obj,
+                        "rs485",
+                        "rs485_enabled",
+                        config->sensors.rs485_enabled);
+
+                    config->sensors.mdb_enabled = _json_read_bool(
+                        sensors_obj,
+                        "mdb",
+                        "mdb_enabled",
+                        config->sensors.mdb_enabled);
+
+                    config->sensors.cctalk_enabled = _json_read_bool(
+                        sensors_obj,
+                        "cctalk",
+                        "cctalk_enabled",
+                        config->sensors.cctalk_enabled);
+
+                    config->sensors.eeprom_enabled = _json_read_bool(
+                        sensors_obj,
+                        "eeprom",
+                        "eeprom_enabled",
+                        config->sensors.eeprom_enabled);
+
+                    config->sensors.pwm1_enabled = _json_read_bool(
+                        sensors_obj,
+                        "pwm1",
+                        "pwm1_enabled",
+                        config->sensors.pwm1_enabled);
+
+                    config->sensors.pwm2_enabled = _json_read_bool(
+                        sensors_obj,
+                        "pwm2",
+                        "pwm2_enabled",
+                        config->sensors.pwm2_enabled);
+
+                    config->sensors.sd_card_enabled = _json_read_bool(
+                        sensors_obj,
+                        "sd",
+                        "sd_card_enabled",
+                        config->sensors.sd_card_enabled);
                 }
 
                 // Analisi config Scanner USB

@@ -485,11 +485,11 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_COIN:
-            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (!ctx->allow_additional_payments && ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");
                 return false;
             }
+            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (event->value_i32 > 0) {
                 ctx->ecd_coins    += event->value_i32;
                 ctx->credit_cents += event->value_i32;
@@ -499,6 +499,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
         case FSM_INPUT_EVENT_TOKEN:
+            if (!ctx->allow_additional_payments && ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                fsm_append_message("Pagamento aggiuntivo non consentito");
+                return false;
+            }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (event->value_i32 > 0) {
                 ctx->ecd_coins    += event->value_i32;
@@ -595,10 +599,12 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_PROGRAM_SWITCH: {
             /* cambio programma a macchina running/paused:
-             * NON cambia stato, scala il tempo residuo al rateo del nuovo programma */
+             * scala il tempo residuo al rateo del nuovo programma;
+             * se era in pausa, riprende l'esecuzione */
             if (ctx->state != FSM_STATE_RUNNING && ctx->state != FSM_STATE_PAUSED) {
                 return false;
             }
+            bool was_paused = (ctx->state == FSM_STATE_PAUSED);
             uint32_t new_dur_ms  = event->aux_u32;   /* duration_sec * 1000 nuovo prg */
             uint32_t old_dur_ms  = ctx->running_target_ms;
             uint32_t elapsed     = ctx->running_elapsed_ms;
@@ -624,6 +630,16 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             if (event->value_u32 > 0) ctx->pause_max_ms = event->value_u32;
             snprintf(ctx->running_program_name, sizeof(ctx->running_program_name),
                      "%s", event->text[0] ? event->text : "programma");
+
+            if (was_paused) {
+                ctx->state = FSM_STATE_RUNNING;
+                ctx->program_running = true;
+                ctx->pause_elapsed_ms = 0;
+                ctx->pause_limit_reached = false;
+                ctx->inactivity_ms = 0;
+                return true;
+            }
+
             return false; /* nessun cambio di stato */
         }
 
