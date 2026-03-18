@@ -28,6 +28,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "led.h"
+#include "led_test.h"
 #include "led_strip.h"
 #include "lwip/etharp.h"
 #include "lwip/ip4_addr.h"
@@ -1924,6 +1925,9 @@ esp_err_t init_run_factory(void)
     else
     {
       init_agent_status_set(AGN_ID_LED, 1, INIT_AGENT_ERR_NONE);
+      // Ferma eventuali task LED test rainbow attivi all'avvio
+      led_test_stop();
+      ESP_LOGI(TAG, "[M] LED test rainbow fermato all'avvio");
     }
   }
   else

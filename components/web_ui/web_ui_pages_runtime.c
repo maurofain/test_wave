@@ -287,6 +287,7 @@ esp_err_t status_get_handler(httpd_req_t *req)
     }
 
     char *config_json = device_config_to_json(device_config_get());
+    device_config_t *cfg = device_config_get();
 
     bool remote_enabled = http_services_is_remote_enabled();
     bool remote_online = http_services_is_remote_online();
@@ -304,13 +305,13 @@ esp_err_t status_get_handler(httpd_req_t *req)
              "{\"partition_running\":\"%s\",\"partition_boot\":\"%s\",\"ip_ap\":\"%s\",\"ip_sta\":\"%s\",\"ip_eth\":\"%s\","
              "\"web\":{\"running\":%s},"
              "\"remote\":{\"enabled\":%s,\"online\":%s,\"token\":%s},"
-             "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%lu},"
+             "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%u},"
              "\"sd\":{\"mounted\":%s,\"present\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"},"
              "\"env\":{\"temp\":%.1f,\"hum\":%.1f},"
-             "\"dna\":{"
-               "\"pwm\":%d,\"led_strip\":%d,\"rs232\":%d,\"rs485\":%d,\"mdb\":%d,"
-               "\"sht40\":%d,\"cctalk\":%d,\"sd_card\":%d,\"ethernet\":%d,"
-               "\"wifi\":%d,\"scanner\":%d,\"io_expander\":%d,\"remote_logging\":%d"
+             "\"sensors\":{"
+               "\"io_expander\":%d,\"led_strip\":%d,\"rs232\":%d,\"rs485\":%d,\"mdb\":%d,"
+               "\"temperature\":%d,\"cctalk\":%d,\"sd_card\":%d,\"eeprom\":%d,"
+               "\"pwm1\":%d,\"pwm2\":%d,\"remote_logging\":%d"
              "},"
              "\"config\":%s}",
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,
@@ -318,14 +319,14 @@ esp_err_t status_get_handler(httpd_req_t *req)
              remote_enabled ? "true" : "false",
              remote_online ? "true" : "false",
              remote_token ? "true" : "false",
-             mdb->coin.is_online ? "true" : "false", mdb->coin.state, mdb->coin.credit_cents,
+             mdb->coin.is_online ? "true" : "false", mdb->coin.state, (unsigned int)mdb->coin.credit_cents,
              sd_mounted ? "true" : "false", sd_present ? "true" : "false",
              (unsigned long long)sd_total_kb, (unsigned long long)sd_used_kb,
              sd_card_get_last_error(),
              tasks_get_temperature(), tasks_get_humidity(),
-             DNA_PWM, DNA_LED_STRIP, DNA_RS232, DNA_RS485, DNA_MDB,
-             DNA_SHT40, DNA_CCTALK, DNA_SD_CARD, DNA_ETHERNET,
-             DNA_WIFI, DNA_USB_SCANNER, DNA_IO_EXPANDER, DNA_REMOTE_LOGGING,
+             cfg->sensors.io_expander_enabled, cfg->sensors.led_enabled, cfg->sensors.rs232_enabled, cfg->sensors.rs485_enabled, cfg->sensors.mdb_enabled,
+             cfg->sensors.temperature_enabled, cfg->sensors.cctalk_enabled, cfg->sensors.sd_card_enabled, cfg->sensors.eeprom_enabled,
+             cfg->sensors.pwm1_enabled, cfg->sensors.pwm2_enabled, cfg->remote_log.use_broadcast,
              config_json ? config_json : "{}");
 
     if (config_json) free(config_json);

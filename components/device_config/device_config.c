@@ -1647,18 +1647,18 @@ char* device_config_to_json(const device_config_t *config)
 
     // Sensors
     cJSON *sensors_obj = cJSON_CreateObject();
-    cJSON_AddBoolToObject(sensors_obj, "io_exp", config->sensors.io_expander_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "temp", config->sensors.temperature_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "led", config->sensors.led_enabled);
-    cJSON_AddNumberToObject(sensors_obj, "led_n", config->sensors.led_count);
-    cJSON_AddBoolToObject(sensors_obj, "rs232", config->sensors.rs232_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "rs485", config->sensors.rs485_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "mdb", config->sensors.mdb_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "cctalk", config->sensors.cctalk_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "eeprom", config->sensors.eeprom_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "pwm1", config->sensors.pwm1_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "pwm2", config->sensors.pwm2_enabled);
-    cJSON_AddBoolToObject(sensors_obj, "sd", config->sensors.sd_card_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "io_expander_enabled", config->sensors.io_expander_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "temperature_enabled", config->sensors.temperature_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "led_enabled", config->sensors.led_enabled);
+    cJSON_AddNumberToObject(sensors_obj, "led_count", config->sensors.led_count);
+    cJSON_AddBoolToObject(sensors_obj, "rs232_enabled", config->sensors.rs232_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "rs485_enabled", config->sensors.rs485_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "mdb_enabled", config->sensors.mdb_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "cctalk_enabled", config->sensors.cctalk_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "eeprom_enabled", config->sensors.eeprom_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "pwm1_enabled", config->sensors.pwm1_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "pwm2_enabled", config->sensors.pwm2_enabled);
+    cJSON_AddBoolToObject(sensors_obj, "sd_card_enabled", config->sensors.sd_card_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors_obj);
 
     // Scanner

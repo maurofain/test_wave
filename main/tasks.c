@@ -241,6 +241,12 @@ static BaseType_t task_create(task_param_t *t)
 static void ws2812_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
+    
+    // Disabilita questo task per evitare conflitti con il modulo LED dedicato
+    ESP_LOGW(TAG, "[M] ws2812_task disabilitato per evitare conflitti con modulo LED");
+    vTaskDelete(NULL);
+    return;
+    
     led_strip_handle_t strip = init_get_ws2812_handle();
     TickType_t last_wake = xTaskGetTickCount();
     uint8_t color = 0;

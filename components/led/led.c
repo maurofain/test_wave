@@ -192,8 +192,9 @@ esp_err_t led_fill_color(uint8_t red, uint8_t green, uint8_t blue)
     }
     
     esp_err_t err = ESP_OK;
+    // Invertiti G e B per correggere i colori del chip LED
     for (uint32_t i = 0; i < s_led_count; i++) {
-        err = led_strip_set_pixel(s_led_strip, i, red, green, blue);
+        err = led_strip_set_pixel(s_led_strip, i, red, blue, green);
         if (err != ESP_OK) break;
     }
     
@@ -227,11 +228,12 @@ esp_err_t led_set_pixel(uint32_t index, uint8_t red, uint8_t green, uint8_t blue
     
     if (index >= s_led_count) {
         LED_UNLOCK();
-        ESP_LOGW(TAG, "[C] Index %lu fuori range (max: %lu)", index, s_led_count - 1);
+        ESP_LOGE(TAG, "[C] Indice LED %lu fuori range (max: %lu)", index, s_led_count);
         return ESP_ERR_INVALID_ARG;
     }
     
-    esp_err_t err = led_strip_set_pixel(s_led_strip, index, red, green, blue);
+    // Invertiti G e B per correggere i colori del chip LED
+    esp_err_t err = led_strip_set_pixel(s_led_strip, index, red, blue, green);
     LED_UNLOCK();
     return err;
 }
