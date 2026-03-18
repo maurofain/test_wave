@@ -1,5 +1,6 @@
 #include "fsm.h"
 #include "tasks.h"
+#include "device_config.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
@@ -63,6 +64,7 @@ static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
     ctx->running_price_units = 0;
     memset(ctx->running_program_name, 0, sizeof(ctx->running_program_name));
     ctx->inactivity_ms = 0;
+    ctx->pre_fine_ciclo_active = false;
 }
 
 static void fsm_close_session(fsm_ctx_t *ctx, bool clear_credit)
@@ -316,6 +318,7 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->credit_reset_timeout_ms = FSM_DEFAULT_CREDIT_RESET_TIMEOUT_MS;
     ctx->ads_enabled = true;
     ctx->allow_additional_payments = false;
+    ctx->pre_fine_ciclo_active = false;
 }
 
 
@@ -678,6 +681,37 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
 
     if (ctx->state == FSM_STATE_RUNNING) {
         ctx->running_elapsed_ms += elapsed_ms;
+        
+        // Logica PreFineCiclo: attiva la segnalazione quando si raggiunge la percentuale configurata
+        if (!ctx->pre_fine_ciclo_active && ctx->running_target_ms > 0) {
+            device_config_t *cfg = device_config_get();
+            if (cfg && cfg->timeouts.pre_fine_ciclo_percent > 0 && cfg->timeouts.pre_fine_ciclo_percent < 100) {
+                uint32_t pre_fine_threshold_ms = (ctx->running_target_ms * cfg->timeouts.pre_fine_ciclo_percent) / 100;
+                if (ctx->running_elapsed_ms >= pre_fine_threshold_ms) {
+                    ctx->pre_fine_ciclo_active = true;
+                    // Pubblica evento PreFineCiclo per notificare altri componenti (LED, display, etc.)
+                    fsm_input_event_t pre_fine_event = {
+                        .from = AGN_ID_FSM,
+                        .to = {AGN_ID_LED, AGN_ID_LVGL, AGN_ID_WEB_UI},
+                        .action = ACTION_ID_PROGRAM_PREFINE_CYCLO,
+                        .type = FSM_INPUT_EVENT_NONE,
+                        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+                        .value_i32 = 0,
+                        .value_u32 = 0,
+                        .aux_u32 = 0,
+                        .data_ptr = NULL,
+                        .text = {0}
+                    };
+                    fsm_event_publish(&pre_fine_event, pdMS_TO_TICKS(100));
+                    fsm_append_message("PreFineCiclo: soglia raggiunta");
+                    ESP_LOGI(TAG, "[M] PreFineCiclo attivo - %u%% raggiunta (%lu ms / %lu ms)", 
+                             cfg->timeouts.pre_fine_ciclo_percent, 
+                             (unsigned long)ctx->running_elapsed_ms, 
+                             (unsigned long)ctx->running_target_ms);
+                }
+            }
+        }
+        
         if (ctx->running_target_ms > 0 && ctx->running_elapsed_ms >= ctx->running_target_ms) {
             if (fsm_try_autorenew_running_program(ctx)) {
                 return false;

@@ -697,3 +697,189 @@ esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms)
 }
 
 #endif /* DNA_LED_STRIP */
+
+/* =========================================================================
+ * LED BAR - Device virtuale per gestione 2 strisce sincrone
+ * ========================================================================= */
+
+static struct {
+    bool initialized;
+    uint32_t total_leds;
+    uint32_t half_leds;  /* LED per ogni striscia */
+    led_bar_state_t state;
+    uint8_t progress_percent;
+    uint32_t last_update_ms;
+    bool blink_state;
+    uint32_t blink_counter;
+} s_led_bar = {0};
+
+/* Colori definiti */
+#define LED_BAR_COLOR_IDLE_R     0
+#define LED_BAR_COLOR_IDLE_G     50
+#define LED_BAR_COLOR_IDLE_B     100
+#define LED_BAR_COLOR_RUN_R      0
+#define LED_BAR_COLOR_RUN_G      255
+#define LED_BAR_COLOR_RUN_B      0
+#define LED_BAR_COLOR_PREFINE_R  128
+#define LED_BAR_COLOR_PREFINE_G  0
+#define LED_BAR_COLOR_PREFINE_B  128
+#define LED_BAR_COLOR_FINISH_R   128
+#define LED_BAR_COLOR_FINISH_G   0
+#define LED_BAR_COLOR_FINISH_B   128
+
+esp_err_t led_bar_init(uint32_t total_leds)
+{
+    if (total_leds == 0 || total_leds % 2 != 0) {
+        ESP_LOGE(TAG, "[LED_BAR] Numero LED deve essere pari e > 0");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    s_led_bar.total_leds = total_leds;
+    s_led_bar.half_leds = total_leds / 2;
+    s_led_bar.state = LED_BAR_STATE_OFF;
+    s_led_bar.progress_percent = 0;
+    s_led_bar.last_update_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    s_led_bar.blink_state = false;
+    s_led_bar.blink_counter = 0;
+    s_led_bar.initialized = true;
+    
+    ESP_LOGI(TAG, "[LED_BAR] Inizializzato con %u LED (%u per striscia)", 
+             total_leds, s_led_bar.half_leds);
+    
+    return led_bar_clear();
+}
+
+esp_err_t led_bar_set_state(led_bar_state_t state)
+{
+    if (!s_led_bar.initialized) return ESP_ERR_INVALID_STATE;
+    
+    if (s_led_bar.state != state) {
+        ESP_LOGI(TAG, "[LED_BAR] Stato cambiato: %d -> %d", s_led_bar.state, state);
+        s_led_bar.state = state;
+        s_led_bar.blink_counter = 0;
+        s_led_bar.blink_state = false;
+        
+        /* Reset progress se necessario */
+        if (state == LED_BAR_STATE_IDLE || state == LED_BAR_STATE_OFF) {
+            s_led_bar.progress_percent = 0;
+        }
+    }
+    
+    return ESP_OK;
+}
+
+esp_err_t led_bar_set_progress(uint8_t progress_percent)
+{
+    if (!s_led_bar.initialized) return ESP_ERR_INVALID_STATE;
+    if (progress_percent > 100) progress_percent = 100;
+    
+    s_led_bar.progress_percent = progress_percent;
+    
+    /* Transizione automatica a PRE-FINE se configurato */
+    device_config_t *cfg = device_config_get();
+    if (cfg && cfg->timeouts.pre_fine_ciclo_percent > 0) {
+        if (progress_percent >= cfg->timeouts.pre_fine_ciclo_percent && 
+            s_led_bar.state == LED_BAR_STATE_RUNNING) {
+            led_bar_set_state(LED_BAR_STATE_PREFINE);
+        }
+    }
+    
+    return ESP_OK;
+}
+
+static void led_bar_set_strip_color(uint8_t red, uint8_t green, uint8_t blue)
+{
+    /* Imposta lo stesso colore su entrambe le strisce */
+    for (uint32_t i = 0; i < s_led_bar.total_leds; i++) {
+        led_set_pixel(i, red, green, blue);
+    }
+    led_refresh();
+}
+
+static void led_bar_set_progress_color(uint8_t red, uint8_t green, uint8_t blue)
+{
+    /* Spegne tutto prima */
+    led_clear();
+    
+    /* Calcola LED da accendere su ogni striscia */
+    uint32_t leds_to_light = (s_led_bar.half_leds * s_led_bar.progress_percent) / 100;
+    if (leds_to_light > s_led_bar.half_leds) leds_to_light = s_led_bar.half_leds;
+    
+    /* Accende LED progressivi su entrambe le strisce */
+    for (uint32_t i = 0; i < leds_to_light; i++) {
+        /* Prima striscia */
+        led_set_pixel(i, red, green, blue);
+        /* Seconda striscia (sincrona) */
+        led_set_pixel(s_led_bar.half_leds + i, red, green, blue);
+    }
+    
+    led_refresh();
+}
+
+esp_err_t led_bar_update(void)
+{
+    if (!s_led_bar.initialized) return ESP_ERR_INVALID_STATE;
+    
+    uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    
+    switch (s_led_bar.state) {
+        case LED_BAR_STATE_IDLE:
+            /* Effetto respirazione lenta in IDLE */
+            if (now_ms - s_led_bar.last_update_ms >= 1000) {
+                uint8_t brightness = (sin(now_ms / 500.0) + 1.0) * 127.5;
+                led_bar_set_strip_color(
+                    LED_BAR_COLOR_IDLE_R * brightness / 255,
+                    LED_BAR_COLOR_IDLE_G * brightness / 255,
+                    LED_BAR_COLOR_IDLE_B * brightness / 255
+                );
+                s_led_bar.last_update_ms = now_ms;
+            }
+            break;
+            
+        case LED_BAR_STATE_RUNNING:
+            led_bar_set_progress_color(LED_BAR_COLOR_RUN_R, LED_BAR_COLOR_RUN_G, LED_BAR_COLOR_RUN_B);
+            break;
+            
+        case LED_BAR_STATE_PREFINE:
+            led_bar_set_progress_color(LED_BAR_COLOR_PREFINE_R, LED_BAR_COLOR_PREFINE_G, LED_BAR_COLOR_PREFINE_B);
+            break;
+            
+        case LED_BAR_STATE_FINISHED:
+            /* Lampeggio 2Hz porpora su tutte le strisce */
+            if (now_ms - s_led_bar.last_update_ms >= 250) {  /* 2Hz = 500ms, toggle ogni 250ms */
+                s_led_bar.blink_state = !s_led_bar.blink_state;
+                if (s_led_bar.blink_state) {
+                    led_bar_set_strip_color(LED_BAR_COLOR_FINISH_R, LED_BAR_COLOR_FINISH_G, LED_BAR_COLOR_FINISH_B);
+                } else {
+                    led_clear();
+                }
+                s_led_bar.last_update_ms = now_ms;
+                s_led_bar.blink_counter++;
+            }
+            break;
+            
+        case LED_BAR_STATE_OFF:
+            led_clear();
+            break;
+    }
+    
+    return ESP_OK;
+}
+
+esp_err_t led_bar_clear(void)
+{
+    if (!s_led_bar.initialized) return ESP_ERR_INVALID_STATE;
+    
+    led_clear();
+    s_led_bar.state = LED_BAR_STATE_OFF;
+    s_led_bar.progress_percent = 0;
+    s_led_bar.blink_state = false;
+    s_led_bar.blink_counter = 0;
+    
+    return ESP_OK;
+}
+
+led_bar_state_t led_bar_get_state(void)
+{
+    return s_led_bar.initialized ? s_led_bar.state : LED_BAR_STATE_OFF;
+}

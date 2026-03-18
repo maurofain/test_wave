@@ -78,3 +78,131 @@
   refreshIoExpanderPanel();
   setInterval(refreshIoExpanderPanel, 1000);
 })();
+
+/* LED Bar Test Integration */
+let ledBarTestActive = false;
+let ledBarTestTimer = null;
+let ledBarTestPhase = 'idle';
+
+async function startLedBarTest() {
+  if (ledBarTestActive) {
+    stopLedBarTest();
+    return;
+  }
+  
+  try {
+    ledBarTestActive = true;
+    ledBarTestPhase = 'idle';
+    
+    const btn = document.getElementById('btn_led_bar_test');
+    if (btn) {
+      btn.innerHTML = '{{098}}';
+      btn.style.background = '#e74c3c';
+    }
+    
+    const statusEl = document.getElementById('led_bar_status');
+    if (statusEl) {
+      statusEl.innerHTML = '⏳ {{099}}';
+    }
+    
+    // Inizializza LED bar (20 LED totali = 10 per striscia)
+    const initRes = await mbPost('test/led_bar_init', { total_leds: 20 });
+    if (!initRes.ok) {
+      throw new Error(initRes.error || 'LED bar init failed');
+    }
+    
+    // Imposta stato IDLE
+    await mbPost('test/led_bar_set_state', { state: 0 });
+    
+    // Avvia test sequenziale
+    ledBarTestTimer = setTimeout(() => {
+      if (ledBarTestActive) {
+        startProgressPhase();
+      }
+    }, 1000);
+    
+  } catch (error) {
+    console.error('LED bar test error:', error);
+    stopLedBarTest();
+    const statusEl = document.getElementById('led_bar_status');
+    if (statusEl) {
+      statusEl.innerHTML = '❌ ' + (error.message || 'Errore test');
+    }
+  }
+}
+
+async function startProgressPhase() {
+  if (!ledBarTestActive) return;
+  
+  ledBarTestPhase = 'progress';
+  
+  await mbPost('test/led_bar_set_state', { state: 1 });
+  
+  let progress = 0;
+  const progressInterval = setInterval(async () => {
+    if (!ledBarTestActive || progress > 100) {
+      clearInterval(progressInterval);
+      if (ledBarTestActive) {
+        startFinishedPhase();
+      }
+      return;
+    }
+    
+    try {
+      await mbPost('test/led_bar_set_progress', { progress_percent: progress });
+      progress += 5;
+    } catch (error) {
+      console.error('Progress error:', error);
+      clearInterval(progressInterval);
+      stopLedBarTest();
+    }
+  }, 250);
+}
+
+async function startFinishedPhase() {
+  if (!ledBarTestActive) return;
+  
+  ledBarTestPhase = 'finished';
+  
+  await mbPost('test/led_bar_set_state', { state: 3 });
+  
+  setTimeout(() => {
+    if (ledBarTestActive) {
+      stopLedBarTest();
+    }
+  }, 3000);
+}
+
+async function stopLedBarTest() {
+  ledBarTestActive = false;
+  
+  if (ledBarTestTimer) {
+    clearTimeout(ledBarTestTimer);
+    ledBarTestTimer = null;
+  }
+  
+  try {
+    await mbPost('test/led_bar_clear', {});
+  } catch (error) {
+    console.error('Stop LED bar error:', error);
+  }
+  
+  const btn = document.getElementById('btn_led_bar_test');
+  if (btn) {
+    btn.innerHTML = '{{097}}';
+    btn.style.background = '#27ae60';
+  }
+  
+  const statusEl = document.getElementById('led_bar_status');
+  if (statusEl) {
+    statusEl.innerHTML = '{{100}}';
+  }
+}
+
+// Inizializzazione pulsante LED bar se presente
+document.addEventListener('DOMContentLoaded', function() {
+  const btn = document.getElementById('btn_led_bar_test');
+  if (btn) {
+    btn.addEventListener('click', startLedBarTest);
+  }
+});

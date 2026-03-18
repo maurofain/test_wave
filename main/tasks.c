@@ -59,7 +59,11 @@ typedef struct {
     esp_err_t result;
     bool bool_value;
     digital_io_snapshot_t snapshot;
+    bool completed;
+    bool abandoned;
 } tasks_digital_io_agent_result_t;
+
+static portMUX_TYPE s_digital_io_agent_lock = portMUX_INITIALIZER_UNLOCKED;
 
 static bool tasks_is_fsm_context(void)
 {
@@ -131,11 +135,25 @@ static bool tasks_handle_digital_io_agent_event(const fsm_input_event_t *event)
 
     tasks_digital_io_agent_result_t *result = (tasks_digital_io_agent_result_t *)event->data_ptr;
     if (result) {
+        TaskHandle_t requester_task = NULL;
+        bool should_free = false;
+
         result->result = op_err;
         result->bool_value = bool_value;
         result->snapshot = snapshot;
-        if (result->requester_task) {
-            xTaskNotifyGive(result->requester_task);
+
+        portENTER_CRITICAL(&s_digital_io_agent_lock);
+        result->completed = true;
+        should_free = result->abandoned;
+        if (!should_free) {
+            requester_task = result->requester_task;
+        }
+        portEXIT_CRITICAL(&s_digital_io_agent_lock);
+
+        if (requester_task) {
+            xTaskNotifyGive(requester_task);
+        } else if (should_free) {
+            free(result);
         }
     }
 
@@ -171,11 +189,18 @@ static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
         return ESP_ERR_INVALID_STATE;
     }
 
-    tasks_digital_io_agent_result_t result = {
+    tasks_digital_io_agent_result_t *result = (tasks_digital_io_agent_result_t *)calloc(1, sizeof(*result));
+    if (!result) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    *result = (tasks_digital_io_agent_result_t){
         .requester_task = xTaskGetCurrentTaskHandle(),
         .result = ESP_ERR_TIMEOUT,
         .bool_value = false,
         .snapshot = {0},
+        .completed = false,
+        .abandoned = false,
     };
 
     fsm_input_event_t event = {
@@ -187,7 +212,7 @@ static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
         .value_i32 = 0,
         .value_u32 = value_u32,
         .aux_u32 = aux_u32,
-        .data_ptr = &result,
+        .data_ptr = result,
         .text = {0},
     };
 
@@ -195,24 +220,41 @@ static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
 
     TickType_t publish_timeout = pdMS_TO_TICKS(20);
     if (!fsm_event_publish(&event, publish_timeout)) {
+        free(result);
         return ESP_ERR_TIMEOUT;
     }
 
     TickType_t wait_timeout = (timeout_ticks > 0) ? timeout_ticks : pdMS_TO_TICKS(200);
     if (ulTaskNotifyTake(pdTRUE, wait_timeout) == 0) {
-        return ESP_ERR_TIMEOUT;
+        bool completed = false;
+
+        portENTER_CRITICAL(&s_digital_io_agent_lock);
+        completed = result->completed;
+        if (!completed) {
+            result->abandoned = true;
+            result->requester_task = NULL;
+        }
+        portEXIT_CRITICAL(&s_digital_io_agent_lock);
+
+        if (!completed) {
+            return ESP_ERR_TIMEOUT;
+        }
+
+        (void)ulTaskNotifyTake(pdTRUE, 0);
     }
 
-    if (result.result == ESP_OK) {
+    esp_err_t final_result = result->result;
+    if (final_result == ESP_OK) {
         if (out_bool) {
-            *out_bool = result.bool_value;
+            *out_bool = result->bool_value;
         }
         if (out_snapshot) {
-            *out_snapshot = result.snapshot;
+            *out_snapshot = result->snapshot;
         }
     }
 
-    return result.result;
+    free(result);
+    return final_result;
 }
 
 esp_err_t tasks_digital_io_set_output_via_agent(uint8_t output_id, bool value, TickType_t timeout_ticks)
@@ -1339,11 +1381,8 @@ static void http_services_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
 
-    if (!fsm_event_queue_init(0)) {
-        ESP_LOGE(TAG, "[M] HTTP_SERVICES task: mailbox init fallita");
-        vTaskDelete(NULL);
-        return;
-    }
+    // La mailbox FSM è già inizializzata in init.c, non chiamare qui
+    // per evitare race condition durante il boot
 
     while (true) {
         fsm_input_event_t event;

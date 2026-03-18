@@ -2105,6 +2105,16 @@
       "072": {
         "label": "config.text.072",
         "text": {
+          "it": "Massima sospensione programma (s)",
+          "en": "Maximum program suspension (s)",
+          "fr": "Suspension maximale du programme (s)",
+          "de": "Maximale Programmsuspension (s)",
+          "es": "Suspensión máxima del programa (s)"
+        }
+      },
+      "073": {
+        "label": "config.text.073",
+        "text": {
           "it": "📺 Display",
           "en": "📺 Display",
           "fr": "📺 Affichage",
@@ -2112,14 +2122,14 @@
           "es": "📺 Pantalla"
         }
       },
-      "073": {
-        "label": "config.text.073",
+      "077": {
+        "label": "config.text.077",
         "text": {
-          "it": "Display abilitato",
-          "en": "Display enabled",
-          "fr": "Affichage activé",
-          "de": "Anzeige aktiviert",
-          "es": "Pantalla activada"
+          "it": "Massima sospensione programma (s)",
+          "en": "Maximum program suspension (s)",
+          "fr": "Suspension maximale du programme (s)",
+          "de": "Maximale Programmsuspension (s)",
+          "es": "Suspensión máxima del programa (s)"
         }
       },
       "074": {
@@ -2377,9 +2387,19 @@
         "text": {
           "it": "Configurazione fissa driver CCTalk (GPIO20/GPIO21, 9600 8N1).",
           "en": "Fixed CCTalk driver configuration (GPIO20/GPIO21, 9600 8N1).",
-          "fr": "Correction de la configuration du pilote CCTalk (GPIO20/GPIO21, 9600 8N1).",
+          "fr": "Configuration fixe du pilote CCTalk (GPIO20/GPIO21, 9600 8N1).",
           "de": "Feste CCTalk-Treiberkonfiguration (GPIO20/GPIO21, 9600 8N1).",
-          "es": "Corregida la configuración del controlador CCTalk (GPIO20/GPIO21, 9600 8N1)."
+          "es": "Configuración fija del controlador CCTalk (GPIO20/GPIO21, 9600 8N1)."
+        }
+      },
+      "110": {
+        "label": "config.text.110",
+        "text": {
+          "it": "Soglia PreFineCiclo (%)",
+          "en": "PreFineCiclo threshold (%)",
+          "fr": "Seuil PreFineCiclo (%)",
+          "de": "PreFineCiclo Schwellenwert (%)",
+          "es": "Umbral PreFineCiclo (%)"
         }
       }
     },
@@ -7779,6 +7799,76 @@
         "fr": "Erreur d'analyse",
         "de": "Scan-Fehler",
         "es": "Error de escaneo"
+      }
+    },
+    "094": {
+      "label": "test.text.094",
+      "text": {
+        "it": "Striscia LED",
+        "en": "LED Strip",
+        "fr": "Bandeau LED",
+        "de": "LED-Leiste",
+        "es": "Tira LED"
+      }
+    },
+    "095": {
+      "label": "test.text.095",
+      "text": {
+        "it": "IDLE (respirazione blu)",
+        "en": "IDLE (blue breathing)",
+        "fr": "IDLE (respiration bleue)",
+        "de": "IDLE (blaue Atmung)",
+        "es": "IDLE (respiración azul)"
+      }
+    },
+    "096": {
+      "label": "test.text.096",
+      "text": {
+        "it": "Progressione 0-100% (5 secondi)",
+        "en": "Progress 0-100% (5 seconds)",
+        "fr": "Progression 0-100% (5 secondes)",
+        "de": "Fortschritt 0-100% (5 Sekunden)",
+        "es": "Progresión 0-100% (5 segundos)"
+      }
+    },
+    "097": {
+      "label": "test.text.097",
+      "text": {
+        "it": "Start barra",
+        "en": "Start bar",
+        "fr": "Démarrer barre",
+        "de": "Leiste starten",
+        "es": "Iniciar barra"
+      }
+    },
+    "098": {
+      "label": "test.text.098",
+      "text": {
+        "it": "Ferma barra",
+        "en": "Stop bar",
+        "fr": "Arrêter barre",
+        "de": "Leiste stoppen",
+        "es": "Detener barra"
+      }
+    },
+    "099": {
+      "label": "test.text.099",
+      "text": {
+        "it": "Test barra LED in corso...",
+        "en": "LED bar test in progress...",
+        "fr": "Test barre LED en cours...",
+        "de": "LED-Leiste-Test läuft...",
+        "es": "Test de barra LED en progreso..."
+      }
+    },
+    "100": {
+      "label": "test.text.100",
+      "text": {
+        "it": "Test barra LED completato",
+        "en": "LED bar test completed",
+        "fr": "Test barre LED terminé",
+        "de": "LED-Leiste-Test abgeschlossen",
+        "es": "Test de barra LED completado"
       }
     },
     "language_select_title": {

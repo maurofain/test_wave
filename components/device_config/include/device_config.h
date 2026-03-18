@@ -91,6 +91,8 @@ typedef struct {
     uint32_t idle_before_ads_ms;     ///< Timeout inattività prima di mostrare ads (default 60000ms=60s)
     uint32_t ad_rotation_ms;         ///< Intervallo rotazione immagini ads (default 30000ms=30s)
     uint32_t credit_reset_timeout_ms; ///< Timeout per reset crediti CVD/ECD (default 300000ms=5min)
+    uint8_t  pre_fine_ciclo_percent; ///< Percentuale ciclo per passaggio a PreFineCiclo (default 70, range 0-99)
+    uint32_t pause_max_suspend_sec;  ///< Massima sospensione programma in secondi (default 300s=5min)
 } device_timeouts_config_t;
 
 /**
@@ -357,6 +359,16 @@ char* device_config_get_ui_texts_records_json(const char *language);
  * @return ESP_OK se salvato correttamente
  */
 esp_err_t device_config_set_ui_texts_records_json(const char *language, const char *records_json);
+
+/**
+ * @brief Aggiorna il testo di un programma in i18n_v2.json
+ * 
+ * @param program_key Chiave del programma (es. "program_name_01")
+ * @param language Codice lingua (es. "it", "en")
+ * @param new_text Nuovo testo per il programma
+ * @return ESP_OK se aggiornato correttamente
+ */
+esp_err_t device_config_update_program_text_i18n(const char *program_key, const char *language, const char *new_text);
 
 /**
  * @brief Recupera testo i18n da scope+key per la lingua corrente

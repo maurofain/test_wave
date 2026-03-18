@@ -3,6 +3,7 @@
 #include "init.h"
 #include "tasks.h"
 #include "esp_log.h"
+#include "led.h"
 
 /**
  * @file web_ui_test_api.c
@@ -1531,6 +1532,95 @@ modbus_read_end:
             cJSON_Delete(root);
         }
         snprintf(response, sizeof(response), "{\"status\":\"ok\"}");
+    }
+
+    /* LED Bar test endpoints */
+    else if (strcmp(test_name, "led_bar_init") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *total_leds_obj = cJSON_GetObjectItem(root, "total_leds");
+            if (total_leds_obj && cJSON_IsNumber(total_leds_obj)) {
+                uint32_t total_leds = (uint32_t)total_leds_obj->valuedouble;
+                esp_err_t err = led_bar_init(total_leds);
+                if (err == ESP_OK) {
+                    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"total_leds\":%lu}", (unsigned long)total_leds);
+                } else {
+                    snprintf(response, sizeof(response), "{\"error\":\"LED bar init failed: %s\"}", esp_err_to_name(err));
+                    httpd_resp_set_status(req, "500");
+                }
+            } else {
+                snprintf(response, sizeof(response), "{\"error\":\"Missing or invalid total_leds\"}");
+                httpd_resp_set_status(req, "400");
+            }
+            cJSON_Delete(root);
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+            httpd_resp_set_status(req, "400");
+        }
+    }
+
+    else if (strcmp(test_name, "led_bar_set_state") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *state_obj = cJSON_GetObjectItem(root, "state");
+            if (state_obj && cJSON_IsNumber(state_obj)) {
+                int state = state_obj->valueint;
+                esp_err_t err = led_bar_set_state((led_bar_state_t)state);
+                if (err == ESP_OK) {
+                    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"state\":%d}", state);
+                } else {
+                    snprintf(response, sizeof(response), "{\"error\":\"LED bar set_state failed: %s\"}", esp_err_to_name(err));
+                    httpd_resp_set_status(req, "500");
+                }
+            } else {
+                snprintf(response, sizeof(response), "{\"error\":\"Missing or invalid state\"}");
+                httpd_resp_set_status(req, "400");
+            }
+            cJSON_Delete(root);
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+            httpd_resp_set_status(req, "400");
+        }
+    }
+
+    else if (strcmp(test_name, "led_bar_set_progress") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *progress_obj = cJSON_GetObjectItem(root, "progress_percent");
+            if (progress_obj && cJSON_IsNumber(progress_obj)) {
+                uint8_t progress = (uint8_t)progress_obj->valuedouble;
+                esp_err_t err = led_bar_set_progress(progress);
+                if (err == ESP_OK) {
+                    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"progress_percent\":%u}", progress);
+                } else {
+                    snprintf(response, sizeof(response), "{\"error\":\"LED bar set_progress failed: %s\"}", esp_err_to_name(err));
+                    httpd_resp_set_status(req, "500");
+                }
+            } else {
+                snprintf(response, sizeof(response), "{\"error\":\"Missing or invalid progress_percent\"}");
+                httpd_resp_set_status(req, "400");
+            }
+            cJSON_Delete(root);
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+            httpd_resp_set_status(req, "400");
+        }
+    }
+
+    else if (strcmp(test_name, "led_bar_clear") == 0) {
+        esp_err_t err = led_bar_clear();
+        if (err == ESP_OK) {
+            snprintf(response, sizeof(response), "{\"status\":\"ok\"}");
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"LED bar clear failed: %s\"}", esp_err_to_name(err));
+            httpd_resp_set_status(req, "500");
+        }
     }
 
     else {

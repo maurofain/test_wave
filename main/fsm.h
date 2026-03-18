@@ -97,6 +97,7 @@ typedef enum {
     ACTION_ID_PROGRAM_SELECTED,
     ACTION_ID_PROGRAM_STOP,
     ACTION_ID_PROGRAM_PAUSE_TOGGLE,
+    ACTION_ID_PROGRAM_PREFINE_CYCLO,  /* attivazione segnalazione PreFineCiclo */
     ACTION_ID_CREDIT_ENDED,
     ACTION_ID_BUTTON_PRESSED,    /* new event requested */
     ACTION_ID_SYSTEM_IDLE,       /* new event requested */
@@ -158,6 +159,9 @@ typedef enum {
     ACTION_ID_LED_SET_RGBCOLOR,
     ACTION_ID_LED_ALL_OFF,
     ACTION_ID_LED_CONFIG,
+    ACTION_ID_LED_BAR_SET_STATE,
+    ACTION_ID_LED_BAR_SET_PROGRESS,
+    ACTION_ID_LED_BAR_CLEAR,
 
     /* Sensor SHT40 */
     ACTION_ID_SHT40_MEASURE_READY,
@@ -246,6 +250,7 @@ typedef struct {
     uint32_t credit_reset_timeout_ms;
     bool ads_enabled;
     bool allow_additional_payments;
+    bool pre_fine_ciclo_active;  /* true quando la soglia PreFineCiclo è stata raggiunta */
 } fsm_ctx_t;
 
 void fsm_init(fsm_ctx_t *ctx);

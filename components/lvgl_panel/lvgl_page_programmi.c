@@ -212,11 +212,20 @@ static void process_physical_touch_mappings(void)
     }
 
     uint8_t input_usage[DEVICE_TOUCH_INPUT_MAX + 1U] = {0};
+    bool need_snapshot = false;
     for (uint8_t program_id = 1; program_id <= PROG_COUNT; ++program_id) {
         uint8_t input_id = get_program_input_mapping(cfg, program_id);
         if (input_id >= DEVICE_TOUCH_INPUT_MIN && input_id <= DEVICE_TOUCH_INPUT_MAX) {
             input_usage[input_id]++;
+            need_snapshot = true;
         }
+    }
+
+    digital_io_snapshot_t snapshot = {0};
+    bool snapshot_available = false;
+    if (need_snapshot &&
+        tasks_digital_io_get_snapshot_via_agent(&snapshot, pdMS_TO_TICKS(20)) == ESP_OK) {
+        snapshot_available = true;
     }
 
     for (uint8_t program_id = 1; program_id <= PROG_COUNT; ++program_id) {
@@ -224,13 +233,12 @@ static void process_physical_touch_mappings(void)
         uint8_t input_id = get_program_input_mapping(cfg, program_id);
 
         bool now_pressed = false;
-        if (input_id >= DEVICE_TOUCH_INPUT_MIN && input_id <= DEVICE_TOUCH_INPUT_MAX && input_usage[input_id] == 1U) {
-            bool input_level = false;
-            if (tasks_digital_io_get_input_via_agent(input_id,
-                                                     &input_level,
-                                                     pdMS_TO_TICKS(10)) == ESP_OK) {
-                now_pressed = input_level;
-            }
+        if (snapshot_available &&
+            input_id >= DEVICE_TOUCH_INPUT_MIN &&
+            input_id <= DEVICE_TOUCH_INPUT_MAX &&
+            input_usage[input_id] == 1U) {
+            uint16_t input_mask = (uint16_t)(1U << (input_id - 1U));
+            now_pressed = ((snapshot.inputs_mask & input_mask) != 0U);
         }
 
         bool rising_edge = (!s_input_last_pressed[index] && now_pressed);
@@ -265,26 +273,25 @@ static void set_program_label_text(lv_obj_t *label, uint8_t pid)
     }
 
     char fallback[8] = {0};
+    char keyname[24] = {0};
+    char resolved[WEB_UI_PROGRAM_NAME_MAX] = {0};
     const char *target_text = NULL;
     const web_ui_program_entry_t *entry = find_program_entry(pid);
 
-    if (entry && entry->name[0] != '\0')
+    snprintf(fallback, sizeof(fallback), "%u", (unsigned)pid);
+    snprintf(keyname, sizeof(keyname), "program_name_%02u", (unsigned)pid);
+
+    if (device_config_get_ui_text_scoped("lvgl", keyname, fallback, resolved, sizeof(resolved)) == ESP_OK &&
+        resolved[0] != '\0')
     {
-        if (strncmp(entry->name, "__i18n__", 8) == 0) {
-            static char resolved[WEB_UI_PROGRAM_NAME_MAX];
-            const char *keyname = entry->name + 8;
-            if (device_config_get_ui_text_scoped("p_emulator", keyname, entry->name, resolved, sizeof(resolved)) == ESP_OK) {
-                target_text = resolved;
-            } else {
-                target_text = entry->name;
-            }
-        } else {
-            target_text = entry->name;
-        }
+        target_text = resolved;
+    }
+    else if (entry && entry->name[0] != '\0')
+    {
+        target_text = entry->name;
     }
     else
     {
-        snprintf(fallback, sizeof(fallback), "%u", (unsigned)pid);
         target_text = fallback;
     }
 

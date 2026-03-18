@@ -157,9 +157,11 @@ function buildRelayMaskEditor(mask, rowIndex) {
 
 function normalizeProgram(program, idx) {
     const entry = program || {};
+    const programId = toInt(entry.program_id, idx + 1);
+
     return {
-        program_id: toInt(entry.program_id, idx + 1),
-        name: String(entry.name || ''),
+        program_id: programId,
+        display_name: String(entry.name || ''),
         enabled: !!entry.enabled,
         price_units: toInt(entry.price_units, 0),
         duration_sec: toInt(entry.duration_sec, 0),
@@ -170,14 +172,14 @@ function normalizeProgram(program, idx) {
 
 function rowHtml(program, idx) {
     const p = normalizeProgram(program, idx);
+    const displayName = tr(p.display_name) || String(p.program_id);
 
     return `<tr>
-        <td><input type="number" min="1" max="255" value="${p.program_id}" onchange="programs[${idx}].program_id=toInt(this.value,${idx + 1})"></td>
-        <td><input type="text" value="${escapeHtml(p.name)}" onchange="programs[${idx}].name=this.value"></td>
+        <td>${p.program_id}</td>
+        <td>${escapeHtml(displayName)}</td>
         <td style="text-align:center"><input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="programs[${idx}].enabled=this.checked"></td>
         <td><input type="number" min="0" max="65535" value="${p.price_units}" onchange="programs[${idx}].price_units=toInt(this.value,0)"></td>
         <td><input type="number" min="0" max="65535" value="${p.duration_sec}" onchange="programs[${idx}].duration_sec=toInt(this.value,0)"></td>
-        <td><input type="number" min="0" max="65535" value="${p.pause_max_suspend_sec}" onchange="programs[${idx}].pause_max_suspend_sec=toInt(this.value,0)"></td>
         <td>${buildRelayMaskEditor(p.relay_mask, idx)}</td>
     </tr>`;
 }
@@ -188,18 +190,6 @@ function render() {
     programs.forEach((program, idx) => {
         body.insertAdjacentHTML('beforeend', rowHtml(program, idx));
     });
-}
-
-function setAllPauses() {
-    const value = toInt(document.getElementById('pauseAll').value, 0);
-    programs.forEach((program, idx) => {
-        programs[idx] = {
-            ...normalizeProgram(program, idx),
-            pause_max_suspend_sec: value,
-        };
-    });
-    render();
-    showStatus(`${tr('programs.js.028')} ${value}${tr('programs.js.029')}`, true);
 }
 
 window.onRelayMaskSegmentInput = function onRelayMaskSegmentInput(element) {
@@ -267,10 +257,19 @@ async function savePrograms() {
             return normalized;
         });
 
+        const payloadPrograms = programs.map((program) => ({
+            program_id: program.program_id,
+            enabled: program.enabled,
+            price_units: program.price_units,
+            duration_sec: program.duration_sec,
+            pause_max_suspend_sec: program.pause_max_suspend_sec,
+            relay_mask: program.relay_mask,
+        }));
+
         const response = await fetch('/api/programs/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ programs }),
+            body: JSON.stringify({ programs: payloadPrograms }),
         });
 
         if (!response.ok) {
@@ -285,7 +284,6 @@ async function savePrograms() {
     }
 }
 
-window.setAllPauses = setAllPauses;
 window.loadPrograms = loadPrograms;
 window.savePrograms = savePrograms;
 

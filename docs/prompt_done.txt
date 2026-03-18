@@ -29,4 +29,7 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
 [X] Correggere i JS e/o gli html di /config per visualizzare tutte le sezioni abilitate (ad esempio i/o expander)
 [X ] Dopo l'inserimento della moneta ritorna alla schermata ads e poi lingue
-
+[V] La gestione della striscia LED deve prevedere che la striscia led venga divisa dal punto di vista logico in 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione) e che sono gestite da un device virtuale led_bar che va creato. led_bar avrà :
+un comportamento da definire per la situazione di IDLE, 
+durante il run segue aumenta a partire dal primo led ad accendere progressivamente dei led in verde in base ad una ACTION ricevuta dalla FSM, 
+al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane completamente accesa lampeggioante a 2hz in colore porpora fino a che la macchina ritorna in IDLE o viene premuto qualsiasi funzione sui tasti o touch che la portano a spegnersi

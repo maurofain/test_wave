@@ -133,6 +133,10 @@ extern TaskHandle_t s_rs232_test_handle;
 extern TaskHandle_t s_rs485_test_handle;
 void uart_test_task(void *arg);
 
+// Test page handlers
+esp_err_t test_page_handler(httpd_req_t *req);
+esp_err_t led_bar_test_page_handler(httpd_req_t *req);
+
 // Helper spostati in web_ui_common.c e usati da più file
 void ip_to_str(esp_netif_t *netif, char *out, size_t len);
 esp_err_t perform_ota(const char *url);

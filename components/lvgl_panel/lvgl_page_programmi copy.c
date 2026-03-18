@@ -202,7 +202,7 @@ static void set_program_label_text(lv_obj_t *label, uint8_t pid)
         if (strncmp(entry->name, "__i18n__", 8) == 0) {
             static char resolved[WEB_UI_PROGRAM_NAME_MAX];
             const char *keyname = entry->name + 8;
-            if (device_config_get_ui_text_scoped("p_emulator", keyname, entry->name, resolved, sizeof(resolved)) == ESP_OK) {
+            if (device_config_get_ui_text_scoped("lvgl", keyname, entry->name, resolved, sizeof(resolved)) == ESP_OK) {
                 target_text = resolved;
             } else {
                 target_text = entry->name;

@@ -27,4 +27,4 @@ function initCollapsibleSections(){
 initCollapsibleSections();
 window.addEventListener('load', initCollapsibleSections);
 // Sperimentali: append USB Debug buttons near scanner fields (se presenti)
-try{(function(){const pidEl=document.getElementById('scanner_pid'); if(pidEl){const btnEnum=document.createElement('button'); btnEnum.textContent='USB:Enumerate (Sperimentali)'; btnEnum.type='button'; btnEnum.onclick=async function(){const r=await fetch('/api/debug/usb/enumerate'); const j=await r.json(); alert(JSON.stringify(j,null,2));}; pidEl.parentNode.insertBefore(btnEnum,pidEl.nextSibling); const btnRestart=document.createElement('button'); btnRestart.textContent='USB:Restart Host (Sperimentali)'; btnRestart.type='button'; btnRestart.onclick=async function(){const r=await fetch('/api/debug/usb/restart',{method:'POST'}); const txt=await r.text(); alert('Restart: '+txt);}; pidEl.parentNode.insertBefore(btnRestart,btnEnum.nextSibling); } })();}catch(e){}</script><script src='/js/config_touch_map.js'></script></body></html>
+</script><script src='/js/pre_fine_ciclo.js'></script></body></html>

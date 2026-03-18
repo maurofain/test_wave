@@ -21,11 +21,67 @@
 
 #define TAG "WEB_UI_PROGRAMS"
 #define PROGRAMS_STORAGE_PATH "/spiffs/programs.json"
+#define PROGRAM_NAME_KEY_MAX 32
 
 static web_ui_program_table_t s_program_table;
 static web_ui_virtual_relay_state_t s_virtual_relays[WEB_UI_VIRTUAL_RELAY_MAX + 1];
 static bool s_initialized = false;
 static bool s_storage_loaded = false;
+
+static char *programs_table_to_json_internal(bool include_display_name);
+
+static void program_name_build_key(uint8_t program_id, char *key_out, size_t key_out_len)
+{
+    if (!key_out || key_out_len == 0) {
+        return;
+    }
+
+    if (program_id == 0) {
+        key_out[0] = '\0';
+        return;
+    }
+
+    snprintf(key_out, key_out_len, "program_name_%02u", (unsigned)program_id);
+}
+
+static void program_name_build_fallback(uint8_t program_id, char *fallback_out, size_t fallback_out_len)
+{
+    if (!fallback_out || fallback_out_len == 0) {
+        return;
+    }
+
+    snprintf(fallback_out, fallback_out_len, "Programma %u", (unsigned)program_id);
+}
+
+static void program_entry_refresh_name(web_ui_program_entry_t *entry)
+{
+    if (!entry) {
+        return;
+    }
+
+    char key[PROGRAM_NAME_KEY_MAX] = {0};
+    char fallback[WEB_UI_PROGRAM_NAME_MAX] = {0};
+    char localized[WEB_UI_PROGRAM_NAME_MAX] = {0};
+
+    program_name_build_key(entry->program_id, key, sizeof(key));
+    program_name_build_fallback(entry->program_id, fallback, sizeof(fallback));
+
+    if (key[0] != '\0' &&
+        device_config_get_ui_text_scoped("lvgl", key, fallback, localized, sizeof(localized)) == ESP_OK &&
+        localized[0] != '\0') {
+        snprintf(entry->name, sizeof(entry->name), "%s", localized);
+        return;
+    }
+
+    snprintf(entry->name, sizeof(entry->name), "%s", fallback);
+}
+
+static void programs_refresh_names_from_i18n(void)
+{
+    for (uint8_t index = 0; index < s_program_table.count; ++index) {
+        program_entry_refresh_name(&s_program_table.programs[index]);
+    }
+}
 
 /**
  * @brief Salva la tabella dei programmi su SPIFFS
@@ -37,7 +93,7 @@ static bool s_storage_loaded = false;
  */
 static esp_err_t programs_save_to_storage(void)
 {
-    char *json = web_ui_program_table_to_json();
+    char *json = programs_table_to_json_internal(false);
     if (!json) {
         return ESP_FAIL;
     }
@@ -127,13 +183,15 @@ static void programs_init_defaults(void)
     for (uint8_t index = 0; index < s_program_table.count; ++index) {
         web_ui_program_entry_t *entry = &s_program_table.programs[index];
         entry->program_id = (uint8_t)(index + 1);
-        snprintf(entry->name, sizeof(entry->name), "__i18n__programma_%u", (unsigned)entry->program_id);
+        entry->name[0] = '\0';
         entry->enabled = true;
         entry->price_units = 10;
         entry->duration_sec = 60;
         entry->pause_max_suspend_sec = 60;
         entry->relay_mask = (uint16_t)(1U << index);
     }
+
+    programs_refresh_names_from_i18n();
 
     memset(s_virtual_relays, 0, sizeof(s_virtual_relays));
     s_initialized = true;
@@ -159,19 +217,14 @@ esp_err_t web_ui_program_table_init(void)
 const web_ui_program_table_t *web_ui_program_table_get(void)
 {
     programs_init_defaults();
+    programs_refresh_names_from_i18n();
     return &s_program_table;
 }
 
-/**
- * @brief Converte la tabella programmi in stringa JSON minificata
- *
- * L'utente deve liberare la memoria restituita con free().
- *
- * @return stringa JSON allocata oppure NULL in caso di errore
- */
-char *web_ui_program_table_to_json(void)
+static char *programs_table_to_json_internal(bool include_display_name)
 {
     programs_init_defaults();
+    programs_refresh_names_from_i18n();
 
     cJSON *root = cJSON_CreateObject();
     cJSON *programs = cJSON_CreateArray();
@@ -187,21 +240,9 @@ char *web_ui_program_table_to_json(void)
         if (!item) {
             continue;
         }
+
         cJSON_AddNumberToObject(item, "program_id", entry->program_id);
-        // If entry->name uses the __i18n__ prefix, resolve localized text from device i18n
-        if (entry->name[0] == '_' && entry->name[1] == '_' && entry->name[2] == 'i' && entry->name[3] == '1') {
-            // old-style check - keep fallback
-            cJSON_AddStringToObject(item, "name", entry->name);
-        } else if (strncmp(entry->name, "__i18n__", 8) == 0) {
-            const char *keyname = entry->name + 8;
-            char buf[WEB_UI_PROGRAM_NAME_MAX] = {0};
-            // scope for program names is p_emulator
-            if (device_config_get_ui_text_scoped("p_emulator", keyname, entry->name, buf, sizeof(buf)) == ESP_OK) {
-                cJSON_AddStringToObject(item, "name", buf);
-            } else {
-                cJSON_AddStringToObject(item, "name", entry->name);
-            }
-        } else {
+        if (include_display_name) {
             cJSON_AddStringToObject(item, "name", entry->name);
         }
         cJSON_AddBoolToObject(item, "enabled", entry->enabled);
@@ -218,6 +259,18 @@ char *web_ui_program_table_to_json(void)
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     return json;
+}
+
+/**
+ * @brief Converte la tabella programmi in stringa JSON minificata
+ *
+ * L'utente deve liberare la memoria restituita con free().
+ *
+ * @return stringa JSON allocata oppure NULL in caso di errore
+ */
+char *web_ui_program_table_to_json(void)
+{
+    return programs_table_to_json_internal(true);
 }
 
 /**
@@ -292,14 +345,13 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         web_ui_program_entry_t *entry = &next.programs[index];
 
         cJSON *program_id = cJSON_GetObjectItem(item, "program_id");
-        cJSON *name = cJSON_GetObjectItem(item, "name");
         cJSON *enabled = cJSON_GetObjectItem(item, "enabled");
         cJSON *price_units = cJSON_GetObjectItem(item, "price_units");
         cJSON *duration_sec = cJSON_GetObjectItem(item, "duration_sec");
         cJSON *pause_max_suspend_sec = cJSON_GetObjectItem(item, "pause_max_suspend_sec");
         cJSON *relay_mask = cJSON_GetObjectItem(item, "relay_mask");
 
-        if (!cJSON_IsNumber(program_id) || !cJSON_IsString(name) || !cJSON_IsBool(enabled) ||
+        if (!cJSON_IsNumber(program_id) || !cJSON_IsBool(enabled) ||
             !cJSON_IsNumber(price_units) || !cJSON_IsNumber(duration_sec) || !cJSON_IsNumber(relay_mask)) {
             cJSON_Delete(root);
             if (err_msg && err_msg_len > 0) {
@@ -324,12 +376,13 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         }
 
         entry->program_id = (uint8_t)pid;
-        snprintf(entry->name, sizeof(entry->name), "%s", name->valuestring);
         entry->enabled = cJSON_IsTrue(enabled);
         entry->price_units = (uint16_t)price;
         entry->duration_sec = (uint16_t)duration;
         entry->pause_max_suspend_sec = (uint16_t)pause_max;
         entry->relay_mask = (uint16_t)mask;
+
+        program_entry_refresh_name(entry);
     }
 
     s_program_table = next;

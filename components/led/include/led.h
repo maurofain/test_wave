@@ -97,3 +97,54 @@ esp_err_t led_fade_in(uint8_t red, uint8_t green, uint8_t blue, uint32_t steps, 
  * @return ESP_OK se riuscito
  */
 esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms);
+
+/* =========================================================================
+ * LED BAR - Device virtuale per gestione 2 strisce sincrone
+ * ========================================================================= */
+
+typedef enum {
+    LED_BAR_STATE_IDLE,           /* Attesa cliente */
+    LED_BAR_STATE_RUNNING,        /* Programma in esecuzione */
+    LED_BAR_STATE_PREFINE,        /* Pre-fine ciclo */
+    LED_BAR_STATE_FINISHED,       /* Ciclo completato */
+    LED_BAR_STATE_OFF             /* Spento */
+} led_bar_state_t;
+
+/**
+ * @brief Inizializza il device led_bar
+ * @param total_leds Numero totale di LED (diviso in 2 strisce)
+ * @return ESP_OK se riuscito
+ */
+esp_err_t led_bar_init(uint32_t total_leds);
+
+/**
+ * @brief Imposta lo stato del led_bar
+ * @param state Nuovo stato
+ * @return ESP_OK se riuscito
+ */
+esp_err_t led_bar_set_state(led_bar_state_t state);
+
+/**
+ * @brief Aggiorna la progressione del led_bar durante il run
+ * @param progress_percent Progressione (0-100)
+ * @return ESP_OK se riuscito
+ */
+esp_err_t led_bar_set_progress(uint8_t progress_percent);
+
+/**
+ * @brief Aggiorna il led_bar (chiamare periodicamente)
+ * @return ESP_OK se riuscito
+ */
+esp_err_t led_bar_update(void);
+
+/**
+ * @brief Spegne il led_bar
+ * @return ESP_OK se riuscito
+ */
+esp_err_t led_bar_clear(void);
+
+/**
+ * @brief Ottiene lo stato attuale del led_bar
+ * @return Stato attuale
+ */
+led_bar_state_t led_bar_get_state(void);

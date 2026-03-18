@@ -389,6 +389,8 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
 
         cJSON *scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
         cJSON *key = cJSON_GetObjectItemCaseSensitive(item, "key");
+        
+        // Gestione sistema vecchio (chiavi numeriche)
         if (cJSON_IsNumber(scope) && cJSON_IsNumber(key)) {
             int scope_id = scope->valueint;
             int key_id = key->valueint;
@@ -408,18 +410,29 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
             if (key_text && !cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key)) {
                 cJSON_AddStringToObject(aggregated_key, scoped_key, key_text);
             }
-            continue;
         }
+        // Gestione nuovo sistema (chiavi testuali)
+        else if (cJSON_IsNumber(scope) && cJSON_IsString(key)) {
+            int scope_id = scope->valueint;
+            const char *key_text = key->valuestring;
+            if (scope_id <= 0 || !key_text) {
+                continue;
+            }
 
-        if (!cJSON_IsString(scope) || !scope->valuestring ||
-            !cJSON_IsString(key) || !key->valuestring) {
-            continue;
+            const char *scope_text = i18n_scope_name(scope_id);
+            if (scope_text) {
+                // Aggiungi chiave scoped: scope_text.key_text
+                char scoped_key[96] = {0};
+                snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope_text, key_text);
+                _append_json_text(aggregated, scoped_key, text->valuestring);
+                
+                // Aggiungi anche chiave non scoped per fallback
+                _append_json_text(aggregated, key_text, text->valuestring);
+                
+                ESP_LOGD(TAG, "[C] Cache aggiunta: '%s' -> '%s' e '%s' -> '%s'", 
+                         scoped_key, text->valuestring, key_text, text->valuestring);
+            }
         }
-
-        char scoped_key[96] = {0};
-        snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope->valuestring, key->valuestring);
-
-        _append_json_text(aggregated, scoped_key, text->valuestring);
     }
 
     cJSON *entry = NULL;
@@ -513,16 +526,130 @@ static char *_read_text_file(const char *path, size_t *out_len)
 
     size_t read = fread(buffer, 1, (size_t)sz, file);
     fclose(file);
+    
     if (read != (size_t)sz) {
         free(buffer);
         return NULL;
     }
-
-    buffer[sz] = '\0';
+    
+    buffer[read] = '\0';
     if (out_len) {
-        *out_len = (size_t)sz;
+        *out_len = read;
     }
+    
     return buffer;
+}
+
+static esp_err_t _write_text_file(const char *path, const char *content)
+{
+    if (!path || !content) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    FILE *file = fopen(path, "w");
+    if (!file) {
+        ESP_LOGE(TAG, "[C] Impossibile aprire il file %s in scrittura", path);
+        return ESP_FAIL;
+    }
+
+    size_t len = strlen(content);
+    size_t written = fwrite(content, 1, len, file);
+    fclose(file);
+
+    if (written != len) {
+        ESP_LOGE(TAG, "[C] Scrittura incompleta su %s: %zu/%zu byte", path, written, len);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "[C] Scritti %zu byte su %s", written, path);
+    return ESP_OK;
+}
+
+/**
+ * @brief Aggiorna il testo di un programma in i18n_v2.json
+ * 
+ * @param program_key Chiave del programma (es. "program_name_01")
+ * @param language Codice lingua (es. "it", "en")
+ * @param new_text Nuovo testo per il programma
+ * @return ESP_OK se aggiornato correttamente
+ */
+esp_err_t device_config_update_program_text_i18n(const char *program_key, const char *language, const char *new_text)
+{
+    if (!program_key || !language || !new_text) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Carica i18n_v2.json
+    size_t sz = 0;
+    char *json_content = _read_text_file(I18N_V2_FILE_PATH, &sz);
+    if (!json_content || sz == 0) {
+        ESP_LOGE(TAG, "[C] Impossibile leggere i18n_v2.json");
+        if (json_content) free(json_content);
+        return ESP_FAIL;
+    }
+
+    // Parse JSON
+    cJSON *root = cJSON_Parse(json_content);
+    free(json_content);
+    if (!root) {
+        ESP_LOGE(TAG, "[C] Errore parsing i18n_v2.json");
+        return ESP_FAIL;
+    }
+
+    // Naviga fino a lvgl -> program_key -> text -> language
+    cJSON *lvgl_section = cJSON_GetObjectItem(root, "lvgl");
+    if (!lvgl_section) {
+        ESP_LOGE(TAG, "[C] Sezione 'lvgl' non trovata in i18n_v2.json");
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+
+    cJSON *program_entry = cJSON_GetObjectItem(lvgl_section, program_key);
+    if (!program_entry) {
+        ESP_LOGE(TAG, "[C] Programma '%s' non trovato in i18n_v2.json", program_key);
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+
+    cJSON *text_section = cJSON_GetObjectItem(program_entry, "text");
+    if (!text_section) {
+        ESP_LOGE(TAG, "[C] Sezione 'text' non trovata per programma '%s'", program_key);
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+
+    // Aggiorna il testo per la lingua specificata
+    if (!cJSON_IsString(text_section) && cJSON_IsObject(text_section)) {
+        cJSON *lang_entry = cJSON_GetObjectItem(text_section, language);
+        if (lang_entry) {
+            cJSON_ReplaceItemInObject(text_section, language, cJSON_CreateString(new_text));
+        } else {
+            cJSON_AddStringToObject(text_section, language, new_text);
+        }
+    }
+
+    // Converti JSON aggiornato in stringa
+    char *updated_json = cJSON_Print(root);
+    cJSON_Delete(root);
+    
+    if (!updated_json) {
+        ESP_LOGE(TAG, "[C] Errore generazione JSON aggiornato");
+        return ESP_FAIL;
+    }
+
+    // Salva su file
+    esp_err_t err = _write_text_file(I18N_V2_FILE_PATH, updated_json);
+    free(updated_json);
+
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "[C] Aggiornato testo programma '%s' per lingua '%s': '%s'", program_key, language, new_text);
+        
+        // Invalida cache i18n per forzare ricaricamento
+        extern void web_ui_i18n_cache_invalidate(void);
+        web_ui_i18n_cache_invalidate();
+    }
+
+    return err;
 }
 
 static cJSON *_i18n_v2_root_get(void)
@@ -541,17 +668,18 @@ static cJSON *_i18n_v2_root_get(void)
         return NULL;
     }
 
-    cJSON *root = cJSON_Parse(json);
+    s_i18n_v2_root = cJSON_Parse(json);
     free(json);
-    if (!root || !cJSON_IsObject(root)) {
-        ESP_LOGE(TAG, "[I18N_V2] JSON invalido in %s", I18N_V2_FILE_PATH);
-        if (root) {
-            cJSON_Delete(root);
-        }
-        return NULL;
+    
+    // Forza ricostruzione cache per includere chiavi program_name_xx
+    if (s_i18n_v2_root) {
+        ESP_LOGI(TAG, "[C] i18n_v2.json caricato, forzo ricostruzione cache");
+        _i18n_lookup_cache_clear();
+        const char *lang = device_config_get_ui_backend_language();
+        if (!lang) lang = "it";
+        _i18n_lookup_cache_build_for_lang(lang);
     }
-
-    s_i18n_v2_root = root;
+    
     return s_i18n_v2_root;
 }
 
@@ -655,24 +783,46 @@ static void _i18n_v2_append_entry(cJSON *array, cJSON *entry, const char *lang)
         return;
     }
 
-    cJSON *legacy = cJSON_GetObjectItemCaseSensitive(entry, "legacyId");
-    if (!cJSON_IsString(legacy) || !legacy->valuestring) {
-        return;
-    }
-
-    int scope_id = 0;
-    int key_id = 0;
-    if (!_legacy_id_parse(legacy->valuestring, &scope_id, &key_id)) {
-        return;
-    }
-
     const char *text = _i18n_v2_entry_pick_text(entry, lang);
     if (!text) {
         return;
     }
 
-    cJSON *record = _build_record_object(scope_id, key_id, text);
-    _records_append_or_free(array, record);
+    // Prima prova con legacyId (sistema vecchio)
+    cJSON *legacy = cJSON_GetObjectItemCaseSensitive(entry, "legacyId");
+    if (cJSON_IsString(legacy) && legacy->valuestring) {
+        int scope_id = 0;
+        int key_id = 0;
+        if (_legacy_id_parse(legacy->valuestring, &scope_id, &key_id)) {
+            cJSON *record = _build_record_object(scope_id, key_id, text);
+            _records_append_or_free(array, record);
+            return;
+        }
+    }
+    
+    // Se legacyId non è valido, usa il nome della chiave direttamente (nuovo sistema)
+    // Itera sull'array per trovare il nome della chiave corrispondente a questa entry
+    cJSON *root = _i18n_v2_root_get();
+    if (root) {
+        cJSON *lvgl_section = cJSON_GetObjectItem(root, "lvgl");
+        if (cJSON_IsObject(lvgl_section)) {
+            cJSON *key_entry = NULL;
+            cJSON_ArrayForEach(key_entry, lvgl_section) {
+                if (key_entry == entry) {
+                    // Trovato! Usa il nome della chiave come testo diretto
+                    cJSON *record = cJSON_CreateObject();
+                    if (record) {
+                        cJSON_AddStringToObject(record, "key", key_entry->string);
+                        cJSON_AddStringToObject(record, "text", text);
+                        cJSON_AddNumberToObject(record, "scope_id", 2); // lvgl scope
+                        _records_append_or_free(array, record);
+                        ESP_LOGD(TAG, "[C] Aggiunta chiave diretta: '%s' -> '%s'", key_entry->string, text);
+                    }
+                    return;
+                }
+            }
+        }
+    }
 }
 
 static cJSON *_i18n_v2_build_records_for_language(const char *language)
@@ -863,6 +1013,8 @@ static void _set_defaults(device_config_t *config)
     config->timeouts.idle_before_ads_ms = 60000;    // Default 60s prima di mostrare ads
     config->timeouts.ad_rotation_ms = 30000;         // Default 30s per rotazione slide (tempo cambio slide)
     config->timeouts.credit_reset_timeout_ms = 300000; // Default 5min per reset crediti
+    config->timeouts.pre_fine_ciclo_percent = 70;   // Default 70% per PreFineCiclo
+    config->timeouts.pause_max_suspend_sec = 300;   // Default 5min (300s) per sospensione programma
     config->display.ads_enabled = true;
 
     // Default testi UI / lingua
@@ -1443,6 +1595,20 @@ esp_err_t device_config_load(device_config_t *config)
                     if (t_lang && cJSON_IsNumber(t_lang) && t_lang->valueint > 0) {
                         config->timeouts.exit_language_ms = (uint32_t)t_lang->valueint;
                     }
+                    cJSON *pre_fine = cJSON_GetObjectItem(timeouts_obj, "pre_fine_ciclo_percent");
+                    if (pre_fine && cJSON_IsNumber(pre_fine)) {
+                        uint8_t val = (uint8_t)pre_fine->valueint;
+                        if (val <= 99) {
+                            config->timeouts.pre_fine_ciclo_percent = val;
+                        }
+                    }
+                    cJSON *pause_suspend = cJSON_GetObjectItem(timeouts_obj, "pause_max_suspend_sec");
+                    if (pause_suspend && cJSON_IsNumber(pause_suspend)) {
+                        uint32_t val = (uint32_t)pause_suspend->valuedouble;
+                        if (val <= 65535) {
+                            config->timeouts.pause_max_suspend_sec = val;
+                        }
+                    }
                 }
                 if (config->timeouts.exit_programs_ms < 1000U)  config->timeouts.exit_programs_ms = 1000U;
                 if (config->timeouts.exit_programs_ms > 600000U) config->timeouts.exit_programs_ms = 600000U;
@@ -1753,6 +1919,8 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(timeouts_obj, "idle_before_ads_ms", config->timeouts.idle_before_ads_ms);
     cJSON_AddNumberToObject(timeouts_obj, "ad_rotation_ms", config->timeouts.ad_rotation_ms);
     cJSON_AddNumberToObject(timeouts_obj, "credit_reset_timeout_ms", config->timeouts.credit_reset_timeout_ms);
+    cJSON_AddNumberToObject(timeouts_obj, "pre_fine_ciclo_percent", config->timeouts.pre_fine_ciclo_percent);
+    cJSON_AddNumberToObject(timeouts_obj, "pause_max_suspend_sec", config->timeouts.pause_max_suspend_sec);
     cJSON_AddItemToObject(root, "timeouts", timeouts_obj);
 
     // MDB
@@ -2180,11 +2348,15 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
 
     char scoped_key[96] = {0};
     snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope, key);
+    ESP_LOGD(TAG, "[C] Cerco nella cache i18n: '%s' e poi '%s'", scoped_key, key);
 
     esp_err_t ret = ESP_ERR_NOT_FOUND;
     cJSON *val = cJSON_GetObjectItemCaseSensitive(s_i18n_lookup_cache, scoped_key);
     if (!cJSON_IsString(val) || !val->valuestring) {
         val = cJSON_GetObjectItemCaseSensitive(s_i18n_lookup_cache, key);
+        ESP_LOGD(TAG, "[C] Secondo tentativo con chiave '%s': %s", key, val ? "trovato" : "non trovato");
+    } else {
+        ESP_LOGD(TAG, "[C] Trovato con chiave scoped '%s': '%s'", scoped_key, val->valuestring);
     }
 
     if (cJSON_IsString(val) && val->valuestring) {

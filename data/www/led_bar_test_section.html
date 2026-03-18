@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <title>LED Bar Test Section</title>
+    <style>
+        .test-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            margin: 10px 0;
+            background: #ecf0f1;
+            border-radius: 6px;
+        }
+        .test-label {
+            font-weight: bold;
+            color: #2c3e50;
+            flex: 1;
+        }
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        button {
+            padding: 8px 16px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #229954;
+        }
+        .status-box {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            background: #003366;
+            color: #ffffff;
+            min-height: 60px;
+            overflow-y: auto;
+            max-height: 250px;
+            border: 1px solid #3498db;
+            box-sizing: border-box;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="section_led_bar" class="section">
+        <h2>{{094}} <span style="font-size:14px; color:#bdc3c7">(Device virtuale)</span></h2>
+        
+        <div class="test-item">
+            <span class="test-label">{{095}}</span>
+            <div class="test-controls">
+                <span>1 sec respirazione blu</span>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <span class="test-label">{{096}}</span>
+            <div class="test-controls">
+                <span>Progressione verde 0→100%</span>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <span class="test-label">Test completo</span>
+            <div class="test-controls">
+                <button id="btn_led_bar_test">{{097}}</button>
+            </div>
+        </div>
+        
+        <div id="led_bar_status" class="status-box">Pronto per test LED Bar</div>
+    </div>
+
+    <script src="/js/test_led_bar.js"></script>
+</body>
+</html>

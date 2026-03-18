@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "device_config.h"
 #include "sd_card.h"
+#include "lvgl_panel.h"
 #include <dirent.h>
 #include <string.h>
 #include <stdlib.h>
@@ -344,6 +345,19 @@ static void ad_carousel_timer_cb(lv_timer_t *timer)
 static void switch_from_ads_async(void *arg)
 {
     (void)arg;
+
+    fsm_ctx_t snap = {0};
+    if (fsm_runtime_snapshot(&snap)) {
+        if (snap.state == FSM_STATE_CREDIT ||
+            snap.state == FSM_STATE_RUNNING ||
+            snap.state == FSM_STATE_PAUSED) {
+            ESP_LOGI(TAG, "[C] Ads touch con FSM gia' in stato %s: apro pagina principale",
+                     fsm_state_to_string(snap.state));
+            lvgl_panel_show_main_page();
+            return;
+        }
+    }
+
     fsm_input_event_t ev = {
         .from = AGN_ID_LVGL,
         .to = {AGN_ID_FSM},
@@ -506,9 +520,18 @@ void lvgl_page_ads_show(void)
     lv_obj_remove_flag(err_box, LV_OBJ_FLAG_SCROLLABLE);
 
     s_error_lbl = lv_label_create(err_box);
-    char no_error[64] = {0};
-    device_config_get_ui_text_scoped("lvgl", "ads_no_error", "Nessun errore", no_error, sizeof(no_error));
-    lv_label_set_text(s_error_lbl, s_error_msg[0] ? s_error_msg : no_error);
+    
+    // Nascondi la barra errore se non ci sono messaggi di errore
+    if (s_error_msg[0]) {
+        // C'è un errore, mostra la barra e il messaggio
+        lv_obj_clear_flag(err_box, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(s_error_lbl, s_error_msg);
+    } else {
+        // Nessun errore, nascondi completamente la barra
+        lv_obj_add_flag(err_box, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(s_error_lbl, "");
+    }
+    
     lv_obj_set_style_text_color(s_error_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_error_lbl, &GoogleSans40, LV_PART_MAIN);
     lv_label_set_long_mode(s_error_lbl, LV_LABEL_LONG_DOT);
@@ -543,12 +566,20 @@ void lvgl_page_ads_set_error_message(const char *msg)
     s_error_msg[sizeof(s_error_msg) - 1] = '\0';
 
     if (s_error_lbl && lv_obj_is_valid(s_error_lbl)) {
-        if (s_error_msg[0]) {
-            lv_label_set_text(s_error_lbl, s_error_msg);
-            lv_obj_clear_flag(s_error_lbl, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_label_set_text(s_error_lbl, "");
-            lv_obj_add_flag(s_error_lbl, LV_OBJ_FLAG_HIDDEN);
+        // Trova il parent box dell'errore
+        lv_obj_t *err_box = lv_obj_get_parent(s_error_lbl);
+        if (err_box && lv_obj_is_valid(err_box)) {
+            if (s_error_msg[0]) {
+                // C'è un errore, mostra barra e messaggio
+                lv_label_set_text(s_error_lbl, s_error_msg);
+                lv_obj_clear_flag(err_box, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_clear_flag(s_error_lbl, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                // Nessun errore, nascondi completamente barra e label
+                lv_label_set_text(s_error_lbl, "");
+                lv_obj_add_flag(err_box, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(s_error_lbl, LV_OBJ_FLAG_HIDDEN);
+            }
         }
     }
 }

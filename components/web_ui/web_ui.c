@@ -63,6 +63,9 @@
 
 #define TAG "WEB_UI"
 #define MAX_STORED_LOGS 100
+#define I18N_V2_FILE_PATH "/spiffs/i18n_v2.json"
+
+static void web_ui_lang_label_from_code(const char *lang, char *label, size_t label_len);
 
 /**
  * @brief Restituisce la versione e data build correnti
@@ -560,6 +563,188 @@ static bool web_ui_extract_lang_from_filename(const char *name, char *out_lang, 
 }
 
 /**
+ * @brief Verifica che il codice lingua abbia un formato plausibile.
+ *
+ * Accetta codici come `it`, `en`, `pt-br` e rifiuta artefatti come `v2`.
+ */
+static bool web_ui_is_valid_lang_code(const char *lang)
+{
+    if (!lang) {
+        return false;
+    }
+
+    size_t len = strlen(lang);
+    if (len < 2 || len > 7) {
+        return false;
+    }
+
+    size_t letters = 0;
+    for (size_t i = 0; i < len; ++i) {
+        char c = lang[i];
+        bool is_lower = (c >= 'a' && c <= 'z');
+        bool is_sep = (c == '-' || c == '_');
+        if (!is_lower && !is_sep) {
+            return false;
+        }
+        if (is_lower) {
+            ++letters;
+        }
+        if (is_sep && (i == 0 || i == (len - 1))) {
+            return false;
+        }
+    }
+
+    return letters >= 2;
+}
+
+/**
+ * @brief Aggiunge una lingua alla risposta JSON evitando duplicati.
+ */
+static bool web_ui_append_language_item(cJSON *languages,
+                                        const char *lang,
+                                        const char *file_path,
+                                        bool *has_it)
+{
+    if (!languages || !lang || !file_path || !web_ui_is_valid_lang_code(lang)) {
+        return false;
+    }
+
+    int count = cJSON_GetArraySize(languages);
+    for (int i = 0; i < count; ++i) {
+        cJSON *it = cJSON_GetArrayItem(languages, i);
+        cJSON *code = cJSON_GetObjectItem(it, "code");
+        if (cJSON_IsString(code) && code->valuestring && strcmp(code->valuestring, lang) == 0) {
+            return false;
+        }
+    }
+
+    char label[32] = {0};
+    web_ui_lang_label_from_code(lang, label, sizeof(label));
+
+    cJSON *item = cJSON_CreateObject();
+    if (!item) {
+        return false;
+    }
+
+    cJSON_AddStringToObject(item, "code", lang);
+    cJSON_AddStringToObject(item, "label", label);
+    cJSON_AddStringToObject(item, "file", file_path);
+    cJSON_AddItemToArray(languages, item);
+
+    if (has_it && strcmp(lang, "it") == 0) {
+        *has_it = true;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Carica la lista lingue dal catalogo unico i18n_v2.json.
+ */
+static bool web_ui_append_languages_from_i18n_v2(cJSON *languages, bool *has_it)
+{
+    if (!languages) {
+        return false;
+    }
+
+    FILE *f = fopen(I18N_V2_FILE_PATH, "r");
+    if (!f) {
+        return false;
+    }
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        ESP_LOGW(TAG, "[C] Impossibile posizionarsi su %s", I18N_V2_FILE_PATH);
+        return false;
+    }
+
+    long file_size = ftell(f);
+    if (file_size <= 0) {
+        fclose(f);
+        ESP_LOGW(TAG, "[C] File i18n vuoto o non leggibile: %s", I18N_V2_FILE_PATH);
+        return false;
+    }
+
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        ESP_LOGW(TAG, "[C] Impossibile riavvolgere %s", I18N_V2_FILE_PATH);
+        return false;
+    }
+
+    char *json = (char *)malloc((size_t)file_size + 1U);
+    if (!json) {
+        fclose(f);
+        ESP_LOGE(TAG, "[C] Memoria insufficiente per leggere %s", I18N_V2_FILE_PATH);
+        return false;
+    }
+
+    size_t read_size = fread(json, 1, (size_t)file_size, f);
+    fclose(f);
+    json[read_size] = '\0';
+    if (read_size != (size_t)file_size) {
+        free(json);
+        ESP_LOGW(TAG, "[C] Lettura incompleta del catalogo %s", I18N_V2_FILE_PATH);
+        return false;
+    }
+
+    cJSON *root = cJSON_Parse(json);
+    free(json);
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) {
+            cJSON_Delete(root);
+        }
+        ESP_LOGW(TAG, "[C] Catalogo i18n non valido: %s", I18N_V2_FILE_PATH);
+        return false;
+    }
+
+    bool added_any = false;
+    cJSON *langs = cJSON_GetObjectItemCaseSensitive(root, "languages");
+    if (cJSON_IsArray(langs)) {
+        cJSON *lang = NULL;
+        cJSON_ArrayForEach(lang, langs) {
+            if (!cJSON_IsString(lang) || !lang->valuestring) {
+                continue;
+            }
+            if (web_ui_append_language_item(languages, lang->valuestring, I18N_V2_FILE_PATH, has_it)) {
+                added_any = true;
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+    return added_any;
+}
+
+/**
+ * @brief Fallback legacy: estrae le lingue da file i18n_<lang>.json.
+ */
+static void web_ui_append_languages_from_legacy_scan(cJSON *languages, bool *has_it)
+{
+    DIR *dir = opendir("/spiffs");
+    if (!dir) {
+        ESP_LOGW(TAG, "[C] Impossibile aprire /spiffs per scansione lingue");
+        return;
+    }
+
+    struct dirent *entry = NULL;
+    while ((entry = readdir(dir)) != NULL) {
+        char lang[8] = {0};
+        if (!web_ui_extract_lang_from_filename(entry->d_name, lang, sizeof(lang))) {
+            continue;
+        }
+        if (!web_ui_is_valid_lang_code(lang)) {
+            continue;
+        }
+
+        char file_path[320] = {0};
+        snprintf(file_path, sizeof(file_path), "/spiffs/%s", entry->d_name);
+        web_ui_append_language_item(languages, lang, file_path, has_it);
+    }
+
+    closedir(dir);
+}
+
+/**
  * @brief Converte un codice lingua in etichetta leggibile
  *
  * Ad esempio "it" => "Italiano (IT)"; usa l'upper-case per codici
@@ -579,6 +764,12 @@ static void web_ui_lang_label_from_code(const char *lang, char *label, size_t la
         snprintf(label, label_len, "Italiano (IT)");
     } else if (strcmp(lang, "en") == 0) {
         snprintf(label, label_len, "English (EN)");
+    } else if (strcmp(lang, "fr") == 0) {
+        snprintf(label, label_len, "Français (FR)");
+    } else if (strcmp(lang, "de") == 0) {
+        snprintf(label, label_len, "Deutsch (DE)");
+    } else if (strcmp(lang, "es") == 0) {
+        snprintf(label, label_len, "Español (ES)");
     } else {
         char upper[16] = {0};
         size_t n = strlen(lang);
@@ -1341,6 +1532,8 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(timeouts, "idle_before_ads_ms", cfg->timeouts.idle_before_ads_ms);
     cJSON_AddNumberToObject(timeouts, "ad_rotation_ms", cfg->timeouts.ad_rotation_ms);
     cJSON_AddNumberToObject(timeouts, "credit_reset_timeout_ms", cfg->timeouts.credit_reset_timeout_ms);
+    cJSON_AddNumberToObject(timeouts, "pre_fine_ciclo_percent", cfg->timeouts.pre_fine_ciclo_percent);
+    cJSON_AddNumberToObject(timeouts, "pause_max_suspend_sec", cfg->timeouts.pause_max_suspend_sec);
     cJSON_AddItemToObject(root, "timeouts", timeouts);
 
     // UI multilingua
@@ -1438,56 +1631,12 @@ esp_err_t api_ui_languages_get(httpd_req_t *req)
     cJSON_AddItemToObject(root, "languages", languages);
 
     bool has_it = false;
-    DIR *dir = opendir("/spiffs");
-    if (dir) {
-        struct dirent *entry = NULL;
-        while ((entry = readdir(dir)) != NULL) {
-            char lang[8] = {0};
-            if (!web_ui_extract_lang_from_filename(entry->d_name, lang, sizeof(lang))) {
-                continue;
-            }
-
-            bool duplicate = false;
-            int count = cJSON_GetArraySize(languages);
-            for (int i = 0; i < count; ++i) {
-                cJSON *it = cJSON_GetArrayItem(languages, i);
-                cJSON *code = cJSON_GetObjectItem(it, "code");
-                if (cJSON_IsString(code) && code->valuestring && strcmp(code->valuestring, lang) == 0) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (duplicate) {
-                continue;
-            }
-
-            char label[32] = {0};
-            web_ui_lang_label_from_code(lang, label, sizeof(label));
-
-            cJSON *item = cJSON_CreateObject();
-            cJSON_AddStringToObject(item, "code", lang);
-            cJSON_AddStringToObject(item, "label", label);
-
-            char file_path[64] = {0};
-            snprintf(file_path, sizeof(file_path), "/spiffs/i18n_%s.json", lang);
-            cJSON_AddStringToObject(item, "file", file_path);
-            cJSON_AddItemToArray(languages, item);
-
-            if (strcmp(lang, "it") == 0) {
-                has_it = true;
-            }
-        }
-        closedir(dir);
-    } else {
-        ESP_LOGW(TAG, "Impossibile aprire /spiffs per scansione lingue");
+    if (!web_ui_append_languages_from_i18n_v2(languages, &has_it)) {
+        web_ui_append_languages_from_legacy_scan(languages, &has_it);
     }
 
     if (!has_it) {
-        cJSON *it_item = cJSON_CreateObject();
-        cJSON_AddStringToObject(it_item, "code", "it");
-        cJSON_AddStringToObject(it_item, "label", "Italiano (IT)");
-        cJSON_AddStringToObject(it_item, "file", "/spiffs/i18n_it.json");
-        cJSON_AddItemToArray(languages, it_item);
+        web_ui_append_language_item(languages, "it", I18N_V2_FILE_PATH, &has_it);
     }
 
     char *json = cJSON_PrintUnformatted(root);
@@ -2071,6 +2220,24 @@ esp_err_t api_config_save(httpd_req_t *req)
                 cfg->timeouts.exit_language_ms = (uint32_t)strtoul(t_lang->valuestring, NULL, 0);
             }
         }
+        cJSON *pause_suspend = cJSON_GetObjectItem(timeouts_obj, "pause_max_suspend_sec");
+        if (pause_suspend) {
+            if (cJSON_IsNumber(pause_suspend)) {
+                uint32_t val = (uint32_t)pause_suspend->valuedouble;
+                if (val <= 65535) {
+                    cfg->timeouts.pause_max_suspend_sec = val;
+                }
+            }
+        }
+        cJSON *pre_fine = cJSON_GetObjectItem(timeouts_obj, "pre_fine_ciclo_percent");
+        if (pre_fine) {
+            if (cJSON_IsNumber(pre_fine)) {
+                uint8_t val = (uint8_t)pre_fine->valueint;
+                if (val <= 99) {
+                    cfg->timeouts.pre_fine_ciclo_percent = val;
+                }
+            }
+        }
     }
     if (cfg->timeouts.exit_programs_ms < 1000U)  cfg->timeouts.exit_programs_ms = 1000U;
     if (cfg->timeouts.exit_programs_ms > 600000U) cfg->timeouts.exit_programs_ms = 600000U;
@@ -2082,6 +2249,8 @@ esp_err_t api_config_save(httpd_req_t *req)
     if (cfg->timeouts.ad_rotation_ms > 60000U) cfg->timeouts.ad_rotation_ms = 60000U;
     if (cfg->timeouts.credit_reset_timeout_ms < 1000U) cfg->timeouts.credit_reset_timeout_ms = 1000U;
     if (cfg->timeouts.credit_reset_timeout_ms > 3600000U) cfg->timeouts.credit_reset_timeout_ms = 3600000U;
+    if (cfg->timeouts.pause_max_suspend_sec > 65535U) cfg->timeouts.pause_max_suspend_sec = 65535U;
+    if (cfg->timeouts.pre_fine_ciclo_percent > 99U) cfg->timeouts.pre_fine_ciclo_percent = 99U;
 
     // UI multilingua
     cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
@@ -3067,6 +3236,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_TEST)) {
         httpd_uri_t uri_test = {.uri = "/test", .method = HTTP_GET, .handler = test_page_handler};
         httpd_register_uri_handler(server, &uri_test);
+        
+        httpd_uri_t uri_led_bar_test = {.uri = "/led_bar_test", .method = HTTP_GET, .handler = led_bar_test_page_handler};
+        httpd_register_uri_handler(server, &uri_led_bar_test);
     }
 
     httpd_uri_t uri_files = {.uri = "/files", .method = HTTP_GET, .handler = files_page_handler};
