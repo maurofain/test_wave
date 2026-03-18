@@ -1,5 +1,6 @@
 #include "web_ui_internal.h"
 #include "web_ui_programs.h"
+#include "digital_io.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -56,6 +57,31 @@ esp_err_t api_programs_get(httpd_req_t *req)
     if (!json) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(json);
+    if (root && cJSON_IsObject(root)) {
+        cJSON_AddNumberToObject(root, "relay_outputs_count", DIGITAL_IO_OUTPUT_COUNT);
+        cJSON_AddNumberToObject(root, "relay_local_count", DIGITAL_IO_LOCAL_OUTPUT_COUNT);
+        cJSON_AddNumberToObject(root, "relay_modbus_group_count", DIGITAL_IO_MODBUS_OUTPUT_COUNT);
+
+        char *enriched = cJSON_PrintUnformatted(root);
+        cJSON_Delete(root);
+        free(json);
+
+        if (!enriched) {
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+
+        httpd_resp_set_type(req, "application/json");
+        esp_err_t ret = httpd_resp_send(req, enriched, strlen(enriched));
+        free(enriched);
+        return ret;
+    }
+
+    if (root) {
+        cJSON_Delete(root);
     }
 
     httpd_resp_set_type(req, "application/json");

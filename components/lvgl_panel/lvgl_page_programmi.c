@@ -6,9 +6,12 @@
 #include "language_flags.h"
 #include "lvgl_page_chrome.h"
 #include "main.h"
+#include "tasks.h"
 #include "web_ui_programs.h"
+#include "digital_io.h"
 
 #include "lvgl.h"
+#include "esp_err.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -113,6 +116,7 @@ static bool s_btn_last_active[PROG_COUNT] = {0};
 static bool s_btn_last_warning[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
 static bool s_prog_suspended[PROG_COUNT] = {0};
+static bool s_input_last_pressed[PROG_COUNT] = {0};
 static fsm_state_t s_last_fsm_state = FSM_STATE_IDLE;  /* Track last FSM state for credit reset */
 static uint32_t s_credit_inactivity_start_ms = 0;      /* When CREDIT state was entered */
 static uint32_t s_last_user_interaction_ms = 0;
@@ -184,6 +188,73 @@ static const web_ui_program_entry_t *find_program_entry(uint8_t pid)
     }
 
     return NULL;
+}
+
+static uint8_t get_program_input_mapping(const device_config_t *cfg, uint8_t program_id)
+{
+    if (!cfg || program_id == 0 || program_id > PROG_COUNT) {
+        return DEVICE_TOUCH_BUTTON_UNASSIGNED;
+    }
+
+    uint8_t input_id = cfg->touch_button_map.button_to_input[program_id - 1U];
+    if (input_id < DEVICE_TOUCH_INPUT_MIN || input_id > DEVICE_TOUCH_INPUT_MAX) {
+        return DEVICE_TOUCH_BUTTON_UNASSIGNED;
+    }
+
+    return input_id;
+}
+
+static void process_physical_touch_mappings(void)
+{
+    const device_config_t *cfg = device_config_get();
+    if (!cfg) {
+        return;
+    }
+
+    uint8_t input_usage[DEVICE_TOUCH_INPUT_MAX + 1U] = {0};
+    for (uint8_t program_id = 1; program_id <= PROG_COUNT; ++program_id) {
+        uint8_t input_id = get_program_input_mapping(cfg, program_id);
+        if (input_id >= DEVICE_TOUCH_INPUT_MIN && input_id <= DEVICE_TOUCH_INPUT_MAX) {
+            input_usage[input_id]++;
+        }
+    }
+
+    for (uint8_t program_id = 1; program_id <= PROG_COUNT; ++program_id) {
+        uint8_t index = (uint8_t)(program_id - 1U);
+        uint8_t input_id = get_program_input_mapping(cfg, program_id);
+
+        bool now_pressed = false;
+        if (input_id >= DEVICE_TOUCH_INPUT_MIN && input_id <= DEVICE_TOUCH_INPUT_MAX && input_usage[input_id] == 1U) {
+            bool input_level = false;
+            if (tasks_digital_io_get_input_via_agent(input_id,
+                                                     &input_level,
+                                                     pdMS_TO_TICKS(10)) == ESP_OK) {
+                now_pressed = input_level;
+            }
+        }
+
+        bool rising_edge = (!s_input_last_pressed[index] && now_pressed);
+        s_input_last_pressed[index] = now_pressed;
+
+        if (!rising_edge) {
+            continue;
+        }
+
+        lv_obj_t *button = s_prog_btns[index];
+        if (!button) {
+            continue;
+        }
+
+        if (!lv_obj_has_flag(button, LV_OBJ_FLAG_CLICKABLE) || lv_obj_has_flag(button, LV_OBJ_FLAG_HIDDEN)) {
+            continue;
+        }
+
+        ESP_LOGI(TAG,
+                 "[C] Trigger pulsante touch %u da ingresso fisico IN%02u",
+                 (unsigned)program_id,
+                 (unsigned)input_id);
+        (void)lv_obj_send_event(button, LV_EVENT_CLICKED, NULL);
+    }
 }
 
 static void set_program_label_text(lv_obj_t *label, uint8_t pid)
@@ -1037,7 +1108,7 @@ static void build_status(lv_obj_t *scr)
  */
 static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t y, int32_t w, int32_t h)
 {
-    ESP_LOGI(TAG, "[C] === create_prog_button START: pid=%u ===", (unsigned)pid);
+    // ESP_LOGI(TAG, "[C] === create_prog_button START: pid=%u ===", (unsigned)pid);
     
     if (pid == 0 || pid > PROG_COUNT)
     {
@@ -1046,8 +1117,8 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
         return;
     }
 
-    ESP_LOGI(TAG, "[C] create_prog_button: pid=%u, parent=%p, pos=(%d,%d), size=(%d,%d)", 
-             (unsigned)pid, (void*)parent, (int)x, (int)y, (int)w, (int)h);
+    // ESP_LOGI(TAG, "[C] create_prog_button: pid=%u, parent=%p, pos=(%d,%d), size=(%d,%d)",
+    //          (unsigned)pid, (void*)parent, (int)x, (int)y, (int)w, (int)h);
 
     if (!parent) {
         ESP_LOGE(TAG, "[C] create_prog_button: ERRORE - parent è NULL per pid=%u", (unsigned)pid);
@@ -1064,7 +1135,7 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     lv_obj_set_size(btn, w, h);
     btn_style(btn, COL_PROG);
     
-    ESP_LOGI(TAG, "[C] create_prog_button: btn=%p created and positioned for pid=%u", (void*)btn, (unsigned)pid);
+    // ESP_LOGI(TAG, "[C] create_prog_button: btn=%p created and positioned for pid=%u", (void*)btn, (unsigned)pid);
 
     lv_obj_t *lbl = lv_label_create(btn);
     lv_obj_set_style_text_color(lbl, COL_WHITE, LV_PART_MAIN);
@@ -1075,8 +1146,8 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     set_program_label_text(lbl, pid);
     lv_obj_center(lbl);
     
-    ESP_LOGI(TAG, "[C] create_prog_button: label=%p created with text='%s' for pid=%u", 
-             (void*)lbl, lv_label_get_text(lbl), (unsigned)pid);
+    // ESP_LOGI(TAG, "[C] create_prog_button: label=%p created with text='%s' for pid=%u", 
+            //  (void*)lbl, lv_label_get_text(lbl), (unsigned)pid);
 
     int idx = (int)pid - 1;
     s_prog_ud[idx].prog_id = pid;
@@ -1086,16 +1157,16 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     s_prog_btns[idx] = btn;
     s_prog_lbls[idx] = lbl;
     
-    ESP_LOGI(TAG, "[C] create_prog_button: STORED - s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
-             idx, (void*)s_prog_btns[idx], idx, (void*)s_prog_lbls[idx]);
+    // ESP_LOGI(TAG, "[C] create_prog_button: STORED - s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
+            //  idx, (void*)s_prog_btns[idx], idx, (void*)s_prog_lbls[idx]);
 
     /* [C] Inizialmente non selezionabile: colore scuro, opacità piena (refresh_prog_buttons aggiornerà) */
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
     btn_style(btn, COL_PROG_DIS);
     lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
     
-    ESP_LOGI(TAG, "[C] === create_prog_button END: pid=%u, btn=%p, lbl=%p ===", 
-             (unsigned)pid, (void*)btn, (void*)lbl);
+    // ESP_LOGI(TAG, "[C] === create_prog_button END: pid=%u, btn=%p, lbl=%p ===", 
+    //          (unsigned)pid, (void*)btn, (void*)lbl);
 }
 
 /** @brief Costruisce i pulsanti del programma.
@@ -1228,6 +1299,7 @@ static void clear_panel_handles(void)
         s_btn_state_valid[i] = false;
         s_btn_last_active[i] = false;
         s_btn_last_clickable[i] = false;
+        s_input_last_pressed[i] = false;
     }
 
     s_last_gauge_pct = -1;
@@ -1275,6 +1347,12 @@ static void panel_timer_cb(lv_timer_t *t)
             uint32_t reset_timeout_ms = 300000;  /* Default 5 minutes */
             if (cfg && cfg->timeouts.credit_reset_timeout_ms > 0) {
                 reset_timeout_ms = cfg->timeouts.credit_reset_timeout_ms;
+            }
+
+            /* Evita overflow quando s_credit_inactivity_start_ms non è stato inizializzato */
+            if (s_credit_inactivity_start_ms == 0) {
+                s_credit_inactivity_start_ms = snap.inactivity_ms;
+                ESP_LOGI(TAG, "[C] Inizializzato s_credit_inactivity_start_ms=%u", s_credit_inactivity_start_ms);
             }
 
             uint32_t time_in_credit = snap.inactivity_ms - s_credit_inactivity_start_ms;
@@ -1325,6 +1403,8 @@ static void panel_timer_cb(lv_timer_t *t)
         s_last_fsm_state = snap.state;
         last_snap = snap;
 
+        process_physical_touch_mappings();
+
         update_state(&snap);
         refresh_prog_buttons(&snap);
     }
@@ -1367,6 +1447,11 @@ void lvgl_page_main_deactivate(void)
 void lvgl_page_main_show(void)
 {
     ESP_LOGI(TAG, "[C] ===== lvgl_page_main_show START =====");
+
+    esp_err_t dio_err = digital_io_init();
+    if (dio_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Init digital_io per mappa pulsanti fallita: %s", esp_err_to_name(dio_err));
+    }
     
     /* Invia sequenza init CCTalk prima di ogni caricamento della pagina programmi */
     main_cctalk_send_initialization_sequence_async();

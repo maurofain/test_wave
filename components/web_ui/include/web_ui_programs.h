@@ -12,7 +12,7 @@
 
 #define WEB_UI_PROGRAM_MAX 10
 #define WEB_UI_PROGRAM_NAME_MAX 32
-#define WEB_UI_VIRTUAL_RELAY_MAX 10
+#define WEB_UI_VIRTUAL_RELAY_MAX 12
 
 /**
  * @brief Rappresenta un singolo programma configurabile

@@ -1661,6 +1661,83 @@ static void generic_i2c_diagnostic_scan(i2c_master_bus_handle_t bus,
  * - ESP_OK: Operazione completata con successo.
  * - ESP_FAIL: Operazione fallita.
  */
+static void init_bsp_i2c_bus_with_log(void)
+{
+#if defined(CONFIG_BSP_I2C_NUM)
+  ESP_LOGI(TAG,
+           "[M] [I2C] Avvio init bus I2C BSP Monitor (port=%d SDA=%d SCL=%d)",
+           BSP_I2C_NUM, BSP_I2C_SDA, BSP_I2C_SCL);
+  esp_err_t i2c_ret = bsp_i2c_init();
+  if (i2c_ret != ESP_OK)
+  {
+    ESP_LOGW(TAG, "[M] [I2C] Init bus I2C BSP fallita: %s",
+             esp_err_to_name(i2c_ret));
+  }
+  else
+  {
+    ESP_LOGI(TAG, "[M] [I2C] Bus I2C BSP inizializzato correttamente");
+  }
+#else
+  ESP_LOGW(TAG, "[M] [I2C] CONFIG_BSP_I2C_NUM non definito: init bus I2C BSP "
+                "non disponibile");
+#endif
+}
+
+static esp_err_t init_periph_i2c_bus_with_log(void)
+{
+  ESP_LOGI(TAG,
+           "[M] [IOX] Avvio init Periferiche su bus I2C (port=%d SDA=%d SCL=%d)",
+           CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SDA_GPIO,
+           CONFIG_APP_I2C_SCL_GPIO);
+  esp_err_t periph_ret = periph_i2c_init();
+  if (periph_ret != ESP_OK)
+  {
+    ESP_LOGW(TAG, "[M] [I2C] Init bus periferiche fallita: %s",
+             esp_err_to_name(periph_ret));
+  }
+  else
+  {
+    ESP_LOGI(TAG, "[M] [I2C] Bus periferiche pronto su GPIO%d/GPIO%d",
+             CONFIG_APP_I2C_SCL_GPIO, CONFIG_APP_I2C_SDA_GPIO);
+  }
+  return periph_ret;
+}
+
+static void init_eeprom_on_periph_i2c(void)
+{
+  if (periph_i2c_get_handle() == NULL)
+  {
+    ESP_LOGW(TAG,
+             "[M] EEPROM 24LC16 non inizializzata: bus periferiche non disponibile");
+    init_agent_status_set(AGN_ID_EEPROM, 0, INIT_AGENT_ERR_DEPENDENCY_FAILED);
+    return;
+  }
+
+  ESP_LOGI(TAG,
+           "[M] Inizializzo EEPROM 24LC16 su periph_i2c (port=%d, GPIO%d SCL, "
+           "GPIO%d SDA)",
+           CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SCL_GPIO,
+           CONFIG_APP_I2C_SDA_GPIO);
+  esp_err_t eeprom_ret = eeprom_24lc16_init();
+  if (eeprom_ret != ESP_OK)
+  {
+    ESP_LOGW(TAG, "[M] EEPROM init fallita: %s", esp_err_to_name(eeprom_ret));
+    init_agent_status_set(AGN_ID_EEPROM, 0, INIT_AGENT_ERR_INIT_FAILED);
+    return;
+  }
+
+  if (eeprom_24lc16_is_available())
+  {
+    ESP_LOGI(TAG, "[M] EEPROM 24LC16 pronta");
+    init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NONE);
+  }
+  else
+  {
+    ESP_LOGW(TAG, "[M] EEPROM 24LC16 non rilevata sul bus periferiche");
+    init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NOT_AVAILABLE);
+  }
+}
+
 esp_err_t init_run_factory(void)
 {
   init_agent_status_reset_defaults();
@@ -1674,7 +1751,7 @@ esp_err_t init_run_factory(void)
   log_partitions();
   ESP_ERROR_CHECK(init_event_loop());
 
-  periph_i2c_init();
+  (void)init_periph_i2c_bus_with_log();
 
   // Lascia assestare i livelli elettrici (pull-up hardware/software) per
   // evitare che la FSM I2C si blocchi al primissimo start e dia "I2C software
@@ -1688,17 +1765,18 @@ esp_err_t init_run_factory(void)
   // ridotto a 20 ticks (il prolungato mascherava timeout fisici)
   generic_i2c_diagnostic_scan(periph_i2c_get_handle(), "Periph I2C", 20);
 
+  init_bsp_i2c_bus_with_log();
 #if defined(CONFIG_BSP_I2C_NUM)
-  bsp_i2c_init();
   // Scansione diagnostica bus BSP (port 1, GPIO 7/8) - timeout breve (20 ticks
   // = ~20ms)
   generic_i2c_diagnostic_scan(bsp_i2c_get_handle(), "BSP I2C", 20);
 #endif
 
-  // NOTA: L'inizializzazione EEPROM viene spostata più avanti dopo
-  // periph_i2c_init()
+  /* La EEPROM deve essere pronta prima del load config, altrimenti
+   * device_config ricade inutilmente su NVS/default e registra errori fuorvianti. */
+  init_eeprom_on_periph_i2c();
 
-  // Inizializza configurazione device PRIMA degli altri moduli
+  // Inizializza configurazione device PRIMA degli altri moduli applicativi
   ESP_ERROR_CHECK(device_config_init());
   init_agent_status_set(AGN_ID_DEVICE_CONFIG, 1, INIT_AGENT_ERR_NONE);
 
@@ -1741,9 +1819,6 @@ esp_err_t init_run_factory(void)
     return ESP_FAIL;
   }
   init_agent_status_set(AGN_ID_FSM, 1, INIT_AGENT_ERR_NONE);
-
-  // Tentativo rapido pre-boot di invio crash (best-effort, timeout corto)
-  ESP_ERROR_CHECK(try_send_pending_crash_record());
 
   if (s_error_lock_active)
   {
@@ -1846,6 +1921,9 @@ esp_err_t init_run_factory(void)
   {
     ESP_LOGI(TAG, "[M] Ethernet disabilitato da config");
   }
+
+  // Invio crash record solo dopo che la rete è stata inizializzata
+  ESP_ERROR_CHECK(try_send_pending_crash_record());
 
   // Inizializza monitoraggio seriale per i test
   serial_test_init();
@@ -2217,42 +2295,9 @@ void init_get_netifs(esp_netif_t **ap, esp_netif_t **sta, esp_netif_t **eth)
  */
 void init_i2c_and_io_expander(void)
 {
-#if defined(CONFIG_BSP_I2C_NUM)
-  ESP_LOGI(TAG,
-           "[M] [I2C] Avvio init bus I2C BSP Monitor (port=%d SDA=%d SCL=%d)",
-           BSP_I2C_NUM, BSP_I2C_SDA, BSP_I2C_SCL);
-  esp_err_t i2c_ret = bsp_i2c_init();
-  if (i2c_ret != ESP_OK)
-  {
-    ESP_LOGW(TAG, "[M] [I2C] Init bus I2C BSP fallita: %s",
-             esp_err_to_name(i2c_ret));
-  }
-  else
-  {
-    ESP_LOGI(TAG, "[M] [I2C] Bus I2C BSP inizializzato correttamente");
-  }
-#else
-  ESP_LOGW(TAG, "[M] [I2C] CONFIG_BSP_I2C_NUM non definito: init bus I2C BSP "
-                "non disponibile");
-#endif
-  ESP_LOGI(
-      TAG,
-      "[M] [IOX] Avvio init Periferiche su bus I2C (port=%d SDA=%d SCL=%d)",
-      CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SDA_GPIO, CONFIG_APP_I2C_SCL_GPIO);
-  esp_err_t periph_ret = periph_i2c_init();
-  ESP_LOGI(TAG, "[M] DEBUG: periph_i2c_init() ritornato con: %s",
-           esp_err_to_name(periph_ret));
-
-  // Inizializza EEPROM dopo che periph_i2c è pronto
-  ESP_LOGI(TAG,
-           "[M] Inizializzo EEPROM 24LC16 su periph_i2c (port=%d, GPIO%d SCL, "
-           "GPIO%d SDA)",
-           CONFIG_APP_I2C_PORT, CONFIG_APP_I2C_SCL_GPIO,
-           CONFIG_APP_I2C_SDA_GPIO);
-  ESP_LOGI(TAG, "[M] DEBUG: Chiamando eeprom_24lc16_init()...");
-  ESP_ERROR_CHECK(eeprom_24lc16_init());
-  ESP_LOGI(TAG, "[M] DEBUG: eeprom_24lc16_init() completata");
-  init_agent_status_set(AGN_ID_EEPROM, 1, INIT_AGENT_ERR_NONE);
+  init_bsp_i2c_bus_with_log();
+  (void)init_periph_i2c_bus_with_log();
+  init_eeprom_on_periph_i2c();
 
   esp_err_t exp_ret = io_expander_init();
   if (exp_ret != ESP_OK)

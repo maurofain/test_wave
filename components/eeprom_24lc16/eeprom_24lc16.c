@@ -80,6 +80,14 @@ esp_err_t eeprom_24lc16_init(void) {
     s_eeprom_available = false;
     return ESP_OK;
 #endif
+    if (s_eeprom_available) {
+        ESP_LOGI(TAG, "[M] EEPROM init: dispositivo gia' disponibile");
+        return ESP_OK;
+    }
+
+    cleanup_dev_handles();
+    s_eeprom_available = false;
+
     ESP_LOGI("INIT", "[M] EEPROM init: INIZIO funzione");
     ESP_LOGI(TAG, "[M] EEPROM init: INIZIO funzione");
     
@@ -96,7 +104,6 @@ esp_err_t eeprom_24lc16_init(void) {
         }
     }
     
-    s_eeprom_available = false;
     ESP_LOGI("INIT", "[M] DEBUG: bus handle dopo retry = %p, retry_count=%d", bus, retry_count);
     if (bus == NULL) {
         ESP_LOGW("INIT", "[M] EEPROM init: Periph I2C bus not initialized dopo %d tentativi", retry_count);
@@ -112,6 +119,7 @@ esp_err_t eeprom_24lc16_init(void) {
     if (detect_ret != ESP_OK) {
         ESP_LOGW("INIT", "[M] EEPROM init: nessuna EEPROM rilevata tra 0x50 e 0x57 (%s)",
                  esp_err_to_name(detect_ret));
+        cleanup_dev_handles();
         return ESP_OK;
     }
 
@@ -200,7 +208,10 @@ esp_err_t eeprom_24lc16_init(void) {
         }
     } else {
         s_eeprom_available = false;
-        ESP_LOGW("INIT", "[M] EEPROM init: 24LC16BT non presente su indirizzo 0x%02X (%s)", EEPROM_BASE_ADDR, esp_err_to_name(ret));
+        ESP_LOGW("INIT",
+                 "[M] EEPROM init: verifica lettura fallita su indirizzo 0x%02X (%s)",
+                 detected_addr,
+                 esp_err_to_name(ret));
         cleanup_dev_handles();
     }
     return ESP_OK; 

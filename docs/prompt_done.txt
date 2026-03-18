@@ -23,4 +23,10 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [X] la sequenza delle pagine è : Init con logo > pubblicità con tasto per scelta programmi e bandierina per passare a scelta lingua - dopo scelta lingua (o timeour 60 secondi) si ritorna alla pagina su cui si è premuta la bandierina - da scelta programmi si ritorna a pubblicità dopo timeout inayyività 60 secondi
 [X]Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
 [X]Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
+[X] Il tasto Stop deve apparire solo a programma avviato, il tasto programma selezionato deve cambiare il titolo in "Sospendi" se premuto durante l'esecuzione e alla pressione successiva (riavvio da sospensione) rimettere il nome del programma.
+[X] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => a PreFineCiclo% i tutti i pulsanti , il bordo dell'area crediti, la barra di progressione e la barra led diventanono porpora 
+[X] ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
+All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
+[X] Correggere i JS e/o gli html di /config per visualizzare tutte le sezioni abilitate (ad esempio i/o expander)
+[X ] Dopo l'inserimento della moneta ritorna alla schermata ads e poi lingue
 

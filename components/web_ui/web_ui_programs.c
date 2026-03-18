@@ -1,6 +1,7 @@
 #include "web_ui_programs.h"
 #include "fsm.h"
 #include "device_config.h"
+#include "tasks.h"
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -350,15 +351,15 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
 }
 
 /**
- * @brief Controlla uno dei relè virtuali (stub per test)
+ * @brief Controlla uno dei relè logici R01..R12 tramite layer I/O unificato
  *
- * L'implementazione registra lo stato richiesto e aggiunge un messaggio al
- * log FSM. Non ha effetto sull'hardware reale.
+ * L'API mantiene lo stato richiesto nel registro locale e inoltra il comando
+ * al backend hardware corretto (I/O locale o Modbus) in base al numero relè.
  *
  * @param relay_number indice relè (1..WEB_UI_VIRTUAL_RELAY_MAX)
  * @param status true per attivare, false per disattivare
  * @param duration_ms durata della segnalazione in millisecondi
- * @return ESP_OK se accettato, ESP_ERR_INVALID_ARG se l'indice è fuori range
+ * @return ESP_OK se accettato, errore driver in caso contrario
  */
 esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32_t duration_ms)
 {
@@ -368,10 +369,21 @@ esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32
         return ESP_ERR_INVALID_ARG;
     }
 
+    esp_err_t io_err = tasks_digital_io_set_output_via_agent(relay_number,
+                                                              status,
+                                                              pdMS_TO_TICKS(250));
+    if (io_err != ESP_OK) {
+        ESP_LOGW(TAG,
+                 "[C] Relay R%u non aggiornato su hardware: %s",
+                 (unsigned)relay_number,
+                 esp_err_to_name(io_err));
+        return io_err;
+    }
+
     s_virtual_relays[relay_number].status = status;
     s_virtual_relays[relay_number].duration_ms = duration_ms;
 
-    ESP_LOGI(TAG, "[STUB] relay %u => status=%s duration_ms=%lu",
+    ESP_LOGI(TAG, "[C] relay %u => status=%s duration_ms=%lu",
              (unsigned)relay_number,
              status ? "ON" : "OFF",
              (unsigned long)duration_ms);
@@ -398,6 +410,14 @@ bool web_ui_virtual_relay_get(uint8_t relay_number, web_ui_virtual_relay_state_t
 
     if (relay_number == 0 || relay_number > WEB_UI_VIRTUAL_RELAY_MAX || !state_out) {
         return false;
+    }
+
+    bool hw_status = false;
+    esp_err_t io_err = tasks_digital_io_get_output_via_agent(relay_number,
+                                                              &hw_status,
+                                                              pdMS_TO_TICKS(250));
+    if (io_err == ESP_OK) {
+        s_virtual_relays[relay_number].status = hw_status;
     }
 
     *state_out = s_virtual_relays[relay_number];

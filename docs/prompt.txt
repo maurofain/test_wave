@@ -1,16 +1,13 @@
-[ ] Correggere i JS e/o gli html di /config per visualizzare tutte le sezioni abilitate (ad esempio i/o expander)
-[ ] ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
-All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
-[ ] Dopo l'inserimento della moneta ritorna alla schermata ads e poi lingue
 [ ]Controlla lo logica della FSM : 
 - all'avvio deve inizializzare tutto l'hardware e sincronizzarsi con il server remoto e NTP : va introdotto un nuovo stato FSM_STATE_INIT
 - poi deve passare in attesa di presenza cliente (tramite tocco del touch) mostrando lo slideshow nel riquadro centrale della pagina con il tasto con il tasto Selezione Lavaggio e il messaggio di errore opzionale in basso : va introdotto un nuovo stato FSM_STATE_SLIDESHOW
 - alla pressione di selezione lavaggio deve andare alla pagina programmi
-[ ] La gestione della striscia LED deve prevedere che ci sono 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione), con una effetto da definire per la situazione di IDLE, durante il run segue aumenta a partire dal primo led ad accedndere sezioni di verde, al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane completamente accesa lampeggioante a 2hz in colore porpora fino a che la macchina ritorna in IDLE o viene premuto qualsiasi funzione sui tasti o touch che la portano a spegnersi
+[ ] La gestione della striscia LED deve prevedere che la striscia led venga divisa dal punto di vista logico in 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione) e che sono gestite da un device virtuale led_bar che va creato. led_bar avrà :
+un comportamento da definire per la situazione di IDLE, 
+durante il run segue aumenta a partire dal primo led ad accendere progressivamente dei led in verde in base ad una ACTION ricevuta dalla FSM, 
+al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane completamente accesa lampeggioante a 2hz in colore porpora fino a che la macchina ritorna in IDLE o viene premuto qualsiasi funzione sui tasti o touch che la portano a spegnersi
 [ ] va aggiunto un parametro in /config -> Timeouts con la percentuale di ciclo eseguito per passare alla segnalazione di PreFineCiclo: un numero intero 0-99 che esprime la peercentuale del tempo rimanente per la fine  
-[V] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => a PreFineCiclo% i tutti i pulsanti , il bordo dell'area crediti, la barra di progressione e la barra led diventanono porpora 
 [ ] nell'esecuzione del programma al raggiungimento 
-[*] Il tasto Stop deve apparire solo a programma avviato, il tasto programma selezionato deve cambiare il titolo in "Sospendi" se premuto durante l'esecuzione e alla pressione successiva (riavvio da sospensione) rimettere il nome del programma.
 [ ] i pulsanti programma devono cambiare colore al raggiungimento del 70%
 [ ] il caricamento delle immagini per lo slideshow segue questo ordine: se ci sono file imgxx.jpg in SPIFFS vanno caricate da SPIFFS, se non ci sono in SPIFFS le cerchiamo in SDCARD. se non ci sono in SDCARD saltiamo la pagina pubblicità e passiamo direttamente a scelta programmi
 [ ] Font da utilizzare : pagina ads : testo nome impianto GoogleSans70, Selezione lavaggio GoogleSans50, messaggio errore GoogleSans40

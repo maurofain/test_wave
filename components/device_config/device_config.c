@@ -737,6 +737,13 @@ static void _set_defaults(device_config_t *config)
 
     // Numero pulsanti programma e coordinate geografiche
     config->num_programs = 10;   /* default: 10 programmi (2 colonne x 5 righe) */
+    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
+        uint8_t default_input = (uint8_t)(button_index + 1U);
+        if (default_input < DEVICE_TOUCH_INPUT_MIN || default_input > DEVICE_TOUCH_INPUT_MAX) {
+            default_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
+        }
+        config->touch_button_map.button_to_input[button_index] = default_input;
+    }
     config->latitude     = 0.0;
     config->longitude    = 0.0;
 
@@ -893,7 +900,10 @@ static uint32_t _calculate_crc(const char *json_str)
 static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
 {
     if (!json_str) return ESP_ERR_INVALID_ARG;
-    if (!eeprom_24lc16_is_available()) return ESP_ERR_INVALID_STATE;
+    if (!eeprom_24lc16_is_available()) {
+        ESP_LOGW(TAG, "[C] EEPROM non disponibile: salto persistenza config");
+        return ESP_ERR_INVALID_STATE;
+    }
 
     size_t json_len = strlen(json_str);
     if (json_len == 0 || json_len > EEPROM_JSON_MAX_LENGTH) {
@@ -943,10 +953,16 @@ static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
  */
 static char* _read_from_eeprom(bool *out_modified)
 {
-    if (!eeprom_24lc16_is_available()) return NULL;
+    if (!eeprom_24lc16_is_available()) {
+        ESP_LOGI(TAG, "[C] EEPROM non disponibile o non inizializzata");
+        return NULL;
+    }
 
     eeprom_header_t header;
-    if (eeprom_24lc16_read(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header)) != ESP_OK) return NULL;
+    if (eeprom_24lc16_read(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header)) != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Lettura header EEPROM fallita");
+        return NULL;
+    }
 
     if (header.magic != EEPROM_MAGIC) {
         ESP_LOGW(TAG, "[C] Magic EEPROM non valido (0x%08lX)", (unsigned long)header.magic);
@@ -962,6 +978,7 @@ static char* _read_from_eeprom(bool *out_modified)
     if (!json_str) return NULL;
 
     if (eeprom_24lc16_read(EEPROM_HEADER_ADDR + sizeof(header), (uint8_t *)json_str, header.length) != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Lettura payload EEPROM fallita");
         free(json_str);
         return NULL;
     }
@@ -1116,8 +1133,9 @@ esp_err_t device_config_load(device_config_t *config)
 
     _set_defaults(config);
 
+    bool eeprom_available = eeprom_24lc16_is_available();
     bool eeprom_modified = false;
-    char *json_str = _read_from_eeprom(&eeprom_modified);
+    char *json_str = eeprom_available ? _read_from_eeprom(&eeprom_modified) : NULL;
     bool source_is_eeprom = false;
     bool source_is_nvs = false;
 
@@ -1130,12 +1148,19 @@ esp_err_t device_config_load(device_config_t *config)
             ESP_LOGI(TAG, "[C] Flag 'modified' attivo: sincronizzo EEPROM -> NVS");
             if (_write_to_nvs(json_str) == ESP_OK) {
                 // Riscrivi in EEPROM per azzerare il flag di modifica
-                _write_to_eeprom(json_str, false);
+                esp_err_t clear_modified_err = _write_to_eeprom(json_str, false);
+                if (clear_modified_err != ESP_OK) {
+                    ESP_LOGW(TAG, "[C] Reset flag modified in EEPROM fallito: %s",
+                             esp_err_to_name(clear_modified_err));
+                }
             }
         }
     } else {
-        // EEPROM non valida, prova NVS
-        ESP_LOGI(TAG, "[C] EEPROM non valida, provo NVS...");
+        // EEPROM non disponibile/non valida, prova NVS
+        const char *eeprom_fallback_msg = eeprom_available
+                                              ? "[C] EEPROM non valida o non leggibile, provo NVS..."
+                                              : "[C] EEPROM non disponibile, provo NVS...";
+        ESP_LOGI(TAG, "%s", eeprom_fallback_msg);
         json_str = _read_from_nvs();
         if (json_str) {
             ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
@@ -1146,7 +1171,15 @@ esp_err_t device_config_load(device_config_t *config)
             char *def_json = device_config_to_json(config);
             if (def_json) {
                 _write_to_nvs(def_json);
-                _write_to_eeprom(def_json, false);
+                if (eeprom_available) {
+                    esp_err_t eeprom_wr_err = _write_to_eeprom(def_json, false);
+                    if (eeprom_wr_err != ESP_OK) {
+                        ESP_LOGW(TAG, "[C] Persistenza defaults in EEPROM fallita: %s",
+                                 esp_err_to_name(eeprom_wr_err));
+                    }
+                } else {
+                    ESP_LOGI(TAG, "[C] Defaults salvati solo in NVS: EEPROM assente");
+                }
                 free(def_json);
             }
             return ESP_OK; // Caricati i defaults in s_config via _set_defaults
@@ -1190,6 +1223,33 @@ esp_err_t device_config_load(device_config_t *config)
                 cJSON *lon_j = cJSON_GetObjectItem(root, "lon");
                 if (!lon_j) lon_j = cJSON_GetObjectItem(root, "longitude"); /* compat */
                 if (lon_j && cJSON_IsNumber(lon_j)) config->longitude = lon_j->valuedouble;
+
+                cJSON *touch_map_obj = cJSON_GetObjectItem(root, "touch_map");
+                if (!touch_map_obj) {
+                    touch_map_obj = cJSON_GetObjectItem(root, "touch_button_map"); /* compat */
+                }
+                if (touch_map_obj && cJSON_IsObject(touch_map_obj)) {
+                    cJSON *buttons = cJSON_GetObjectItem(touch_map_obj, "buttons");
+                    if (buttons && cJSON_IsArray(buttons)) {
+                        int button_count = cJSON_GetArraySize(buttons);
+                        for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
+                            uint8_t mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
+                            if ((int)button_index < button_count) {
+                                cJSON *item = cJSON_GetArrayItem(buttons, (int)button_index);
+                                if (cJSON_IsNumber(item)) {
+                                    mapped_input = (uint8_t)item->valueint;
+                                } else if (cJSON_IsString(item) && item->valuestring) {
+                                    mapped_input = (uint8_t)strtoul(item->valuestring, NULL, 10);
+                                }
+                            }
+
+                            if (mapped_input < DEVICE_TOUCH_INPUT_MIN || mapped_input > DEVICE_TOUCH_INPUT_MAX) {
+                                mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
+                            }
+                            config->touch_button_map.button_to_input[button_index] = mapped_input;
+                        }
+                    }
+                }
 
                 // Analisi config Ethernet
                 cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
@@ -1597,6 +1657,22 @@ char* device_config_to_json(const device_config_t *config)
 
     // Numero programmi e coordinate geografiche
     cJSON_AddNumberToObject(root, "n_prg", config->num_programs);
+
+    cJSON *touch_map_obj = cJSON_CreateObject();
+    cJSON *touch_buttons = cJSON_CreateArray();
+    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
+        uint8_t mapped_input = config->touch_button_map.button_to_input[button_index];
+        if (mapped_input < DEVICE_TOUCH_INPUT_MIN || mapped_input > DEVICE_TOUCH_INPUT_MAX) {
+            mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
+        }
+        cJSON_AddItemToArray(touch_buttons, cJSON_CreateNumber(mapped_input));
+    }
+    cJSON_AddItemToObject(touch_map_obj, "buttons", touch_buttons);
+    cJSON_AddNumberToObject(touch_map_obj, "max_buttons", DEVICE_TOUCH_BUTTON_MAX);
+    cJSON_AddNumberToObject(touch_map_obj, "input_min", DEVICE_TOUCH_INPUT_MIN);
+    cJSON_AddNumberToObject(touch_map_obj, "input_max", DEVICE_TOUCH_INPUT_MAX);
+    cJSON_AddItemToObject(root, "touch_map", touch_map_obj);
+
     cJSON_AddNumberToObject(root, "lat", config->latitude);
     cJSON_AddNumberToObject(root, "lon", config->longitude);
 

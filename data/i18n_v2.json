@@ -1312,6 +1312,86 @@
           "es": "USB:Reiniciar host (Experimental)"
         }
       },
+      "155": {
+        "label": "config.js.155",
+        "text": {
+          "it": "Pulsante",
+          "en": "Button",
+          "fr": "Bouton",
+          "de": "Taste",
+          "es": "Botón"
+        }
+      },
+      "156": {
+        "label": "config.js.156",
+        "text": {
+          "it": "🕹️ Mappa pulsanti",
+          "en": "🕹️ Button mapping",
+          "fr": "🕹️ Mappage boutons",
+          "de": "🕹️ Tastenbelegung",
+          "es": "🕹️ Mapeo de botones"
+        }
+      },
+      "157": {
+        "label": "config.js.157",
+        "text": {
+          "it": "Assegna ogni pulsante touch a un ingresso digitale (IN01-IN12). I conflitti tra assegnazioni vengono evidenziati in rosso.",
+          "en": "Assign each touch button to a digital input (IN01-IN12). Assignment conflicts are highlighted in red.",
+          "fr": "Assignez chaque bouton tactile à une entrée numérique (IN01-IN12). Les conflits d'affectation sont signalés en rouge.",
+          "de": "Ordnen Sie jede Touch-Taste einem digitalen Eingang (IN01-IN12) zu. Zuordnungskonflikte werden rot hervorgehoben.",
+          "es": "Asigne cada botón táctil a una entrada digital (IN01-IN12). Los conflictos de asignación se resaltan en rojo."
+        }
+      },
+      "158": {
+        "label": "config.js.158",
+        "text": {
+          "it": "Pulsante touch",
+          "en": "Touch button",
+          "fr": "Bouton tactile",
+          "de": "Touch-Taste",
+          "es": "Botón táctil"
+        }
+      },
+      "159": {
+        "label": "config.js.159",
+        "text": {
+          "it": "Ingresso digital_io",
+          "en": "digital_io input",
+          "fr": "Entrée digital_io",
+          "de": "digital_io-Eingang",
+          "es": "Entrada digital_io"
+        }
+      },
+      "160": {
+        "label": "config.js.160",
+        "text": {
+          "it": "-- Non assegnato --",
+          "en": "-- Not assigned --",
+          "fr": "-- Non attribué --",
+          "de": "-- Nicht zugewiesen --",
+          "es": "-- No asignado --"
+        }
+      },
+      "161": {
+        "label": "config.js.161",
+        "text": {
+          "it": "(non disponibile)",
+          "en": "(not available)",
+          "fr": "(non disponible)",
+          "de": "(nicht verfügbar)",
+          "es": "(no disponible)"
+        }
+      },
+      "162": {
+        "label": "config.js.162",
+        "text": {
+          "it": "Conflitto assegnazioni: ogni pulsante virtuale deve usare un ingresso IN diverso.",
+          "en": "Assignment conflict: each virtual button must use a different IN input.",
+          "fr": "Conflit d'affectation : chaque bouton virtuel doit utiliser une entrée IN différente.",
+          "de": "Zuordnungskonflikt: Jede virtuelle Taste muss einen anderen IN-Eingang verwenden.",
+          "es": "Conflicto de asignación: cada botón virtual debe usar una entrada IN diferente."
+        }
+      },
       "001": {
         "label": "config.text.001",
         "text": {
@@ -5149,11 +5229,11 @@
       "014": {
         "label": "programs.text.014",
         "text": {
-          "it": "Imposta nome, abilitazione, prezzo, durata e relay mask per ogni programma.",
-          "en": "Set name, enable, price, duration and relay mask for each program.",
-          "fr": "Définissez le nom, l'activation, le prix, la durée et le masque de relais pour chaque programme.",
-          "de": "Legen Sie für jede Sendung Name, Freigabe, Preis, Dauer und Relaismaske fest.",
-          "es": "Configure el nombre, la activación, el precio, la duración y la máscara de retransmisión de cada programa."
+          "it": "Imposta nome, abilitazione, prezzo, durata e maschera relay OUT per ciascun programma.",
+          "en": "Set name, enable, price, duration, and relay OUT mask for each program.",
+          "fr": "Définissez le nom, l'activation, le prix, la durée et le masque relais OUT pour chaque programme.",
+          "de": "Legen Sie Name, Aktivierung, Preis, Dauer und OUT-Relaismaske für jedes Programm fest.",
+          "es": "Configure nombre, habilitación, precio, duración y máscara de relé OUT para cada programa."
         }
       },
       "015": {
@@ -5219,11 +5299,11 @@
       "021": {
         "label": "programs.text.021",
         "text": {
-          "it": "Relay mask",
-          "en": "Relay mask",
-          "fr": "Masque de relais",
-          "de": "Relaismaske",
-          "es": "Máscara de relé"
+          "it": "Maschera Relay OUT",
+          "en": "Relay OUT Mask",
+          "fr": "Masque relais OUT",
+          "de": "OUT-Relaismaske",
+          "es": "Máscara de relé OUT"
         }
       },
       "022": {
@@ -5364,6 +5444,46 @@
           "fr": "Chargement des programmes...",
           "de": "Programme werden geladen...",
           "es": "Cargando programas..."
+        }
+      },
+      "036": {
+        "label": "programs.text.036",
+        "text": {
+          "it": "Le maschere sono organizzate per device (MH1001 + schede Modbus).",
+          "en": "Masks are organized per device (MH1001 + Modbus boards).",
+          "fr": "Les masques sont organisés par appareil (MH1001 + cartes Modbus).",
+          "de": "Die Masken sind nach Gerät organisiert (MH1001 + Modbus-Karten).",
+          "es": "Las máscaras están organizadas por dispositivo (MH1001 + tarjetas Modbus)."
+        }
+      },
+      "037": {
+        "label": "programs.js.037",
+        "text": {
+          "it": "Relay 1-{end} (MH1001)",
+          "en": "Relay 1-{end} (MH1001)",
+          "fr": "Relais 1-{end} (MH1001)",
+          "de": "Relais 1-{end} (MH1001)",
+          "es": "Relé 1-{end} (MH1001)"
+        }
+      },
+      "038": {
+        "label": "programs.js.038",
+        "text": {
+          "it": "Relay {start}-{end} (Waveshare Modbus {idx})",
+          "en": "Relay {start}-{end} (Waveshare Modbus {idx})",
+          "fr": "Relais {start}-{end} (Waveshare Modbus {idx})",
+          "de": "Relais {start}-{end} (Waveshare Modbus {idx})",
+          "es": "Relé {start}-{end} (Waveshare Modbus {idx})"
+        }
+      },
+      "039": {
+        "label": "programs.js.039",
+        "text": {
+          "it": "Ogni editbox: 4 bit (0/1), completamento automatico con trailing zeroes.",
+          "en": "Each input box: 4 bits (0/1), auto-completed with trailing zeros.",
+          "fr": "Chaque zone de saisie : 4 bits (0/1), complétion automatique avec des zéros de fin.",
+          "de": "Jedes Eingabefeld: 4 Bit (0/1), automatische Vervollständigung mit nachgestellten Nullen.",
+          "es": "Cada cuadro de edición: 4 bits (0/1), autocompletado con ceros finales."
         }
       }
     },
@@ -7579,6 +7699,86 @@
         "fr": "Aucune erreur",
         "de": "Kein Fehler",
         "es": "Sin error"
+      }
+    },
+    "086": {
+      "label": "test.text.086",
+      "text": {
+        "it": "Lettura input discreti slave 1...",
+        "en": "Reading discrete inputs slave 1...",
+        "fr": "Lecture des entrées discrètes esclave 1...",
+        "de": "Lese diskrete Eingänge Slave 1...",
+        "es": "Leyendo entradas discretas esclavo 1..."
+      }
+    },
+    "087": {
+      "label": "test.text.087",
+      "text": {
+        "it": "Lettura input discreti da slave 1",
+        "en": "Reading discrete inputs from slave 1",
+        "fr": "Lecture des entrées discrètes de l'esclave 1",
+        "de": "Lese diskrete Eingänge von Slave 1",
+        "es": "Leyendo entradas discretas del esclavo 1"
+      }
+    },
+    "088": {
+      "label": "test.text.088",
+      "text": {
+        "it": "Input letti: {0} (hex: {1})",
+        "en": "Inputs read: {0} (hex: {1})",
+        "fr": "Entrées lues: {0} (hex: {1})",
+        "de": "Eingänge gelesen: {0} (hex: {1})",
+        "es": "Entradas leídas: {0} (hex: {1})"
+      }
+    },
+    "089": {
+      "label": "test.text.089",
+      "text": {
+        "it": "Errore lettura input",
+        "en": "Input read error",
+        "fr": "Erreur de lecture d'entrée",
+        "de": "Eingabe-Lesefehler",
+        "es": "Error de lectura de entrada"
+      }
+    },
+    "090": {
+      "label": "test.text.090",
+      "text": {
+        "it": "Scansione da {0} a {1}...",
+        "en": "Scanning from {0} to {1}...",
+        "fr": "Analyse de {0} à {1}...",
+        "de": "Scanne von {0} bis {1}...",
+        "es": "Escaneando de {0} a {1}..."
+      }
+    },
+    "091": {
+      "label": "test.text.091",
+      "text": {
+        "it": "Scansione slave ID da {0} a {1}",
+        "en": "Scanning slave ID from {0} to {1}",
+        "fr": "Analyse des ID esclave de {0} à {1}",
+        "de": "Scanne Slave-ID von {0} bis {1}",
+        "es": "Escaneando ID esclavo de {0} a {1}"
+      }
+    },
+    "092": {
+      "label": "test.text.092",
+      "text": {
+        "it": "Trovati {0} modulo/i ({1}..{2})",
+        "en": "Found {0} module(s) ({1}..{2})",
+        "fr": "{0} module(s) trouvé(s) ({1}..{2})",
+        "de": "{0} Modul(e) gefunden ({1}..{2})",
+        "es": "{0} módulo(s) encontrado(s) ({1}..{2})"
+      }
+    },
+    "093": {
+      "label": "test.text.093",
+      "text": {
+        "it": "Errore scansione",
+        "en": "Scan error",
+        "fr": "Erreur d'analyse",
+        "de": "Scan-Fehler",
+        "es": "Error de escaneo"
       }
     },
     "language_select_title": {

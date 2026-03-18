@@ -44,6 +44,7 @@
 #include "sht40.h"
 #include "http_services.h"
 #include "web_ui_programs.h"
+#include "digital_io.h"
 
 /*
  * @file web_ui.c
@@ -154,6 +155,107 @@ static const device_serial_config_t s_web_ui_serial_default_mdb = {
     .rx_buf_size = 1024,
     .tx_buf_size = 1024,
 };
+
+static uint8_t web_ui_sanitize_touch_input_id(int value)
+{
+    if (value < (int)DEVICE_TOUCH_INPUT_MIN || value > (int)DEVICE_TOUCH_INPUT_MAX) {
+        return DEVICE_TOUCH_BUTTON_UNASSIGNED;
+    }
+    return (uint8_t)value;
+}
+
+static void web_ui_add_touch_map_to_json(cJSON *root, const device_config_t *cfg)
+{
+    if (!root || !cfg) {
+        return;
+    }
+
+    cJSON *touch_map = cJSON_CreateObject();
+    cJSON *buttons = cJSON_CreateArray();
+    if (!touch_map || !buttons) {
+        cJSON_Delete(touch_map);
+        cJSON_Delete(buttons);
+        return;
+    }
+
+    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
+        uint8_t mapped_input = cfg->touch_button_map.button_to_input[button_index];
+        mapped_input = web_ui_sanitize_touch_input_id((int)mapped_input);
+        cJSON_AddItemToArray(buttons, cJSON_CreateNumber(mapped_input));
+    }
+
+    cJSON_AddItemToObject(touch_map, "buttons", buttons);
+    cJSON_AddNumberToObject(touch_map, "max_buttons", DEVICE_TOUCH_BUTTON_MAX);
+    cJSON_AddNumberToObject(touch_map, "input_min", DEVICE_TOUCH_INPUT_MIN);
+    cJSON_AddNumberToObject(touch_map, "input_max", DEVICE_TOUCH_INPUT_MAX);
+    cJSON_AddItemToObject(root, "touch_map", touch_map);
+}
+
+static void web_ui_add_digital_inputs_to_json(cJSON *root)
+{
+    if (!root) {
+        return;
+    }
+
+    cJSON *inputs = cJSON_CreateArray();
+    if (!inputs) {
+        return;
+    }
+
+    digital_io_input_info_t infos[DIGITAL_IO_INPUT_COUNT] = {0};
+    size_t count = digital_io_get_input_infos(infos, DIGITAL_IO_INPUT_COUNT);
+    for (size_t index = 0; index < count; ++index) {
+        cJSON *item = cJSON_CreateObject();
+        if (!item) {
+            continue;
+        }
+
+        char code[8] = {0};
+        snprintf(code, sizeof(code), "IN%02u", (unsigned)infos[index].input_id);
+
+        cJSON_AddNumberToObject(item, "id", infos[index].input_id);
+        cJSON_AddStringToObject(item, "code", code);
+        cJSON_AddBoolToObject(item, "available", infos[index].available);
+        cJSON_AddBoolToObject(item, "is_local", infos[index].is_local);
+        cJSON_AddItemToArray(inputs, item);
+    }
+
+    cJSON_AddItemToObject(root, "digital_io_inputs", inputs);
+}
+
+static void web_ui_parse_touch_map_from_json(cJSON *root, device_config_t *cfg)
+{
+    if (!root || !cfg) {
+        return;
+    }
+
+    cJSON *touch_map = cJSON_GetObjectItem(root, "touch_map");
+    if (!touch_map) {
+        touch_map = cJSON_GetObjectItem(root, "touch_button_map");
+    }
+    if (!touch_map || !cJSON_IsObject(touch_map)) {
+        return;
+    }
+
+    cJSON *buttons = cJSON_GetObjectItem(touch_map, "buttons");
+    if (!buttons || !cJSON_IsArray(buttons)) {
+        return;
+    }
+
+    int count = cJSON_GetArraySize(buttons);
+    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
+        uint8_t mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
+        if ((int)button_index < count) {
+            cJSON *item = cJSON_GetArrayItem(buttons, (int)button_index);
+            if (cJSON_IsNumber(item)) {
+                mapped_input = web_ui_sanitize_touch_input_id(item->valueint);
+            } else if (cJSON_IsString(item) && item->valuestring) {
+                mapped_input = web_ui_sanitize_touch_input_id((int)strtoul(item->valuestring, NULL, 10));
+            }
+        }
+        cfg->touch_button_map.button_to_input[button_index] = mapped_input;
+    }
+}
 
 typedef void (*lvgl_test_page_fn_t)(void);
 
@@ -1088,6 +1190,8 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddStringToObject(root, "loc", cfg->location_name);
     cJSON_AddStringToObject(root, "image_source", cfg->image_source == IMAGE_SOURCE_SDCARD ? "sdcard" : "spiffs");
     cJSON_AddNumberToObject(root, "n_prg", cfg->num_programs ? cfg->num_programs : 10);
+    web_ui_add_touch_map_to_json(root, cfg);
+    web_ui_add_digital_inputs_to_json(root);
     cJSON_AddNumberToObject(root, "lat",  cfg->latitude);
     cJSON_AddNumberToObject(root, "lon", cfg->longitude);
     
@@ -1425,6 +1529,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddStringToObject(root, "dname", cfg->device_name);
     cJSON_AddStringToObject(root, "loc", cfg->location_name);
     cJSON_AddStringToObject(root, "image_source", cfg->image_source == IMAGE_SOURCE_SDCARD ? "sdcard" : "spiffs");
+    web_ui_add_touch_map_to_json(root, cfg);
 
     cJSON *eth = cJSON_CreateObject();
     cJSON_AddBoolToObject(eth, "en", cfg->eth.enabled);
@@ -1619,6 +1724,8 @@ esp_err_t api_config_save(httpd_req_t *req)
         }
         cfg->num_programs = np_ok ? np : 10;
     }
+
+    web_ui_parse_touch_map_from_json(root, cfg);
 
     /* [C] Coordinate geografiche impianto */
     cJSON *lat_obj = cJSON_GetObjectItem(root, "lat");

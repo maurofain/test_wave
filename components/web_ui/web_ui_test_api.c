@@ -1,6 +1,7 @@
 #include "web_ui.h"
 #include "web_ui_internal.h"
 #include "init.h"
+#include "tasks.h"
 #include "esp_log.h"
 
 /**
@@ -33,6 +34,7 @@
 #include "aux_gpio.h"
 #include "sht40.h"
 #include "modbus_relay.h"
+#include "digital_io.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -467,6 +469,52 @@ esp_err_t api_test_handler(httpd_req_t *req)
     else if (strcmp(test_name, "io_get") == 0) {
         uint8_t in = io_get();
         snprintf(response, sizeof(response), "{\"input\":%d,\"output\":%d}", in, io_output_state);
+    }
+
+    else if (strcmp(test_name, "dio_set") == 0) {
+        char buf[128] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *output_obj = cJSON_GetObjectItem(root, "output");
+            cJSON *val_obj = cJSON_GetObjectItem(root, "val");
+            if (output_obj && val_obj && cJSON_IsNumber(output_obj) && cJSON_IsNumber(val_obj)) {
+                esp_err_t err = tasks_digital_io_set_output_via_agent((uint8_t)output_obj->valueint,
+                                                                       val_obj->valueint != 0,
+                                                                       pdMS_TO_TICKS(250));
+                if (err == ESP_OK) {
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"ok\",\"output\":%d,\"val\":%d}",
+                             output_obj->valueint,
+                             val_obj->valueint ? 1 : 0);
+                } else {
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"error\",\"error\":\"%s\"}",
+                             esp_err_to_name(err));
+                }
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    else if (strcmp(test_name, "dio_get") == 0) {
+        digital_io_snapshot_t snapshot = {0};
+        esp_err_t err = tasks_digital_io_get_snapshot_via_agent(&snapshot,
+                                                                 pdMS_TO_TICKS(250));
+        if (err == ESP_OK) {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"status\":\"ok\",\"outputs_mask\":%u,\"inputs_mask\":%u}",
+                     (unsigned)snapshot.outputs_mask,
+                     (unsigned)snapshot.inputs_mask);
+        } else {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"status\":\"error\",\"outputs_mask\":%u,\"inputs_mask\":%u,\"error\":\"%s\"}",
+                     (unsigned)snapshot.outputs_mask,
+                     (unsigned)snapshot.inputs_mask,
+                     esp_err_to_name(err));
+        }
     }
 
     else if (strcmp(test_name, "rs232_start") == 0) {

@@ -42,3 +42,4 @@ exec.log
 # i18n editor generated/dependency folders
 i18n_editor/legacy_py/
 i18n_editor/node_modules/
+.aider*

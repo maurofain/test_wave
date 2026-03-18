@@ -4,6 +4,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define DEVICE_TOUCH_BUTTON_MAX 10U
+#define DEVICE_TOUCH_BUTTON_UNASSIGNED 0U
+#define DEVICE_TOUCH_INPUT_MIN 1U
+#define DEVICE_TOUCH_INPUT_MAX 12U
+
 /**
  * @brief Struttura di configurazione Ethernet
  */
@@ -170,6 +175,13 @@ typedef struct {
 } device_remote_log_config_t;
 
 /**
+ * @brief Mappatura pulsanti touch virtuali -> ingressi digitali fisici
+ */
+typedef struct {
+    uint8_t button_to_input[DEVICE_TOUCH_BUTTON_MAX];  ///< indice [0..9] => Pulsante 1..10, valore 0=non assegnato, 1..12=INxx
+} device_touch_button_map_t;
+
+/**
  * @brief Configurazione testi UI per multilingua
  *
  * Now supports two separate language selectors:
@@ -198,6 +210,7 @@ typedef struct {
     char location_name[64];     ///< Nome dell'impianto / locale commerciale
     bool updated;               ///< Indica se la configurazione è stata aggiornata
     uint8_t  num_programs;      ///< Numero pulsanti programma sul pannello (valori ammessi: 1,2,3,4,5,6,8,10)
+    device_touch_button_map_t touch_button_map; ///< Mappa pulsanti touch virtuali su ingressi digitali IN01..IN12
     double   latitude;          ///< Latitudine geografica impianto (gradi decimali, -90..+90)
     double   longitude;         ///< Longitudine geografica impianto (gradi decimali, -180..+180)
     device_eth_config_t eth;

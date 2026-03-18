@@ -13,7 +13,7 @@ idf_component_register(
          "lvgl_page_language_2.c"
          "lvgl_page_out_of_service.c"
     INCLUDE_DIRS "include"
-    REQUIRES waveshare__esp32_p4_nano web_ui device_config usb_cdc_scanner sd_card
+    REQUIRES waveshare__esp32_p4_nano web_ui device_config usb_cdc_scanner sd_card digital_io
     PRIV_REQUIRES main
 )
 

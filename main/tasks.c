@@ -54,6 +54,219 @@ static bool s_last_customer_available = false;
 
 static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event);
 
+typedef struct {
+    TaskHandle_t requester_task;
+    esp_err_t result;
+    bool bool_value;
+    digital_io_snapshot_t snapshot;
+} tasks_digital_io_agent_result_t;
+
+static bool tasks_is_fsm_context(void)
+{
+    const char *task_name = pcTaskGetName(NULL);
+    return (task_name != NULL && strcmp(task_name, "fsm") == 0);
+}
+
+static esp_err_t tasks_execute_digital_io_action(action_id_t action,
+                                                 uint32_t value_u32,
+                                                 uint32_t aux_u32,
+                                                 bool *out_bool,
+                                                 digital_io_snapshot_t *out_snapshot)
+{
+    esp_err_t init_err = digital_io_init();
+    if (init_err != ESP_OK) {
+        return init_err;
+    }
+
+    switch (action) {
+        case ACTION_ID_DIGITAL_IO_SET_OUTPUT:
+            return digital_io_set_output((uint8_t)value_u32, aux_u32 != 0U);
+
+        case ACTION_ID_DIGITAL_IO_GET_OUTPUT:
+            if (!out_bool) {
+                return ESP_ERR_INVALID_ARG;
+            }
+            return digital_io_get_output((uint8_t)value_u32, out_bool);
+
+        case ACTION_ID_DIGITAL_IO_GET_INPUT:
+            if (!out_bool) {
+                return ESP_ERR_INVALID_ARG;
+            }
+            return digital_io_get_input((uint8_t)value_u32, out_bool);
+
+        case ACTION_ID_DIGITAL_IO_GET_SNAPSHOT:
+            if (!out_snapshot) {
+                return ESP_ERR_INVALID_ARG;
+            }
+            return digital_io_get_snapshot(out_snapshot);
+
+        default:
+            return ESP_ERR_INVALID_ARG;
+    }
+}
+
+static bool tasks_handle_digital_io_agent_event(const fsm_input_event_t *event)
+{
+    if (!event) {
+        return false;
+    }
+
+    switch (event->action) {
+        case ACTION_ID_DIGITAL_IO_SET_OUTPUT:
+        case ACTION_ID_DIGITAL_IO_GET_OUTPUT:
+        case ACTION_ID_DIGITAL_IO_GET_INPUT:
+        case ACTION_ID_DIGITAL_IO_GET_SNAPSHOT:
+            break;
+        default:
+            return false;
+    }
+
+    bool bool_value = false;
+    digital_io_snapshot_t snapshot = {0};
+    esp_err_t op_err = tasks_execute_digital_io_action(event->action,
+                                                        event->value_u32,
+                                                        event->aux_u32,
+                                                        &bool_value,
+                                                        &snapshot);
+
+    tasks_digital_io_agent_result_t *result = (tasks_digital_io_agent_result_t *)event->data_ptr;
+    if (result) {
+        result->result = op_err;
+        result->bool_value = bool_value;
+        result->snapshot = snapshot;
+        if (result->requester_task) {
+            xTaskNotifyGive(result->requester_task);
+        }
+    }
+
+    return true;
+}
+
+static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
+                                                         uint32_t value_u32,
+                                                         uint32_t aux_u32,
+                                                         bool *out_bool,
+                                                         digital_io_snapshot_t *out_snapshot,
+                                                         TickType_t timeout_ticks)
+{
+    switch (action) {
+        case ACTION_ID_DIGITAL_IO_SET_OUTPUT:
+        case ACTION_ID_DIGITAL_IO_GET_OUTPUT:
+        case ACTION_ID_DIGITAL_IO_GET_INPUT:
+        case ACTION_ID_DIGITAL_IO_GET_SNAPSHOT:
+            break;
+        default:
+            return ESP_ERR_INVALID_ARG;
+    }
+
+    if (tasks_is_fsm_context()) {
+        return tasks_execute_digital_io_action(action,
+                                               value_u32,
+                                               aux_u32,
+                                               out_bool,
+                                               out_snapshot);
+    }
+
+    if (!fsm_event_queue_init(0)) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    tasks_digital_io_agent_result_t result = {
+        .requester_task = xTaskGetCurrentTaskHandle(),
+        .result = ESP_ERR_TIMEOUT,
+        .bool_value = false,
+        .snapshot = {0},
+    };
+
+    fsm_input_event_t event = {
+        .from = AGN_ID_WEB_UI,
+        .to = {AGN_ID_FSM},
+        .action = action,
+        .type = FSM_INPUT_EVENT_NONE,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,
+        .value_u32 = value_u32,
+        .aux_u32 = aux_u32,
+        .data_ptr = &result,
+        .text = {0},
+    };
+
+    (void)ulTaskNotifyTake(pdTRUE, 0);
+
+    TickType_t publish_timeout = pdMS_TO_TICKS(20);
+    if (!fsm_event_publish(&event, publish_timeout)) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    TickType_t wait_timeout = (timeout_ticks > 0) ? timeout_ticks : pdMS_TO_TICKS(200);
+    if (ulTaskNotifyTake(pdTRUE, wait_timeout) == 0) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    if (result.result == ESP_OK) {
+        if (out_bool) {
+            *out_bool = result.bool_value;
+        }
+        if (out_snapshot) {
+            *out_snapshot = result.snapshot;
+        }
+    }
+
+    return result.result;
+}
+
+esp_err_t tasks_digital_io_set_output_via_agent(uint8_t output_id, bool value, TickType_t timeout_ticks)
+{
+    return tasks_dispatch_digital_io_agent_request(ACTION_ID_DIGITAL_IO_SET_OUTPUT,
+                                                   (uint32_t)output_id,
+                                                   value ? 1U : 0U,
+                                                   NULL,
+                                                   NULL,
+                                                   timeout_ticks);
+}
+
+esp_err_t tasks_digital_io_get_output_via_agent(uint8_t output_id, bool *out_value, TickType_t timeout_ticks)
+{
+    if (!out_value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return tasks_dispatch_digital_io_agent_request(ACTION_ID_DIGITAL_IO_GET_OUTPUT,
+                                                   (uint32_t)output_id,
+                                                   0U,
+                                                   out_value,
+                                                   NULL,
+                                                   timeout_ticks);
+}
+
+esp_err_t tasks_digital_io_get_input_via_agent(uint8_t input_id, bool *out_value, TickType_t timeout_ticks)
+{
+    if (!out_value) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return tasks_dispatch_digital_io_agent_request(ACTION_ID_DIGITAL_IO_GET_INPUT,
+                                                   (uint32_t)input_id,
+                                                   0U,
+                                                   out_value,
+                                                   NULL,
+                                                   timeout_ticks);
+}
+
+esp_err_t tasks_digital_io_get_snapshot_via_agent(digital_io_snapshot_t *out_snapshot, TickType_t timeout_ticks)
+{
+    if (!out_snapshot) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return tasks_dispatch_digital_io_agent_request(ACTION_ID_DIGITAL_IO_GET_SNAPSHOT,
+                                                   0U,
+                                                   0U,
+                                                   NULL,
+                                                   out_snapshot,
+                                                   timeout_ticks);
+}
+
 
 /**
  * @brief Ottiene il timeout in millisecondi per la restituzione della lingua.
@@ -536,7 +749,11 @@ static void fsm_task(void *arg)
          * dell'iterazione *precedente*. */
         if (fsm_event_receive(&event, AGN_ID_FSM, param->period_ticks)) {
             event_received = true;
-            changed = fsm_handle_input_event(&fsm, &event);
+            if (tasks_handle_digital_io_agent_event(&event)) {
+                changed = false;
+            } else {
+                changed = fsm_handle_input_event(&fsm, &event);
+            }
         }
 
         TickType_t now_tick = xTaskGetTickCount();
