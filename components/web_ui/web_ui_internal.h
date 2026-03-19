@@ -4,12 +4,7 @@
 #include "esp_err.h"
 #include "esp_netif.h"
 #include "web_ui_profile.h"
-#include "webpages_embedded.h"
 #include <stdbool.h>
-
-#ifndef WEB_UI_USE_EMBEDDED_PAGES
-#define WEB_UI_USE_EMBEDDED_PAGES 0
-#endif
 
 /* I18n compact record stored in PSRAM
  * fields: numeric ids for scope/key/section and fixed-size text (32 bytes incl. NUL)
@@ -29,14 +24,6 @@ typedef struct {
  * funzioni sono implementate in altri .c e servono a mantenere il codice
  * organizzato.
  */
-
-// Helper interni esportati tra i file di web_ui (NON API pubblica)
-/**
- * @brief Invia l'intestazione HTML standard per le pagine Web UI
- *
- * Gestisce head/meta, stile CSS e navigazione superiore opzionale.
- */
-esp_err_t send_head(httpd_req_t *req, const char *title, const char *extra_style, bool show_nav);
 
 // Asset/handler spostato nel modulo comune
 esp_err_t logo_get_handler(httpd_req_t *req);

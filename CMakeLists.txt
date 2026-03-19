@@ -43,17 +43,13 @@ set(F_HID             0)
 set(F_SYS_MONITOR     0)
 set(F_SERVER_POST     0)
 set(F_LVGL_COUNTDOWN_BG 0)
-# Web pages source: 0=embedded (C), 1=SPIFFS (/spiffs/www), 2=SD (/sdcard/www)
+# Web pages source: 1=SPIFFS (/spiffs/www), 2=SD (/sdcard/www)
 set(F_WEB_UI_PAGE_SOURCE 1)
 # Export pagine seed all'avvio quando source è esterno (0=off, 1=on)
 set(F_WEB_UI_EXPORT_ON_BOOT 0)
 
-# Embedded pages include switch: when source is embedded (0) include C HTML/JS,
-# otherwise compile in external-only mode (SPIFFS/SD)
-if(F_WEB_UI_PAGE_SOURCE EQUAL 0)
-    set(F_WEB_UI_USE_EMBEDDED_PAGES 1)
-else()
-    set(F_WEB_UI_USE_EMBEDDED_PAGES 0)
+if(NOT (F_WEB_UI_PAGE_SOURCE EQUAL 1 OR F_WEB_UI_PAGE_SOURCE EQUAL 2))
+    message(FATAL_ERROR "F_WEB_UI_PAGE_SOURCE must be 1 (SPIFFS) or 2 (SD)")
 endif()
 
 # --- Override: se la scheda di espansione è assente, mock tutti i moduli ---
@@ -99,7 +95,6 @@ add_compile_definitions(
     DNA_LVGL_COUNTDOWN_BG=${F_LVGL_COUNTDOWN_BG}
     WEB_UI_PAGE_SOURCE=${F_WEB_UI_PAGE_SOURCE}
     WEB_UI_EXPORT_ON_BOOT=${F_WEB_UI_EXPORT_ON_BOOT}
-    WEB_UI_USE_EMBEDDED_PAGES=${F_WEB_UI_USE_EMBEDDED_PAGES}
 )
 
 project(test_wave)

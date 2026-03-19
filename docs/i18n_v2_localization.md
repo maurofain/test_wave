@@ -14,11 +14,9 @@ Principi guida:
 
 ## Stato attuale (sintesi)
 
-- Le pagine web esistono in doppia forma:
-  - embedded in C (`webpages_embedded.c`)
-  - esterne (`/spiffs/www` o `/sdcard/www`)
+- Le pagine web sono servite da filesystem esterno (`/spiffs/www` o `/sdcard/www`).
 - Le traduzioni sono in file `i18n_<lang>.json` su SPIFFS.
-- Oggi il web usa una localizzazione runtime (script i18n + mapping per scope), mentre LVGL usa lookup puntuali.
+- Oggi il web usa una localizzazione runtime/cache applicata ai template HTML esterni, mentre LVGL usa lookup puntuali.
 
 Questa versione v2 introduce un modello più deterministico:
 - pagine web localizzate una volta al boot (o al cambio lingua)
@@ -30,13 +28,12 @@ Questa versione v2 introduce un modello più deterministico:
 ## Decisione pipeline web (aggiornata)
 
 Decisione approvata:
-- eliminare il passaggio Python di conversione `embedded C -> html` nel flusso principale
+- eliminare il passaggio Python di conversione `embedded C -> html`
 - usare direttamente file HTML in `SPIFFS` come sorgente web (`HTML-first`)
-- mantenere opzionalmente una pagina embedded minima solo come fallback di emergenza
 
 Motivazioni:
 - riduzione complessità toolchain
-- eliminazione doppio mantenimento (`.c` + `.html`)
+- eliminazione doppio mantenimento
 - migliore allineamento con preload/localizzazione in PSRAM
 
 ---

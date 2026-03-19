@@ -186,7 +186,8 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
 /**
  * @brief Initialize display's brightness
  *
- * Brightness is controlled with PWM signal to a pin controlling backlight.
+ * Brightness is controlled via I2C communication with the display controller.
+ * The controller receives brightness values through I2C registers.
  *
  * @return
  *      - ESP_OK                On success
@@ -197,7 +198,8 @@ esp_err_t bsp_display_brightness_init(void);
 /**
  * @brief Set display's brightness
  *
- * Brightness is controlled with PWM signal to a pin controlling backlight.
+ * Brightness is controlled via I2C communication with the display controller.
+ * The function sends the brightness value to the controller through I2C.
  * Brightness must be already initialized by calling bsp_display_brightness_init() or bsp_display_new()
  *
  * @param[in] brightness_percent Brightness in [%]
@@ -210,7 +212,7 @@ esp_err_t bsp_display_brightness_set(int brightness_percent);
 /**
  * @brief Turn on display backlight
  *
- * Brightness is controlled with PWM signal to a pin controlling backlight.
+ * Brightness is controlled via I2C communication with the display controller.
  * Brightness must be already initialized by calling bsp_display_brightness_init() or bsp_display_new()
  *
  * @return
@@ -222,7 +224,7 @@ esp_err_t bsp_display_backlight_on(void);
 /**
  * @brief Turn off display backlight
  *
- * Brightness is controlled with PWM signal to a pin controlling backlight.
+ * Brightness is controlled via I2C communication with the display controller.
  * Brightness must be already initialized by calling bsp_display_brightness_init() or bsp_display_new()
  *
  * @return

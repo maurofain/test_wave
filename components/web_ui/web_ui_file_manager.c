@@ -102,25 +102,7 @@ static esp_err_t get_query_value(httpd_req_t *req, const char *key, char *out, s
  */
 esp_err_t files_page_handler(httpd_req_t *req)
 {
-#if WEB_UI_USE_EMBEDDED_PAGES == 0
     return webpages_send_external_or_error(req, "files.html", "text/html; charset=utf-8");
-#else
-    esp_err_t ext_page_ret = webpages_try_send_external(req, "files.html", "text/html; charset=utf-8");
-    if (ext_page_ret == ESP_OK) {
-        return ESP_OK;
-    }
-
-    const char *extra_style = WEBPAGE_FILES_EXTRA_STYLE;
-
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "File Manager", extra_style, true);
-
-    const char *body = WEBPAGE_FILES_BODY;
-
-    httpd_resp_sendstr_chunk(req, body);
-    httpd_resp_sendstr_chunk(req, NULL);
-    return ESP_OK;
-#endif
 }
 
 /**

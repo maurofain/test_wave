@@ -59,22 +59,18 @@ if (sd_card_is_mounted() && file_exists("/sdcard/www" + req_path)) {
 - Alta priorità su SD: `index.html`, `config` page HTML/JS/CSS, file JS/CSS minificati, asset multimediali grandi.
 - Tenere in firmware: API JSON (status, config save), pagine di fallback, endpoint di amministrazione critici.
 
-## Export pagine embedded in HTML
-Per rigenerare i file `.html` esterni a partire dalle costanti embedded (`WEBPAGE_*`) usare lo script:
+## Preparazione pagine HTML su SD
+Le pagine Web UI non vengono più generate da sorgenti C embedded.
 
-```bash
-python3 scripts/export_embedded_pages.py --output data/www
-```
+Per usare la Web UI su SD:
+- modifica direttamente i file in `data/www/` e `data/www/js/`
+- copia gli asset finali nella directory `/sdcard/www`
+- imposta `F_WEB_UI_PAGE_SOURCE=2` nel `CMakeLists.txt` radice
 
-Output generato (default):
+Pagine attese di default:
 - `index.html`, `config.html`, `ota.html`
 - `stats.html`, `tasks.html`, `httpservices.html`, `api.html`
 - `files.html`, `logs.html`, `test.html`, `programs.html`, `emulator.html`
-
-Opzioni utili:
-- `--pages index.html,config.html` esporta solo alcune pagine
-- `--config-read-only` aggiunge lo script read-only nella pagina config
-- `--show-factory-password-section` / `--no-show-factory-password-section` imposta la variabile JS di sezione password factory
 
 ## Miglioramenti opzionali
 - Endpoint admin per sincronizzare/validare la versione web sulla SD (`/api/admin/websync`).

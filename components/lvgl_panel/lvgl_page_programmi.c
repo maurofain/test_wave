@@ -35,6 +35,7 @@ static const char *TAG = "lvgl_panel";
 #define COL_PROG_ACT lv_color_make(0x27, 0xd7, 0xb2)
 #define COL_PROG_LOW lv_color_make(0xc0, 0x39, 0x2b)
 #define COL_PROG_PAUSE lv_color_make(0xe6, 0x7e, 0x22)
+#define COL_PROG_PAUSED_BG lv_color_make(0x1f, 0x5f, 0xd6)
 #define COL_TIMER_NORMAL lv_color_make(0x27, 0xd7, 0xb2)
 #define COL_TIMER_WARN lv_color_make(0xb0, 0x0f, 0x6b)
 #define COL_WHITE lv_color_make(0xEE, 0xEE, 0xEE)
@@ -113,7 +114,7 @@ static bool s_stop_pressed = false;
 static bool s_stop_confirm = false;
 static bool s_btn_last_clickable[PROG_COUNT] = {0};
 static bool s_btn_last_active[PROG_COUNT] = {0};
-static bool s_btn_last_warning[PROG_COUNT] = {0};
+static bool s_btn_last_paused[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
 static bool s_prog_suspended[PROG_COUNT] = {0};
 static bool s_input_last_pressed[PROG_COUNT] = {0};
@@ -386,12 +387,18 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
 
         bool is_active = program_is_active_for_snapshot(entry, snap);
         bool can_click = program_is_clickable_for_snapshot(entry, snap);
+        bool is_paused = is_active && s_prog_suspended[i];
         
         // Update button state only if changed
-        if (!s_btn_state_valid[i] || s_btn_last_active[i] != is_active || s_btn_last_clickable[i] != can_click)
+        if (!s_btn_state_valid[i] ||
+            s_btn_last_active[i] != is_active ||
+            s_btn_last_clickable[i] != can_click ||
+            s_btn_last_paused[i] != is_paused)
         {
             lv_color_t btn_color;
-            if (is_active) {
+            if (is_paused) {
+                btn_color = COL_PROG_PAUSED_BG;
+            } else if (is_active) {
                 btn_color = COL_PROG_ACT;
             } else if (can_click) {
                 btn_color = COL_PROG;
@@ -400,6 +407,9 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             }
             btn_style(btn, btn_color);
             lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+            lv_obj_set_style_border_width(btn, is_active ? 5 : 0, LV_PART_MAIN);
+            lv_obj_set_style_border_color(btn, COL_WHITE, LV_PART_MAIN);
+            lv_obj_set_style_border_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
             
             // Update clickability
             if (can_click && !s_btn_last_clickable[i]) {
@@ -409,6 +419,7 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             }
             s_btn_last_active[i] = is_active;
             s_btn_last_clickable[i] = can_click;
+            s_btn_last_paused[i] = is_paused;
         }
 
         s_btn_state_valid[i] = true;

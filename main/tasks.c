@@ -167,14 +167,31 @@ static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
                                                          digital_io_snapshot_t *out_snapshot,
                                                          TickType_t timeout_ticks)
 {
+    bool is_read_only_action = false;
+
     switch (action) {
         case ACTION_ID_DIGITAL_IO_SET_OUTPUT:
+            is_read_only_action = false;
+            break;
         case ACTION_ID_DIGITAL_IO_GET_OUTPUT:
         case ACTION_ID_DIGITAL_IO_GET_INPUT:
         case ACTION_ID_DIGITAL_IO_GET_SNAPSHOT:
+            is_read_only_action = true;
             break;
         default:
             return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Le operazioni di sola lettura hanno gia' serializzazione interna nel
+     * modulo digital_io e non devono attraversare la mailbox FSM.
+     * In questo modo evitiamo il flooding della coda quando la UI/LVGL
+     * richiede snapshot periodici degli ingressi. */
+    if (is_read_only_action) {
+        return tasks_execute_digital_io_action(action,
+                                               value_u32,
+                                               aux_u32,
+                                               out_bool,
+                                               out_snapshot);
     }
 
     if (tasks_is_fsm_context()) {

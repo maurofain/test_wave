@@ -1,5 +1,102 @@
 // Gestione parametro PreFineCiclo nella pagina config
-function addPreFineCicloField() {
+const PREFINE_CICLO_LEGACY_ID = '110';
+const PREFINE_CICLO_LABEL_FALLBACK = 'Soglia PreFineCiclo (%)';
+
+// Escape HTML minimale per inserire testo tradotto in modo sicuro
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Recupera la lingua corrente della UI (query string -> uiI18n -> default)
+function getCurrentUiLanguage() {
+    try {
+        const langFromQuery = new URLSearchParams(window.location.search).get('lang');
+        if (langFromQuery && langFromQuery.length === 2) {
+            return langFromQuery.toLowerCase();
+        }
+    } catch (error) {
+        console.warn('Impossibile leggere lang da query string:', error);
+    }
+
+    if (window.uiI18n && typeof window.uiI18n.language === 'string' && window.uiI18n.language.length === 2) {
+        return window.uiI18n.language.toLowerCase();
+    }
+
+    return 'it';
+}
+
+// Cerca un testo i18n per legacyId nei record API, preferendo lo scope config
+function findTextByLegacyId(records, legacyId) {
+    if (!Array.isArray(records)) {
+        return '';
+    }
+
+    let genericMatch = '';
+
+    for (const item of records) {
+        if (!item || typeof item !== 'object') {
+            continue;
+        }
+
+        const itemKey = item.key != null ? String(item.key).trim() : '';
+        if (itemKey !== String(legacyId)) {
+            continue;
+        }
+
+        const text = item.text != null ? String(item.text).trim() : '';
+        if (!text) {
+            continue;
+        }
+
+        const scope = item.scope != null ? String(item.scope).toLowerCase() : '';
+        const isConfigScope = scope.includes('config') || scope === '2';
+        if (isConfigScope) {
+            return text;
+        }
+
+        if (!genericMatch) {
+            genericMatch = text;
+        }
+    }
+
+    return genericMatch;
+}
+
+// Risolve la label i18n usando prima la tabella runtime e poi l'API testi
+async function resolveLabelByLegacyId(legacyId, fallbackText) {
+    if (window.uiI18n && typeof window.uiI18n.translate === 'function') {
+        const candidates = [String(legacyId), `config.text.${legacyId}`, `p_config.${legacyId}`, `{{${legacyId}}}`];
+        for (const key of candidates) {
+            const translated = window.uiI18n.translate(key);
+            if (translated && translated !== key && !/^\{\{\d+\}\}$/.test(translated)) {
+                return translated;
+            }
+        }
+    }
+
+    try {
+        const language = getCurrentUiLanguage();
+        const response = await fetch(`/api/ui/texts?lang=${encodeURIComponent(language)}`, { cache: 'no-store' });
+        if (response.ok) {
+            const data = await response.json();
+            const resolvedText = findTextByLegacyId(data.records, legacyId);
+            if (resolvedText) {
+                return resolvedText;
+            }
+        }
+    } catch (error) {
+        console.warn('Errore risoluzione label i18n PreFineCiclo:', error);
+    }
+
+    return fallbackText;
+}
+
+async function addPreFineCicloField() {
     // Trova la sezione Timeouts
     const timeoutsSection = document.querySelector('h2');
     if (!timeoutsSection) return;
@@ -26,9 +123,11 @@ function addPreFineCicloField() {
     }
     
     // Crea il nuovo campo PreFineCiclo
+    const preFineLabel = await resolveLabelByLegacyId(PREFINE_CICLO_LEGACY_ID, PREFINE_CICLO_LABEL_FALLBACK);
+
     const fieldHtml = `
         <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
-            <span>{{110}}:</span>
+            <span>${escapeHtml(preFineLabel)}:</span>
             <input type="number" id="pre_fine_ciclo_percent" min="0" max="99" value="70"
                    style="width:80px;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box">
             <span>%</span>

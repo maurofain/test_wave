@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 
 #ifndef WEB_UI_PAGE_SOURCE
-#define WEB_UI_PAGE_SOURCE 0
+#define WEB_UI_PAGE_SOURCE 1
 #endif
 
 #ifndef WEB_UI_EXPORT_ON_BOOT
@@ -634,7 +634,7 @@ static const char *webpages_source_name_impl(void)
 #elif WEB_UI_PAGE_SOURCE == 2
     return "SD";
 #else
-    return "EMBEDDED";
+    return "UNKNOWN";
 #endif
 }
 

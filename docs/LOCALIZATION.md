@@ -50,11 +50,11 @@ Riferimenti:
   - `web_ui_i18n_cache_invalidate(...)`
 
 ### 5) Iniezione nello HTML
-`send_head()` invia header e subito dopo aggiunge lo script i18n runtime (`WEBPAGE_COMMON_I18N_SCRIPT_FMT`) con lingua + tabella.
+Le pagine HTML in `data/www/` includono lo script i18n runtime che espone lingua + tabella al frontend.
 
 Riferimenti:
-- `components/web_ui/web_ui_common.c` (`send_head`, `send_i18n_runtime_script`)
-- `components/web_ui/webpages_embedded.c` (`WEBPAGE_COMMON_I18N_SCRIPT_FMT`)
+- `components/web_ui/webpages.c` (`send_html_localized_cached`, `localize_html_template`)
+- `data/www/*.html`
 
 ---
 
@@ -76,7 +76,7 @@ Lo script runtime crea `window.uiI18n` con:
 - su nuovi nodi via `MutationObserver`
 
 Riferimento:
-- `components/web_ui/webpages_embedded.c` (`WEBPAGE_COMMON_I18N_SCRIPT_FMT`)
+- `data/www/*.html`
 
 ---
 

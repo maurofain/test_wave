@@ -24,7 +24,7 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [X]Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
 [X]Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
 [X] Il tasto Stop deve apparire solo a programma avviato, il tasto programma selezionato deve cambiare il titolo in "Sospendi" se premuto durante l'esecuzione e alla pressione successiva (riavvio da sospensione) rimettere il nome del programma.
-[X] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => a PreFineCiclo% i tutti i pulsanti , il bordo dell'area crediti, la barra di progressione e la barra led diventanono porpora 
+[X] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => a PreFineCiclo% i tutti i pulsanti , il bordo dell'area crediti, la barra di progressione e la barra led diventanono porpora. A sx della barra va mostrato la percentuale rimanente del tempo del programma. Nell'area Crediti non va mostrato il tempo ma il credito e la scritta 'Secondi' non deve apparire ma rimanerte 'Crediti'
 [X] ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
 All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
 [X] Correggere i JS e/o gli html di /config per visualizzare tutte le sezioni abilitate (ad esempio i/o expander)
@@ -33,3 +33,94 @@ All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la 
 un comportamento da definire per la situazione di IDLE, 
 durante il run segue aumenta a partire dal primo led ad accendere progressivamente dei led in verde in base ad una ACTION ricevuta dalla FSM, 
 al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane completamente accesa lampeggioante a 2hz in colore porpora fino a che la macchina ritorna in IDLE o viene premuto qualsiasi funzione sui tasti o touch che la portano a spegnersi
+[ ] lvgl: in ads i messaggi dio errore in basso deve apparire solo se ci sono errori
+[X]Nella cartella i18n_editor Crea webuna app electron da far girare su un pc windows o linux che permetta di editare i file delle lingue:
+- si sceglie lo scope ed appaiono tutte le stringhe di quello scope incolonnate per lingua, la prima colonna è l'ID. la prima lingua è ITALIANO, Ogni voce è editabile e di fianco alla textbox ha un button per la traduzione automatica da fare interrogando un servizio web definito in un file di configurazione. In alto a sx abbiamo la scelta dello scope e a destra i tasti SALVA e ESCI. Il salvataggio crea automaticamente un json con tutti i dati di tutte le lingue con nome 'i18n_{tiomestamp}.json'
+
+
+
+
+-----------------------
+## refactor i18n v2 (decisioni aggiornate)
+- Pipeline web primaria: HTML-first su SPIFFS (`data/www/*.html` + `data/www/js/*.js`), senza passaggio di conversione embedded->html nel flusso principale.
+- Localizzazione web: preload al boot (o su cambio lingua) con cache pagine localizzate in PSRAM; nessun parsing JSON durante la singola richiesta HTTP.
+- Placeholder web: numerici compatti a 3 cifre (`{{001}}..{{999}}`) con validazione formale.
+- Catalogo JSON i18n: per ogni chiave web includere anche `label` alfanumerica descrittiva per editing/manutenzione.
+- Runtime contract: il parser usa solo la chiave numerica; `label` non è usata a runtime.
+- Fallback obbligatorio: lingua richiesta -> `it` -> stringa vuota.
+- JS: separazione script inline in moduli dedicati; include ordinati (`core -> page -> init`).
+- `i18n_editor` v2:
+  - supporto schema nuovo (key numerica + `label`)
+  - aggiunta nuove chiavi da UI (assegnazione automatica prossima libera per pagina)
+  - validazioni bloccanti su duplicati, formato `label`, presenza `text.it`.
+- Validatore build-time:
+  - errori su placeholder invalidi/non mappati, key duplicate, `label` invalida, `text.it` mancante
+  - warning su traduzioni non-base mancanti e chiavi non usate.
+-----------------------
+### Specifiche del Protocollo I2C
+
+Sulla scheda del display, il controllo della luminosità è gestito da un microcontrollore dedicato che risponde a un indirizzo specifico.
+
+* **Indirizzo I2C del Dispositivo:** `0x45`
+* **Indirizzo del Registro:** `0x86`
+* **Gamma Valori:** `0` (0% - Spento) a `255` (100% - Luminosità Massima).
+
+---
+
+### Implementazione su ESP32-P4 (ESP-IDF)
+
+Poiché l'ESP32-P4 utilizza le versioni più recenti dell'ESP-IDF (v5.3+), è consigliabile usare il nuovo driver `i2c_master`.
+
+#### 1. Configurazione del Bus
+
+Assicurati di collegare i pin SDA/SCL del monitor ai pin GPIO dell'ESP32-P4 che hai definito (es. GPIO 7 e 8 sono comuni per I2C su questo chip).
+
+```c
+#include "driver/i2c_master.h"
+
+i2c_master_bus_handle_t bus_handle;
+i2c_master_bus_config_t bus_config = {
+    .clk_source = I2C_CLK_SRC_DEFAULT,
+    .i2c_port = I2C_NUM_0,
+    .scl_io_num = GPIO_NUM_8,
+    .sda_io_num = GPIO_NUM_7,
+    .glitch_ignore_cnt = 7,
+};
+ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus_handle));
+
+i2c_master_dev_handle_t dev_handle;
+i2c_device_config_t dev_config = {
+    .dev_addr = 0x45,
+    .device_config.device_address = 0x45,
+    .scl_speed_hz = 100000, // 100kHz standard
+};
+ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &dev_handle));
+
+```
+
+#### 2. Funzione di regolazione
+
+Per cambiare la luminosità, invia il registro seguito dal valore desiderato:
+
+```c
+esp_err_t set_backlight_brightness(uint8_t level) {
+    uint8_t write_buf[2] = {0x86, level};
+    return i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), -1);
+}
+
+```
+
+---
+
+### Note Importanti per ESP32-P4
+
+* **Alimentazione:** Il monitor richiede 5V stabili per la retroilluminazione. Assicurati che l'ESP32-P4 e il monitor condividano la massa (GND).
+* **Conflitto Indirizzi:** Se hai collegato anche il touch, l'indirizzo del touch controller (Goodix) sarà solitamente `0x5D` o `0x14`. Non confonderlo con lo `0x45` del backlight.
+* **Inizializzazione DSI:** Ricorda che la retroilluminazione potrebbe non accendersi se il segnale MIPI-DSI non è attivo o se il pannello non è stato correttamente inizializzato tramite i comandi DSI (solitamente gestiti dai componenti BSP di Espressif come `esp_lcd_ek79007`).
+
+---
+
+[Display Waveshare DSI Setup](https://www.youtube.com/watch?v=liIlQvlp9Co)
+Questo video mostra l'interfaccia e i collegamenti fisici necessari per far funzionare correttamente i display Waveshare DSI, inclusa la gestione della luminosità.
+
+Vuoi che ti aiuti a integrare questo codice con l'inizializzazione del driver video MIPI-DSI specifico per l'ESP32-P4?

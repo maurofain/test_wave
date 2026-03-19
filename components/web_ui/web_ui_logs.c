@@ -578,24 +578,5 @@ esp_err_t api_logs_options(httpd_req_t *req)
  */
 esp_err_t logs_page_handler(httpd_req_t *req)
 {
-#if WEB_UI_USE_EMBEDDED_PAGES == 0
     return webpages_send_external_or_error(req, "logs.html", "text/html; charset=utf-8");
-#else
-    esp_err_t ext_page_ret = webpages_try_send_external(req, "logs.html", "text/html; charset=utf-8");
-    if (ext_page_ret == ESP_OK) {
-        return ESP_OK;
-    }
-
-    ESP_LOGI(TAG, "[C] GET /logs");
-    const char *extra_style = WEBPAGE_LOGS_EXTRA_STYLE;
-
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Log Remoto", extra_style, true);
-
-    const char *body = WEBPAGE_LOGS_BODY;
-
-    httpd_resp_sendstr_chunk(req, body);
-    httpd_resp_sendstr_chunk(req, NULL);
-    return ESP_OK;
-#endif
 }

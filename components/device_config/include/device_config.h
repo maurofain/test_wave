@@ -68,6 +68,7 @@ typedef struct {
 typedef struct {
     bool enabled;              ///< Display abilitato (true = display on, false = headless)
     uint8_t lcd_brightness;     ///< Luminosità LCD (0-100)
+    bool backlight;            ///< Backlight acceso/spento (true = on, false = off)
     bool ads_enabled;           ///< Abilita schermata ADS nel flusso cliente
 } device_display_config_t;
 

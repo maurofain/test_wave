@@ -982,25 +982,7 @@ esp_err_t maintainer_enable_handler(httpd_req_t *req)
  */
 esp_err_t ota_get_handler(httpd_req_t *req)
 {
-#if WEB_UI_USE_EMBEDDED_PAGES == 0
     return webpages_send_external_or_error(req, "ota.html", "text/html; charset=utf-8");
-#else
-    esp_err_t ext_page_ret = webpages_try_send_external(req, "ota.html", "text/html; charset=utf-8");
-    if (ext_page_ret == ESP_OK) {
-        return ESP_OK;
-    }
-
-    const char *extra_style = WEBPAGE_OTA_EXTRA_STYLE;
-
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Aggiornamento OTA", extra_style, true);
-
-    const char *body = WEBPAGE_OTA_BODY;
-
-    httpd_resp_sendstr_chunk(req, body);
-    httpd_resp_sendstr_chunk(req, NULL);
-    return ESP_OK;
-#endif
 }
 
 // Handler per l'upload OTA (POST)
@@ -1128,44 +1110,7 @@ esp_err_t not_found_handler(httpd_req_t *req, httpd_err_code_t error)
  */
 esp_err_t config_page_handler(httpd_req_t *req)
 {
-#if WEB_UI_USE_EMBEDDED_PAGES == 0
     return webpages_send_external_or_error(req, "config.html", "text/html; charset=utf-8");
-#else
-    /* La pagina /config è lunga e mantiene logica JS aggiornata.
-     * Non permettiamo override da storage esterno perché file obsoleti
-     * mostravano solo poche sezioni. */
-    ESP_LOGI(TAG, "[C] GET /config");
-    const bool config_read_only = !web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS);
-    
-    const char *extra_style = WEBPAGE_CONFIG_EXTRA_STYLE;
-
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Configurazione Device", extra_style, true);
-
-    if (web_ui_feature_enabled(WEB_UI_FEATURE_ENDPOINT_PROGRAMS)) {
-        httpd_resp_sendstr_chunk(req, "<script>window.__showFactoryPasswordSection=true;</script>");
-    } else {
-        httpd_resp_sendstr_chunk(req, "<script>window.__showFactoryPasswordSection=false;</script>");
-    }
-
-    const char *body = WEBPAGE_CONFIG_BODY;
-    
-    httpd_resp_sendstr_chunk(req, body);
-    if (config_read_only) {
-        httpd_resp_sendstr_chunk(req,
-            "<script>(function(){"
-            "var box=document.createElement('div');"
-            "box.style='margin:16px 20px;padding:10px 12px;background:#fff3cd;color:#856404;border:1px solid #ffeeba;border-radius:6px;font-weight:bold;';"
-            "box.innerText='Modalità APP: configurazione in sola lettura';"
-            "var c=document.querySelector('.container');if(c){c.insertBefore(box,c.firstChild);}"
-            "var form=document.getElementById('configForm');"
-            "if(form){form.addEventListener('submit',function(e){e.preventDefault();alert('Modalità APP: modifica configurazione non consentita.');});"
-            "form.querySelectorAll('input,select,textarea,button').forEach(function(el){el.disabled=true;});}"
-            "})();</script>");
-    }
-    httpd_resp_sendstr_chunk(req, NULL);
-    return ESP_OK;
-#endif
 }
 
 // Handler API GET /api/debug/usb/enumerate
@@ -1439,6 +1384,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON *display = cJSON_CreateObject();
     cJSON_AddBoolToObject(display, "en", cfg->display.enabled);
     cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
+    cJSON_AddBoolToObject(display, "backlight", cfg->display.backlight);
     cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", display);
 
@@ -1716,6 +1662,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON *display = cJSON_CreateObject();
     cJSON_AddBoolToObject(display, "en", cfg->display.enabled);
     cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
+    cJSON_AddBoolToObject(display, "backlight", cfg->display.backlight);
     cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", display);
 
@@ -2013,6 +1960,23 @@ esp_err_t api_config_save(httpd_req_t *req)
                 web_ui_add_log("INFO", "DISPLAY", __msg_bright);
             } else {
                 web_ui_add_log("WARN", "DISPLAY", "Display disabilitato: ignorata richiesta luminosità");
+            }
+        }
+        
+        cJSON *backlight = cJSON_GetObjectItem(display_obj, "backlight");
+        if (backlight) {
+            cfg->display.backlight = cJSON_IsTrue(backlight);
+            // Applica immediatamente il stato del backlight SOLO se display abilitato
+            if (cfg->display.enabled) {
+                if (cfg->display.backlight) {
+                    bsp_display_backlight_on();
+                    web_ui_add_log("INFO", "DISPLAY", "Backlight acceso");
+                } else {
+                    bsp_display_backlight_off();
+                    web_ui_add_log("INFO", "DISPLAY", "Backlight spento");
+                }
+            } else {
+                web_ui_add_log("WARN", "DISPLAY", "Display disabilitato: ignorata richiesta backlight");
             }
         }
         cJSON *ads_enabled = cJSON_GetObjectItem(display_obj, "ads_en");

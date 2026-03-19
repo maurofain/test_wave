@@ -22,28 +22,7 @@ esp_err_t programs_page_handler(httpd_req_t *req)
         return httpd_resp_send(req, "404 Non Trovato", -1);
     }
 
-#if WEB_UI_USE_EMBEDDED_PAGES == 0
     return webpages_send_external_or_error(req, "programs.html", "text/html; charset=utf-8");
-#else
-
-    esp_err_t ext_page_ret = webpages_try_send_external(req, "programs.html", "text/html; charset=utf-8");
-    if (ext_page_ret == ESP_OK) {
-        return ESP_OK;
-    }
-
-    ESP_LOGI(TAG, "[C] GET /config/programs");
-
-    const char *extra_style = WEBPAGE_PROGRAMS_EXTRA_STYLE;
-
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Tabella Programmi", extra_style, true);
-
-    const char *body = WEBPAGE_PROGRAMS_BODY;
-
-    httpd_resp_sendstr_chunk(req, body);
-    httpd_resp_sendstr_chunk(req, NULL);
-    return ESP_OK;
-#endif
 }
 
 /**

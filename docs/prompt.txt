@@ -1,11 +1,12 @@
+[ ] i18n non cambia le lingue ne in lvgl ne in web
+[ ] le lingue in /config vanno trattate cosi : 
+lingua Pannello: definisce la lingua di defaul del pannello touch (modificabile dal cliente) : va persistita ma non modificata subito nel display
 [ ]Controlla lo logica della FSM : 
 - all'avvio deve inizializzare tutto l'hardware e sincronizzarsi con il server remoto e NTP : va introdotto un nuovo stato FSM_STATE_INIT
 - poi deve passare in attesa di presenza cliente (tramite tocco del touch) mostrando lo slideshow nel riquadro centrale della pagina con il tasto con il tasto Selezione Lavaggio e il messaggio di errore opzionale in basso : va introdotto un nuovo stato FSM_STATE_SLIDESHOW
 - alla pressione di selezione lavaggio deve andare alla pagina programmi
-[ ] La gestione della striscia LED deve prevedere che la striscia led venga divisa dal punto di vista logico in 2 strisce separate di lunghezza uguale ma che agiscono sincrone (stesso colore led per posizione) e che sono gestite da un device virtuale led_bar che va creato. led_bar avrà :
-un comportamento da definire per la situazione di IDLE, 
-durante il run segue aumenta a partire dal primo led ad accendere progressivamente dei led in verde in base ad una ACTION ricevuta dalla FSM, 
-al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane completamente accesa lampeggioante a 2hz in colore porpora fino a che la macchina ritorna in IDLE o viene premuto qualsiasi funzione sui tasti o touch che la portano a spegnersi
+[ ] Va previsto che si siano più ioExpanders Modbus: l'interfaccia deve adattarsi a più schede 
+[ ] Attuale funzionamento: sono in ads -> inserisco una moneta -> ritorna in ads ma non accetta il button Seleziona lavaggio
 [ ] va aggiunto un parametro in /config -> Timeouts con la percentuale di ciclo eseguito per passare alla segnalazione di PreFineCiclo: un numero intero 0-99 che esprime la peercentuale del tempo rimanente per la fine  
 [ ] nell'esecuzione del programma al raggiungimento 
 [ ] i pulsanti programma devono cambiare colore al raggiungimento del 70%
@@ -17,45 +18,20 @@ al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane comp
 [ ]-definire la maschera di attivazione dei relays nelle righe dei programmi in /config/programs mediante più gruppi di editbox da 4 caratteri  ciascuno (accettano 0 o 1 - 4 caratteri obbligatori fillati con trailing-zeroes) in base al numero di porte di out disponibili. a sx degli editbox ci sarà l'indicazione del numero relauys (1-4, 5-12, ecc.)  1 relays 1-4 sono quelli sulla MH1001,  i successi gruppi di 8 sulle schede waveshare RS485 in modbus. Formattare gli editbox su più righe nella stessa DIV (1 riga per device)
 [ ] Utilizzare i testi delle chiavi program_name_* peer la compilazione dei nomi dei programmi, ed aggiungere in /programs la scelta della lingua 
 [ ] Spostare la voce Abilita log POST da /test alla sezione Remote Logging di /config
+[ ] invece di utilizzare  bsp_display_brightness_set crea una funzione in device_config per effettuare la chiamata i2c sul bus i2c in uso al display
+[ ] il pulsante programma selezionato deve apparire con un bordo bianco 5px, se viene messo in pausa lo sfondo deve diventare blu
+[ ] Gestione di digital_io:
+1. Input : la lettura di un cabio stato 0->1 su un input digitale deve portare an un controllo se l'input sia associato ad un tasto programma del touch e se si deve generare la stessa azione. Se non è associato deve chiamare una funzione de elaborazione degli altri input (per ora senza implementare nulla)
+2. output : all'avviamento di un programma vanno attivati gli output negli stati definiti in tabella programmi fino al termine del programma o fino alla sua interruzione definitiva (STOP)
 -----------------
-## refactor i18n: ristrutturiamo tutta la localizzazione
-- La lingua di riferimento è l'italiano
-- separiamo la parte web dalla parte lvgl
-- lvgl: 
-    - abbiamo poche stringhe da gestire: utilizzaimo un file json con un array della lingue, in ogni elemento ci sarà una array composto da tuple chiave:valore con i testi da visualizzare. 
-    - all'avvio carichiamo tutte le lingue in PSRAM
-    - nelle pagine lvgl al posto delle stringhe effettive mettiamo dei placeholder {{KEY}} che vengono espansi nel valore della lingua corrente
-- html
-    - qui ci sono più stringhe da gestire e quindi modifichiamo la struttura : utilizzaimo un file json con un array della lingue, in ogni elemento ci sarà un array di pagine web che contiene una array composto da tuple chiave:valore con i testi da visualizzare. La chiave è un valore numerico univoco per pagina 
-    - all'avvio carichiamo la lingua corrente in PSRAM : 
-        - si creano dei blob (1 per ogni pagina) in cui le stringhe sono memorizzate una di seguito all'altra in ordine numerico di KEY separate da un carattere 0x00.
-        - Eventuali interruzzioni nella continuità della numerazione comporteranno l'inserimento di 0x00 per ogni numero mancante (es. abbiamo key 25 e poi 28: andranno inserti 2 0x00). 
-        - durante la compilazione si salva la posizione di inizio di ogni stringa (anche equelle vuote o di riempimento sequenza) in un array di uint_16t . 
-        - le pagine web conterranno al posto delle stringhe localizzate dei placeholder {{KEY}} che verranno sostiuiti con le stringhe i18n prima della pubblicazione al browser.
-    . in questo modo la il preporocessore delle pagine web trova i placeholder, ricava dall'array posizioni la posizione della stringa da pubblicare (termonata da 0) la sostiusce e ripete per ogni placeholder.
-    in fase di sviluppo ogni nuovo inserimento di testo deve verificare se la stringa esiste già ed utilizzare la KEY gia assegnata, oppure creare un nuovo record nel set della pagina web in creazione con la prossima KEY e la nuova stringa 
+
 ------------------
-## refactor i18n v2 (decisioni aggiornate)
-- Pipeline web primaria: HTML-first su SPIFFS (`data/www/*.html` + `data/www/js/*.js`), senza passaggio di conversione embedded->html nel flusso principale.
-- Localizzazione web: preload al boot (o su cambio lingua) con cache pagine localizzate in PSRAM; nessun parsing JSON durante la singola richiesta HTTP.
-- Placeholder web: numerici compatti a 3 cifre (`{{001}}..{{999}}`) con validazione formale.
-- Catalogo JSON i18n: per ogni chiave web includere anche `label` alfanumerica descrittiva per editing/manutenzione.
-- Runtime contract: il parser usa solo la chiave numerica; `label` non è usata a runtime.
-- Fallback obbligatorio: lingua richiesta -> `it` -> stringa vuota.
-- JS: separazione script inline in moduli dedicati; include ordinati (`core -> page -> init`).
-- `i18n_editor` v2:
-  - supporto schema nuovo (key numerica + `label`)
-  - aggiunta nuove chiavi da UI (assegnazione automatica prossima libera per pagina)
-  - validazioni bloccanti su duplicati, formato `label`, presenza `text.it`.
-- Validatore build-time:
-  - errori su placeholder invalidi/non mappati, key duplicate, `label` invalida, `text.it` mancante
-  - warning su traduzioni non-base mancanti e chiavi non usate.
+
 ------------------
 !IMPORTANT
 ca completata l'unificazione della gestione di config che ha parti in wen_ui.c
 ------------------
-[X]Nella cartella i18n_editor Crea webuna app python da far girare su un pc windows o linux che permetta di editare i file delle lingue:
-- si sceglie lo scope ed appaiono tutte le stringhe di quello scope incolonnate per lingua, la prima colonna è l'ID. la prima lingua è ITALIANO, Ogni voce è editabile e di fianco alla textbox ha un button per la traduzione automatica da fare interrogando un servizio web definito in un file di configurazione. In alto a sx abbiamo la scelta dello scope e a destra i tasti SALVA e ESCI. Il salvataggio crea automaticamente un json con tutti i dati di tutte le lingue con nome 'i18n_{tiomestamp}.json'
+
 ------------------
 I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
 I (19254) APP: [F] [M] Cmd1 - Address Poll: OK
@@ -72,71 +48,7 @@ Ecco i dettagli tecnici per implementare il controllo sul tuo ESP32-P4.
 
 ---
 
-### Specifiche del Protocollo I2C
+❯ in precedenza usavamo per la gestione delle pagine html e i relativi javascript il sistema che prevedeva che nel file wepages_embedded.c ci fossero i sorgenti html e js delle pagine stesse, che poi venivano estratti da uno script python. Poi abbiamo cambiato con una gestioen diretta di html e js ma il file
+  webpages_embedde.c è rimansto. Fai un report sull'attuale impiego di questo file e verifica se possiamo toglierlo dal codice e dalla documentazione  
 
-Sulla scheda del display, il controllo della luminosità è gestito da un microcontrollore dedicato che risponde a un indirizzo specifico.
-
-* **Indirizzo I2C del Dispositivo:** `0x45`
-* **Indirizzo del Registro:** `0x86`
-* **Gamma Valori:** `0` (0% - Spento) a `255` (100% - Luminosità Massima).
-
----
-
-### Implementazione su ESP32-P4 (ESP-IDF)
-
-Poiché l'ESP32-P4 utilizza le versioni più recenti dell'ESP-IDF (v5.3+), è consigliabile usare il nuovo driver `i2c_master`.
-
-#### 1. Configurazione del Bus
-
-Assicurati di collegare i pin SDA/SCL del monitor ai pin GPIO dell'ESP32-P4 che hai definito (es. GPIO 7 e 8 sono comuni per I2C su questo chip).
-
-```c
-#include "driver/i2c_master.h"
-
-i2c_master_bus_handle_t bus_handle;
-i2c_master_bus_config_t bus_config = {
-    .clk_source = I2C_CLK_SRC_DEFAULT,
-    .i2c_port = I2C_NUM_0,
-    .scl_io_num = GPIO_NUM_8,
-    .sda_io_num = GPIO_NUM_7,
-    .glitch_ignore_cnt = 7,
-};
-ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus_handle));
-
-i2c_master_dev_handle_t dev_handle;
-i2c_device_config_t dev_config = {
-    .dev_addr = 0x45,
-    .device_config.device_address = 0x45,
-    .scl_speed_hz = 100000, // 100kHz standard
-};
-ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_config, &dev_handle));
-
-```
-
-#### 2. Funzione di regolazione
-
-Per cambiare la luminosità, invia il registro seguito dal valore desiderato:
-
-```c
-esp_err_t set_backlight_brightness(uint8_t level) {
-    uint8_t write_buf[2] = {0x86, level};
-    return i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), -1);
-}
-
-```
-
----
-
-### Note Importanti per ESP32-P4
-
-* **Alimentazione:** Il monitor richiede 5V stabili per la retroilluminazione. Assicurati che l'ESP32-P4 e il monitor condividano la massa (GND).
-* **Conflitto Indirizzi:** Se hai collegato anche il touch, l'indirizzo del touch controller (Goodix) sarà solitamente `0x5D` o `0x14`. Non confonderlo con lo `0x45` del backlight.
-* **Inizializzazione DSI:** Ricorda che la retroilluminazione potrebbe non accendersi se il segnale MIPI-DSI non è attivo o se il pannello non è stato correttamente inizializzato tramite i comandi DSI (solitamente gestiti dai componenti BSP di Espressif come `esp_lcd_ek79007`).
-
----
-
-[Display Waveshare DSI Setup](https://www.youtube.com/watch?v=liIlQvlp9Co)
-Questo video mostra l'interfaccia e i collegamenti fisici necessari per far funzionare correttamente i display Waveshare DSI, inclusa la gestione della luminosità.
-
-Vuoi che ti aiuti a integrare questo codice con l'inizializzazione del driver video MIPI-DSI specifico per l'ESP32-P4?
 

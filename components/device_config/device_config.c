@@ -957,6 +957,7 @@ static void _set_defaults(device_config_t *config)
     // Default Display
     config->display.enabled = true; // display abilitato di default
     config->display.lcd_brightness = 80;
+    config->display.backlight = true; // backlight acceso di default
 
     // Default RS232
     config->rs232.baud_rate = 9600;
@@ -1630,6 +1631,8 @@ esp_err_t device_config_load(device_config_t *config)
                     if (enabled) config->display.enabled = cJSON_IsTrue(enabled);
                     cJSON *bright = cJSON_GetObjectItem(disp_obj, "brt"); if (!bright) bright = cJSON_GetObjectItem(disp_obj, "lcd_brightness");
                     if (bright) config->display.lcd_brightness = (uint8_t)bright->valueint;
+                    cJSON *backlight = cJSON_GetObjectItem(disp_obj, "backlight");
+                    if (backlight) config->display.backlight = cJSON_IsTrue(backlight);
                     cJSON *ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_en"); if (!ads_enabled) ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_enabled");
                     if (ads_enabled) config->display.ads_enabled = cJSON_IsTrue(ads_enabled);
                 }
@@ -1934,6 +1937,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON *disp_obj = cJSON_CreateObject();
     cJSON_AddBoolToObject(disp_obj, "en", config->display.enabled);
     cJSON_AddNumberToObject(disp_obj, "brt", config->display.lcd_brightness);
+    cJSON_AddBoolToObject(disp_obj, "backlight", config->display.backlight);
     cJSON_AddBoolToObject(disp_obj, "ads_en", config->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", disp_obj);
 

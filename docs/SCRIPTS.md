@@ -291,19 +291,6 @@ This document describes all Bash and Python scripts in the `scripts/` directory 
 
 **Use Case**: Codebase metrics, dead code detection, documentation generation.
 
-#### ✔️`export_embedded_pages.py`
-**Purpose**: Extract embedded HTML/CSS from C source and export as standalone web pages.
-
-**Features**:
-- Parses C source for `const char *` declarations containing HTML
-- Reconstructs complete HTML pages with embedded CSS/JavaScript
-- Handles style injection from base template
-- Detects `<img>` references and relocates to `data/` directory
-- Outputs standalone `.html` files for review/testing
-- Supports command-line filtering: `--filter <string>` to export specific pages
-
-**Use Case**: QA testing of embedded web UI; audit embedded HTML strings.
-
 #### `login_test.py`
 **Purpose**: Test authentication endpoint with exact firmware parameters.
 

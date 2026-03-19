@@ -37,7 +37,7 @@ Segui rigorosamente queste regole durante la generazione del codice, l'analisi e
 ## 6. Sviluppo Web (Web UI)
 - **Sorgente Web UI:** Modifica HTML/CSS/JS direttamente nei file in `data/www/`.
 - **JavaScript Separato:** Salva il codice JS in file separati in `data/www/js/`.
-- **Pipeline Legacy Disabilitata:** Non usare `components/web_ui/webpages_embedded.c` né lo script `export_embedded_pages.py`.
+- **Pipeline Legacy Disabilitata:** Non usare la vecchia pipeline di pagine web embedded.
 - **Deploy Rapido Web:** Dopo modifiche Web UI esegui solo il flash SPIFFS con `idfc -fs`, senza ricompilare il firmware.
 - **Marcatori Obbligatori:** Il markup/JS per le pagine `/` e `/config` deve essere racchiuso tra:
     `/* DO_NOT_MODIFY_START: <page> */` e `/* DO_NOT_MODIFY_END: <page> */`.

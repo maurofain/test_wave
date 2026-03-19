@@ -18,8 +18,7 @@
 - Le modifiche alle pagine HTML/CSS/JS vanno eseguite **direttamente** nei file in `data/www/`
 - Dopo le modifiche, eseguire solo il flash SPIFFS con `idfc -fs` (2-3 secondi) senza ricompilare il firmware
 - Il codice JS deve essere salvato in file separati in `data/www/js/`
-- **NON usare più** `webpages_embedded.c` né lo script `export_embedded_pages.py`
-- Flag `WEB_UI_USE_EMBEDDED_PAGES` è impostata a 0 in `web_ui_internal.h`
+- **NON usare più** la vecchia pipeline di pagine web embedded
 
 ## Protezione Codice
 - Va gestito un blocco per la generazione del codice che deve inibire la modifica di funzioni marcate con `//DO_NOT_MODIFY` o di sezioni di codice racchiuse tra `//DO_NOT_MODIFY` e `//DO_NOT_MODIFY_END`

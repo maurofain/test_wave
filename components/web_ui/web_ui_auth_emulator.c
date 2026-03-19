@@ -180,26 +180,7 @@ esp_err_t emulator_page_handler_local(httpd_req_t *req)
         return web_ui_send_password_required(req, "Emulator", "/emulator");
     }
 
-#if WEB_UI_USE_EMBEDDED_PAGES == 0
     return webpages_send_external_or_error(req, "emulator.html", "text/html; charset=utf-8");
-#else
-
-    esp_err_t ext_page_ret = webpages_try_send_external(req, "emulator.html", "text/html; charset=utf-8");
-    if (ext_page_ret == ESP_OK) {
-        return ESP_OK;
-    }
-
-    const char *extra_style = WEBPAGE_EMULATOR_EXTRA_STYLE;
-
-    httpd_resp_set_type(req, "text/html; charset=utf-8");
-    send_head(req, "Emulator", extra_style, false);
-
-    const char *body = WEBPAGE_EMULATOR_BODY;
-
-    httpd_resp_sendstr_chunk(req, body);
-    httpd_resp_sendstr_chunk(req, NULL);
-    return ESP_OK;
-#endif
 }
 
 

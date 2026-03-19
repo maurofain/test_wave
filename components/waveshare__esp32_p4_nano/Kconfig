@@ -106,8 +106,9 @@ menu "Board Support Package(ESP32-P4)"
         default 1
         range 0 7
         help
-            LEDC channel is used to generate PWM signal that controls display brightness.
-            Set LEDC index that should be used.
+            LEDC channel is reserved for brightness control but not used.
+            Brightness is actually controlled via I2C communication with display controller.
+            Set LEDC index that should be used (currently unused).
 
         choice BSP_LCD_COLOR_FORMAT
             prompt "Select LCD color format"

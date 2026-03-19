@@ -33,19 +33,10 @@ componenti.
 ### `WEB_UI_PAGE_SOURCE`
 - **File:** `CMakeLists.txt`, `components/web_ui/webpages.c`
 - **Valori:**
-  - `0` = pagine embedded nel firmware (comportamento storico)
   - `1` = pagine da SPIFFS (`/spiffs/www`)
   - `2` = pagine da SD (`/sdcard/www`)
-- **Impatto:** seleziona la sorgente delle pagine Web UI. Con `0` usa markup embedded compilato nel firmware. Con `1`/`2` abilita source esterna (`/spiffs/www` o `/sdcard/www`) e gli handler pagina lavorano in modalità external-only (niente fallback al markup embedded).
+- **Impatto:** seleziona la sorgente esterna delle pagine Web UI. Gli handler HTML leggono solo da filesystem (`/spiffs/www` o `/sdcard/www`) tramite `webpages_send_external_or_error(...)`.
 - **Nota operativa:** il valore è definito tramite `F_WEB_UI_PAGE_SOURCE` nel `CMakeLists.txt` radice; per testare le pagine su SPIFFS impostare `F_WEB_UI_PAGE_SOURCE=1`.
-
-### `WEB_UI_USE_EMBEDDED_PAGES`
-- **File:** `CMakeLists.txt`, `components/web_ui/*`
-- **Valori:** `1` = include pagine HTML/JS embedded C, `0` = non includere percorso embedded
-- **Impatto:** flag derivato automaticamente da `WEB_UI_PAGE_SOURCE`:
-  - `WEB_UI_PAGE_SOURCE=0` ⇒ `WEB_UI_USE_EMBEDDED_PAGES=1`
-  - `WEB_UI_PAGE_SOURCE=1/2` ⇒ `WEB_UI_USE_EMBEDDED_PAGES=0`
-  In modalità `0`, gli handler HTML rispondono solo da filesystem esterno (SPIFFS/SD) tramite `webpages_send_external_or_error(...)`.
 
 ### `WEB_UI_EXPORT_ON_BOOT`
 - **File:** `CMakeLists.txt`, `components/web_ui/webpages.c`

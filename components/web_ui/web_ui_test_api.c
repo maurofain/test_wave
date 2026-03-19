@@ -392,6 +392,46 @@ esp_err_t api_test_handler(httpd_req_t *req)
         }
     }
 
+    else if (strcmp(test_name, "backlight_on") == 0) {
+        device_config_t *cfg = device_config_get();
+        if (!cfg || !cfg->display.enabled) {
+            snprintf(response, sizeof(response), "{\"status\":\"ignored\",\"message\":\"Display disabilitato\"}");
+        } else {
+            esp_err_t ret = bsp_display_backlight_on();
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "[C] Backlight acceso");
+                snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Backlight acceso\"}");
+            } else {
+                ESP_LOGW(TAG, "[C] Backlight ON fallito: %s", esp_err_to_name(ret));
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"message\":\"Backlight ON fallito\",\"error\":\"%s\"}", esp_err_to_name(ret));
+            }
+        }
+    }
+
+    else if (strcmp(test_name, "backlight_off") == 0) {
+        device_config_t *cfg = device_config_get();
+        if (!cfg || !cfg->display.enabled) {
+            snprintf(response, sizeof(response), "{\"status\":\"ignored\",\"message\":\"Display disabilitato\"}");
+        } else {
+            esp_err_t ret = bsp_display_backlight_off();
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "[C] Backlight spento");
+                snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Backlight spento\"}");
+            } else {
+                ESP_LOGW(TAG, "[C] Backlight OFF fallito: %s", esp_err_to_name(ret));
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"message\":\"Backlight OFF fallito\",\"error\":\"%s\"}", esp_err_to_name(ret));
+            }
+        }
+    }
+
+    else if (strcmp(test_name, "backlight_status") == 0) {
+        device_config_t *cfg = device_config_get();
+        bool backlight_on = cfg && cfg->display.enabled && cfg->display.lcd_brightness > 0;
+        snprintf(response, sizeof(response), "{\"backlight_on\":%s,\"brightness\":%d}", 
+                 backlight_on ? "true" : "false", 
+                 cfg ? cfg->display.lcd_brightness : 0);
+    }
+
     else if (strcmp(test_name, "led_set") == 0) {
         char buf[128] = {0};
         int ret = httpd_req_recv(req, buf, sizeof(buf)-1);

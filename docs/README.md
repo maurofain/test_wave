@@ -79,19 +79,9 @@ Nota: quando il controller Modbus è attivo, i test raw RS485 (`/api/test/rs485/
    idf.py -p <PORT> flash monitor
    ```
 
-## Rigenerazione pagine HTML (Web UI)
+## Aggiornamento pagine HTML (Web UI)
 
-Se modifichi i template embedded o il generatore, rigenera i file statici in `data/www` con:
-
-```bash
-python3 scripts/export_embedded_pages.py --output data/www
-```
-
-Esempio (solo home):
-
-```bash
-python3 scripts/export_embedded_pages.py --output data/www --pages index.html
-```
+Le pagine Web UI vanno modificate direttamente in `data/www/` e gli script in `data/www/js/`.
 
 Per aggiornare sul device solo la partizione SPIFFS (senza ricompilare il firmware):
 
@@ -99,7 +89,7 @@ Per aggiornare sul device solo la partizione SPIFFS (senza ricompilare il firmwa
 bash scripts/flash_spiffs.sh
 ```
 
-Nota: in modalità pagine esterne (`WEB_UI_PAGE_SOURCE=1` su SPIFFS), questi file sono quelli serviti dalla Web UI.
+Con `WEB_UI_PAGE_SOURCE=1`, i file presenti in `data/www/` sono quelli serviti dalla Web UI dopo il flash SPIFFS.
 
 ### Codice unificato APP/FACTORY
 - Il progetto usa una singola base sorgente in `main/`.

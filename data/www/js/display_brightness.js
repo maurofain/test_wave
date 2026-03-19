@@ -52,10 +52,12 @@ async function applyDisplayBrightness(brightness) {
 async function persistDisplayBrightness(brightness) {
     try {
         // Prepara la configurazione da salvare
+        const backlightSwitch = document.getElementById('display_backlight');
         const config = {
             display: {
                 enabled: document.getElementById('display_en').checked,
-                brt: brightness
+                brt: brightness,
+                backlight: backlightSwitch ? backlightSwitch.checked : true
             }
         };
         
@@ -97,6 +99,7 @@ function showBrightnessFeedback(message, success) {
 function initDisplayBrightness() {
     const brightSlider = document.getElementById('lcd_bright');
     const displayEnable = document.getElementById('display_en');
+    const backlightSwitch = document.getElementById('display_backlight');
     
     if (brightSlider && displayEnable) {
         // Imposta l'event handler per l'input
@@ -111,6 +114,15 @@ function initDisplayBrightness() {
         displayEnable.addEventListener('change', (e) => {
             brightSlider.disabled = !e.target.checked;
             
+            // Gestisci anche lo switch backlight
+            if (backlightSwitch) {
+                backlightSwitch.disabled = !e.target.checked;
+                if (!e.target.checked) {
+                    backlightSwitch.checked = false;
+                    setBacklight(false);
+                }
+            }
+            
             // Se si abilita il display, applica la luminosità corrente
             if (e.target.checked) {
                 const currentBrightness = brightSlider.value;
@@ -122,6 +134,62 @@ function initDisplayBrightness() {
         const initialBrightness = brightSlider.value;
         if (displayEnable.checked) {
             applyDisplayBrightness(initialBrightness);
+        }
+    }
+    
+    // Inizializzazione controllo backlight
+    if (backlightSwitch && displayEnable) {
+        // Imposta stato iniziale
+        backlightSwitch.disabled = !displayEnable.checked;
+        
+        // Event listener per switch backlight
+        backlightSwitch.addEventListener('change', function() {
+            setBacklight(this.checked);
+        });
+        
+        // Carica stato iniziale backlight
+        loadBacklightState();
+    }
+}
+
+// Funzione per impostare il backlight
+async function setBacklight(turnOn) {
+    try {
+        const endpoint = turnOn ? '/api/test/backlight_on' : '/api/test/backlight_off';
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const message = turnOn ? '✅ Backlight acceso' : '✅ Backlight spento';
+            showBrightnessFeedback(message, true);
+        } else {
+            showBrightnessFeedback('❌ Errore impostazione backlight', false);
+        }
+    } catch (error) {
+        console.error('Error setting backlight:', error);
+        showBrightnessFeedback('❌ Errore connessione', false);
+    }
+}
+
+// Carica stato backlight
+async function loadBacklightState() {
+    try {
+        // Carica la configurazione corrente per ottenere lo stato del backlight
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            const backlightSwitch = document.getElementById('display_backlight');
+            if (backlightSwitch && config.display) {
+                backlightSwitch.checked = config.display.backlight !== false; // default true se non specificato
+            }
+        }
+    } catch (error) {
+        console.log('Config endpoint not available, using default backlight=true');
+        const backlightSwitch = document.getElementById('display_backlight');
+        if (backlightSwitch) {
+            backlightSwitch.checked = true; // default
         }
     }
 }

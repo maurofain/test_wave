@@ -1,6 +1,6 @@
 # JSON Key Rename Map — Compattazione campi config
 
-Rinominazione applicata in: `device_config.c`, `web_ui.c`, `web_ui_logs.c`, `webpages_embedded.c` (e HTML derivati).
+Rinominazione applicata in: `device_config.c`, `web_ui.c`, `web_ui_logs.c` e template HTML derivati.
 
 Le funzioni di parse mantengono retrocompatibilità: provano prima il nuovo nome, poi il vecchio come fallback.
 

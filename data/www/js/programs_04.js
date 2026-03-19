@@ -161,7 +161,8 @@ function normalizeProgram(program, idx) {
 
     return {
         program_id: programId,
-        display_name: String(entry.name || ''),
+        name: String(entry.name || ''),  // Campo name per editabilità
+        display_name: String(entry.name || ''),  // Per visualizzazione
         enabled: !!entry.enabled,
         price_units: toInt(entry.price_units, 0),
         duration_sec: toInt(entry.duration_sec, 0),
@@ -176,7 +177,7 @@ function rowHtml(program, idx) {
 
     return `<tr>
         <td>${p.program_id}</td>
-        <td>${escapeHtml(displayName)}</td>
+        <td><input type="text" value="${escapeHtml(displayName)}" onchange="programs[${idx}].name=this.value"></td>
         <td style="text-align:center"><input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="programs[${idx}].enabled=this.checked"></td>
         <td><input type="number" min="0" max="65535" value="${p.price_units}" onchange="programs[${idx}].price_units=toInt(this.value,0)"></td>
         <td><input type="number" min="0" max="65535" value="${p.duration_sec}" onchange="programs[${idx}].duration_sec=toInt(this.value,0)"></td>
@@ -259,6 +260,7 @@ async function savePrograms() {
 
         const payloadPrograms = programs.map((program) => ({
             program_id: program.program_id,
+            name: program.name,  // Includi il campo name per salvataggio
             enabled: program.enabled,
             price_units: program.price_units,
             duration_sec: program.duration_sec,

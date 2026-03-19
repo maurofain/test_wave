@@ -1,10 +1,11 @@
 - il progetto gestisce 2 modalità di esecuzione: APP e FACTORY, compilate da base codice unica (`main/`) tramite flag `COMPILE_APP` in `main/app_version.h`. Le partizioni restano separate per OTA sicuro.
+- i documenti in docs/doxygen non vanno mai considerati nella costruzione e modifica del codice
 - La app è multilingua e carica tutte le stringhe da un unico catalogo `/spiffs/i18n_v2.json` (costruito da `data/i18n_v2.json`). Ogni testo che appare nell'interfaccia web o nel pannello touch deve avere l'entry corrispondente nel catalogo con `scope`, `key` e `legacyId` coerenti.
 - per il sourcing di ESP-IDF si può usare get_idf 
 - per le compilazioni di verifica usare 'get_if && idfc -b',per flash completo `idfc -f`, per flash solo factory `idfc -ff`, per monitor `idfc -m`, per la sola partizione SPIFFS `idfc -fs`
 - i flag di idfc si possono concatenare
 - per analizzare il funzionamento di idfc chiamare 'idfc -h'
-- le modifiche alle pagine HTML/CSS/JS vanno eseguite **direttamente** nei file in `data/www/`. Dopo le modifiche, eseguire solo il flash SPIFFS con `idfc -fs` (2-3 secondi) senza ricompilare il firmware. Il codice JS deve essere salvato in file separati in `data/www/js/`. Non usare più `webpages_embedded.c` né lo script `export_embedded_pages.py`.
+- le modifiche alle pagine HTML/CSS/JS vanno eseguite **direttamente** nei file in `data/www/`. Dopo le modifiche, eseguire solo il flash SPIFFS con `idfc -fs` (2-3 secondi) senza ricompilare il firmware. Il codice JS deve essere salvato in file separati in `data/www/js/`. Non usare più la pipeline legacy di pagine web embedded.
 - va gestito un blocco per la generazione del codice che deve inibire la modifica di funzioni marcate con //DO_NOT_MODIFY o di sezioni di codice racchiuse tra //DO_NOT_MODIFY and //DO_NOT_MODIFY_END : io indicherò l'operazione con `fai DNM a <file>` o `fai DNME a <file>`
 - Il markup/JS generato per le pagine ` /config ` e ` / ` (home) deve essere sempre racchiuso tra i marcatori `/* DO_NOT_MODIFY_START: <page> */` e `/* DO_NOT_MODIFY_END: <page> */` per impedire modifiche automatiche.
 - l'esecuzione degli script deve avvenire col path `/home/mauro/Progetti/0.Clienti/MicroHard/scripts`
@@ -47,5 +48,4 @@
   Questo approccio permette di mantenere la logica originale intonsa e di
   attivare/disattivare rapidamente il comportamento simulato cambiando il
   valore del simbolo.
-
 
