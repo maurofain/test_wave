@@ -1,12 +1,14 @@
 #include "keepalive_task.h"
 #include "http_services.h"
+#include "digital_io.h"
+#include "sht40.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include <string.h>
 #include <stdlib.h>
-#include "tasks.h" // For tasks_get_temperature and tasks_get_humidity
 
 static const char *TAG = "keepalive_task";
 
@@ -14,47 +16,102 @@ static TaskHandle_t s_keepalive_task_handle = NULL;
 static TimerHandle_t s_keepalive_timer_handle = NULL;
 static bool s_keepalive_running = false;
 static uint32_t s_keepalive_count = 0;
-static uint32_t s_keepalive_failures = 0;
-static uint32_t s_token_refresh_count = 0;
 
 // Keepalive statistics
 static keepalive_stats_t s_stats = {0};
+
+static void keepalive_build_bit_string(uint16_t mask, uint8_t count, char *out, size_t out_len)
+{
+    if (!out || out_len == 0) {
+        return;
+    }
+
+    if (out_len <= count) {
+        out[0] = '\0';
+        return;
+    }
+
+    for (uint8_t i = 0; i < count; ++i) {
+        out[i] = ((mask >> i) & 0x1U) ? '1' : '0';
+    }
+    out[count] = '\0';
+}
 
 /**
  * @brief Send keepalive message without requiring token request first
  */
 static esp_err_t keepalive_send_message(void)
 {
-    if (!http_services_has_auth_token()) {
-        ESP_LOGW(TAG, "[K] No token available, skipping keepalive");
-        snprintf(s_stats.last_error, sizeof(s_stats.last_error), "No token available");
-        return ESP_ERR_INVALID_STATE;
+    digital_io_snapshot_t snapshot = {0};
+    char inputstates[DIGITAL_IO_LOCAL_INPUT_COUNT + 1] = {0};
+    char outputstates[DIGITAL_IO_LOCAL_OUTPUT_COUNT + 1] = {0};
+    float temp_float = 0.0f;
+    float hum_float = 0.0f;
+
+    esp_err_t snapshot_err = digital_io_get_snapshot(&snapshot);
+    if (snapshot_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Snapshot digital_io non disponibile per keepalive: %s",
+                 esp_err_to_name(snapshot_err));
+        snapshot.inputs_mask = 0;
+        snapshot.outputs_mask = 0;
     }
 
-    // Get actual temperature and humidity
-    float temp_float = tasks_get_temperature();
-    float hum_float = tasks_get_humidity();
-    
-    // Convert to hundredths (e.g. 23.45 -> 2345)
+    keepalive_build_bit_string(snapshot.inputs_mask,
+                               DIGITAL_IO_LOCAL_INPUT_COUNT,
+                               inputstates,
+                               sizeof(inputstates));
+    keepalive_build_bit_string(snapshot.outputs_mask,
+                               DIGITAL_IO_LOCAL_OUTPUT_COUNT,
+                               outputstates,
+                               sizeof(outputstates));
+
+    esp_err_t sht_err = sht40_read(&temp_float, &hum_float);
+    if (sht_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Lettura SHT40 fallita per keepalive: %s",
+                 esp_err_to_name(sht_err));
+        temp_float = 0.0f;
+        hum_float = 0.0f;
+    }
+
     int32_t temp_hundredths = (int32_t)(temp_float * 100.0f);
     int32_t hum_hundredths = (int32_t)(hum_float * 100.0f);
-
-    // Prepare keepalive payload with temperature and humidity
-    char payload[256];
-    int64_t timestamp = esp_timer_get_time() / 1000; // milliseconds
-    snprintf(payload, sizeof(payload), 
-             "{\"status\":\"OK\",\"timestamp\":%lld,\"temperature\":%ld,\"humidity\":%ld}", 
-             timestamp, (long)temp_hundredths, (long)hum_hundredths);
-
-    // For now, just simulate keepalive with logging
-    // TODO: Implement actual HTTP POST call when API is available
     s_stats.total_sent++;
+
+    http_services_keepalive_response_t response = {0};
+    esp_err_t err = http_services_keepalive("OK",
+                                            inputstates,
+                                            outputstates,
+                                            temp_hundredths,
+                                            hum_hundredths,
+                                            &response);
+    if (err != ESP_OK) {
+        s_stats.failed++;
+        s_stats.last_failure_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+        const char *err_text = response.common.deserror[0] ? response.common.deserror : esp_err_to_name(err);
+        strncpy(s_stats.last_error, err_text, sizeof(s_stats.last_error) - 1);
+        s_stats.last_error[sizeof(s_stats.last_error) - 1] = '\0';
+        ESP_LOGW(TAG,
+                 "[C] Keepalive remoto fallito: %s (inputs=%s outputs=%s)",
+                 s_stats.last_error,
+                 inputstates,
+                 outputstates);
+        return err;
+    }
+
     s_stats.successful++;
-    s_stats.last_success_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    s_stats.last_success_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+    s_stats.last_error[0] = '\0';
     s_keepalive_count++;
-    
-    ESP_LOGI(TAG, "[K] Keepalive sent: %s (count: %u)", payload, s_keepalive_count);
-    
+
+    ESP_LOGI(TAG,
+             "[C] Keepalive remoto inviato: inputs=%s outputs=%s temp=%ld hum=%ld activities=%u count=%u",
+             inputstates,
+             outputstates,
+             (long)temp_hundredths,
+             (long)hum_hundredths,
+             (unsigned)response.activity_count,
+             (unsigned)s_keepalive_count);
+
     return ESP_OK;
 }
 
@@ -71,7 +128,7 @@ static void keepalive_timer_callback(TimerHandle_t xTimer)
 
     esp_err_t err = keepalive_send_message();
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "[K] Keepalive failed, will retry next cycle");
+        ESP_LOGW(TAG, "[C] Keepalive fallito, nuovo tentativo al prossimo ciclo");
     }
 }
 
@@ -82,7 +139,7 @@ static void keepalive_task(void *parameter)
 {
     (void)parameter;
     
-    ESP_LOGI(TAG, "[K] Keepalive task started");
+    ESP_LOGI(TAG, "[C] Keepalive task avviato");
     
     // Create timer for 10-second intervals
     s_keepalive_timer_handle = xTimerCreate(
@@ -94,26 +151,26 @@ static void keepalive_task(void *parameter)
     );
     
     if (s_keepalive_timer_handle == NULL) {
-        ESP_LOGE(TAG, "[K] Failed to create keepalive timer");
+        ESP_LOGE(TAG, "[C] Failed to create keepalive timer");
         vTaskDelete(NULL);
         return;
     }
     
     // Start the timer
     if (xTimerStart(s_keepalive_timer_handle, 0) != pdPASS) {
-        ESP_LOGE(TAG, "[K] Failed to start keepalive timer");
+        ESP_LOGE(TAG, "[C] Failed to start keepalive timer");
         vTaskDelete(NULL);
         return;
     }
     
-    ESP_LOGI(TAG, "[K] Keepalive timer started (10-second intervals)");
+    ESP_LOGI(TAG, "[C] Keepalive timer started (10-second intervals)");
     
     // Task main loop - just wait and monitor
     while (s_keepalive_running) {
         vTaskDelay(pdMS_TO_TICKS(30000)); // Check every 30 seconds
         
         // Log periodic statistics
-        ESP_LOGI(TAG, "[K] Stats - Sent: %u, Success: %u, Failed: %u, Refresh: %u", 
+        ESP_LOGI(TAG, "[C] Keepalive stats - Sent: %u, Success: %u, Failed: %u, Refresh: %u",
                  s_stats.total_sent, s_stats.successful, s_stats.failed, s_stats.token_refreshes);
     }
     
@@ -123,7 +180,7 @@ static void keepalive_task(void *parameter)
         s_keepalive_timer_handle = NULL;
     }
     
-    ESP_LOGI(TAG, "[K] Keepalive task stopped");
+    ESP_LOGI(TAG, "[C] Keepalive task stopped");
     vTaskDelete(NULL);
 }
 
@@ -133,14 +190,12 @@ static void keepalive_task(void *parameter)
 esp_err_t keepalive_task_start(void)
 {
     if (s_keepalive_running) {
-        ESP_LOGW(TAG, "[K] Keepalive task already running");
+        ESP_LOGW(TAG, "[C] Keepalive task already running");
         return ESP_ERR_INVALID_STATE;
     }
     
     s_keepalive_running = true;
     s_keepalive_count = 0;
-    s_keepalive_failures = 0;
-    s_token_refresh_count = 0;
     memset(&s_stats, 0, sizeof(s_stats));
     
     BaseType_t result = xTaskCreate(
@@ -153,12 +208,12 @@ esp_err_t keepalive_task_start(void)
     );
     
     if (result != pdPASS) {
-        ESP_LOGE(TAG, "[K] Failed to create keepalive task");
+        ESP_LOGE(TAG, "[C] Failed to create keepalive task");
         s_keepalive_running = false;
         return ESP_ERR_NO_MEM;
     }
     
-    ESP_LOGI(TAG, "[K] Keepalive task created successfully");
+    ESP_LOGI(TAG, "[C] Keepalive task created successfully");
     return ESP_OK;
 }
 
@@ -168,7 +223,7 @@ esp_err_t keepalive_task_start(void)
 esp_err_t keepalive_task_stop(void)
 {
     if (!s_keepalive_running) {
-        ESP_LOGW(TAG, "[K] Keepalive task not running");
+        ESP_LOGW(TAG, "[C] Keepalive task not running");
         return ESP_ERR_INVALID_STATE;
     }
     
@@ -179,7 +234,7 @@ esp_err_t keepalive_task_stop(void)
         s_keepalive_task_handle = NULL;
     }
     
-    ESP_LOGI(TAG, "[K] Keepalive task stopped");
+    ESP_LOGI(TAG, "[C] Keepalive task stopped");
     return ESP_OK;
 }
 

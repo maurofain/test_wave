@@ -137,3 +137,21 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
 								int32_t amount,
 								const char *service_code,
 								http_services_payment_response_t *out);
+
+/**
+ * Call remote /api/keepalive with current machine status.
+ *
+ * @param status        Device status string (fallback: "OK").
+ * @param inputstates   Input bitmap string.
+ * @param outputstates  Output bitmap string.
+ * @param temperature   Temperature in hundredths.
+ * @param humidity      Humidity in hundredths.
+ * @param out           Output response struct. Must not be NULL.
+ * @return ESP_OK on HTTP 200 + valid JSON response, ESP_ERR_* otherwise.
+ */
+esp_err_t http_services_keepalive(const char *status,
+                                  const char *inputstates,
+                                  const char *outputstates,
+                                  int32_t temperature,
+                                  int32_t humidity,
+                                  http_services_keepalive_response_t *out);

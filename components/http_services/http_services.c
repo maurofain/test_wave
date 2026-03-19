@@ -1,4 +1,5 @@
 #include "http_services.h"
+#include "keepalive_task.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -222,9 +223,26 @@ esp_err_t http_services_sync_runtime_state(bool force_login)
 {
     device_config_t *cfg = device_config_get();
     if (!http_services_cfg_remote_enabled(cfg)) {
+        if (keepalive_task_is_running()) {
+            esp_err_t keepalive_stop_err = keepalive_task_stop();
+            if (keepalive_stop_err != ESP_OK) {
+                ESP_LOGW(TAG,
+                         "[C] Arresto keepalive fallito durante disable remoto: %s",
+                         esp_err_to_name(keepalive_stop_err));
+            }
+        }
         http_services_clear_token("server_disabled");
         http_services_set_online(false, "server_disabled");
         return ESP_OK;
+    }
+
+    if (!keepalive_task_is_running()) {
+        esp_err_t keepalive_start_err = keepalive_task_start();
+        if (keepalive_start_err != ESP_OK) {
+            ESP_LOGW(TAG,
+                     "[C] Avvio keepalive task fallito: %s",
+                     esp_err_to_name(keepalive_start_err));
+        }
     }
 
     if (!force_login && validate_token(g_auth_token)) {
@@ -246,6 +264,183 @@ esp_err_t http_services_sync_runtime_state(bool force_login)
 
     http_services_set_online(true, "login_ok");
     return ESP_OK;
+}
+
+esp_err_t http_services_keepalive(const char *status,
+                                  const char *inputstates,
+                                  const char *outputstates,
+                                  int32_t temperature,
+                                  int32_t humidity,
+                                  http_services_keepalive_response_t *out)
+{
+    if (!inputstates || !outputstates || !out) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    memset(out, 0, sizeof(*out));
+
+    esp_err_t token_err = http_services_login_if_needed(false);
+    if (token_err != ESP_OK) {
+        out->common.iserror = true;
+        out->common.codeerror = -10;
+        snprintf(out->common.deserror,
+                 sizeof(out->common.deserror),
+                 "login_failed:%s",
+                 esp_err_to_name(token_err));
+        return token_err;
+    }
+
+    cJSON *req = cJSON_CreateObject();
+    if (!req) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON_AddStringToObject(req, "status", (status && status[0] != '\0') ? status : "OK");
+    cJSON_AddStringToObject(req, "inputstates", inputstates);
+    cJSON_AddStringToObject(req, "outputstates", outputstates);
+    cJSON_AddNumberToObject(req, "temperature", temperature);
+    cJSON_AddNumberToObject(req, "humidity", humidity);
+
+    cJSON *subdevices = cJSON_AddArrayToObject(req, "subdevices");
+    if (!subdevices) {
+        cJSON_Delete(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON *qrc = cJSON_CreateObject();
+    cJSON *prn1 = cJSON_CreateObject();
+    if (!qrc || !prn1) {
+        if (qrc) cJSON_Delete(qrc);
+        if (prn1) cJSON_Delete(prn1);
+        cJSON_Delete(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON_AddStringToObject(qrc, "code", "QRC");
+    cJSON_AddStringToObject(qrc, "status", "OK");
+    cJSON_AddItemToArray(subdevices, qrc);
+
+    cJSON_AddStringToObject(prn1, "code", "PRN1");
+    cJSON_AddStringToObject(prn1, "status", "OK");
+    cJSON_AddItemToArray(subdevices, prn1);
+
+    char *body = cJSON_PrintUnformatted(req);
+    cJSON_Delete(req);
+    if (!body) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGI(TAG, "[C] keepalive: body=%s", body);
+
+    char *resp = NULL;
+    int status_code = 0;
+    size_t resp_len = 0;
+    esp_err_t err = ESP_FAIL;
+
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        err = remote_post("/api/keepalive", body, NULL, &resp, &status_code, &resp_len);
+        if (err != ESP_OK) {
+            break;
+        }
+
+        if ((status_code == 401 || status_code == 403) && attempt == 0) {
+            ESP_LOGW(TAG, "[C] keepalive non autorizzato (HTTP %d), rinnovo token", status_code);
+            http_services_clear_token("keepalive_unauthorized");
+            if (resp) {
+                free(resp);
+                resp = NULL;
+            }
+            token_err = http_services_login_if_needed(true);
+            if (token_err != ESP_OK) {
+                err = token_err;
+                break;
+            }
+            continue;
+        }
+
+        break;
+    }
+
+    free(body);
+
+    if (err != ESP_OK) {
+        out->common.iserror = true;
+        out->common.codeerror = -1;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "%s", esp_err_to_name(err));
+        if (resp) {
+            free(resp);
+        }
+        return err;
+    }
+
+    if (status_code < 200 || status_code >= 300) {
+        out->common.iserror = true;
+        out->common.codeerror = status_code;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "http_%d", status_code);
+        if (resp) {
+            free(resp);
+        }
+        return ESP_FAIL;
+    }
+
+    if (!resp) {
+        out->common.iserror = true;
+        out->common.codeerror = -2;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "no_response");
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(resp);
+    free(resp);
+    if (!root) {
+        out->common.iserror = true;
+        out->common.codeerror = -3;
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "json_parse_error");
+        return ESP_FAIL;
+    }
+
+    cJSON *je = cJSON_GetObjectItemCaseSensitive(root, "iserror");
+    out->common.iserror = cJSON_IsTrue(je);
+    cJSON *jce = cJSON_GetObjectItemCaseSensitive(root, "codeerror");
+    if (cJSON_IsNumber(jce)) {
+        out->common.codeerror = (int32_t)jce->valueint;
+    }
+    cJSON *jde = cJSON_GetObjectItemCaseSensitive(root, "deserror");
+    if (cJSON_IsString(jde) && jde->valuestring) {
+        snprintf(out->common.deserror, sizeof(out->common.deserror), "%s", jde->valuestring);
+    }
+    cJSON *jdt = cJSON_GetObjectItemCaseSensitive(root, "datetime");
+    if (cJSON_IsString(jdt) && jdt->valuestring) {
+        snprintf(out->datetime, sizeof(out->datetime), "%s", jdt->valuestring);
+    }
+
+    cJSON *activities = cJSON_GetObjectItemCaseSensitive(root, "activities");
+    if (cJSON_IsArray(activities)) {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, activities) {
+            if (out->activity_count >= HTTP_SERVICES_MAX_ACTIVITIES) {
+                break;
+            }
+            http_services_activity_t *activity = &out->activities[out->activity_count];
+            cJSON *jaid = cJSON_GetObjectItemCaseSensitive(item, "activityid");
+            cJSON *jcode = cJSON_GetObjectItemCaseSensitive(item, "code");
+            cJSON *jparams = cJSON_GetObjectItemCaseSensitive(item, "parameters");
+
+            if (cJSON_IsNumber(jaid)) {
+                activity->activityid = (int32_t)jaid->valueint;
+            }
+            if (cJSON_IsString(jcode) && jcode->valuestring) {
+                snprintf(activity->code, sizeof(activity->code), "%s", jcode->valuestring);
+            }
+            if (cJSON_IsString(jparams) && jparams->valuestring) {
+                snprintf(activity->parameters, sizeof(activity->parameters), "%s", jparams->valuestring);
+            }
+            out->activity_count++;
+        }
+    }
+
+    cJSON_Delete(root);
+    return out->common.iserror ? ESP_FAIL : ESP_OK;
 }
 
 /**
@@ -986,126 +1181,8 @@ static esp_err_t api_login_post(httpd_req_t *req)
  */
 static esp_err_t api_keepalive_post(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "[C] POST /api/keepalive -> processing request");
-
-    // Extract the Authorization header (dynamic length to support long JWT)
-    size_t auth_len = httpd_req_get_hdr_value_len(req, "Authorization");
-    if (auth_len == 0) {
-        ESP_LOGE(TAG, "Authorization header missing");
-        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Authorization header missing");
-        return ESP_FAIL;
-    }
-
-    char *auth_header = malloc(auth_len + 1);
-    if (!auth_header) {
-        ESP_LOGE(TAG, "OOM reading Authorization header");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-        return ESP_FAIL;
-    }
-
-    if (httpd_req_get_hdr_value_str(req, "Authorization", auth_header, auth_len + 1) != ESP_OK) {
-        free(auth_header);
-        ESP_LOGE(TAG, "Authorization header read failed");
-        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Authorization header missing");
-        return ESP_FAIL;
-    }
-
-    // Validate the token (example validation logic)
-    if (strncmp(auth_header, "Bearer ", 7) != 0 || strlen(auth_header) <= 7) {
-        free(auth_header);
-        ESP_LOGE(TAG, "Invalid Authorization header format");
-        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Invalid Authorization header");
-        return ESP_FAIL;
-    }
-
-    const char *token = auth_header + 7; // Skip "Bearer " prefix
-    if (!validate_token(token)) { // Assume validate_token is implemented elsewhere
-        free(auth_header);
-        ESP_LOGE(TAG, "Invalid or expired token");
-        httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, "Invalid or expired token");
-        return ESP_FAIL;
-    }
-    free(auth_header);
-
-    // Buffer to store the incoming JSON payload
-    char content[256];
-    int content_len = httpd_req_recv(req, content, sizeof(content) - 1);
-    if (content_len <= 0) {
-        ESP_LOGE(TAG, "Failed to receive request payload");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to receive payload");
-        return ESP_FAIL;
-    }
-    content[content_len] = '\0'; // Null-terminate the received content
-
-    // Parse the JSON payload
-    cJSON *json = cJSON_Parse(content);
-    if (!json) {
-        ESP_LOGE(TAG, "Invalid JSON payload");
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
-        return ESP_FAIL;
-    }
-
-    // Extract fields from the JSON payload
-    const cJSON *status = cJSON_GetObjectItem(json, "status");
-    const cJSON *inputstates = cJSON_GetObjectItem(json, "inputstates");
-    const cJSON *outputstates = cJSON_GetObjectItem(json, "outputstates");
-    const cJSON *temperature = cJSON_GetObjectItem(json, "temperature");
-    const cJSON *humidity = cJSON_GetObjectItem(json, "humidity");
-    const cJSON *subdevices = cJSON_GetObjectItem(json, "subdevices");
-
-    if (!status || !cJSON_IsString(status) ||
-        !inputstates || !cJSON_IsString(inputstates) ||
-        !outputstates || !cJSON_IsString(outputstates) ||
-        !temperature || !cJSON_IsNumber(temperature) ||
-        !humidity || !cJSON_IsNumber(humidity) ||
-        !subdevices || !cJSON_IsArray(subdevices)) {
-        ESP_LOGE(TAG, "Missing or invalid fields in JSON payload");
-        cJSON_Delete(json);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid fields in JSON");
-        return ESP_FAIL;
-    }
-
-    // Log the received data
-    ESP_LOGI(TAG, "Keepalive status: %s", status->valuestring);
-    ESP_LOGI(TAG, "Input states: %s", inputstates->valuestring);
-    ESP_LOGI(TAG, "Output states: %s", outputstates->valuestring);
-    ESP_LOGI(TAG, "Temperature: %d", temperature->valueint);
-    ESP_LOGI(TAG, "Humidity: %d", humidity->valueint);
-
-    cJSON *subdevice = NULL;
-    cJSON_ArrayForEach(subdevice, subdevices) {
-        const cJSON *code = cJSON_GetObjectItem(subdevice, "code");
-        const cJSON *sub_status = cJSON_GetObjectItem(subdevice, "status");
-        if (code && cJSON_IsString(code) && sub_status && cJSON_IsString(sub_status)) {
-            ESP_LOGI(TAG, "Subdevice code: %s, status: %s", code->valuestring, sub_status->valuestring);
-        }
-    }
-
-    // Create the response JSON
-    cJSON *response = cJSON_CreateObject();
-    cJSON_AddBoolToObject(response, "iserror", false);
-    cJSON_AddNumberToObject(response, "codeerror", 0);
-    cJSON_AddStringToObject(response, "deserror", "");
-    cJSON_AddStringToObject(response, "datetime", "2026-01-23T13:25:13.218763+01:00");
-
-    cJSON *activities = cJSON_AddArrayToObject(response, "activities");
-    cJSON *activity = cJSON_CreateObject();
-    cJSON_AddNumberToObject(activity, "activityid", 1);
-    cJSON_AddStringToObject(activity, "code", "example_activity");
-    cJSON_AddStringToObject(activity, "parameters", "example_parameters");
-    cJSON_AddItemToArray(activities, activity);
-
-    // Send the response
-    const char *response_str = cJSON_Print(response);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, response_str, strlen(response_str));
-
-    // Clean up
-    cJSON_Delete(json);
-    cJSON_Delete(response);
-    free((void *)response_str);
-
-    return ESP_OK;
+    ESP_LOGI(TAG, "[C] POST /api/keepalive -> proxy to remote server");
+    return forward_post(req, "/api/keepalive", NULL, false);
 }
 
 /**

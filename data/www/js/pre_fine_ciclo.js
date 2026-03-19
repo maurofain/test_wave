@@ -97,53 +97,34 @@ async function resolveLabelByLegacyId(legacyId, fallbackText) {
 }
 
 async function addPreFineCicloField() {
-    // Trova la sezione Timeouts
-    const timeoutsSection = document.querySelector('h2');
-    if (!timeoutsSection) return;
-    
-    // Cerca il testo "Timeouts" nei titoli delle sezioni
-    const sections = document.querySelectorAll('h2');
-    let timeoutsSectionEl = null;
-    
-    sections.forEach(section => {
-        if (section.textContent.includes('Timeouts') || 
-            section.textContent.includes('⏱️')) {
-            timeoutsSectionEl = section.parentElement;
-        }
-    });
-    
-    if (!timeoutsSectionEl) {
-        console.warn('Sezione Timeouts non trovata');
-        return;
-    }
-    
     // Verifica se il campo esiste già
     if (document.getElementById('pre_fine_ciclo_percent')) {
         return; // Già aggiunto
     }
     
+    // Trova il campo slideshow_speed_ms (Velocità Slideshow) per inserire dopo di esso
+    const slideshowField = document.getElementById('slideshow_speed_ms');
+    if (!slideshowField) {
+        console.warn('Campo slideshow_speed_ms non trovato');
+        return;
+    }
+    
+    // Trova il contenitore della riga (sw-row o form-row)
+    let targetRow = slideshowField.closest('.sw-row') || slideshowField.closest('.form-row') || slideshowField.parentElement;
+    
     // Crea il nuovo campo PreFineCiclo
     const preFineLabel = await resolveLabelByLegacyId(PREFINE_CICLO_LEGACY_ID, PREFINE_CICLO_LABEL_FALLBACK);
 
     const fieldHtml = `
-        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
-            <span>${escapeHtml(preFineLabel)}:</span>
-            <input type="number" id="pre_fine_ciclo_percent" min="0" max="99" value="70"
-                   style="width:80px;padding:6px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box">
-            <span>%</span>
-            <button onclick="savePreFineCiclo()" style="padding:6px 12px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;">Salva</button>
-        </div>
+        <span style="margin-left:20px;">${escapeHtml(preFineLabel)}:</span>
+        <input type="number" id="pre_fine_ciclo_percent" min="0" max="99" value="70"
+               style="width:60px;padding:4px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box">
+        <span>%</span>
+        <button onclick="savePreFineCiclo()" style="padding:4px 10px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Salva</button>
     `;
     
-    // Trova dove inserire il campo (dopo gli altri campi timeout)
-    const container = timeoutsSectionEl.querySelector('.container, .section');
-    if (container) {
-        // Inserisce dopo gli elementi esistenti
-        container.insertAdjacentHTML('beforeend', fieldHtml);
-    } else {
-        // Fallback: inserisce direttamente nella sezione
-        timeoutsSectionEl.insertAdjacentHTML('beforeend', fieldHtml);
-    }
+    // Inserisce nella stessa riga dopo il campo slideshow
+    targetRow.insertAdjacentHTML('beforeend', fieldHtml);
     
     // Carica il valore corrente dalla configurazione
     loadPreFineCicloValue();

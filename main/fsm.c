@@ -140,6 +140,13 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
     if (!ctx || ctx->running_price_units <= 0) {
         return false;
     }
+
+    /* Se il saldo reale (ECD+VCD) è esaurito, blocca il rinnovo automatico. */
+    if ((ctx->ecd_coins + ctx->vcd_coins) <= 0) {
+        ctx->credit_cents = 0;
+        return false;
+    }
+
     if (!fsm_try_charge_program_cycle(ctx, ctx->running_price_units)) {
         return false;
     }
@@ -373,20 +380,16 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_elapsed_ms = 0;
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
+            } else if (event == FSM_EVENT_USER_ACTIVITY) {
+                ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_TIMEOUT) {
                 if (ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
                     fsm_close_session(ctx, true);
-                } else if (ctx->ecd_coins > 0) {
-                    ctx->credit_cents -= ctx->ecd_coins;
-                    if (ctx->credit_cents < 0) ctx->credit_cents = 0;
-                    ctx->ecd_coins = 0;
-                    if (ctx->credit_cents == 0 && ctx->vcd_coins == 0) {
-                        fsm_close_session(ctx, true);
-                    } else {
-                        ctx->inactivity_ms = 0;
-                    }
                 } else {
-                    fsm_close_session(ctx, true);
+                    /* Timeout in sessione open-payments:
+                     * non azzerare il credito ECD; chiudi solo la sessione runtime.
+                     */
+                    fsm_close_session(ctx, false);
                 }
             } else if (event == FSM_EVENT_PAYMENT_ACCEPTED) {
                 ctx->inactivity_ms = 0;
@@ -716,6 +719,23 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
             if (fsm_try_autorenew_running_program(ctx)) {
                 return false;
             }
+
+            /* Quando il credito ECD+VCD è finito, interrompi il ciclo automatico
+             * e torna sempre alla pagina programmi (stato CREDIT). */
+            if ((ctx->ecd_coins + ctx->vcd_coins) <= 0) {
+                fsm_append_message("Credito esaurito: stop auto-riavvio programma");
+                ESP_LOGI(TAG, "[M] Credito ECD+VCD azzerato: stop auto-riavvio e ritorno a CREDIT");
+
+                ctx->credit_cents = 0;
+                fsm_reset_runtime_locked(ctx);
+                ctx->session_mode = FSM_SESSION_MODE_NONE;
+                ctx->session_source = FSM_SESSION_SOURCE_NONE;
+                ctx->allow_additional_payments = false;
+                ctx->state = FSM_STATE_CREDIT;
+                ctx->inactivity_ms = 0;
+                return true;
+            }
+
             return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_STOP);
         }
     } else if (ctx->state == FSM_STATE_PAUSED) {

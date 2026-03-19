@@ -1,4 +1,10 @@
-[ ] la riparten
+[ ]  il timeout della pagina programmi, quello che resetta il credito, si deve resettare se il touch viene toccato anche in aree non legate ad azioni e il credito ecd non deve essere azzerato. Il credito vcd è a consumo effettivo e non è interessato da questo problema.Se l credito è ecd mostra nell'area in basso (zona errori) un messaggio su 2 righe (da mettere in i18n) 'Il credito scadrà tra xx secondi' - 'tocca il numero del credito per continuare'il testo no va nell'area credit ma nel area del pulsante STOP.
+I pulsanti dei programmi continuano a funzionare normalmente dopo la pressione dell'area credit e si disabilitano se il credito scade
+ora quando inserisco una moneta vieve valorizzato il credito (2 euro) ma appare subito la scritta in ocra 'Il credito scadrà...)mentre anche se rimangono meno di  60 secondi non appare il pulsante in basso s_stop_btn. inoltre il ciclo si ripete anche se il credito è 0: riappare il countdown per la scadenza del credito
+[ ] Riepilogo logica attesa scelta programmi:
+- il cliente ha un credito ECD: non succede nulla - al timeout la schermata siresetta o va in ads ma il cliente paga solo il consumato, quindi solo se sceglie un programma
+- il cliente paga in monete : 60 secondi prima della scadenza della pagina deve apparire un messaggio in s_stop_btn di avvertimento con la richiesta di toccare l'area credito: se la tocca il timer si resetta, altrimentio alla scadenza il credito viene trattenuto e azzerato
+[ ]In esecuzionr programma il tempo rimanate deve apparire nella barra di progressione a sx
 [ ] i18n non cambia le lingue ne in lvgl ne in web
 [ ] le lingue in /config vanno trattate cosi : 
 lingua Pannello: definisce la lingua di defaul del pannello touch (modificabile dal cliente) : va persistita ma non modificata subito nel display

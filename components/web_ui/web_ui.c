@@ -2275,9 +2275,8 @@ esp_err_t api_config_save(httpd_req_t *req)
     }
     // Applica stati task che dipendono dalla configurazione (es. display on/off)
     tasks_apply_n_run();
-    /* Se la lingua backend è cambiata invalidiamo la cache web e prepariamo la
-     * nuova tabella; la lingua pannello invece resta solo persistita e sarà
-     * applicata al prossimo avvio/refresh esplicito del pannello. */
+    /* Se la lingua è cambiata: carica la nuova tabella in PSRAM, invalida cache e
+     * aggiorna i testi LVGL in runtime. Il client web si ricaricherà da sola. */
     {
         /* Backend language changed -> invalidate web i18n cache and load PSRAM for backend */
         if (strncmp(prev_backend_lang, cfg->ui.backend_language, sizeof(prev_backend_lang)) != 0) {
@@ -2288,10 +2287,12 @@ esp_err_t api_config_save(httpd_req_t *req)
             }
         }
 
-        /* La lingua pannello viene solo persistita come default cliente e non
-         * deve modificare subito il display corrente. */
+        /* User panel language changed -> refresh LVGL texts (uses device_config_get_ui_text_scoped)
+         * and invalidate lookup cache so subsequent lookups use new language. */
         if (strncmp(prev_user_lang, cfg->ui.user_language, sizeof(prev_user_lang)) != 0) {
             ESP_LOGI(TAG, "[C] Pannello lingua cambiata: '%s' -> '%s'", prev_user_lang, cfg->ui.user_language);
+            web_ui_i18n_cache_invalidate();
+            lvgl_panel_refresh_texts();
         }
     }
     cJSON_Delete(root);
@@ -3206,6 +3207,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
         
         httpd_uri_t uri_led_bar_test = {.uri = "/led_bar_test", .method = HTTP_GET, .handler = led_bar_test_page_handler};
         httpd_register_uri_handler(server, &uri_led_bar_test);
+        
+        httpd_uri_t uri_digital_io_test = {.uri = "/digital_io_test", .method = HTTP_GET, .handler = digital_io_test_page_handler};
+        httpd_register_uri_handler(server, &uri_digital_io_test);
     }
 
     httpd_uri_t uri_files = {.uri = "/files", .method = HTTP_GET, .handler = files_page_handler};

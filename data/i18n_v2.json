@@ -7479,6 +7479,17 @@
         "es": "Crédito"
       }
     },
+    "credits_label": {
+      "legacyId": "2.469a",
+      "label": "lvgl.panel.credits_label",
+      "text": {
+        "it": "Crediti",
+        "en": "Credits",
+        "fr": "Crédits",
+        "de": "Guthaben",
+        "es": "Créditos"
+      }
+    },
     "elapsed_fmt": {
       "legacyId": "2.470",
       "label": "lvgl.panel.elapsed_fmt",
@@ -7675,6 +7686,28 @@
         "fr": "",
         "de": "",
         "es": ""
+      }
+    },
+    "ecd_expire_line1_fmt": {
+      "legacyId": "2.821",
+      "label": "lvgl.credit.ecd_expire_line1_fmt",
+      "text": {
+        "it": "Il credito scadrà tra %lu secondi",
+        "en": "Credit will expire in %lu seconds",
+        "fr": "Le crédit expirera dans %lu secondes",
+        "de": "Das Guthaben verfällt in %lu Sekunden",
+        "es": "El crédito caducará en %lu segundos"
+      }
+    },
+    "ecd_expire_line2_hint": {
+      "legacyId": "2.822",
+      "label": "lvgl.credit.ecd_expire_line2_hint",
+      "text": {
+        "it": "tocca il numero del credito per continuare",
+        "en": "tap the credit amount to continue",
+        "fr": "touchez le montant du crédit pour continuer",
+        "de": "Tippen Sie auf den Kreditbetrag, um fortzufahren",
+        "es": "toque el importe del crédito para continuar"
       }
     },
     "brand_name": {

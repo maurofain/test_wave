@@ -39,6 +39,7 @@ static const char *TAG = "lvgl_panel";
 #define COL_TIMER_NORMAL lv_color_make(0x27, 0xd7, 0xb2)
 #define COL_TIMER_WARN lv_color_make(0xb0, 0x0f, 0x6b)
 #define COL_WHITE lv_color_make(0xEE, 0xEE, 0xEE)
+#define COL_RED lv_color_make(0xEE, 0x00, 0x00)
 #define COL_GREY lv_color_make(0x88, 0x88, 0x99)
 #define COL_STATE_IDL lv_color_make(0x20, 0x20, 0x48)
 
@@ -109,25 +110,31 @@ static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
 static char s_last_credit_text[32] = "";
 static char s_last_elapsed_text[32] = "";
-static char s_last_pause_text[32] = "";
+static char s_last_pause_text[192] = "";
 static char s_last_residual_credit_text[32] = "";
 static int32_t s_last_gauge_pct = -1;
 static time_t s_last_minute_epoch = (time_t)-1;
 static bool s_stop_pressed = false;
 static bool s_stop_confirm = false;
+static bool s_ecd_warning_dismissed = false;
 static bool s_btn_last_clickable[PROG_COUNT] = {0};
 static bool s_btn_last_active[PROG_COUNT] = {0};
 static bool s_btn_last_paused[PROG_COUNT] = {0};
+static bool s_btn_last_prefine[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
 static bool s_prog_suspended[PROG_COUNT] = {0};
 static fsm_state_t s_last_fsm_state = FSM_STATE_IDLE;  /* Track last FSM state for credit reset */
 static uint32_t s_credit_inactivity_start_ms = 0;      /* When CREDIT state was entered */
 static uint32_t s_last_user_interaction_ms = 0;
+static uint32_t s_last_ads_disabled_log_ms = 0;
 static lv_obj_t *s_touch_reset_bound_scr = NULL;
 
 static char s_tr_credit[32] = "Credito";
+static char s_tr_credits[32] = "Crediti";
 static char s_tr_elapsed_fmt[32] = "Secondi   %s";
 static char s_tr_pause_fmt[32] = "Pausa: %s";
+static char s_tr_ecd_expire_fmt[64] = "Il credito scadrà tra %lu secondi";
+static char s_tr_ecd_touch_hint[96] = "tocca il numero del credito per continuare";
 
 #define MAIN_PAGE_IDLE_TO_ADS_MS 60000U
 
@@ -152,6 +159,16 @@ static void on_main_page_touch(lv_event_t *e)
 }
 
 /**
+ * @brief Callback touch su area credito.
+ */
+static void on_credit_box_touch(lv_event_t *e)
+{
+    (void)e;
+    mark_user_interaction();
+    s_ecd_warning_dismissed = true;
+}
+
+/**
  * @brief Carica le traduzioni per il pannello usando il nuovo sistema i18n LVGL.
  *
  * Questa funzione carica le traduzioni necessarie per il pannello utilizzando
@@ -171,6 +188,13 @@ static void panel_load_translations(void)
     } else {
         ESP_LOGD(TAG, "[C] LVGL i18n: credit_label fallback -> '%s'", s_tr_credit);
     }
+
+    ret = lvgl_i18n_get_text("credits_label", "Crediti", s_tr_credits, sizeof(s_tr_credits));
+    if (ret == ESP_OK) {
+        ESP_LOGD(TAG, "[C] LVGL i18n: credits_label -> '%s'", s_tr_credits);
+    } else {
+        ESP_LOGD(TAG, "[C] LVGL i18n: credits_label fallback -> '%s'", s_tr_credits);
+    }
     
     // Traduzione per formato tempo
     ret = lvgl_i18n_get_text("elapsed_fmt", "Secondi   %s", s_tr_elapsed_fmt, sizeof(s_tr_elapsed_fmt));
@@ -186,6 +210,28 @@ static void panel_load_translations(void)
         ESP_LOGD(TAG, "[C] LVGL i18n: pause_fmt -> '%s'", s_tr_pause_fmt);
     } else {
         ESP_LOGD(TAG, "[C] LVGL i18n: pause_fmt fallback -> '%s'", s_tr_pause_fmt);
+    }
+
+    // Riga 1 messaggio credito ECD in scadenza
+    ret = lvgl_i18n_get_text("ecd_expire_line1_fmt",
+                             "Il credito scadrà tra %lu secondi",
+                             s_tr_ecd_expire_fmt,
+                             sizeof(s_tr_ecd_expire_fmt));
+    if (ret == ESP_OK) {
+        ESP_LOGD(TAG, "[C] LVGL i18n: ecd_expire_line1_fmt -> '%s'", s_tr_ecd_expire_fmt);
+    } else {
+        ESP_LOGD(TAG, "[C] LVGL i18n: ecd_expire_line1_fmt fallback -> '%s'", s_tr_ecd_expire_fmt);
+    }
+
+    // Riga 2 messaggio credito ECD in scadenza
+    ret = lvgl_i18n_get_text("ecd_expire_line2_hint",
+                             "tocca il numero del credito per continuare",
+                             s_tr_ecd_touch_hint,
+                             sizeof(s_tr_ecd_touch_hint));
+    if (ret == ESP_OK) {
+        ESP_LOGD(TAG, "[C] LVGL i18n: ecd_expire_line2_hint -> '%s'", s_tr_ecd_touch_hint);
+    } else {
+        ESP_LOGD(TAG, "[C] LVGL i18n: ecd_expire_line2_hint fallback -> '%s'", s_tr_ecd_touch_hint);
     }
 }
 
@@ -345,6 +391,10 @@ static bool program_is_clickable_for_snapshot(const web_ui_program_entry_t *entr
  */
 static void refresh_prog_buttons(const fsm_ctx_t *snap)
 {
+    const bool prefine_active = snap &&
+                                snap->pre_fine_ciclo_active &&
+                                (snap->state == FSM_STATE_RUNNING || snap->state == FSM_STATE_PAUSED);
+
     for (int i = 0; i < PROG_COUNT; i++)
     {
         lv_obj_t *btn = s_prog_btns[i];
@@ -360,10 +410,13 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
         if (!s_btn_state_valid[i] ||
             s_btn_last_active[i] != is_active ||
             s_btn_last_clickable[i] != can_click ||
-            s_btn_last_paused[i] != is_paused)
+            s_btn_last_paused[i] != is_paused ||
+            s_btn_last_prefine[i] != prefine_active)
         {
             lv_color_t btn_color;
-            if (is_paused) {
+            if (prefine_active) {
+                btn_color = COL_TIMER_WARN;
+            } else if (is_paused) {
                 btn_color = COL_PROG_PAUSED_BG;
             } else if (is_active) {
                 btn_color = COL_PROG_ACT;
@@ -387,6 +440,7 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             s_btn_last_active[i] = is_active;
             s_btn_last_clickable[i] = can_click;
             s_btn_last_paused[i] = is_paused;
+            s_btn_last_prefine[i] = prefine_active;
         }
 
         s_btn_state_valid[i] = true;
@@ -396,8 +450,11 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
     if (s_stop_btn)
     {
         // Only update visual style here; actual visibility/clickability handled in update_state
-        lv_obj_set_style_bg_color(s_stop_btn, COL_PROG_LOW, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(s_stop_btn, prefine_active ? COL_TIMER_WARN : COL_PROG_LOW, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(s_stop_btn, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_border_color(s_stop_btn,
+                                      prefine_active ? COL_WHITE : lv_color_make(0xFF, 0x80, 0x80),
+                                      LV_PART_MAIN);
     }
 }
 
@@ -459,26 +516,41 @@ static void update_state(const fsm_ctx_t *snap)
 
     bool running = (snap->state == FSM_STATE_RUNNING);
     bool paused = (snap->state == FSM_STATE_PAUSED);
+    bool prefine_active = false;
+    uint32_t rem_ms = 0;
+    int32_t remaining_pct = 0;
+
+    if ((running || paused) && snap->running_target_ms > 0)
+    {
+        rem_ms = (snap->running_target_ms > snap->running_elapsed_ms)
+                     ? (snap->running_target_ms - snap->running_elapsed_ms)
+                     : 0;
+        remaining_pct = (int32_t)((rem_ms * 100U) / snap->running_target_ms);
+        prefine_active = snap->pre_fine_ciclo_active;
+    }
 
     if (s_status_box)
     {
         lv_obj_set_style_bg_color(s_status_box, COL_STATE_IDL, LV_PART_MAIN);
     }
 
+    if (s_credit_box)
+    {
+        lv_obj_set_style_border_color(s_credit_box,
+                                      prefine_active ? COL_TIMER_WARN : COL_TIMER_NORMAL,
+                                      LV_PART_MAIN);
+    }
+
     if (s_credit_lbl)
     {
         char buf[16] = {0};
 
-        if ((running || paused) && snap->running_target_ms > 0)
+        if ((running || paused) && snap->running_target_ms > 0 && !prefine_active)
         {
-            uint32_t rem_ms = (snap->running_target_ms > snap->running_elapsed_ms)
-                                  ? (snap->running_target_ms - snap->running_elapsed_ms)
-                                  : 0;
             snprintf(buf, sizeof(buf), "%lu", (unsigned long)(rem_ms / 1000));
         }
         else
         {
-            //snprintf(buf, sizeof(buf), "%ld", (long)snap->credit_cents);
             snprintf(buf, sizeof(buf), "%ld", (long)snap->credit_cents / 100);
         }
 
@@ -494,11 +566,15 @@ static void update_state(const fsm_ctx_t *snap)
     {
         char buf[32] = {0};
 
-        if (running || paused)
+        if ((running || paused) && !prefine_active)
         {
             char mm[10] = {0};
             fmt_mm_ss(mm, sizeof(mm), snap->running_elapsed_ms);
             snprintf(buf, sizeof(buf), s_tr_elapsed_fmt, mm);
+        }
+        else if (running || paused)
+        {
+            snprintf(buf, sizeof(buf), "%s", s_tr_credits);
         }
         else
         {
@@ -515,13 +591,17 @@ static void update_state(const fsm_ctx_t *snap)
 
     if (s_pause_lbl)
     {
-        char buf[32] = {0};
+        char buf[192] = {0};
 
         if (paused && snap->pause_elapsed_ms > 0)
         {
             char mm[10] = {0};
             fmt_mm_ss(mm, sizeof(mm), snap->pause_elapsed_ms);
             snprintf(buf, sizeof(buf), s_tr_pause_fmt, mm);
+        }
+        else
+        {
+            buf[0] = '\0';
         }
 
         if (strcmp(s_last_pause_text, buf) != 0)
@@ -556,25 +636,15 @@ static void update_state(const fsm_ctx_t *snap)
         }
     }
 
-    int32_t pct = 0;
-    uint32_t rem_ms = 0;
-    if (snap->running_target_ms > 0 && (running || paused))
-    {
-        rem_ms = (snap->running_target_ms > snap->running_elapsed_ms)
-                     ? (snap->running_target_ms - snap->running_elapsed_ms)
-                     : 0;
-        pct = (int32_t)((rem_ms * 100U) / snap->running_target_ms);
-    }
-
     if (s_gauge)
     {
-        if (running || paused) {
+        if ((running || paused) && snap->running_target_ms > 0) {
             lv_obj_clear_flag(s_gauge, LV_OBJ_FLAG_HIDDEN);
             int32_t pct = 100 - (int32_t)((rem_ms * 90U) / snap->running_target_ms);
             if (pct < 10) pct = 10;
             if (pct > 100) pct = 100;
 
-            lv_color_t gauge_col = (rem_ms <= (snap->running_target_ms * 30 / 100)) ? lv_color_hex(0x800080) : COL_TIMER_NORMAL;
+            lv_color_t gauge_col = prefine_active ? COL_TIMER_WARN : COL_TIMER_NORMAL;
             lv_obj_set_style_bg_color(s_gauge, gauge_col, LV_PART_INDICATOR);
             lv_obj_set_style_bg_grad_color(s_gauge, gauge_col, LV_PART_INDICATOR);
             lv_obj_set_style_bg_grad_dir(s_gauge, LV_GRAD_DIR_NONE, LV_PART_INDICATOR);
@@ -586,11 +656,57 @@ static void update_state(const fsm_ctx_t *snap)
         }
     }
 
-    /* Manage STOP button visibility and label based on FSM state */
+    if (s_gauge_time_lbl)
+    {
+        if ((running || paused) && snap->running_target_ms > 0) {
+            char buf[16] = {0};
+            snprintf(buf, sizeof(buf), "%ld%%", (long)remaining_pct);
+            lv_label_set_text(s_gauge_time_lbl, buf);
+            lv_obj_set_style_text_color(s_gauge_time_lbl,
+                                        prefine_active ? COL_WHITE : lv_color_make(0x00, 0x00, 0x00),
+                                        LV_PART_MAIN);
+            lv_obj_clear_flag(s_gauge_time_lbl, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(s_gauge_time_lbl, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    /* [C] Gestione STOP + avviso scadenza credito monete (ECD) */
+    bool ecd_warning_active = false;
+    uint32_t ecd_rem_s = 0;
+    const uint32_t ecd_warning_threshold_s = 60U;
+
+    if (snap->state != FSM_STATE_CREDIT || snap->ecd_coins <= 0 || running || paused) {
+        s_ecd_warning_dismissed = false;
+    }
+
+    if (snap->state == FSM_STATE_CREDIT && snap->ecd_coins > 0 && !s_ecd_warning_dismissed) {
+        if (snap->splash_screen_time_ms > snap->inactivity_ms) {
+            ecd_rem_s = (snap->splash_screen_time_ms - snap->inactivity_ms) / 1000U;
+            if (ecd_rem_s <= ecd_warning_threshold_s) {
+                ecd_warning_active = true;
+            }
+        }
+    }
+
     if (s_stop_btn && s_stop_lbl) {
         if (running || paused) {
             lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_bg_color(s_stop_btn, prefine_active ? COL_TIMER_WARN : COL_PROG_LOW, LV_PART_MAIN);
+            char stop_text[64];
+            (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
+            lv_label_set_text(s_stop_lbl, stop_text);
+        } else if (ecd_warning_active) {
+            lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_bg_color(s_stop_btn, COL_TIMER_WARN, LV_PART_MAIN);
+
+            char line1[96] = {0};
+            char warn_text[192] = {0};
+            snprintf(line1, sizeof(line1), s_tr_ecd_expire_fmt, (unsigned long)ecd_rem_s);
+            snprintf(warn_text, sizeof(warn_text), "%s\n%s", line1, s_tr_ecd_touch_hint);
+            lv_label_set_text(s_stop_lbl, warn_text);
         } else {
             lv_obj_add_flag(s_stop_btn, LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
@@ -749,6 +865,10 @@ static void on_prog_btn(lv_event_t *e)
         ESP_LOGW(TAG, "[C] Azione programma pid=%u non pubblicata: %s", (unsigned)pid, tasks_err_to_name(err));
     } else {
         s_active_prog = pid;
+        if (s_pause_lbl) {
+            lv_label_set_text(s_pause_lbl, "");
+            s_last_pause_text[0] = '\0';
+        }
     }
 }
 
@@ -932,6 +1052,14 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_anim_duration(s_gauge, 0, LV_PART_MAIN);
     lv_obj_add_flag(s_gauge, LV_OBJ_FLAG_HIDDEN);
 
+    s_gauge_time_lbl = lv_label_create(s_gauge);
+    lv_label_set_text(s_gauge_time_lbl, "0%");
+    lv_obj_set_style_text_color(s_gauge_time_lbl, lv_color_make(0x00, 0x00, 0x00), LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_gauge_time_lbl, FONT_TIME, LV_PART_MAIN);
+    lv_obj_set_style_text_align(s_gauge_time_lbl, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_obj_align(s_gauge_time_lbl, LV_ALIGN_LEFT_MID, 16, 0);
+    lv_obj_add_flag(s_gauge_time_lbl, LV_OBJ_FLAG_HIDDEN);
+
     s_credit_box = lv_obj_create(scr);
     lv_obj_set_pos(s_credit_box, PANEL_PAD_X, credit_y);
     lv_obj_set_size(s_credit_box, PANEL_FULL_W, credit_h);
@@ -942,6 +1070,8 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_radius(s_credit_box, 40, LV_PART_MAIN);
     lv_obj_set_style_pad_all(s_credit_box, 24, LV_PART_MAIN);
     lv_obj_remove_flag(s_credit_box, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_credit_box, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(s_credit_box, on_credit_box_touch, LV_EVENT_CLICKED, NULL);
 
     s_status_box = lv_obj_create(scr);
     lv_obj_set_pos(s_status_box, PANEL_PAD_X, status_y);
@@ -978,6 +1108,9 @@ static void build_status(lv_obj_t *scr)
     lv_label_set_text(s_pause_lbl, empty_text);
     lv_obj_set_style_text_color(s_pause_lbl, COL_PROG_PAUSE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_pause_lbl, FONT_LABEL, LV_PART_MAIN);
+    lv_label_set_long_mode(s_pause_lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(s_pause_lbl, PANEL_FULL_W - 48);
+    lv_obj_set_style_text_align(s_pause_lbl, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
     lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_LEFT, 20, -12);
 
     /* [C] Pulsante STOP rosso in basso */
@@ -1205,6 +1338,7 @@ static void clear_panel_handles(void)
     s_pause_lbl = NULL;
     s_credit_lbl = NULL;
     s_gauge = NULL;
+    s_gauge_time_lbl = NULL;
     s_stop_btn = NULL;
     /* s_language_flag_btn e s_flag_img rimossi su richiesta dell'utente */
 
@@ -1215,6 +1349,7 @@ static void clear_panel_handles(void)
         s_btn_last_active[i] = false;
         s_btn_last_clickable[i] = false;
         s_btn_last_paused[i] = false;
+        s_btn_last_prefine[i] = false;
         s_prog_suspended[i] = false;
     }
 
@@ -1240,8 +1375,8 @@ static void panel_timer_cb(lv_timer_t *t)
         uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
         device_config_t *cfg = device_config_get();
 
-        if (snap.state == FSM_STATE_CREDIT && s_last_user_interaction_ms > 0) {
-            uint32_t idle_ms = now_ms - s_last_user_interaction_ms;
+        if (snap.state == FSM_STATE_CREDIT) {
+            uint32_t idle_ms = snap.inactivity_ms;
             uint32_t idle_to_ads_ms = (cfg && cfg->timeouts.exit_programs_ms > 0)
                 ? cfg->timeouts.exit_programs_ms : MAIN_PAGE_IDLE_TO_ADS_MS;
             if (idle_ms >= idle_to_ads_ms) {
@@ -1250,9 +1385,10 @@ static void panel_timer_cb(lv_timer_t *t)
                     ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms), ritorno a slideshow ADS", (unsigned long)idle_ms);
                     lvgl_page_ads_show();
                 } else {
-                    ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms) ma ADS disabilitato, rimango sulla pagina", (unsigned long)idle_ms);
-                    // Resetta il timer di inattività per evitare trigger continui
-                    s_last_user_interaction_ms = now_ms;
+                    if ((now_ms - s_last_ads_disabled_log_ms) >= 5000U) {
+                        ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms) ma ADS disabilitato, rimango sulla pagina", (unsigned long)idle_ms);
+                        s_last_ads_disabled_log_ms = now_ms;
+                    }
                 }
                 return;
             }
