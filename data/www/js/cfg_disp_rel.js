@@ -10,19 +10,16 @@
     function getDisplayPayload() {
         const sliderEl = document.getElementById('lcd_bright');
         const displayEnEl = document.getElementById('display_en');
-        const backlightEl = document.getElementById('display_backlight');
 
         const brightness = clampBrightness(sliderEl ? sliderEl.value : 0);
         const displayEnabled = !!(displayEnEl && displayEnEl.checked);
-        const backlightEnabled = !!(backlightEl && backlightEl.checked);
 
         return {
             brightness,
             body: {
                 display: {
-                    en: displayEnabled,
-                    brt: brightness,
-                    backlight: backlightEnabled
+                    enabled: displayEnabled,
+                    brt: brightness
                 }
             }
         };

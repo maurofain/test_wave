@@ -6,7 +6,7 @@
 
     const TOUCH_BUTTON_MAX = 10;
     const TOUCH_INPUT_MIN = 1;
-    const TOUCH_INPUT_MAX = 12;
+    const TOUCH_INPUT_MAX = 16;
     const TOUCH_INPUT_NONE = 0;
 
     let sInputOptions = [];
@@ -129,11 +129,12 @@
                 id,
                 code: (item.code && typeof item.code === 'string') ? item.code : inputCodeFromId(id),
                 available: (typeof item.available === 'boolean') ? item.available : true,
+                touchMappable: item.touch_mappable === true,
             });
         });
 
         result.sort((a, b) => a.id - b.id);
-        return result;
+        return result.filter((item) => item.touchMappable);
     }
 
     function setOptionsToSelect(selectElement, selectedValue) {

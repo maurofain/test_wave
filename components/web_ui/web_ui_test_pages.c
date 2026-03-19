@@ -21,3 +21,8 @@ esp_err_t led_bar_test_page_handler(httpd_req_t *req)
 {
     return webpages_send_external_or_error(req, "led_bar_test_section.html", "text/html; charset=utf-8");
 }
+
+esp_err_t digital_io_test_page_handler(httpd_req_t *req)
+{
+    return webpages_send_external_or_error(req, "digital_io.html", "text/html; charset=utf-8");
+}

@@ -1,6 +1,6 @@
 #include "lvgl_page_chrome.h"
-#include "device_config.h"
 #include "language_flags.h"
+#include "lvgl_panel.h"
 
 #include <time.h>
 
@@ -74,7 +74,7 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
                      top_margin);
     }
 
-    const char *lang = device_config_get_ui_user_language();
+    const char *lang = lvgl_panel_get_runtime_language();
     if (!lang || lang[0] == '\0') {
         lang = "it";
     }

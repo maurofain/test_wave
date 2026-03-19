@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
+#include "esp_err.h"
 /**
  * @file lvgl_panel.h
  * @brief Pannello LVGL emulatore per display 7" 720×1280 verticale.
@@ -75,3 +77,20 @@ void lvgl_panel_show_ads_page(void);
  * @param text Testo da mostrare nella label.
  */
 void lvgl_panel_set_init_status(const char *text);
+
+/**
+ * @brief Restituisce la lingua runtime attuale del pannello LVGL.
+ *
+ * Questa lingua può differire da quella persistita in configurazione quando
+ * l'utente cambia lingua dalla bandierina durante la sessione.
+ */
+const char *lvgl_panel_get_runtime_language(void);
+
+/**
+ * @brief Imposta la lingua runtime del pannello LVGL senza persisterla.
+ *
+ * @param lang_code Codice lingua ISO-2 (es. "it", "en").
+ * @param refresh_texts Se true forza il refresh dei testi LVGL visibili.
+ * @return ESP_OK se impostata, errore in caso di lingua non valida o stato non pronto.
+ */
+esp_err_t lvgl_panel_set_runtime_language(const char *lang_code, bool refresh_texts);

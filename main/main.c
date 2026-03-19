@@ -380,11 +380,18 @@ void app_main(void)
     }
 
     if (cfg && cfg->display.enabled) {
-        /* [M] Show ads slideshow at boot, then transition to main by touch or timeout */
+        /* [M] Check if ADS is enabled before loading images and showing slideshow */
         main_cctalk_start_acceptor_async();
-        lvgl_page_ads_preload_images();
-        lvgl_panel_show_ads_page();  /* [M] usa lock + preload imagini fuori lock */
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: slideshow pubblicitario attivato");
+        if (cfg->display.ads_enabled) {
+            lvgl_page_ads_preload_images();
+            lvgl_panel_show_ads_page();  /* [M] usa lock + preload imagini fuori lock */
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] finestra stabilita' chiusa: slideshow pubblicitario attivato");
+        } else {
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] ADS disabilitato: salto caricamento immagini e slideshow");
+            // Mostra direttamente la pagina principale se ADS è disabilitato
+            lvgl_panel_show();  // [C] Inizializza il sistema i18n LVGL prima di mostrare la pagina
+            lvgl_panel_show_main_page();
+        }
     } else {
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto slideshow");
     }

@@ -1,5 +1,6 @@
 #include "lvgl_panel_pages.h"
 #include "lvgl_page_chrome.h"
+#include "lvgl_i18n.h"
 #include "lvgl.h"
 #include "esp_log.h"
 #include "device_config.h"
@@ -502,7 +503,10 @@ void lvgl_page_ads_show(void)
 
     lv_obj_t *sel_lbl = lv_label_create(sel_btn);
     char select_wash[64] = {0};
-    device_config_get_ui_text_scoped("lvgl", "ads_select_wash", "Seleziona lavaggio", select_wash, sizeof(select_wash));
+    (void)lvgl_i18n_get_text("ads_select_wash",
+                             "Seleziona lavaggio",
+                             select_wash,
+                             sizeof(select_wash));
     lv_label_set_text(sel_lbl, select_wash);
     lv_obj_set_style_text_color(sel_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(sel_lbl, &GoogleSans50, LV_PART_MAIN);

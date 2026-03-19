@@ -1,8 +1,9 @@
 #include "lvgl_panel_pages.h"
 
-#include "device_config.h"
 #include "language_flags.h"
 #include "lvgl_page_chrome.h"
+#include "lvgl_panel.h"
+#include "lvgl_i18n.h"
 #include "usb_cdc_scanner.h"
 
 #include "lvgl.h"
@@ -104,15 +105,11 @@ static void panel_apply_selected_language_async(void *arg)
 {
     (void)arg;
 
-    device_config_t *cfg = device_config_get();
-    if (cfg) {
-        strncpy(cfg->ui.user_language, s_selected_user_lang, sizeof(cfg->ui.user_language) - 1);
-        cfg->ui.user_language[sizeof(cfg->ui.user_language) - 1] = '\0';
-        cfg->updated = true;
-
-        if (device_config_save(cfg) != ESP_OK) {
-            ESP_LOGW(TAG, "[C] Salvataggio lingua pannello fallito (%s)", s_selected_user_lang);
-        }
+    esp_err_t lang_err = lvgl_panel_set_runtime_language(s_selected_user_lang, false);
+    if (lang_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Cambio lingua runtime pannello fallito (%s): %s",
+                 s_selected_user_lang,
+                 esp_err_to_name(lang_err));
     }
 
     panel_reenable_scanner("dopo scelta lingua");
@@ -174,7 +171,7 @@ void lvgl_page_language_show(void)
 
     panel_reenable_scanner("all'apertura scelta lingua");
 
-    const char *current_lang = device_config_get_ui_user_language();
+    const char *current_lang = lvgl_panel_get_runtime_language();
     if (current_lang && strlen(current_lang) == 2) {
         strncpy(s_selected_user_lang, current_lang, sizeof(s_selected_user_lang) - 1);
         s_selected_user_lang[sizeof(s_selected_user_lang) - 1] = '\0';
@@ -182,7 +179,10 @@ void lvgl_page_language_show(void)
 
     lv_obj_t *title = lv_label_create(scr);
     char select_language[64] = {0};
-    device_config_get_ui_text_scoped("lvgl", "language_select_title", "Seleziona lingua", select_language, sizeof(select_language));
+    (void)lvgl_i18n_get_text("language_select_title",
+                             "Seleziona lingua",
+                             select_language,
+                             sizeof(select_language));
     lv_label_set_text(title, select_language);
     lv_obj_set_style_text_color(title, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(title, FONT_TITLE, LV_PART_MAIN);

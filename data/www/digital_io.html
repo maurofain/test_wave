@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='UTF-8'>
+    <title>Digital I/O Test Section</title>
+    <style>
+        .test-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            margin: 10px 0;
+            background: #ecf0f1;
+            border-radius: 6px;
+        }
+        .test-label {
+            font-weight: bold;
+            color: #2c3e50;
+            flex: 1;
+        }
+        .test-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        button {
+            padding: 8px 16px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background: #229954;
+        }
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        .status-box {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            background: #003366;
+            color: #ffffff;
+            min-height: 60px;
+            overflow-y: auto;
+            max-height: 250px;
+            border: 1px solid #3498db;
+            box-sizing: border-box;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .dip-grid, .io-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .dip-item, .io-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .dip-label, .io-label {
+            font-weight: bold;
+            font-size: 12px;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        .dip-state, .input-state, .output-state {
+            font-family: monospace;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .dip-on, .input-high, .output-on {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .dip-off, .input-low, .output-off {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .hex-display {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        .hex-item {
+            background: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ced4da;
+        }
+        .hex-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .hex-value {
+            color: #007bff;
+            font-weight: bold;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #f5c6cb;
+            margin: 10px 0;
+            display: none;
+        }
+        .timestamp {
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="section_digital_io" class="section">
+        <h2>🔌 Digital I/O <span style="font-size:14px; color:#bdc3c7">(DIP1-3, Relay, Input/Output)</span></h2>
+        
+        <!-- DIP Switches -->
+        <h3 style="color: #3498db; margin-top: 20px;">🎛️ DIP Switches</h3>
+        <div class="dip-grid">
+            <div class="dip-item">
+                <div class="dip-label">DIP1</div>
+                <div id="dip1_state" class="dip-state">--</div>
+            </div>
+            <div class="dip-item">
+                <div class="dip-label">DIP2</div>
+                <div id="dip2_state" class="dip-state">--</div>
+            </div>
+            <div class="dip-item">
+                <div class="dip-label">DIP3</div>
+                <div id="dip3_state" class="dip-state">--</div>
+            </div>
+        </div>
+        
+        <!-- Altri Input -->
+        <h3 style="color: #3498db; margin-top: 20px;">📡 Altri Input</h3>
+        <div class="io-grid">
+            <div class="io-item">
+                <div class="io-label">SERVICE_SW</div>
+                <div id="input4_state" class="input-state">--</div>
+            </div>
+            <div class="io-item">
+                <div class="io-label">OPTO2</div>
+                <div id="input5_state" class="input-state">--</div>
+            </div>
+            <div class="io-item">
+                <div class="io-label">OPTO1</div>
+                <div id="input6_state" class="input-state">--</div>
+            </div>
+            <div class="io-item">
+                <div class="io-label">OPTO4</div>
+                <div id="input7_state" class="input-state">--</div>
+            </div>
+            <div class="io-item">
+                <div class="io-label">OPTO3</div>
+                <div id="input8_state" class="input-state">--</div>
+            </div>
+        </div>
+        
+        <!-- Output (Relay) -->
+        <h3 style="color: #3498db; margin-top: 20px;">⚡ Output (Relay)</h3>
+        <div class="io-grid">
+            <div class="io-item">
+                <div class="io-label">WHITE_LED</div>
+                <div id="output1_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(1)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+            <div class="io-item">
+                <div class="io-label">BLUE_LED</div>
+                <div id="output2_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(2)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+            <div class="io-item">
+                <div class="io-label">RELAY3</div>
+                <div id="output3_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(3)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+            <div class="io-item">
+                <div class="io-label">RELAY4</div>
+                <div id="output4_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(4)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+            <div class="io-item">
+                <div class="io-label">RELAY2</div>
+                <div id="output5_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(5)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+            <div class="io-item">
+                <div class="io-label">RELAY1</div>
+                <div id="output6_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(6)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+            <div class="io-item">
+                <div class="io-label">RED_LED</div>
+                <div id="output7_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(7)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+            <div class="io-item">
+                <div class="io-label">HEATER1</div>
+                <div id="output8_state" class="output-state">--</div>
+                <button onclick="toggleDigitalOutput(8)" style="margin-top: 5px; font-size: 12px;">Toggle</button>
+            </div>
+        </div>
+        
+        <!-- Hex Display -->
+        <div class="hex-display">
+            <div class="hex-item">
+                <span class="hex-label">Inputs:</span>
+                <span id="digital_io_inputs_hex" class="hex-value">0x0000</span>
+            </div>
+            <div class="hex-item">
+                <span class="hex-label">Outputs:</span>
+                <span id="digital_io_outputs_hex" class="hex-value">0x0000</span>
+            </div>
+        </div>
+        
+        <!-- Error Display -->
+        <div id="digital_io_error" class="error-message"></div>
+        
+        <!-- Controls -->
+        <div class="test-item">
+            <span class="test-label">Aggiorna stato</span>
+            <div class="test-controls">
+                <button onclick="updateDigitalIOState()">🔄 Aggiorna</button>
+                <button id="btn_digital_io_autorefresh" onclick="toggleDigitalIOAutoRefresh()">▶️ Auto-refresh</button>
+            </div>
+        </div>
+        
+        <!-- Status Box -->
+        <div id="digital_io_status" class="status-box">Pronto per test Digital I/O</div>
+        
+        <!-- Timestamp -->
+        <div id="digital_io_timestamp" class="timestamp">--:--:--</div>
+    </div>
+
+    <script src="/js/digital_io_test.js"></script>
+</body>
+</html>

@@ -664,23 +664,36 @@ static cJSON *_i18n_v2_root_get(void)
         if (json) {
             free(json);
         }
-        ESP_LOGE(TAG, "[I18N_V2] Impossibile leggere %s", I18N_V2_FILE_PATH);
         return NULL;
     }
 
-    s_i18n_v2_root = cJSON_Parse(json);
+    cJSON *root = cJSON_Parse(json);
     free(json);
-    
-    // Forza ricostruzione cache per includere chiavi program_name_xx
-    if (s_i18n_v2_root) {
-        ESP_LOGI(TAG, "[C] i18n_v2.json caricato, forzo ricostruzione cache");
-        _i18n_lookup_cache_clear();
-        const char *lang = device_config_get_ui_backend_language();
-        if (!lang) lang = "it";
-        _i18n_lookup_cache_build_for_lang(lang);
+
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) {
+            cJSON_Delete(root);
+        }
+        return NULL;
     }
+
+    s_i18n_v2_root = root;
+    
+    const char *lang = device_config_get_ui_backend_language();
+    if (!lang) lang = "it";
+    _i18n_lookup_cache_build_for_lang(lang);
     
     return s_i18n_v2_root;
+}
+
+/**
+ * @brief Ottiene il root JSON i18n v2 (funzione pubblica)
+ * 
+ * @return Puntatore al root JSON o NULL se non disponibile
+ */
+cJSON* device_config_get_i18n_v2_root(void)
+{
+    return _i18n_v2_root_get();
 }
 
 static void _i18n_v2_clear_cache(void)
@@ -887,8 +900,20 @@ static void _set_defaults(device_config_t *config)
 
     // Numero pulsanti programma e coordinate geografiche
     config->num_programs = 10;   /* default: 10 programmi (2 colonne x 5 righe) */
+    static const uint8_t s_default_touch_inputs[DEVICE_TOUCH_BUTTON_MAX] = {
+        DEVICE_TOUCH_INPUT_OPTO1,
+        DEVICE_TOUCH_INPUT_OPTO2,
+        DEVICE_TOUCH_INPUT_OPTO3,
+        DEVICE_TOUCH_INPUT_OPTO4,
+        DEVICE_TOUCH_BUTTON_UNASSIGNED,
+        DEVICE_TOUCH_BUTTON_UNASSIGNED,
+        DEVICE_TOUCH_BUTTON_UNASSIGNED,
+        DEVICE_TOUCH_BUTTON_UNASSIGNED,
+        DEVICE_TOUCH_BUTTON_UNASSIGNED,
+        DEVICE_TOUCH_BUTTON_UNASSIGNED,
+    };
     for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
-        uint8_t default_input = (uint8_t)(button_index + 1U);
+        uint8_t default_input = s_default_touch_inputs[button_index];
         if (default_input < DEVICE_TOUCH_INPUT_MIN || default_input > DEVICE_TOUCH_INPUT_MAX) {
             default_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
         }
@@ -1259,8 +1284,8 @@ esp_err_t device_config_init(void)
         return err;
     }
 
-    if (_i18n_lookup_cache_build_for_lang(s_config.ui.user_language) == ESP_OK) {
-        ESP_LOGI(TAG, "[I18N] Cache lookup lingua user '%s' precaricata", _effective_lang(s_config.ui.user_language));
+    if (_i18n_lookup_cache_build_for_lang(s_config.ui.backend_language) == ESP_OK) {
+        ESP_LOGI(TAG, "[I18N] Cache lookup lingua backend '%s' precaricata", _effective_lang(s_config.ui.backend_language));
     }
 
     return ESP_OK;
@@ -2325,6 +2350,8 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
         return ESP_ERR_INVALID_ARG;
     }
 
+    ESP_LOGD("DEVICE_CFG", "[C] i18n lookup: scope='%s', key='%s', fallback='%s'", scope, key, fallback ? fallback : "NULL");
+
     /* Prefer numeric lookup via PSRAM when the dictionary is loaded. */
     {
         uint8_t  scope_id = (uint8_t)i18n_scope_id(scope);
@@ -2334,13 +2361,16 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
             if (concat) {
                 strncpy(out, concat, out_len - 1);
                 out[out_len - 1] = '\0';
+                ESP_LOGD("DEVICE_CFG", "[C] i18n PSRAM hit: '%s' -> '%s'", key, out);
                 free(concat);
                 return ESP_OK;
             }
         }
     }
 
+    ESP_LOGD("DEVICE_CFG", "[C] i18n PSRAM miss, trying cache build");
     if (_i18n_lookup_cache_build_for_lang(NULL) != ESP_OK || !s_i18n_lookup_cache) {
+        ESP_LOGW("DEVICE_CFG", "[C] i18n cache build failed, using fallback");
         if (fallback) {
             strncpy(out, fallback, out_len - 1);
             out[out_len - 1] = '\0';

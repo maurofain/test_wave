@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include <stdio.h>
 
 #define TAG "DIGITAL_IO"
 
@@ -53,6 +54,164 @@ static uint16_t modbus_output_offset(uint8_t output_id)
 static uint16_t modbus_input_offset(uint8_t input_id)
 {
     return (uint16_t)(input_id - DIGITAL_IO_FIRST_MODBUS_INPUT);
+}
+
+bool digital_io_input_is_touch_mappable(uint8_t input_id)
+{
+    switch (input_id) {
+        case DIGITAL_IO_INPUT_OPTO1:
+        case DIGITAL_IO_INPUT_OPTO2:
+        case DIGITAL_IO_INPUT_OPTO3:
+        case DIGITAL_IO_INPUT_OPTO4:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool digital_io_input_is_io_process_signal(uint8_t input_id)
+{
+    return is_valid_input_id(input_id) && !digital_io_input_is_touch_mappable(input_id);
+}
+
+bool digital_io_output_is_program_relay(uint8_t output_id)
+{
+    switch (output_id) {
+        case DIGITAL_IO_OUTPUT_RELAY1:
+        case DIGITAL_IO_OUTPUT_RELAY2:
+        case DIGITAL_IO_OUTPUT_RELAY3:
+        case DIGITAL_IO_OUTPUT_RELAY4:
+            return true;
+        default:
+            return (output_id >= DIGITAL_IO_FIRST_MODBUS_OUTPUT && output_id <= DIGITAL_IO_OUTPUT_COUNT);
+    }
+}
+
+bool digital_io_output_is_io_process_signal(uint8_t output_id)
+{
+    switch (output_id) {
+        case DIGITAL_IO_OUTPUT_WHITE_LED:
+        case DIGITAL_IO_OUTPUT_BLUE_LED:
+        case DIGITAL_IO_OUTPUT_RED_LED:
+        case DIGITAL_IO_OUTPUT_HEATER1:
+            return true;
+        default:
+            return false;
+    }
+}
+
+esp_err_t digital_io_program_relay_to_output_id(uint8_t relay_number, uint8_t *out_output_id)
+{
+    if (out_output_id == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t output_id = 0U;
+    switch (relay_number) {
+        case 1U:
+            output_id = DIGITAL_IO_OUTPUT_RELAY1;
+            break;
+        case 2U:
+            output_id = DIGITAL_IO_OUTPUT_RELAY2;
+            break;
+        case 3U:
+            output_id = DIGITAL_IO_OUTPUT_RELAY3;
+            break;
+        case 4U:
+            output_id = DIGITAL_IO_OUTPUT_RELAY4;
+            break;
+        default:
+            if (relay_number < 5U) {
+                return ESP_ERR_INVALID_ARG;
+            }
+            output_id = (uint8_t)(DIGITAL_IO_FIRST_MODBUS_OUTPUT + (relay_number - 5U));
+            break;
+    }
+
+    if (!is_valid_output_id(output_id) || !digital_io_output_is_program_relay(output_id)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_output_id = output_id;
+    return ESP_OK;
+}
+
+esp_err_t digital_io_input_get_code(uint8_t input_id, char *out_code, size_t out_code_len)
+{
+    if (!is_valid_input_id(input_id) || out_code == NULL || out_code_len == 0U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    switch (input_id) {
+        case DIGITAL_IO_INPUT_DIP1:
+            snprintf(out_code, out_code_len, "DIP1");
+            break;
+        case DIGITAL_IO_INPUT_DIP2:
+            snprintf(out_code, out_code_len, "DIP2");
+            break;
+        case DIGITAL_IO_INPUT_DIP3:
+            snprintf(out_code, out_code_len, "DIP3");
+            break;
+        case DIGITAL_IO_INPUT_SERVICE_SWITCH:
+            snprintf(out_code, out_code_len, "SERVICE_SWITCH");
+            break;
+        case DIGITAL_IO_INPUT_OPTO2:
+            snprintf(out_code, out_code_len, "OPTO2");
+            break;
+        case DIGITAL_IO_INPUT_OPTO1:
+            snprintf(out_code, out_code_len, "OPTO1");
+            break;
+        case DIGITAL_IO_INPUT_OPTO4:
+            snprintf(out_code, out_code_len, "OPTO4");
+            break;
+        case DIGITAL_IO_INPUT_OPTO3:
+            snprintf(out_code, out_code_len, "OPTO3");
+            break;
+        default:
+            snprintf(out_code, out_code_len, "IN%02u", (unsigned)input_id);
+            break;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t digital_io_output_get_code(uint8_t output_id, char *out_code, size_t out_code_len)
+{
+    if (!is_valid_output_id(output_id) || out_code == NULL || out_code_len == 0U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    switch (output_id) {
+        case DIGITAL_IO_OUTPUT_WHITE_LED:
+            snprintf(out_code, out_code_len, "WHITE_LED");
+            break;
+        case DIGITAL_IO_OUTPUT_BLUE_LED:
+            snprintf(out_code, out_code_len, "BLUE_LED");
+            break;
+        case DIGITAL_IO_OUTPUT_RELAY3:
+            snprintf(out_code, out_code_len, "RELAY3");
+            break;
+        case DIGITAL_IO_OUTPUT_RELAY4:
+            snprintf(out_code, out_code_len, "RELAY4");
+            break;
+        case DIGITAL_IO_OUTPUT_RELAY2:
+            snprintf(out_code, out_code_len, "RELAY2");
+            break;
+        case DIGITAL_IO_OUTPUT_RELAY1:
+            snprintf(out_code, out_code_len, "RELAY1");
+            break;
+        case DIGITAL_IO_OUTPUT_RED_LED:
+            snprintf(out_code, out_code_len, "RED_LED");
+            break;
+        case DIGITAL_IO_OUTPUT_HEATER1:
+            snprintf(out_code, out_code_len, "HEATER1");
+            break;
+        default:
+            snprintf(out_code, out_code_len, "OUT%02u", (unsigned)output_id);
+            break;
+    }
+
+    return ESP_OK;
 }
 
 static esp_err_t ensure_lock(void)
@@ -102,11 +261,11 @@ static bool is_modbus_available(const device_config_t *cfg)
 static esp_err_t ensure_local_io_ready(const device_config_t *cfg)
 {
     if (cfg == NULL) {
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     if (!cfg->sensors.io_expander_enabled) {
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_LOCAL_IO_DISABLED;
     }
 
     return io_expander_init();
@@ -115,7 +274,7 @@ static esp_err_t ensure_local_io_ready(const device_config_t *cfg)
 static esp_err_t ensure_modbus_ready(const device_config_t *cfg)
 {
     if (!is_modbus_available(cfg)) {
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_MODBUS_DISABLED;
     }
 
     return modbus_relay_init();
@@ -225,7 +384,7 @@ esp_err_t digital_io_init(void)
     const device_config_t *cfg = device_config_get();
     if (cfg == NULL) {
         give_lock();
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     if (cfg->sensors.io_expander_enabled) {
@@ -261,7 +420,7 @@ esp_err_t digital_io_set_output(uint8_t output_id, bool value)
     const device_config_t *cfg = device_config_get();
     if (cfg == NULL) {
         give_lock();
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     err = set_output_locked(cfg, output_id, value);
@@ -291,7 +450,7 @@ esp_err_t digital_io_get_output(uint8_t output_id, bool *out_value)
     const device_config_t *cfg = device_config_get();
     if (cfg == NULL) {
         give_lock();
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     err = get_output_locked(cfg, output_id, out_value);
@@ -313,7 +472,7 @@ esp_err_t digital_io_get_input(uint8_t input_id, bool *out_value)
     const device_config_t *cfg = device_config_get();
     if (cfg == NULL) {
         give_lock();
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     err = get_input_locked(cfg, input_id, out_value);
@@ -331,7 +490,7 @@ esp_err_t digital_io_set_outputs_mask(uint16_t outputs_mask)
     const device_config_t *cfg = device_config_get();
     if (cfg == NULL) {
         give_lock();
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     esp_err_t first_err = ESP_OK;
@@ -365,7 +524,9 @@ esp_err_t digital_io_get_snapshot(digital_io_snapshot_t *out_snapshot)
     const device_config_t *cfg = device_config_get();
     if (cfg == NULL) {
         give_lock();
-        return ESP_ERR_INVALID_STATE;
+        // Durante l'avvio è normale che config non sia pronto ancora
+        ESP_LOGD(TAG, "[D] Config non disponibile per snapshot (non critico)");
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     digital_io_snapshot_t snapshot = {0};
@@ -416,6 +577,9 @@ size_t digital_io_get_input_infos(digital_io_input_info_t *out_list, size_t max_
         out_list[index].input_id = input_id;
         out_list[index].is_local = is_local;
         out_list[index].available = is_local ? local_available : modbus_available;
+        out_list[index].touch_mappable = digital_io_input_is_touch_mappable(input_id);
+        out_list[index].io_process_consumer = digital_io_input_is_io_process_signal(input_id);
+        (void)digital_io_input_get_code(input_id, out_list[index].code, sizeof(out_list[index].code));
     }
 
     return count;

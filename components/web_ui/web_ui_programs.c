@@ -221,6 +221,40 @@ const web_ui_program_table_t *web_ui_program_table_get(void)
     return &s_program_table;
 }
 
+const web_ui_program_entry_t *web_ui_program_find_by_id(uint8_t program_id)
+{
+    const web_ui_program_table_t *table = web_ui_program_table_get();
+    if (!table || program_id == 0U) {
+        return NULL;
+    }
+
+    for (uint8_t index = 0; index < table->count; ++index) {
+        const web_ui_program_entry_t *entry = &table->programs[index];
+        if (entry->program_id == program_id) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
+const web_ui_program_entry_t *web_ui_program_find_by_name(const char *program_name)
+{
+    const web_ui_program_table_t *table = web_ui_program_table_get();
+    if (!table || !program_name || program_name[0] == '\0') {
+        return NULL;
+    }
+
+    for (uint8_t index = 0; index < table->count; ++index) {
+        const web_ui_program_entry_t *entry = &table->programs[index];
+        if (entry->name[0] != '\0' && strcmp(entry->name, program_name) == 0) {
+            return entry;
+        }
+    }
+
+    return NULL;
+}
+
 static char *programs_table_to_json_internal(bool include_display_name)
 {
     programs_init_defaults();
@@ -403,6 +437,41 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
     return ESP_OK;
 }
 
+esp_err_t web_ui_program_clear_outputs(void)
+{
+    esp_err_t first_err = ESP_OK;
+
+    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
+        esp_err_t err = web_ui_virtual_relay_control(relay, false, 0);
+        if (err != ESP_OK && first_err == ESP_OK) {
+            first_err = err;
+        }
+    }
+
+    return first_err;
+}
+
+esp_err_t web_ui_program_apply_outputs(const web_ui_program_entry_t *entry)
+{
+    if (!entry) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t first_err = ESP_OK;
+    uint32_t duration_ms = (uint32_t)entry->duration_sec * 1000U;
+
+    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
+        bool on = ((entry->relay_mask & (1U << (relay - 1U))) != 0U);
+        uint32_t relay_duration = on ? duration_ms : 0U;
+        esp_err_t err = web_ui_virtual_relay_control(relay, on, relay_duration);
+        if (err != ESP_OK && first_err == ESP_OK) {
+            first_err = err;
+        }
+    }
+
+    return first_err;
+}
+
 /**
  * @brief Controlla uno dei relè logici R01..R12 tramite layer I/O unificato
  *
@@ -422,14 +491,20 @@ esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_err_t io_err = tasks_digital_io_set_output_via_agent(relay_number,
-                                                              status,
-                                                              pdMS_TO_TICKS(250));
+    uint8_t output_id = 0U;
+    esp_err_t map_err = digital_io_program_relay_to_output_id(relay_number, &output_id);
+    if (map_err != ESP_OK) {
+        return map_err;
+    }
+
+    esp_err_t io_err = tasks_digital_io_set_output_via_agent(output_id,
+                                                               status,
+                                                               pdMS_TO_TICKS(250));
     if (io_err != ESP_OK) {
         ESP_LOGW(TAG,
                  "[C] Relay R%u non aggiornato su hardware: %s",
                  (unsigned)relay_number,
-                 esp_err_to_name(io_err));
+                 tasks_err_to_name(io_err));
         return io_err;
     }
 
@@ -465,10 +540,15 @@ bool web_ui_virtual_relay_get(uint8_t relay_number, web_ui_virtual_relay_state_t
         return false;
     }
 
+    uint8_t output_id = 0U;
+    if (digital_io_program_relay_to_output_id(relay_number, &output_id) != ESP_OK) {
+        return false;
+    }
+
     bool hw_status = false;
-    esp_err_t io_err = tasks_digital_io_get_output_via_agent(relay_number,
-                                                              &hw_status,
-                                                              pdMS_TO_TICKS(250));
+    esp_err_t io_err = tasks_digital_io_get_output_via_agent(output_id,
+                                                               &hw_status,
+                                                               pdMS_TO_TICKS(250));
     if (io_err == ESP_OK) {
         s_virtual_relays[relay_number].status = hw_status;
     }

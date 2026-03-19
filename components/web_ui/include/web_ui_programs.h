@@ -41,6 +41,8 @@ typedef struct {
  * @brief Ottiene la tabella programmi corrente
  */
 const web_ui_program_table_t *web_ui_program_table_get(void);
+const web_ui_program_entry_t *web_ui_program_find_by_id(uint8_t program_id);
+const web_ui_program_entry_t *web_ui_program_find_by_name(const char *program_name);
 esp_err_t web_ui_program_table_init(void);
 #/**
  * @brief Serializza la tabella programmi in JSON (allocato)
@@ -51,6 +53,8 @@ char *web_ui_program_table_to_json(void);
  */
 esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t len, char *err_msg, size_t err_msg_len);
 
+esp_err_t web_ui_program_apply_outputs(const web_ui_program_entry_t *entry);
+esp_err_t web_ui_program_clear_outputs(void);
 esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32_t duration_ms);
 bool web_ui_virtual_relay_get(uint8_t relay_number, web_ui_virtual_relay_state_t *state_out);
 char *web_ui_virtual_relays_to_json(void);

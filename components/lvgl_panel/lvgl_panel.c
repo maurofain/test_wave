@@ -1,3 +1,4 @@
+#include "lvgl_i18n.h"
 #include "lvgl_panel.h"
 #include "lvgl_panel_pages.h"
 #include "lvgl_page_chrome.h"
@@ -19,6 +20,7 @@ extern const lv_font_t GoogleSans35;
 static const char *TAG = "lvgl_panel";
 static lv_obj_t *s_init_status_label = NULL;
 static char s_lvgl_i18n_lang[8] = {0};
+static char s_lvgl_runtime_lang[8] = "it";
 
 /* Forward declaration from web_ui_common.c to avoid pulling the entire header. */
 esp_err_t web_ui_i18n_load_language_psram(const char *language);
@@ -165,13 +167,85 @@ static bool lvgl_panel_load_i18n_dictionary(const char *lang)
     return false;
 }
 
+const char *lvgl_panel_get_runtime_language(void)
+{
+    if (s_lvgl_runtime_lang[0] == '\0') {
+        return "it";
+    }
+    return s_lvgl_runtime_lang;
+}
+
+esp_err_t lvgl_panel_set_runtime_language(const char *lang_code, bool refresh_texts)
+{
+    const char *requested = (lang_code && strlen(lang_code) == 2) ? lang_code : "it";
+    lvgl_i18n_lang_t lvgl_lang = lvgl_i18n_lang_from_string(requested);
+    if (lvgl_lang == LVGL_LANG_NONE) {
+        requested = "it";
+        lvgl_lang = LVGL_LANG_IT;
+    }
+
+    strncpy(s_lvgl_runtime_lang, requested, sizeof(s_lvgl_runtime_lang) - 1);
+    s_lvgl_runtime_lang[sizeof(s_lvgl_runtime_lang) - 1] = '\0';
+
+    esp_err_t set_ret = lvgl_i18n_set_language(lvgl_lang);
+    if (set_ret != ESP_OK && set_ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "[C] Cambio lingua runtime LVGL fallito (%s): %s",
+                 requested,
+                 esp_err_to_name(set_ret));
+        return set_ret;
+    }
+
+    (void)lvgl_panel_load_i18n_dictionary(requested);
+
+    if (refresh_texts) {
+        lvgl_panel_refresh_texts();
+    }
+
+    ESP_LOGI(TAG, "[C] Lingua runtime LVGL impostata a '%s'", requested);
+    return ESP_OK;
+}
+
 void lvgl_panel_show(void)
 {
-    const char *lang = device_config_get_ui_user_language();
-    if (!lvgl_panel_load_i18n_dictionary(lang)) {
+    ESP_LOGI(TAG, "[C] ===== lvgl_panel_show() INIZIO =====");
+    
+    // Test base per verificare se la funzione viene eseguita
+    ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 1");
+    
+    const char *startup_lang = device_config_get_ui_user_language();
+    ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 2 - startup_lang=%s", startup_lang ? startup_lang : "NULL");
+    
+    const char *backend_lang = device_config_get_ui_backend_language();
+    ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 3 - backend_lang=%s", backend_lang ? backend_lang : "NULL");
+    
+    ESP_LOGI(TAG, "[C] LVGL show - user_language='%s', backend_language='%s'", 
+             startup_lang ? startup_lang : "NULL", backend_lang ? backend_lang : "NULL");
+    
+    ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 4 - prima i18n init");
+    
+    // Inizializza il nuovo sistema i18n LVGL
+    esp_err_t i18n_ret = lvgl_i18n_init();
+    ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 5 - i18n_init=%s", esp_err_to_name(i18n_ret));
+    
+    if (i18n_ret != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Errore inizializzazione sistema i18n LVGL: %s", esp_err_to_name(i18n_ret));
+    } else {
+        ESP_LOGI(TAG, "[C] ✅ Sistema i18n LVGL inizializzato con successo");
+        (void)lvgl_panel_set_runtime_language(startup_lang, false);
+    }
+    
+    ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 6 - prima vecchio sistema");
+    
+    // Manteniamo il vecchio sistema come fallback per ora
+    if (!lvgl_panel_load_i18n_dictionary(lvgl_panel_get_runtime_language())) {
         ESP_LOGW(TAG, "[C] Continuo senza dizionario LVGL in PSRAM (fallback testo)");
     }
+    
+    ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 7 - prima boot logo");
+    
     lvgl_panel_show_boot_logo();
+    
+    ESP_LOGI(TAG, "[C] ===== lvgl_panel_show() FINE =====");
 }
 
 
@@ -247,6 +321,23 @@ void lvgl_panel_refresh_texts(void)
         return;
     }
 
+    // Aggiorna la lingua nel nuovo sistema i18n LVGL
+    const char *lang = lvgl_panel_get_runtime_language();
+    if (lang && lang[0]) {
+        lvgl_i18n_lang_t lvgl_lang = lvgl_i18n_lang_from_string(lang);
+        if (lvgl_lang != LVGL_LANG_NONE) {
+            esp_err_t ret = lvgl_i18n_set_language(lvgl_lang);
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "[C] Lingua LVGL aggiornata a: %s", lang);
+            } else {
+                ESP_LOGE(TAG, "[C] Errore aggiornamento lingua LVGL: %s", esp_err_to_name(ret));
+            }
+        } else {
+            ESP_LOGW(TAG, "[C] Lingua '%s' non valida per LVGL", lang);
+        }
+    }
+
+    // Chiama il refresh delle pagine LVGL
     lvgl_page_main_refresh_texts();
 
     bsp_display_unlock();

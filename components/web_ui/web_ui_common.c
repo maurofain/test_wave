@@ -386,8 +386,11 @@ void web_ui_i18n_cache_invalidate(void)
  */
 i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out_count)
 {
+    ESP_LOGI(TAG, "[C] i18n_load_full_dictionary_psram: language='%s'", language ? language : "NULL");
+    
     if (!language)
     {
+        ESP_LOGE(TAG, "[C] i18n_load_full_dictionary_psram: language is NULL");
         if (out_count)
         {
             *out_count = 0;
@@ -398,6 +401,7 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     char *json = device_config_get_ui_texts_records_json(language);
     if (!json)
     {
+        ESP_LOGE(TAG, "[C] i18n_load_full_dictionary_psram: device_config_get_ui_texts_records_json returned NULL for language='%s'", language);
         if (out_count)
         {
             *out_count = 0;
@@ -405,10 +409,13 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
         return NULL;
     }
 
+    ESP_LOGD(TAG, "[C] i18n_load_full_dictionary_psram: got JSON for language='%s', length=%zu", language, strlen(json));
+    
     cJSON *root = cJSON_Parse(json);
     free(json);
     if (!root || !cJSON_IsArray(root))
     {
+        ESP_LOGE(TAG, "[C] i18n_load_full_dictionary_psram: JSON parse failed or not array for language='%s'", language);
         if (root)
         {
             cJSON_Delete(root);
@@ -423,6 +430,7 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
     const int total = cJSON_GetArraySize(root);
     if (total <= 0)
     {
+        ESP_LOGE(TAG, "[C] i18n_load_full_dictionary_psram: JSON array is empty for language='%s'", language);
         cJSON_Delete(root);
         if (out_count)
         {
@@ -431,9 +439,12 @@ i18n_record_t *i18n_load_full_dictionary_psram(const char *language, size_t *out
         return NULL;
     }
 
+    ESP_LOGI(TAG, "[C] i18n_load_full_dictionary_psram: parsing %d records for language='%s'", total, language);
+
     ps_i18n_rec_t *arr = ps_malloc((size_t)total * sizeof(ps_i18n_rec_t));
     if (!arr)
     {
+        ESP_LOGE(TAG, "[C] i18n_load_full_dictionary_psram: ps_malloc failed for %d records", total);
         cJSON_Delete(root);
         if (out_count)
         {

@@ -60,6 +60,8 @@ typedef enum {
     AGN_ID_WEB_UI,            /* web interface / emulator */
     AGN_ID_TOUCH,             /* touch driver */
     AGN_ID_TOKEN,             /* token reader */
+    AGN_ID_DIGITAL_IO,        /* unified digital I/O task */
+    AGN_ID_IO_PROCESS,        /* consumer fallback per segnali I/O */
 
     /* hardware/peripheral agents */
     AGN_ID_AUX_GPIO,          /* aux gpio (GPIO33 etc) */
@@ -148,6 +150,7 @@ typedef enum {
     ACTION_ID_DIGITAL_IO_GET_OUTPUT,
     ACTION_ID_DIGITAL_IO_GET_INPUT,
     ACTION_ID_DIGITAL_IO_GET_SNAPSHOT,
+    ACTION_ID_DIGITAL_IO_INPUT_RISING,
 
     /* PWM output events */
     ACTION_ID_PWM_SET_DUTY,

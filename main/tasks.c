@@ -4,6 +4,7 @@
 #include "esp_system.h"
 #include "led_strip.h"
 #include "device_config.h"
+#include "digital_io.h"
 #include "sht40.h"
 #include "esp_lcd_touch.h"
 #include "web_ui.h"
@@ -37,6 +38,8 @@
 static const char *TAG = "TASKS";
 static float s_temperature = 0.0f;
 static float s_humidity = 0.0f;
+static const uint8_t DIGITAL_IO_FIRST_CHANNEL_ID = 1U;
+static const uint32_t DIGITAL_IO_POLL_DEFAULT_MS = 50U;
 
 #define SCANNER_QR_COOLDOWN_DEFAULT_MS 10000U
 #define SCANNER_QR_COOLDOWN_MIN_MS 500U
@@ -65,10 +68,183 @@ typedef struct {
 
 static portMUX_TYPE s_digital_io_agent_lock = portMUX_INITIALIZER_UNLOCKED;
 
+const char *tasks_err_to_name(esp_err_t err)
+{
+    switch (err) {
+        case TASKS_ERR_FSM_QUEUE_NOT_READY:
+            return "TASKS_ERR_FSM_QUEUE_NOT_READY";
+        case TASKS_ERR_PROGRAM_DISABLED:
+            return "TASKS_ERR_PROGRAM_DISABLED";
+        case TASKS_ERR_FSM_SNAPSHOT_UNAVAILABLE:
+            return "TASKS_ERR_FSM_SNAPSHOT_UNAVAILABLE";
+        case TASKS_ERR_PROGRAM_STATE_CONFLICT:
+            return "TASKS_ERR_PROGRAM_STATE_CONFLICT";
+        case TASKS_ERR_PROGRAM_CREDIT_INSUFFICIENT:
+            return "TASKS_ERR_PROGRAM_CREDIT_INSUFFICIENT";
+        default:
+            return esp_err_to_name(err);
+    }
+}
+
 static bool tasks_is_fsm_context(void)
 {
     const char *task_name = pcTaskGetName(NULL);
     return (task_name != NULL && strcmp(task_name, "fsm") == 0);
+}
+
+static bool tasks_publish_io_process_event(agn_id_t sender,
+                                           action_id_t action,
+                                           uint32_t value_u32,
+                                           uint32_t aux_u32,
+                                           const char *text)
+{
+    if (!fsm_event_queue_init(0)) {
+        return false;
+    }
+
+    fsm_input_event_t event = {
+        .from = sender,
+        .to = {AGN_ID_IO_PROCESS},
+        .action = action,
+        .type = FSM_INPUT_EVENT_NONE,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,
+        .value_u32 = value_u32,
+        .aux_u32 = aux_u32,
+        .data_ptr = NULL,
+        .text = {0},
+    };
+
+    if (text && text[0] != '\0') {
+        snprintf(event.text, sizeof(event.text), "%s", text);
+    }
+
+    return fsm_event_publish(&event, pdMS_TO_TICKS(20));
+}
+
+static uint8_t tasks_find_program_id_for_input(uint8_t input_id)
+{
+    const device_config_t *cfg = device_config_get();
+    if (!cfg || !digital_io_input_is_touch_mappable(input_id)) {
+        return 0U;
+    }
+
+    size_t button_limit = cfg->num_programs;
+    if (button_limit == 0U || button_limit > DEVICE_TOUCH_BUTTON_MAX) {
+        button_limit = DEVICE_TOUCH_BUTTON_MAX;
+    }
+
+    uint8_t matched_program_id = 0U;
+    for (size_t button_index = 0; button_index < button_limit; ++button_index) {
+        uint8_t mapped_input = cfg->touch_button_map.button_to_input[button_index];
+        if (mapped_input != input_id) {
+            continue;
+        }
+
+        if (matched_program_id != 0U) {
+            ESP_LOGW(TAG,
+                     "[M] IN%02u associato a piu' programmi (%u e %u): input ignorato",
+                     (unsigned)input_id,
+                     (unsigned)matched_program_id,
+                     (unsigned)(button_index + 1U));
+            return 0U;
+        }
+
+        matched_program_id = (uint8_t)(button_index + 1U);
+    }
+
+    return matched_program_id;
+}
+
+static void tasks_process_other_digital_input_rising(uint8_t input_id)
+{
+    char input_code[24] = {0};
+    (void)digital_io_input_get_code(input_id, input_code, sizeof(input_code));
+
+    if (!tasks_publish_io_process_event(AGN_ID_DIGITAL_IO,
+                                        ACTION_ID_DIGITAL_IO_INPUT_RISING,
+                                        (uint32_t)input_id,
+                                        0U,
+                                        input_code)) {
+        ESP_LOGW(TAG,
+                 "[M] Publish verso io_process fallito per ingresso %s",
+                 input_code[0] != '\0' ? input_code : "digital_input");
+        return;
+    }
+
+    ESP_LOGI(TAG,
+             "[M] Fronte 0->1 su %s inoltrato a io_process",
+             input_code[0] != '\0' ? input_code : "digital_input");
+}
+
+esp_err_t tasks_publish_program_button_action(uint8_t program_id, agn_id_t sender)
+{
+    if (program_id == 0U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!fsm_event_queue_init(0)) {
+        return TASKS_ERR_FSM_QUEUE_NOT_READY;
+    }
+
+    const web_ui_program_entry_t *entry = web_ui_program_find_by_id(program_id);
+    if (!entry) {
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (!entry->enabled) {
+        return TASKS_ERR_PROGRAM_DISABLED;
+    }
+
+    fsm_ctx_t snap = {0};
+    if (!fsm_runtime_snapshot(&snap)) {
+        return TASKS_ERR_FSM_SNAPSHOT_UNAVAILABLE;
+    }
+
+    fsm_input_event_t event = {
+        .from = sender,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_NONE,
+        .type = FSM_INPUT_EVENT_NONE,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .data_ptr = NULL,
+        .text = {0},
+    };
+
+    snprintf(event.text, sizeof(event.text), "%s", entry->name);
+
+    bool is_running_or_paused = (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED);
+    bool is_active_program = is_running_or_paused &&
+                             entry->name[0] != '\0' &&
+                             strcmp(entry->name, snap.running_program_name) == 0;
+
+    if (is_active_program) {
+        event.action = ACTION_ID_PROGRAM_PAUSE_TOGGLE;
+        event.type = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE;
+        event.value_i32 = (int32_t)program_id;
+    } else {
+        if (snap.state != FSM_STATE_CREDIT && !is_running_or_paused) {
+            return TASKS_ERR_PROGRAM_STATE_CONFLICT;
+        }
+        if (snap.state == FSM_STATE_CREDIT &&
+            snap.credit_cents < (int32_t)entry->price_units) {
+            return TASKS_ERR_PROGRAM_CREDIT_INSUFFICIENT;
+        }
+
+        event.action = ACTION_ID_PROGRAM_SELECTED;
+        event.type = is_running_or_paused ? FSM_INPUT_EVENT_PROGRAM_SWITCH
+                                          : FSM_INPUT_EVENT_PROGRAM_SELECTED;
+        event.value_i32 = (int32_t)entry->price_units;
+        event.value_u32 = (uint32_t)entry->pause_max_suspend_sec * 1000U;
+        event.aux_u32 = (uint32_t)entry->duration_sec * 1000U;
+    }
+
+    if (!fsm_event_publish(&event, pdMS_TO_TICKS(20))) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    return ESP_OK;
 }
 
 static esp_err_t tasks_execute_digital_io_action(action_id_t action,
@@ -116,6 +292,34 @@ static bool tasks_handle_digital_io_agent_event(const fsm_input_event_t *event)
     }
 
     switch (event->action) {
+        case ACTION_ID_DIGITAL_IO_INPUT_RISING: {
+            uint8_t input_id = (uint8_t)event->value_u32;
+            if (input_id < DIGITAL_IO_FIRST_CHANNEL_ID || input_id > DIGITAL_IO_INPUT_COUNT) {
+                ESP_LOGW(TAG, "[M] Evento fronte digitale con input non valido: %u", (unsigned)input_id);
+                return true;
+            }
+
+            uint8_t program_id = tasks_find_program_id_for_input(input_id);
+            if (program_id != 0U) {
+                esp_err_t publish_err = tasks_publish_program_button_action(program_id, AGN_ID_DIGITAL_IO);
+                if (publish_err != ESP_OK) {
+                    ESP_LOGW(TAG,
+                             "[M] IN%02u -> programma %u non pubblicato: %s",
+                             (unsigned)input_id,
+                             (unsigned)program_id,
+                             tasks_err_to_name(publish_err));
+                } else {
+                    ESP_LOGI(TAG,
+                             "[M] IN%02u associato al programma %u: pubblicata azione equivalente al touch",
+                             (unsigned)input_id,
+                             (unsigned)program_id);
+                }
+            } else {
+                tasks_process_other_digital_input_rising(input_id);
+            }
+
+            return true;
+        }
         case ACTION_ID_DIGITAL_IO_SET_OUTPUT:
         case ACTION_ID_DIGITAL_IO_GET_OUTPUT:
         case ACTION_ID_DIGITAL_IO_GET_INPUT:
@@ -127,11 +331,29 @@ static bool tasks_handle_digital_io_agent_event(const fsm_input_event_t *event)
 
     bool bool_value = false;
     digital_io_snapshot_t snapshot = {0};
+    uint8_t output_id = (uint8_t)event->value_u32;
+    bool output_value = (event->aux_u32 != 0U);
     esp_err_t op_err = tasks_execute_digital_io_action(event->action,
-                                                        event->value_u32,
-                                                        event->aux_u32,
-                                                        &bool_value,
-                                                        &snapshot);
+                                                         event->value_u32,
+                                                         event->aux_u32,
+                                                         &bool_value,
+                                                         &snapshot);
+
+    if (event->action == ACTION_ID_DIGITAL_IO_SET_OUTPUT &&
+        op_err == ESP_OK &&
+        digital_io_output_is_io_process_signal(output_id)) {
+        char output_code[24] = {0};
+        (void)digital_io_output_get_code(output_id, output_code, sizeof(output_code));
+        if (!tasks_publish_io_process_event(event->from,
+                                            ACTION_ID_DIGITAL_IO_SET_OUTPUT,
+                                            (uint32_t)output_id,
+                                            output_value ? 1U : 0U,
+                                            output_code)) {
+            ESP_LOGW(TAG,
+                     "[M] Publish output %s verso io_process fallito",
+                     output_code[0] != '\0' ? output_code : "digital_output");
+        }
+    }
 
     tasks_digital_io_agent_result_t *result = (tasks_digital_io_agent_result_t *)event->data_ptr;
     if (result) {
@@ -167,31 +389,14 @@ static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
                                                          digital_io_snapshot_t *out_snapshot,
                                                          TickType_t timeout_ticks)
 {
-    bool is_read_only_action = false;
-
     switch (action) {
         case ACTION_ID_DIGITAL_IO_SET_OUTPUT:
-            is_read_only_action = false;
-            break;
         case ACTION_ID_DIGITAL_IO_GET_OUTPUT:
         case ACTION_ID_DIGITAL_IO_GET_INPUT:
         case ACTION_ID_DIGITAL_IO_GET_SNAPSHOT:
-            is_read_only_action = true;
             break;
         default:
             return ESP_ERR_INVALID_ARG;
-    }
-
-    /* Le operazioni di sola lettura hanno gia' serializzazione interna nel
-     * modulo digital_io e non devono attraversare la mailbox FSM.
-     * In questo modo evitiamo il flooding della coda quando la UI/LVGL
-     * richiede snapshot periodici degli ingressi. */
-    if (is_read_only_action) {
-        return tasks_execute_digital_io_action(action,
-                                               value_u32,
-                                               aux_u32,
-                                               out_bool,
-                                               out_snapshot);
     }
 
     if (tasks_is_fsm_context()) {
@@ -203,7 +408,7 @@ static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
     }
 
     if (!fsm_event_queue_init(0)) {
-        return ESP_ERR_INVALID_STATE;
+        return TASKS_ERR_FSM_QUEUE_NOT_READY;
     }
 
     tasks_digital_io_agent_result_t *result = (tasks_digital_io_agent_result_t *)calloc(1, sizeof(*result));
@@ -324,6 +529,166 @@ esp_err_t tasks_digital_io_get_snapshot_via_agent(digital_io_snapshot_t *out_sna
                                                    NULL,
                                                    out_snapshot,
                                                    timeout_ticks);
+}
+
+static const web_ui_program_entry_t *tasks_find_running_program_entry(const fsm_ctx_t *ctx)
+{
+    if (!ctx || ctx->running_program_name[0] == '\0') {
+        return NULL;
+    }
+
+    return web_ui_program_find_by_name(ctx->running_program_name);
+}
+
+static void tasks_apply_running_program_outputs(const fsm_ctx_t *ctx)
+{
+    const web_ui_program_entry_t *entry = tasks_find_running_program_entry(ctx);
+    if (!entry) {
+        ESP_LOGW(TAG,
+                 "[M] Nessuna configurazione programma trovata per '%s': output non aggiornati",
+                 (ctx && ctx->running_program_name[0] != '\0') ? ctx->running_program_name : "");
+        return;
+    }
+
+    esp_err_t err = web_ui_program_apply_outputs(entry);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG,
+                 "[M] Applicazione output per programma '%s' fallita: %s",
+                 entry->name,
+                 esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG,
+                 "[M] Output programma '%s' applicati (mask=0x%04x)",
+                 entry->name,
+                 (unsigned)entry->relay_mask);
+    }
+}
+
+static void digital_io_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t last_wake = xTaskGetTickCount();
+    TickType_t period_ticks = (param && param->period_ticks > 0)
+                                ? param->period_ticks
+                                : pdMS_TO_TICKS(DIGITAL_IO_POLL_DEFAULT_MS);
+    digital_io_snapshot_t previous_snapshot = {0};
+    bool previous_valid = false;
+
+    while (true) {
+        vTaskDelayUntil(&last_wake, period_ticks);
+
+        esp_err_t init_err = digital_io_init();
+        if (init_err != ESP_OK) {
+            ESP_LOGW(TAG, "[M] Init digital_io fallita nel poll task: %s", esp_err_to_name(init_err));
+            previous_valid = false;
+            continue;
+        }
+
+        digital_io_snapshot_t snapshot = {0};
+        esp_err_t snapshot_err = digital_io_get_snapshot(&snapshot);
+        if (snapshot_err != ESP_OK) {
+            // Gestione differenziata per i nuovi codici di errore
+            switch (snapshot_err) {
+                case DIGITAL_IO_ERR_CONFIG_NOT_READY:
+                    ESP_LOGD(TAG, "[M] Snapshot digital_io attesa config (non critico)");
+                    break;
+                case DIGITAL_IO_ERR_LOCAL_IO_DISABLED:
+                    ESP_LOGD(TAG, "[M] I/O locali disabilitati (non critico)");
+                    break;
+                case DIGITAL_IO_ERR_MODBUS_DISABLED:
+                    ESP_LOGD(TAG, "[M] Modbus disabilitato (non critico)");
+                    break;
+                default:
+                    ESP_LOGW(TAG, "[M] Snapshot digital_io fallito: %s", esp_err_to_name(snapshot_err));
+                    break;
+            }
+            previous_valid = false;
+            continue;
+        }
+
+        if (!previous_valid) {
+            previous_snapshot = snapshot;
+            previous_valid = true;
+            continue;
+        }
+
+        uint16_t rising_mask = (uint16_t)((~previous_snapshot.inputs_mask) & snapshot.inputs_mask);
+        previous_snapshot = snapshot;
+        if (rising_mask == 0U) {
+            continue;
+        }
+
+        for (uint8_t input_id = DIGITAL_IO_FIRST_CHANNEL_ID; input_id <= DIGITAL_IO_INPUT_COUNT; ++input_id) {
+            uint16_t input_mask = (uint16_t)(1U << (input_id - 1U));
+            if ((rising_mask & input_mask) == 0U) {
+                continue;
+            }
+
+            uint8_t program_id = tasks_find_program_id_for_input(input_id);
+            if (program_id != 0U) {
+                char input_code[24] = {0};
+                (void)digital_io_input_get_code(input_id, input_code, sizeof(input_code));
+                esp_err_t publish_err = tasks_publish_program_button_action(program_id, AGN_ID_DIGITAL_IO);
+                if (publish_err != ESP_OK) {
+                    ESP_LOGW(TAG,
+                             "[M] %s -> programma %u non pubblicato: %s",
+                             input_code[0] != '\0' ? input_code : "digital_input",
+                             (unsigned)program_id,
+                             tasks_err_to_name(publish_err));
+                } else {
+                    ESP_LOGI(TAG,
+                             "[M] %s associato al programma %u: pubblicata azione equivalente al touch",
+                             input_code[0] != '\0' ? input_code : "digital_input",
+                             (unsigned)program_id);
+                }
+                continue;
+            }
+
+            tasks_process_other_digital_input_rising(input_id);
+        }
+    }
+}
+
+static void io_process_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+
+    while (true) {
+        fsm_input_event_t event;
+        if (!fsm_event_receive(&event, AGN_ID_IO_PROCESS, param->period_ticks)) {
+            continue;
+        }
+
+        switch (event.action) {
+            case ACTION_ID_DIGITAL_IO_INPUT_RISING: {
+                uint8_t input_id = (uint8_t)event.value_u32;
+                char input_code[24] = {0};
+                (void)digital_io_input_get_code(input_id, input_code, sizeof(input_code));
+                ESP_LOGI(TAG,
+                         "[M] io_process: ricevuto fronte 0->1 su %s, nessuna azione implementata",
+                         input_code[0] != '\0' ? input_code : event.text);
+                break;
+            }
+
+            case ACTION_ID_DIGITAL_IO_SET_OUTPUT: {
+                uint8_t output_id = (uint8_t)event.value_u32;
+                bool value = (event.aux_u32 != 0U);
+                char output_code[24] = {0};
+                (void)digital_io_output_get_code(output_id, output_code, sizeof(output_code));
+                ESP_LOGI(TAG,
+                         "[M] io_process: ricevuto stato %s=%u, nessuna azione implementata",
+                         output_code[0] != '\0' ? output_code : event.text,
+                         value ? 1U : 0U);
+                break;
+            }
+
+            default:
+                ESP_LOGW(TAG,
+                         "[M] io_process: evento digital_io non gestito action=%d",
+                         (int)event.action);
+                break;
+        }
+    }
 }
 
 
@@ -821,6 +1186,16 @@ static void fsm_task(void *arg)
 
         changed = fsm_tick(&fsm, elapsed_ms) || changed;
 
+        if (event_received &&
+            ((event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED &&
+              state_before == FSM_STATE_CREDIT &&
+              fsm.state == FSM_STATE_RUNNING) ||
+             (event.type == FSM_INPUT_EVENT_PROGRAM_SWITCH &&
+              (state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) &&
+              fsm.state == FSM_STATE_RUNNING))) {
+            tasks_apply_running_program_outputs(&fsm);
+        }
+
         /* log alive ogni ALIVE_INTERVAL_MS */
         alive_ms += elapsed_ms;
         if (alive_ms >= ALIVE_INTERVAL_MS) {
@@ -841,9 +1216,7 @@ static void fsm_task(void *arg)
         }
 
         if ((state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) && fsm.state == FSM_STATE_CREDIT) {
-            for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
-                (void)web_ui_virtual_relay_control(relay, false, 0);
-            }
+            (void)web_ui_program_clear_outputs();
             fsm_append_message("Programma terminato: reset relay/schermata");
         }
 
@@ -1679,6 +2052,30 @@ static task_param_t s_tasks[] = {
         .task_fn = fsm_task,
         .stack_words = 32768,                 /* RISC-V: 32KB; logica FSM + ESP_LOG + cJSON */
         .stack_caps = MALLOC_CAP_INTERNAL,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "digital_io",
+        .state = TASK_STATE_RUN,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(50),
+        .task_fn = digital_io_task,
+        .stack_words = 4096,
+        .stack_caps = MALLOC_CAP_SPIRAM,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "io_process",
+        .state = TASK_STATE_RUN,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(100),
+        .task_fn = io_process_task,
+        .stack_words = 4096,
+        .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,
     },

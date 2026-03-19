@@ -4,10 +4,17 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+// Forward declaration per evitare dipendenze circolari
+typedef struct cJSON cJSON;
+
 #define DEVICE_TOUCH_BUTTON_MAX 10U
 #define DEVICE_TOUCH_BUTTON_UNASSIGNED 0U
 #define DEVICE_TOUCH_INPUT_MIN 1U
-#define DEVICE_TOUCH_INPUT_MAX 12U
+#define DEVICE_TOUCH_INPUT_MAX 16U
+#define DEVICE_TOUCH_INPUT_OPTO2 5U
+#define DEVICE_TOUCH_INPUT_OPTO1 6U
+#define DEVICE_TOUCH_INPUT_OPTO4 7U
+#define DEVICE_TOUCH_INPUT_OPTO3 8U
 
 /**
  * @brief Struttura di configurazione Ethernet
@@ -381,3 +388,10 @@ esp_err_t device_config_update_program_text_i18n(const char *program_key, const 
  * @return ESP_OK se trovata, ESP_ERR_NOT_FOUND se usa fallback
  */
 esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, const char *fallback, char *out, size_t out_len);
+
+/**
+ * @brief Ottiene il root JSON i18n v2
+ * 
+ * @return Puntatore al root JSON o NULL se non disponibile
+ */
+cJSON* device_config_get_i18n_v2_root(void);

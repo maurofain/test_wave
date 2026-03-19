@@ -164,6 +164,9 @@ static uint8_t web_ui_sanitize_touch_input_id(int value)
     if (value < (int)DEVICE_TOUCH_INPUT_MIN || value > (int)DEVICE_TOUCH_INPUT_MAX) {
         return DEVICE_TOUCH_BUTTON_UNASSIGNED;
     }
+    if (!digital_io_input_is_touch_mappable((uint8_t)value)) {
+        return DEVICE_TOUCH_BUTTON_UNASSIGNED;
+    }
     return (uint8_t)value;
 }
 
@@ -213,13 +216,12 @@ static void web_ui_add_digital_inputs_to_json(cJSON *root)
             continue;
         }
 
-        char code[8] = {0};
-        snprintf(code, sizeof(code), "IN%02u", (unsigned)infos[index].input_id);
-
         cJSON_AddNumberToObject(item, "id", infos[index].input_id);
-        cJSON_AddStringToObject(item, "code", code);
+        cJSON_AddStringToObject(item, "code", infos[index].code);
         cJSON_AddBoolToObject(item, "available", infos[index].available);
         cJSON_AddBoolToObject(item, "is_local", infos[index].is_local);
+        cJSON_AddBoolToObject(item, "touch_mappable", infos[index].touch_mappable);
+        cJSON_AddBoolToObject(item, "io_process_consumer", infos[index].io_process_consumer);
         cJSON_AddItemToArray(inputs, item);
     }
 
@@ -1969,7 +1971,9 @@ esp_err_t api_config_save(httpd_req_t *req)
             // Applica immediatamente il stato del backlight SOLO se display abilitato
             if (cfg->display.enabled) {
                 if (cfg->display.backlight) {
-                    bsp_display_backlight_on();
+                    if (!bright) {
+                        bsp_display_backlight_on();
+                    }
                     web_ui_add_log("INFO", "DISPLAY", "Backlight acceso");
                 } else {
                     bsp_display_backlight_off();
@@ -2271,8 +2275,9 @@ esp_err_t api_config_save(httpd_req_t *req)
     }
     // Applica stati task che dipendono dalla configurazione (es. display on/off)
     tasks_apply_n_run();
-    /* Se la lingua è cambiata: carica la nuova tabella in PSRAM, invalida cache e
-     * aggiorna i testi LVGL in runtime. Il client web si ricaricherà da sola. */
+    /* Se la lingua backend è cambiata invalidiamo la cache web e prepariamo la
+     * nuova tabella; la lingua pannello invece resta solo persistita e sarà
+     * applicata al prossimo avvio/refresh esplicito del pannello. */
     {
         /* Backend language changed -> invalidate web i18n cache and load PSRAM for backend */
         if (strncmp(prev_backend_lang, cfg->ui.backend_language, sizeof(prev_backend_lang)) != 0) {
@@ -2283,12 +2288,10 @@ esp_err_t api_config_save(httpd_req_t *req)
             }
         }
 
-        /* User panel language changed -> refresh LVGL texts (uses device_config_get_ui_text_scoped)
-         * and invalidate lookup cache so subsequent lookups use new language. */
+        /* La lingua pannello viene solo persistita come default cliente e non
+         * deve modificare subito il display corrente. */
         if (strncmp(prev_user_lang, cfg->ui.user_language, sizeof(prev_user_lang)) != 0) {
             ESP_LOGI(TAG, "[C] Pannello lingua cambiata: '%s' -> '%s'", prev_user_lang, cfg->ui.user_language);
-            web_ui_i18n_cache_invalidate();
-            lvgl_panel_refresh_texts();
         }
     }
     cJSON_Delete(root);

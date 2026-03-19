@@ -24,7 +24,7 @@ poi crea in /config sez. Display una serie di tasti per forzare la visualizzazio
 [X]Selezione lingua : titolo GoogleSans70, nome lingua GoogleSans35
 [X]Scelta Programmi : Credits GoogleSans70, Valore GoogleSans140, nome del programma GoogleSans35, secondi nella barra progressione GoogleSans40
 [X] Il tasto Stop deve apparire solo a programma avviato, il tasto programma selezionato deve cambiare il titolo in "Sospendi" se premuto durante l'esecuzione e alla pressione successiva (riavvio da sospensione) rimettere il nome del programma.
-[X] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => a PreFineCiclo% i tutti i pulsanti , il bordo dell'area crediti, la barra di progressione e la barra led diventanono porpora. A sx della barra va mostrato la percentuale rimanente del tempo del programma. Nell'area Crediti non va mostrato il tempo ma il credito e la scritta 'Secondi' non deve apparire ma rimanerte 'Crediti'
+[X] la barra di progressione deve apparire solo dopo che è stato scelto il programma: deve partire dal 10% (con tutto il tempo da utilizzare) crescere al 100% quando il tempo è finito. Quando il residuo è => a PreFineCiclo i tutti i pulsanti , il bordo dell'area crediti, la barra di progressione e la barra led diventanono porpora. A sx della barra va mostrato la percentuale rimanente del tempo del programma. Nell'area Crediti non va mostrato il tempo ma il credito e la scritta 'Secondi' non deve apparire ma rimanerte 'Crediti'
 [X] ampliamo la sezione /test/IOexpander per poter controllare anche gli I/O su scheda waveshare via RS485: Raggruppa i pulsanti IN e Uot in 2 file da 4 (non 6+2) , poi metti un altra sezione con nome Wavwshare con gli stessi pulsanti della sezione Chip043 ma numerate da IN8-IBN15 e OUT8-OUT15. Collega questi nuovi tasti a delle funzioni che controllino la scheda Waveshare secondo le specifiche in Modbus.md. 
 All'avvio della app dopo l'inizializzazione di CCTALK inizializza la RS485 e la scheda waveshare. 
 [X] Correggere i JS e/o gli html di /config per visualizzare tutte le sezioni abilitate (ad esempio i/o expander)
@@ -36,8 +36,8 @@ al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane comp
 [ ] lvgl: in ads i messaggi dio errore in basso deve apparire solo se ci sono errori
 [X]Nella cartella i18n_editor Crea webuna app electron da far girare su un pc windows o linux che permetta di editare i file delle lingue:
 - si sceglie lo scope ed appaiono tutte le stringhe di quello scope incolonnate per lingua, la prima colonna è l'ID. la prima lingua è ITALIANO, Ogni voce è editabile e di fianco alla textbox ha un button per la traduzione automatica da fare interrogando un servizio web definito in un file di configurazione. In alto a sx abbiamo la scelta dello scope e a destra i tasti SALVA e ESCI. Il salvataggio crea automaticamente un json con tutti i dati di tutte le lingue con nome 'i18n_{tiomestamp}.json'
-
-
+[X] vedo che lo stato ESP_ERR_INVALID_STATE è usato per molte motivazioni diverse: crea degli stati più specifici
+[X] se ADS è disabilitato la pagina programmi non ha u8n timeou per tornare a ADS , rimane sempre attiva, e la pagina ADS non va mai renderizzata
 
 
 -----------------------

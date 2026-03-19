@@ -1,6 +1,11 @@
+[ ] la riparten
 [ ] i18n non cambia le lingue ne in lvgl ne in web
 [ ] le lingue in /config vanno trattate cosi : 
 lingua Pannello: definisce la lingua di defaul del pannello touch (modificabile dal cliente) : va persistita ma non modificata subito nel display
+lingua backend: definisce la lingua da usarfe per l'interfaccia web : va persistita e cambiata subito rinfrescando invalidanto la lingua e le pagine
+[ ] Tasto STOP si esecuzione programma : alla prima pressione devi mostrare il messaggio di conferma : se premuto devi proseguire con il programma in corso ma alla fine devi disabilitare la ripetizione automatica del programma a fine ciclo anche con credito disponibile. 
+[ ] Allinea la grafica di Emulator con quella lvgl, tenedo invariata la parte a dx del pannello
+[ ] In /test -> I/O expander lo stato degli inmput non viene rilevato per DIP1 2 3
 [ ]Controlla lo logica della FSM : 
 - all'avvio deve inizializzare tutto l'hardware e sincronizzarsi con il server remoto e NTP : va introdotto un nuovo stato FSM_STATE_INIT
 - poi deve passare in attesa di presenza cliente (tramite tocco del touch) mostrando lo slideshow nel riquadro centrale della pagina con il tasto con il tasto Selezione Lavaggio e il messaggio di errore opzionale in basso : va introdotto un nuovo stato FSM_STATE_SLIDESHOW
@@ -23,8 +28,24 @@ lingua Pannello: definisce la lingua di defaul del pannello touch (modificabile 
 [ ] Gestione di digital_io:
 1. Input : la lettura di un cabio stato 0->1 su un input digitale deve portare an un controllo se l'input sia associato ad un tasto programma del touch e se si deve generare la stessa azione. Se non è associato deve chiamare una funzione de elaborazione degli altri input (per ora senza implementare nulla)
 2. output : all'avviamento di un programma vanno attivati gli output negli stati definiti in tabella programmi fino al termine del programma o fino alla sua interruzione definitiva (STOP)
------------------
+3. gli eventi digital_io vanno reinseriti nella mailbox e trattati come descritoo in questa nota
+[ ]  dobbiamo rivedere digital_io : la scheda una gli expander interni i2c in questo modo: 
+innanzitutto creiamo un task 'io_process' che sarà il consumer di tutti gli eventi digital_io non già consumati da altri moduli
+OUT : WHITE_LED, BLUE_LED,RELAY3,RELAY4,RELAY2,RELAY1,RED_LED,HEATHER1
+IN  : DIP1, DIP2, DIP3 , SERVICE_SWITCH, OPTO2, OPTO1, OPTO4, OPTO3
+Dobbiamo mappare tutti gli input nel device considerando gli input OPTOx come possibili tasti e gli altri come segnali da far processare al task io_process (per ora non agisce) , gli out considerando RELAYx come relay da pilotare e da usare nella lista programmi e i LED come segnali da utilizzare per eventi usando come consumer task il io_process (per ora non agisce), lo stato di HEATER va processato dal task io_process (per ora non agisce)
 
+-----------------
+le due lingue sono completamente separate e gestite con logiche diverse:
+LVGL : cambio su richiesta dell'utente e stringhe da caricare in PSRAM all'avvio
+WEB : Scelta effettuata dal manutentore con rilettura del file i18n ed adeguamento dell'interfaccia web
+Non c'è relazione tra le 2 lingue e non posso settarle uguali
+Dobbiamo verificare le operazioni al boot per :
+Caricamento lingue per LVGL in PSRAM ed attivazione della lingua di default definita in config
+Caricamento di 1 sola lingua per backend in base al config
+Cambiamento della lingua LVGL in base alla scelta utente usando la tabella in PSRAM
+Cambiamento della lingua di backend in base alla richiesta utente web (manutentore) e rilettura del json con successiva invalidazione pagine .
+Per ora prepara un report della situazione e il programma per la correzzione che salverai in 260319_LANGUAGE_ISSUES.md
 ------------------
 
 ------------------

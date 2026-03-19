@@ -1,5 +1,6 @@
 #include "lvgl_panel_pages.h"
 
+#include "lvgl_i18n.h"
 #include "device_config.h"
 #include "fsm.h"
 #include "lvgl_panel.h"
@@ -8,7 +9,6 @@
 #include "main.h"
 #include "tasks.h"
 #include "web_ui_programs.h"
-#include "digital_io.h"
 
 #include "lvgl.h"
 #include "esp_err.h"
@@ -101,6 +101,9 @@ static lv_timer_t *s_clock_timer = NULL;
 static uint8_t s_active_prog = 0;
 static uint8_t s_num_programs = 10;  /* [C] Numero programmi effettivamente costruiti al build corrente */
 static char s_current_language[8] = "it";  /* [C] Current language code (default: Italian) */
+static char s_prog_label_cache[PROG_COUNT][WEB_UI_PROGRAM_NAME_MAX] = {{0}};
+static bool s_prog_label_cache_valid = false;
+static char s_prog_label_cache_lang[8] = "";
 
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
@@ -117,10 +120,10 @@ static bool s_btn_last_active[PROG_COUNT] = {0};
 static bool s_btn_last_paused[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
 static bool s_prog_suspended[PROG_COUNT] = {0};
-static bool s_input_last_pressed[PROG_COUNT] = {0};
 static fsm_state_t s_last_fsm_state = FSM_STATE_IDLE;  /* Track last FSM state for credit reset */
 static uint32_t s_credit_inactivity_start_ms = 0;      /* When CREDIT state was entered */
 static uint32_t s_last_user_interaction_ms = 0;
+static lv_obj_t *s_touch_reset_bound_scr = NULL;
 
 static char s_tr_credit[32] = "Credito";
 static char s_tr_elapsed_fmt[32] = "Secondi   %s";
@@ -129,29 +132,60 @@ static char s_tr_pause_fmt[32] = "Pausa: %s";
 #define MAIN_PAGE_IDLE_TO_ADS_MS 60000U
 
 /**
- * @brief Carica le traduzioni per il pannello.
+ * @brief Marca una interazione utente per il timeout della pagina programmi.
+ */
+static void mark_user_interaction(void)
+{
+    s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+}
+
+/**
+ * @brief Callback touch su area generica pagina programmi.
  *
- * Questa funzione carica le traduzioni necessarie per il pannello utilizzando la configurazione del dispositivo.
+ * Qualsiasi tocco sullo schermo (anche fuori da pulsanti azionabili)
+ * deve resettare il timer di inattività della pagina programmi.
+ */
+static void on_main_page_touch(lv_event_t *e)
+{
+    (void)e;
+    mark_user_interaction();
+}
+
+/**
+ * @brief Carica le traduzioni per il pannello usando il nuovo sistema i18n LVGL.
  *
- * @param [in/out] s_tr_credit Puntatore alla stringa dove verrà memorizzata la traduzione del label "Credito".
+ * Questa funzione carica le traduzioni necessarie per il pannello utilizzando
+ * il nuovo sistema ottimizzato i18n LVGL con cache in PSRAM.
+ *
  * @return void
  */
 static void panel_load_translations(void)
 {
-    if (device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", s_tr_credit, sizeof(s_tr_credit)) != ESP_OK)
-    {
-        strncpy(s_tr_credit, "Credito", sizeof(s_tr_credit) - 1);
-        s_tr_credit[sizeof(s_tr_credit) - 1] = '\0';
+    // Usa il nuovo sistema i18n LVGL per le traduzioni principali
+    esp_err_t ret;
+    
+    // Traduzione per "Credito"
+    ret = lvgl_i18n_get_text("credit_label", "Credito", s_tr_credit, sizeof(s_tr_credit));
+    if (ret == ESP_OK) {
+        ESP_LOGD(TAG, "[C] LVGL i18n: credit_label -> '%s'", s_tr_credit);
+    } else {
+        ESP_LOGD(TAG, "[C] LVGL i18n: credit_label fallback -> '%s'", s_tr_credit);
     }
-    if (device_config_get_ui_text_scoped("lvgl", "elapsed_fmt", "Secondi   %s", s_tr_elapsed_fmt, sizeof(s_tr_elapsed_fmt)) != ESP_OK)
-    {
-        strncpy(s_tr_elapsed_fmt, "Secondi   %s", sizeof(s_tr_elapsed_fmt) - 1);
-        s_tr_elapsed_fmt[sizeof(s_tr_elapsed_fmt) - 1] = '\0';
+    
+    // Traduzione per formato tempo
+    ret = lvgl_i18n_get_text("elapsed_fmt", "Secondi   %s", s_tr_elapsed_fmt, sizeof(s_tr_elapsed_fmt));
+    if (ret == ESP_OK) {
+        ESP_LOGD(TAG, "[C] LVGL i18n: elapsed_fmt -> '%s'", s_tr_elapsed_fmt);
+    } else {
+        ESP_LOGD(TAG, "[C] LVGL i18n: elapsed_fmt fallback -> '%s'", s_tr_elapsed_fmt);
     }
-    if (device_config_get_ui_text_scoped("lvgl", "pause_fmt", "Pausa: %s", s_tr_pause_fmt, sizeof(s_tr_pause_fmt)) != ESP_OK)
-    {
-        strncpy(s_tr_pause_fmt, "Pausa: %s", sizeof(s_tr_pause_fmt) - 1);
-        s_tr_pause_fmt[sizeof(s_tr_pause_fmt) - 1] = '\0';
+    
+    // Traduzione per formato pausa
+    ret = lvgl_i18n_get_text("pause_fmt", "Pausa: %s", s_tr_pause_fmt, sizeof(s_tr_pause_fmt));
+    if (ret == ESP_OK) {
+        ESP_LOGD(TAG, "[C] LVGL i18n: pause_fmt -> '%s'", s_tr_pause_fmt);
+    } else {
+        ESP_LOGD(TAG, "[C] LVGL i18n: pause_fmt fallback -> '%s'", s_tr_pause_fmt);
     }
 }
 
@@ -191,108 +225,71 @@ static const web_ui_program_entry_t *find_program_entry(uint8_t pid)
     return NULL;
 }
 
-static uint8_t get_program_input_mapping(const device_config_t *cfg, uint8_t program_id)
+static void invalidate_program_label_cache(void)
 {
-    if (!cfg || program_id == 0 || program_id > PROG_COUNT) {
-        return DEVICE_TOUCH_BUTTON_UNASSIGNED;
-    }
-
-    uint8_t input_id = cfg->touch_button_map.button_to_input[program_id - 1U];
-    if (input_id < DEVICE_TOUCH_INPUT_MIN || input_id > DEVICE_TOUCH_INPUT_MAX) {
-        return DEVICE_TOUCH_BUTTON_UNASSIGNED;
-    }
-
-    return input_id;
+    s_prog_label_cache_valid = false;
+    s_prog_label_cache_lang[0] = '\0';
 }
 
-static void process_physical_touch_mappings(void)
+static void rebuild_program_label_cache_if_needed(void)
 {
-    const device_config_t *cfg = device_config_get();
-    if (!cfg) {
+    const char *runtime_lang = lvgl_panel_get_runtime_language();
+    const char *lang = (runtime_lang && runtime_lang[0] != '\0') ? runtime_lang : "it";
+
+    if (s_prog_label_cache_valid &&
+        strncmp(s_prog_label_cache_lang, lang, sizeof(s_prog_label_cache_lang)) == 0)
+    {
         return;
     }
 
-    uint8_t input_usage[DEVICE_TOUCH_INPUT_MAX + 1U] = {0};
-    bool need_snapshot = false;
-    for (uint8_t program_id = 1; program_id <= PROG_COUNT; ++program_id) {
-        uint8_t input_id = get_program_input_mapping(cfg, program_id);
-        if (input_id >= DEVICE_TOUCH_INPUT_MIN && input_id <= DEVICE_TOUCH_INPUT_MAX) {
-            input_usage[input_id]++;
-            need_snapshot = true;
+    for (uint8_t pid = 1; pid <= PROG_COUNT; ++pid)
+    {
+        char fallback[8] = {0};
+        char keyname[24] = {0};
+        char resolved[WEB_UI_PROGRAM_NAME_MAX] = {0};
+        const char *target_text = NULL;
+        const web_ui_program_entry_t *entry = find_program_entry(pid);
+
+        snprintf(fallback, sizeof(fallback), "%u", (unsigned)pid);
+        snprintf(keyname, sizeof(keyname), "program_name_%02u", (unsigned)pid);
+
+        if (lvgl_i18n_get_text(keyname, fallback, resolved, sizeof(resolved)) == ESP_OK && resolved[0] != '\0')
+        {
+            target_text = resolved;
         }
+        else if (entry && entry->name[0] != '\0')
+        {
+            target_text = entry->name;
+        }
+        else
+        {
+            target_text = fallback;
+        }
+
+        snprintf(s_prog_label_cache[(int)pid - 1],
+                 sizeof(s_prog_label_cache[0]),
+                 "%s",
+                 target_text);
     }
 
-    digital_io_snapshot_t snapshot = {0};
-    bool snapshot_available = false;
-    if (need_snapshot &&
-        tasks_digital_io_get_snapshot_via_agent(&snapshot, pdMS_TO_TICKS(20)) == ESP_OK) {
-        snapshot_available = true;
-    }
-
-    for (uint8_t program_id = 1; program_id <= PROG_COUNT; ++program_id) {
-        uint8_t index = (uint8_t)(program_id - 1U);
-        uint8_t input_id = get_program_input_mapping(cfg, program_id);
-
-        bool now_pressed = false;
-        if (snapshot_available &&
-            input_id >= DEVICE_TOUCH_INPUT_MIN &&
-            input_id <= DEVICE_TOUCH_INPUT_MAX &&
-            input_usage[input_id] == 1U) {
-            uint16_t input_mask = (uint16_t)(1U << (input_id - 1U));
-            now_pressed = ((snapshot.inputs_mask & input_mask) != 0U);
-        }
-
-        bool rising_edge = (!s_input_last_pressed[index] && now_pressed);
-        s_input_last_pressed[index] = now_pressed;
-
-        if (!rising_edge) {
-            continue;
-        }
-
-        lv_obj_t *button = s_prog_btns[index];
-        if (!button) {
-            continue;
-        }
-
-        if (!lv_obj_has_flag(button, LV_OBJ_FLAG_CLICKABLE) || lv_obj_has_flag(button, LV_OBJ_FLAG_HIDDEN)) {
-            continue;
-        }
-
-        ESP_LOGI(TAG,
-                 "[C] Trigger pulsante touch %u da ingresso fisico IN%02u",
-                 (unsigned)program_id,
-                 (unsigned)input_id);
-        (void)lv_obj_send_event(button, LV_EVENT_CLICKED, NULL);
-    }
+    snprintf(s_prog_label_cache_lang, sizeof(s_prog_label_cache_lang), "%s", lang);
+    s_prog_label_cache_valid = true;
 }
 
 static void set_program_label_text(lv_obj_t *label, uint8_t pid)
 {
-    if (!label)
+    if (!label || pid == 0 || pid > PROG_COUNT)
     {
         return;
     }
 
+    rebuild_program_label_cache_if_needed();
+
+    const char *target_text = s_prog_label_cache[(int)pid - 1];
     char fallback[8] = {0};
-    char keyname[24] = {0};
-    char resolved[WEB_UI_PROGRAM_NAME_MAX] = {0};
-    const char *target_text = NULL;
-    const web_ui_program_entry_t *entry = find_program_entry(pid);
-
-    snprintf(fallback, sizeof(fallback), "%u", (unsigned)pid);
-    snprintf(keyname, sizeof(keyname), "program_name_%02u", (unsigned)pid);
-
-    if (device_config_get_ui_text_scoped("lvgl", keyname, fallback, resolved, sizeof(resolved)) == ESP_OK &&
-        resolved[0] != '\0')
+    if (!target_text || target_text[0] == '\0')
     {
-        target_text = resolved;
-    }
-    else if (entry && entry->name[0] != '\0')
-    {
-        target_text = entry->name;
-    }
-    else
-    {
+        snprintf(fallback, sizeof(fallback), "%u", (unsigned)pid);
         target_text = fallback;
     }
 
@@ -340,31 +337,6 @@ static bool program_is_clickable_for_snapshot(const web_ui_program_entry_t *entr
     return false;
 }
 
-static void clear_all_program_relays(void)
-{
-    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
-        if (web_ui_virtual_relay_control(relay, false, 0) != ESP_OK) {
-            ESP_LOGW(TAG, "[C] clear relay failed relay=%u", (unsigned)relay);
-        }
-    }
-}
-
-static void apply_program_relays(const web_ui_program_entry_t *entry)
-{
-    if (!entry) {
-        return;
-    }
-
-    uint32_t duration_ms = (uint32_t)entry->duration_sec * 1000U;
-    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
-        bool on = ((entry->relay_mask & (1U << (relay - 1))) != 0U);
-        uint32_t relay_duration = on ? duration_ms : 0U;
-        if (web_ui_virtual_relay_control(relay, on, relay_duration) != ESP_OK) {
-            ESP_LOGW(TAG, "[C] apply relay failed relay=%u on=%d", (unsigned)relay, (int)on);
-        }
-    }
-}
-
 /**
  * @brief Aggiorna i pulsanti del programma in base allo stato corrente del contesto del finite state machine.
  *
@@ -379,11 +351,6 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
         if (!btn) continue;
 
         const web_ui_program_entry_t *entry = find_program_entry((uint8_t)(i + 1));
-
-        if (s_prog_lbls[i])
-        {
-            set_program_label_text(s_prog_lbls[i], (uint8_t)(i + 1));
-        }
 
         bool is_active = program_is_active_for_snapshot(entry, snap);
         bool can_click = program_is_clickable_for_snapshot(entry, snap);
@@ -629,7 +596,7 @@ static void update_state(const fsm_ctx_t *snap)
             lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
             s_stop_confirm = false;
             char stop_text[64];
-            device_config_get_ui_text_scoped("lvgl", "program_stop", "STOP", stop_text, sizeof(stop_text));
+            (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
             lv_label_set_text(s_stop_lbl, stop_text);
         }
     }
@@ -647,7 +614,7 @@ static void update_state(const fsm_ctx_t *snap)
                         s_prog_suspended[idx] = true;
                         if (s_prog_lbls[idx]) {
                             char suspend_text[64];
-                            device_config_get_ui_text_scoped("lvgl", "program_suspend", "Sospendi", suspend_text, sizeof(suspend_text));
+                            (void)lvgl_i18n_get_text("program_suspend", "Sospendi", suspend_text, sizeof(suspend_text));
                             lv_label_set_text(s_prog_lbls[idx], suspend_text);
                         }
                     } else {
@@ -757,7 +724,7 @@ static bool publish_program(uint8_t prog_id, bool pause_toggle, const web_ui_pro
  */
 static void on_prog_btn(lv_event_t *e)
 {
-    s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+    mark_user_interaction();
 
     lv_obj_t *btn = lv_event_get_target(e);
     prog_btn_ud_t *ud = (prog_btn_ud_t *)lv_obj_get_user_data(btn);
@@ -777,76 +744,11 @@ static void on_prog_btn(lv_event_t *e)
         return;
     }
 
-    fsm_ctx_t snap = {0};
-    bool has_snap = fsm_runtime_snapshot(&snap);
-    if (has_snap && snap.state == FSM_STATE_CREDIT && snap.credit_cents < (int32_t)entry->price_units) {
-        ESP_LOGI(TAG, "[C] Credito insufficiente pid=%u credit=%ld price=%u",
-                 (unsigned)pid,
-                 (long)snap.credit_cents,
-                 (unsigned)entry->price_units);
-        return;
-    }
-
-    bool is_active = false;
-    if (has_snap && (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED) && entry && entry->name[0] != '\0') {
-        if (strcmp(entry->name, snap.running_program_name) == 0) {
-            is_active = true;
-        }
-    }
-
-    int idx = (int)pid - 1;
-
-    if (is_active) {
-        /* Toggle pause/resume for active program */
-        fsm_input_event_t ev = {
-            .from = AGN_ID_LVGL,
-            .to = {AGN_ID_FSM},
-            .action = ACTION_ID_PROGRAM_PAUSE_TOGGLE,
-            .type = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE,
-            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-            .value_i32 = (int32_t)pid,
-            .value_u32 = 0,
-            .aux_u32 = 0,
-            .data_ptr = NULL,
-            .text = {0},
-        };
-        if (entry) {
-            strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
-        }
-        if (fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            /* Toggle local suspended state and update label */
-            s_prog_suspended[idx] = !s_prog_suspended[idx];
-            if (s_prog_suspended[idx]) {
-                clear_all_program_relays();
-                if (s_prog_lbls[idx]) lv_label_set_text(s_prog_lbls[idx], "Sospendi");
-            } else {
-                apply_program_relays(entry);
-                if (s_prog_lbls[idx]) set_program_label_text(s_prog_lbls[idx], pid);
-            }
-        } else {
-            ESP_LOGW(TAG, "[C] publish pause_toggle failed for pid=%u", (unsigned)pid);
-        }
+    esp_err_t err = tasks_publish_program_button_action(pid, AGN_ID_LVGL);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Azione programma pid=%u non pubblicata: %s", (unsigned)pid, tasks_err_to_name(err));
     } else {
-        bool is_switch = has_snap && (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED);
-        fsm_input_event_t ev = {
-            .from = AGN_ID_LVGL,
-            .to = {AGN_ID_FSM},
-            .action = ACTION_ID_PROGRAM_SELECTED,
-            .type = is_switch ? FSM_INPUT_EVENT_PROGRAM_SWITCH : FSM_INPUT_EVENT_PROGRAM_SELECTED,
-            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-            .value_i32 = entry ? (int32_t)entry->price_units : (int32_t)pid,
-            .value_u32 = entry ? (uint32_t)entry->pause_max_suspend_sec * 1000U : 0,
-            .aux_u32 = entry ? (uint32_t)entry->duration_sec * 1000U : 0,
-            .data_ptr = NULL,
-            .text = {0},
-        };
-        if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
-        if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            ESP_LOGW(TAG, "[C] publish program %s failed for pid=%u", is_switch ? "switch" : "selected", (unsigned)pid);
-        } else {
-            apply_program_relays(entry);
-            s_active_prog = pid;
-        }
+        s_active_prog = pid;
     }
 }
 
@@ -863,7 +765,7 @@ static void on_prog_btn(lv_event_t *e)
 static void on_stop_btn(lv_event_t *e)
 {
     (void)e;
-    s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+    mark_user_interaction();
     ESP_LOGI(TAG, "[C] Pulsante STOP premuto (confirm=%d)", (int)s_stop_confirm);
 
     uint8_t pid = s_active_prog;
@@ -885,7 +787,10 @@ static void on_stop_btn(lv_event_t *e)
         /* First press: ask for confirmation and suspend program */
         s_stop_confirm = true;
         char stop_confirm_text[64];
-        device_config_get_ui_text_scoped("lvgl", "program_confirm_cancel", "Conferma annullamento", stop_confirm_text, sizeof(stop_confirm_text));
+        (void)lvgl_i18n_get_text("program_confirm_cancel",
+                                 "Conferma annullamento",
+                                 stop_confirm_text,
+                                 sizeof(stop_confirm_text));
         lv_label_set_text(s_stop_lbl, stop_confirm_text);
 
         fsm_input_event_t ev = {
@@ -904,9 +809,7 @@ static void on_stop_btn(lv_event_t *e)
             const web_ui_program_entry_t *entry = find_program_entry(pid);
             if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
         }
-        if (fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            clear_all_program_relays();
-        } else {
+        if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
             ESP_LOGW(TAG, "[C] publish pause_toggle from stop failed for pid=%u", (unsigned)pid);
         }
     } else {
@@ -934,7 +837,6 @@ static void on_stop_btn(lv_event_t *e)
             ESP_LOGW(TAG, "[C] publish program stop/cancel failed for pid=%u", (unsigned)pid);
         } else {
             s_stop_pressed = true;
-            clear_all_program_relays();
         }
     }
 }
@@ -949,7 +851,7 @@ static void main_to_lang_async(void *arg)
 static void on_lang_btn(lv_event_t *e)
 {
     (void)e;
-    s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+    mark_user_interaction();
     ESP_LOGI(TAG, "[C] Pulsante bandiera lingua premuto");
     lv_async_call(main_to_lang_async, NULL);
 }
@@ -966,15 +868,10 @@ static void update_language_flag(const char *lang_code)
 
 static void sync_language_from_config(void)
 {
-    device_config_t *cfg = device_config_get();
-    if (cfg && cfg->ui.user_language[0] != '\0') {
-        update_language_flag(cfg->ui.user_language);
-        ESP_LOGI(TAG, "[C] Lingua sincronizzata da device_config: %s", cfg->ui.user_language);
-    } else {
-        /* Default to Italian if not set */
-        update_language_flag("it");
-        ESP_LOGI(TAG, "[C] Lingua impostata al default (italiano)");
-    }
+    const char *runtime_lang = lvgl_panel_get_runtime_language();
+    update_language_flag(runtime_lang && runtime_lang[0] ? runtime_lang : "it");
+    ESP_LOGI(TAG, "[C] Lingua sincronizzata da runtime LVGL: %s",
+             runtime_lang && runtime_lang[0] ? runtime_lang : "it");
 }
 
 /**
@@ -1061,7 +958,7 @@ static void build_status(lv_obj_t *scr)
 
     s_credit_lbl = lv_label_create(s_credit_box);
     char zero_text[64];
-    device_config_get_ui_text_scoped("lvgl", "program_zero", "0", zero_text, sizeof(zero_text));
+    (void)lvgl_i18n_get_text("program_zero", "0", zero_text, sizeof(zero_text));
     lv_label_set_text(s_credit_lbl, zero_text);
     lv_obj_set_style_text_color(s_credit_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_credit_lbl, FONT_BIGNUM, LV_PART_MAIN);
@@ -1069,7 +966,7 @@ static void build_status(lv_obj_t *scr)
 
     s_elapsed_lbl = lv_label_create(s_credit_box);
     char credit_text[64];
-    device_config_get_ui_text_scoped("lvgl", "credit_label", "Credito", credit_text, sizeof(credit_text));
+    (void)lvgl_i18n_get_text("credit_label", "Credito", credit_text, sizeof(credit_text));
     lv_label_set_text(s_elapsed_lbl, credit_text);
     lv_obj_set_style_text_color(s_elapsed_lbl, COL_GREY, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_elapsed_lbl, FONT_LABEL, LV_PART_MAIN);
@@ -1077,7 +974,7 @@ static void build_status(lv_obj_t *scr)
 
     s_pause_lbl = lv_label_create(s_credit_box);
     char empty_text[64];
-    device_config_get_ui_text_scoped("lvgl", "program_empty", "", empty_text, sizeof(empty_text));
+    (void)lvgl_i18n_get_text("program_empty", "", empty_text, sizeof(empty_text));
     lv_label_set_text(s_pause_lbl, empty_text);
     lv_obj_set_style_text_color(s_pause_lbl, COL_PROG_PAUSE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_pause_lbl, FONT_LABEL, LV_PART_MAIN);
@@ -1097,7 +994,7 @@ static void build_status(lv_obj_t *scr)
 
     s_stop_lbl = lv_label_create(s_stop_btn);
     char stop_text2[64];
-    device_config_get_ui_text_scoped("lvgl", "program_stop", "STOP", stop_text2, sizeof(stop_text2));
+    (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text2, sizeof(stop_text2));
     lv_label_set_text(s_stop_lbl, stop_text2);
     lv_obj_set_style_text_color(s_stop_lbl, COL_WHITE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_stop_lbl, FONT_PROG_BTN, LV_PART_MAIN);
@@ -1200,7 +1097,7 @@ static void build_prog_buttons(void)
 {
     ESP_LOGI(TAG, "[C] ===== build_prog_buttons START =====");
     
-    ESP_LOGI(TAG, "[C] build_prog_buttons: s_status_box=%p", (void*)s_status_box);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: s_status_box=%p", (void*)s_status_box);
     
     if (!s_status_box) {
         ESP_LOGE(TAG, "[C] build_prog_buttons: ERRORE - s_status_box è NULL!");
@@ -1210,13 +1107,13 @@ static void build_prog_buttons(void)
     // Usa le costanti definite invece di leggere dimensioni dinamiche
     const int32_t status_h = PROG_BUTTONS_AREA_H;
     const int32_t status_w = PANEL_FULL_W;
-    ESP_LOGI(TAG, "[C] build_prog_buttons: using constants - w=%d, h=%d", (int)status_w, (int)status_h);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: using constants - w=%d, h=%d", (int)status_w, (int)status_h);
 
     /* Legge numero programmi dalla configurazione */
     device_config_t *cfg = device_config_get();
     uint8_t num_progs = (cfg && cfg->num_programs) ? cfg->num_programs : 10;
-    ESP_LOGI(TAG, "[C] build_prog_buttons: cfg=%p, cfg->num_programs=%u, num_progs=%u", 
-             (void*)cfg, cfg ? cfg->num_programs : 0, (unsigned)num_progs);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: cfg=%p, cfg->num_programs=%u, num_progs=%u", 
+    //          (void*)cfg, cfg ? cfg->num_programs : 0, (unsigned)num_progs);
 
     /* Validazione: solo valori ammessi; default 10 */
     static const uint8_t s_valid[] = {1, 2, 3, 4, 5, 6, 8, 10};
@@ -1230,7 +1127,7 @@ static void build_prog_buttons(void)
     }
 
     s_num_programs = num_progs;
-    ESP_LOGI(TAG, "[C] build_prog_buttons: FINAL num_progs=%u", (unsigned)num_progs);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: FINAL num_progs=%u", (unsigned)num_progs);
 
     if (num_progs <= 5) {
         /* Layout a colonna singola per 1-5 pulsanti */
@@ -1238,14 +1135,14 @@ static void build_prog_buttons(void)
         int32_t usable_h = status_h - 2 * PROG_BTN_ROW_PAD - (num_progs - 1) * PROG_BTN_ROW_GAP;
         int32_t btn_h = usable_h / num_progs;
         
-        ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COLUMN - num_progs=%d, btn_w=%d, btn_h=%d", 
-                 (int)num_progs, (int)btn_w, (int)btn_h);
+        // ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COLUMN - num_progs=%d, btn_w=%d, btn_h=%d", 
+        //          (int)num_progs, (int)btn_w, (int)btn_h);
         
         for (int i = 0; i < num_progs; i++) {
             int32_t y = PROG_BTN_ROW_PAD + i * (btn_h + PROG_BTN_ROW_GAP);
             uint8_t pid = (uint8_t)(i + 1);
-            ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COL - creating button pid=%d at y=%d", 
-                     (int)pid, (int)y);
+            // ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COL - creating button pid=%d at y=%d", 
+            //          (int)pid, (int)y);
             create_prog_button(s_status_box, pid, PROG_BTN_SIDE_PAD, y, btn_w, btn_h);
         }
     } else {
@@ -1257,10 +1154,10 @@ static void build_prog_buttons(void)
         int32_t x_left  = PROG_BTN_SIDE_PAD;
         int32_t x_right = PROG_BTN_SIDE_PAD + col_w + PROG_BTN_COL_GAP;
         
-        ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - n_rows=%d, col_w=%d, btn_h=%d", 
-                 (int)n_rows, (int)col_w, (int)btn_h);
-        ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - x_left=%d, x_right=%d", 
-                 (int)x_left, (int)x_right);
+        // ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - n_rows=%d, col_w=%d, btn_h=%d", 
+        //          (int)n_rows, (int)col_w, (int)btn_h);
+        // ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - x_left=%d, x_right=%d", 
+        //          (int)x_left, (int)x_right);
 
         int buttons_created = 0;
         for (int32_t row = 0; row < n_rows; row++) {
@@ -1268,8 +1165,8 @@ static void build_prog_buttons(void)
             uint8_t p_left  = (uint8_t)(row * 2 + 1);
             uint8_t p_right = (uint8_t)(row * 2 + 2);
             
-            ESP_LOGI(TAG, "[C] build_prog_buttons: ROW %d - y=%d, left_prog=%d, right_prog=%d", 
-                     (int)row, (int)y, (int)p_left, (int)p_right);
+            // ESP_LOGI(TAG, "[C] build_prog_buttons: ROW %d - y=%d, left_prog=%d, right_prog=%d", 
+            //          (int)row, (int)y, (int)p_left, (int)p_right);
             
             create_prog_button(s_status_box, p_left,  x_left,  y, col_w, btn_h);
             buttons_created++;
@@ -1317,12 +1214,14 @@ static void clear_panel_handles(void)
         s_btn_state_valid[i] = false;
         s_btn_last_active[i] = false;
         s_btn_last_clickable[i] = false;
-        s_input_last_pressed[i] = false;
+        s_btn_last_paused[i] = false;
+        s_prog_suspended[i] = false;
     }
 
     s_last_gauge_pct = -1;
     s_last_minute_epoch = (time_t)-1;
     s_stop_pressed = false;
+    invalidate_program_label_cache();
 }
 
 /**
@@ -1346,9 +1245,15 @@ static void panel_timer_cb(lv_timer_t *t)
             uint32_t idle_to_ads_ms = (cfg && cfg->timeouts.exit_programs_ms > 0)
                 ? cfg->timeouts.exit_programs_ms : MAIN_PAGE_IDLE_TO_ADS_MS;
             if (idle_ms >= idle_to_ads_ms) {
-                ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms), ritorno a slideshow",
-                         (unsigned long)idle_ms);
-                lvgl_page_ads_show();
+                // Verifica se ADS è abilitato prima di tornare alla slideshow
+                if (cfg && cfg->display.ads_enabled) {
+                    ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms), ritorno a slideshow ADS", (unsigned long)idle_ms);
+                    lvgl_page_ads_show();
+                } else {
+                    ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms) ma ADS disabilitato, rimango sulla pagina", (unsigned long)idle_ms);
+                    // Resetta il timer di inattività per evitare trigger continui
+                    s_last_user_interaction_ms = now_ms;
+                }
                 return;
             }
         }
@@ -1420,8 +1325,6 @@ static void panel_timer_cb(lv_timer_t *t)
 
         s_last_fsm_state = snap.state;
         last_snap = snap;
-
-        process_physical_touch_mappings();
 
         update_state(&snap);
         refresh_prog_buttons(&snap);
@@ -1498,9 +1401,16 @@ void lvgl_page_main_show(void)
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
+
+    if (s_touch_reset_bound_scr != scr) {
+        lv_obj_add_event_cb(scr, on_main_page_touch, LV_EVENT_PRESSED, NULL);
+        s_touch_reset_bound_scr = scr;
+    }
 
     s_active_prog = 0;
-    s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+    mark_user_interaction();
+    invalidate_program_label_cache();
 
     panel_load_translations();
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: translations loaded");
@@ -1512,7 +1422,7 @@ void lvgl_page_main_show(void)
     build_header(scr);
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_header completed");
     
-    sync_language_from_config();  /* Sync language flag from device config */
+    sync_language_from_config();
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: language synced");
     
     build_prog_buttons();
@@ -1557,6 +1467,7 @@ void lvgl_page_main_show(void)
 void lvgl_page_main_refresh_texts(void)
 {
     panel_load_translations();
+    invalidate_program_label_cache();
     s_last_elapsed_text[0] = '\0';
     s_last_pause_text[0] = '\0';
 

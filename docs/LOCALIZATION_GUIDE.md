@@ -25,9 +25,10 @@ Guida aggiornata al funzionamento reale del progetto `test_wave`, con distinzion
 
 ### 2.2 Pannello utente LVGL (user language)
 
-1. La UI LVGL legge i testi tramite `device_config_get_ui_text_scoped("lvgl", ...)`.
-2. Al cambio `ui.user_language`, il backend invoca `lvgl_panel_refresh_texts()`.
-3. `lvgl_panel_refresh_texts()` aggiorna label e nomi programma visibili sul pannello.
+1. All'avvio LVGL, la lingua runtime del pannello viene inizializzata da `ui.user_language` (default persistito).
+2. La scelta lingua da bandierina sul pannello aggiorna solo la lingua runtime (`lvgl_panel_set_runtime_language(...)`), senza `device_config_save(...)`.
+3. Le stringhe LVGL sono già in memoria (`lvgl_i18n`) e lo switch lingua cambia solo il selettore di rendering.
+4. La combo web "Lingua Pannello Utente (LCD, default)" salva solo il default di partenza (`ui.user_language`) e non forza il cambio immediato sul display corrente.
 
 ### 2.3 Programmi (pagina emulator/programs)
 
@@ -82,8 +83,8 @@ Nel salvataggio configurazione (`api_config_save`):
   - `web_ui_i18n_cache_invalidate()`
   - `web_ui_i18n_load_language_psram(new_backend_lang)`
 - se cambia `ui.user_language`:
-  - `web_ui_i18n_cache_invalidate()`
-  - `lvgl_panel_refresh_texts()`
+  - viene aggiornato solo il valore persistito di default
+  - nessun refresh immediato forzato del pannello LVGL
 
 ## 5) Elementi legacy rimossi
 

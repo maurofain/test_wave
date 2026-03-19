@@ -2,6 +2,7 @@
 #include "web_ui_internal.h"
 #include "init.h"
 #include "tasks.h"
+#include "digital_io.h"
 #include "esp_log.h"
 #include "led.h"
 
@@ -531,7 +532,7 @@ esp_err_t api_test_handler(httpd_req_t *req)
                 } else {
                     snprintf(response, sizeof(response),
                              "{\"status\":\"error\",\"error\":\"%s\"}",
-                             esp_err_to_name(err));
+                             tasks_err_to_name(err));
                 }
             }
             cJSON_Delete(root);
@@ -554,7 +555,7 @@ esp_err_t api_test_handler(httpd_req_t *req)
                      "{\"status\":\"error\",\"outputs_mask\":%u,\"inputs_mask\":%u,\"error\":\"%s\"}",
                      (unsigned)snapshot.outputs_mask,
                      (unsigned)snapshot.inputs_mask,
-                     esp_err_to_name(err));
+                     tasks_err_to_name(err));
         }
     }
 
@@ -1660,6 +1661,123 @@ modbus_read_end:
         } else {
             snprintf(response, sizeof(response), "{\"error\":\"LED bar clear failed: %s\"}", esp_err_to_name(err));
             httpd_resp_set_status(req, "500");
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Digital I/O endpoints - per visualizzare stato DIP e relay          */
+    /* ------------------------------------------------------------------ */
+    else if (strcmp(test_name, "digital_io_snapshot") == 0) {
+        digital_io_snapshot_t snapshot = {0};
+        esp_err_t err = digital_io_get_snapshot(&snapshot);
+        if (err == ESP_OK) {
+            snprintf(response, sizeof(response),
+                     "{\"status\":\"ok\",\"outputs_mask\":%u,\"inputs_mask\":%u,"
+                     "\"outputs_hex\":\"%04X\",\"inputs_hex\":\"%04X\"}",
+                     snapshot.outputs_mask, snapshot.inputs_mask,
+                     snapshot.outputs_mask, snapshot.inputs_mask);
+        } else {
+            snprintf(response, sizeof(response),
+                     "{\"status\":\"error\",\"error\":\"Snapshot fallito\",\"err\":\"%s\"}",
+                     esp_err_to_name(err));
+            httpd_resp_set_status(req, "500");
+        }
+    }
+    else if (strcmp(test_name, "digital_io_get_input") == 0) {
+        char buf[64] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *input_id_obj = cJSON_GetObjectItem(root, "input_id");
+            if (input_id_obj && cJSON_IsNumber(input_id_obj)) {
+                uint8_t input_id = (uint8_t)input_id_obj->valuedouble;
+                bool state = false;
+                esp_err_t err = digital_io_get_input(input_id, &state);
+                if (err == ESP_OK) {
+                    char input_code[24] = {0};
+                    digital_io_input_get_code(input_id, input_code, sizeof(input_code));
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"ok\",\"input_id\":%u,\"code\":\"%s\",\"state\":%s}",
+                             input_id, input_code, state ? "true" : "false");
+                } else {
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"error\",\"error\":\"Lettura input fallita\",\"err\":\"%s\"}",
+                             esp_err_to_name(err));
+                    httpd_resp_set_status(req, "500");
+                }
+            } else {
+                snprintf(response, sizeof(response), "{\"error\":\"Missing or invalid input_id\"}");
+                httpd_resp_set_status(req, "400");
+            }
+            cJSON_Delete(root);
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+            httpd_resp_set_status(req, "400");
+        }
+    }
+    else if (strcmp(test_name, "digital_io_get_output") == 0) {
+        char buf[64] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *output_id_obj = cJSON_GetObjectItem(root, "output_id");
+            if (output_id_obj && cJSON_IsNumber(output_id_obj)) {
+                uint8_t output_id = (uint8_t)output_id_obj->valuedouble;
+                bool state = false;
+                esp_err_t err = digital_io_get_output(output_id, &state);
+                if (err == ESP_OK) {
+                    char output_code[24] = {0};
+                    digital_io_output_get_code(output_id, output_code, sizeof(output_code));
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"ok\",\"output_id\":%u,\"code\":\"%s\",\"state\":%s}",
+                             output_id, output_code, state ? "true" : "false");
+                } else {
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"error\",\"error\":\"Lettura output fallita\",\"err\":\"%s\"}",
+                             esp_err_to_name(err));
+                    httpd_resp_set_status(req, "500");
+                }
+            } else {
+                snprintf(response, sizeof(response), "{\"error\":\"Missing or invalid output_id\"}");
+                httpd_resp_set_status(req, "400");
+            }
+            cJSON_Delete(root);
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+            httpd_resp_set_status(req, "400");
+        }
+    }
+    else if (strcmp(test_name, "digital_io_set_output") == 0) {
+        char buf[64] = {0};
+        httpd_req_recv(req, buf, sizeof(buf)-1);
+        cJSON *root = cJSON_Parse(buf);
+        if (root) {
+            cJSON *output_id_obj = cJSON_GetObjectItem(root, "output_id");
+            cJSON *value_obj = cJSON_GetObjectItem(root, "value");
+            if (output_id_obj && cJSON_IsNumber(output_id_obj) && value_obj && cJSON_IsNumber(value_obj)) {
+                uint8_t output_id = (uint8_t)output_id_obj->valuedouble;
+                bool value = value_obj->valuedouble != 0;
+                esp_err_t err = digital_io_set_output(output_id, value);
+                if (err == ESP_OK) {
+                    char output_code[24] = {0};
+                    digital_io_output_get_code(output_id, output_code, sizeof(output_code));
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"ok\",\"output_id\":%u,\"code\":\"%s\",\"value\":%s}",
+                             output_id, output_code, value ? "true" : "false");
+                } else {
+                    snprintf(response, sizeof(response),
+                             "{\"status\":\"error\",\"error\":\"Set output fallito\",\"err\":\"%s\"}",
+                             esp_err_to_name(err));
+                    httpd_resp_set_status(req, "500");
+                }
+            } else {
+                snprintf(response, sizeof(response), "{\"error\":\"Missing or invalid output_id or value\"}");
+                httpd_resp_set_status(req, "400");
+            }
+            cJSON_Delete(root);
+        } else {
+            snprintf(response, sizeof(response), "{\"error\":\"Invalid JSON\"}");
+            httpd_resp_set_status(req, "400");
         }
     }
 

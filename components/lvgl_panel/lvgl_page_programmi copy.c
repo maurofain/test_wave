@@ -984,8 +984,8 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
         return;
     }
 
-    ESP_LOGI(TAG, "[C] create_prog_button: pid=%u, parent=%p, pos=(%d,%d), size=(%d,%d)", 
-             (unsigned)pid, (void*)parent, (int)x, (int)y, (int)w, (int)h);
+    // ESP_LOGI(TAG, "[C] create_prog_button: pid=%u, parent=%p, pos=(%d,%d), size=(%d,%d)", 
+    //          (unsigned)pid, (void*)parent, (int)x, (int)y, (int)w, (int)h);
 
     if (!parent) {
         ESP_LOGE(TAG, "[C] create_prog_button: ERRORE - parent è NULL per pid=%u", (unsigned)pid);
@@ -1002,7 +1002,7 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     lv_obj_set_size(btn, w, h);
     btn_style(btn, COL_PROG);
     
-    ESP_LOGI(TAG, "[C] create_prog_button: btn=%p created and positioned for pid=%u", (void*)btn, (unsigned)pid);
+    // ESP_LOGI(TAG, "[C] create_prog_button: btn=%p created and positioned for pid=%u", (void*)btn, (unsigned)pid);
 
     lv_obj_t *lbl = lv_label_create(btn);
     lv_obj_set_style_text_color(lbl, COL_WHITE, LV_PART_MAIN);
@@ -1013,8 +1013,8 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     set_program_label_text(lbl, pid);
     lv_obj_center(lbl);
     
-    ESP_LOGI(TAG, "[C] create_prog_button: label=%p created with text='%s' for pid=%u", 
-             (void*)lbl, lv_label_get_text(lbl), (unsigned)pid);
+    // ESP_LOGI(TAG, "[C] create_prog_button: label=%p created with text='%s' for pid=%u", 
+    //          (void*)lbl, lv_label_get_text(lbl), (unsigned)pid);
 
     int idx = (int)pid - 1;
     s_prog_ud[idx].prog_id = pid;
@@ -1024,16 +1024,16 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     s_prog_btns[idx] = btn;
     s_prog_lbls[idx] = lbl;
     
-    ESP_LOGI(TAG, "[C] create_prog_button: STORED - s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
-             idx, (void*)s_prog_btns[idx], idx, (void*)s_prog_lbls[idx]);
+    // ESP_LOGI(TAG, "[C] create_prog_button: STORED - s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
+    //          idx, (void*)s_prog_btns[idx], idx, (void*)s_prog_lbls[idx]);
 
     /* [C] Inizialmente non selezionabile: colore scuro, opacità piena (refresh_prog_buttons aggiornerà) */
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICKABLE);
     btn_style(btn, COL_PROG_DIS);
     lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
     
-    ESP_LOGI(TAG, "[C] === create_prog_button END: pid=%u, btn=%p, lbl=%p ===", 
-             (unsigned)pid, (void*)btn, (void*)lbl);
+//     ESP_LOGI(TAG, "[C] === create_prog_button END: pid=%u, btn=%p, lbl=%p ===", 
+//              (unsigned)pid, (void*)btn, (void*)lbl);
 }
 
 /** @brief Costruisce i pulsanti del programma.
@@ -1049,7 +1049,7 @@ static void build_prog_buttons(void)
 {
     ESP_LOGI(TAG, "[C] ===== build_prog_buttons START =====");
     
-    ESP_LOGI(TAG, "[C] build_prog_buttons: s_status_box=%p", (void*)s_status_box);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: s_status_box=%p", (void*)s_status_box);
     
     if (!s_status_box) {
         ESP_LOGE(TAG, "[C] build_prog_buttons: ERRORE - s_status_box è NULL!");
@@ -1058,13 +1058,13 @@ static void build_prog_buttons(void)
     
     int32_t status_w = PANEL_FULL_W;
     int32_t status_h = (s_status_box) ? lv_obj_get_height(s_status_box) : PROG_BUTTONS_AREA_H;
-    ESP_LOGI(TAG, "[C] build_prog_buttons: status_box h=%d, w=%d", (int)status_h, (int)status_w);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: status_box h=%d, w=%d", (int)status_h, (int)status_w);
 
     /* Legge numero programmi dalla configurazione */
     device_config_t *cfg = device_config_get();
     uint8_t num_progs = (cfg && cfg->num_programs) ? cfg->num_programs : 10;
-    ESP_LOGI(TAG, "[C] build_prog_buttons: cfg=%p, cfg->num_programs=%u, num_progs=%u", 
-             (void*)cfg, cfg ? cfg->num_programs : 0, (unsigned)num_progs);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: cfg=%p, cfg->num_programs=%u, num_progs=%u", 
+    //          (void*)cfg, cfg ? cfg->num_programs : 0, (unsigned)num_progs);
 
     /* Validazione: solo valori ammessi; default 10 */
     static const uint8_t s_valid[] = {1, 2, 3, 4, 5, 6, 8, 10};
@@ -1078,7 +1078,7 @@ static void build_prog_buttons(void)
     }
 
     s_num_programs = num_progs;
-    ESP_LOGI(TAG, "[C] build_prog_buttons: FINAL num_progs=%u", (unsigned)num_progs);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: FINAL num_progs=%u", (unsigned)num_progs);
 
     if (num_progs <= 5) {
         /* Layout a colonna singola per 1-5 pulsanti */
@@ -1086,14 +1086,14 @@ static void build_prog_buttons(void)
         int32_t usable_h = status_h - 2 * PROG_BTN_ROW_PAD - (num_progs - 1) * PROG_BTN_ROW_GAP;
         int32_t btn_h = usable_h / num_progs;
         
-        ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COLUMN - num_progs=%d, btn_w=%d, btn_h=%d", 
-                 (int)num_progs, (int)btn_w, (int)btn_h);
+        // ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COLUMN - num_progs=%d, btn_w=%d, btn_h=%d", 
+        //          (int)num_progs, (int)btn_w, (int)btn_h);
         
         for (int i = 0; i < num_progs; i++) {
             int32_t y = PROG_BTN_ROW_PAD + i * (btn_h + PROG_BTN_ROW_GAP);
             uint8_t pid = (uint8_t)(i + 1);
-            ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COL - creating button pid=%d at y=%d", 
-                     (int)pid, (int)y);
+            // ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COL - creating button pid=%d at y=%d", 
+            //          (int)pid, (int)y);
             create_prog_button(s_status_box, pid, PROG_BTN_SIDE_PAD, y, btn_w, btn_h);
         }
     } else {
@@ -1105,10 +1105,10 @@ static void build_prog_buttons(void)
         int32_t x_left  = PROG_BTN_SIDE_PAD;
         int32_t x_right = PROG_BTN_SIDE_PAD + col_w + PROG_BTN_COL_GAP;
         
-        ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - n_rows=%d, col_w=%d, btn_h=%d", 
-                 (int)n_rows, (int)col_w, (int)btn_h);
-        ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - x_left=%d, x_right=%d", 
-                 (int)x_left, (int)x_right);
+        // ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - n_rows=%d, col_w=%d, btn_h=%d", 
+        //          (int)n_rows, (int)col_w, (int)btn_h);
+        // ESP_LOGI(TAG, "[C] build_prog_buttons: GRID LAYOUT - x_left=%d, x_right=%d", 
+        //          (int)x_left, (int)x_right);
 
         int buttons_created = 0;
         for (int32_t row = 0; row < n_rows; row++) {
@@ -1116,8 +1116,8 @@ static void build_prog_buttons(void)
             uint8_t p_left  = (uint8_t)(row * 2 + 1);
             uint8_t p_right = (uint8_t)(row * 2 + 2);
             
-            ESP_LOGI(TAG, "[C] build_prog_buttons: ROW %d - y=%d, left_prog=%d, right_prog=%d", 
-                     (int)row, (int)y, (int)p_left, (int)p_right);
+            // ESP_LOGI(TAG, "[C] build_prog_buttons: ROW %d - y=%d, left_prog=%d, right_prog=%d", 
+            //          (int)row, (int)y, (int)p_left, (int)p_right);
             
             create_prog_button(s_status_box, p_left,  x_left,  y, col_w, btn_h);
             buttons_created++;
@@ -1304,7 +1304,7 @@ void lvgl_page_main_show(void)
     main_cctalk_send_initialization_sequence_async();
 
     lv_obj_t *scr = lv_scr_act();
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: scr=%p", (void*)scr);
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: scr=%p", (void*)scr);
 
     lvgl_page_ads_deactivate();
     lvgl_page_main_deactivate();
@@ -1321,7 +1321,7 @@ void lvgl_page_main_show(void)
     }
 
     lv_obj_clean(scr);
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: screen cleaned");
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: screen cleaned");
 
     lv_obj_set_style_bg_color(scr, COL_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
@@ -1332,23 +1332,23 @@ void lvgl_page_main_show(void)
     s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
 
     panel_load_translations();
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: translations loaded");
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: translations loaded");
 
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: building UI components...");
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: building UI components...");
     build_status(scr);
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_status completed");
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_status completed");
     
     build_header(scr);
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_header completed");
+//  ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_header completed");
     
     sync_language_from_config();  /* Sync language flag from device config */
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: language synced");
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: language synced");
     
     build_prog_buttons();
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_prog_buttons completed");
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: build_prog_buttons completed");
     
     lvgl_page_chrome_add(scr);
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added");
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added");
 
     update_time(true);
 
@@ -1360,13 +1360,13 @@ void lvgl_page_main_show(void)
     }
 
     /* Log finale con riepilogo dei pulsanti creati */
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: BUTTONS SUMMARY - s_num_programs=%u", (unsigned)s_num_programs);
-    for (int i = 0; i < PROG_COUNT && i < (int)s_num_programs; i++) {
-        ESP_LOGI(TAG, "[C] lvgl_page_main_show: s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
-                 i, (void*)s_prog_btns[i], i, (void*)s_prog_lbls[i]);
-    }
+    // ESP_LOGI(TAG, "[C] lvgl_page_main_show: BUTTONS SUMMARY - s_num_programs=%u", (unsigned)s_num_programs);
+    // for (int i = 0; i < PROG_COUNT && i < (int)s_num_programs; i++) {
+    //     ESP_LOGI(TAG, "[C] lvgl_page_main_show: s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
+    //              i, (void*)s_prog_btns[i], i, (void*)s_prog_lbls[i]);
+    // }
     
-    ESP_LOGI(TAG, "[C] ===== lvgl_page_main_show END =====");
+    // ESP_LOGI(TAG, "[C] ===== lvgl_page_main_show END =====");
 
     s_panel_timer = lv_timer_create(panel_timer_cb, PANEL_REFRESH_MS, NULL);
     s_clock_timer = lv_timer_create(clock_timer_cb, 1000, NULL);

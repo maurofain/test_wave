@@ -5,33 +5,65 @@
 #include "cJSON.h"
 #include "fsm.h"
 #include "web_ui_programs.h"
+#include "tasks.h"
 #include <stdio.h>
 #include <string.h>
 
 static const char *TAG = "WEB_UI_EMU";
-
-static const web_ui_program_entry_t *find_program_by_id(uint8_t program_id)
-{
-    const web_ui_program_table_t *table = web_ui_program_table_get();
-    if (!table) {
-        return NULL;
-    }
-
-    for (uint8_t i = 0; i < table->count; ++i) {
-        const web_ui_program_entry_t *entry = &table->programs[i];
-        if (entry->program_id == program_id) {
-            return entry;
-        }
-    }
-
-    return NULL;
-}
 
 #define WEB_UI_PROTECTED_PASSWORD "factoryUser"
 #define WEB_UI_PASSWORD_FILE "/spiffs/ui_password.txt"
 
 static char s_boot_password[64] = {0};
 static bool s_boot_password_loaded = false;
+
+static esp_err_t web_ui_program_action_send_error(httpd_req_t *req, esp_err_t err)
+{
+    if (!req) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *status = "409 Conflict";
+    const char *message = "Programma non avviabile nello stato corrente";
+
+    switch (err) {
+        case TASKS_ERR_FSM_QUEUE_NOT_READY:
+            status = "503 Service Unavailable";
+            message = "Coda FSM non pronta";
+            break;
+        case TASKS_ERR_PROGRAM_DISABLED:
+            message = "Programma disabilitato";
+            break;
+        case TASKS_ERR_FSM_SNAPSHOT_UNAVAILABLE:
+            status = "503 Service Unavailable";
+            message = "FSM snapshot non disponibile";
+            break;
+        case TASKS_ERR_PROGRAM_STATE_CONFLICT:
+            message = "Programma non avviabile nello stato corrente";
+            break;
+        case TASKS_ERR_PROGRAM_CREDIT_INSUFFICIENT:
+            message = "Credito insufficiente per il programma";
+            break;
+        case ESP_ERR_NOT_FOUND:
+            message = "Programma non trovato";
+            break;
+        case ESP_ERR_TIMEOUT:
+            status = "503 Service Unavailable";
+            message = "Coda FSM piena";
+            break;
+        default:
+            status = "500 Internal Server Error";
+            message = tasks_err_to_name(err);
+            break;
+    }
+
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, "application/json");
+
+    char response[160] = {0};
+    snprintf(response, sizeof(response), "{\"error\":\"%s\"}", message);
+    return httpd_resp_send(req, response, -1);
+}
 
 
 /**
@@ -408,7 +440,7 @@ esp_err_t api_emulator_program_start(httpd_req_t *req)
     uint8_t pid = (uint8_t)program_id->valueint;
     cJSON_Delete(root);
 
-    const web_ui_program_entry_t *entry = find_program_by_id(pid);
+    const web_ui_program_entry_t *entry = web_ui_program_find_by_id(pid);
     if (!entry) {
         httpd_resp_set_status(req, "404 Not Found");
         httpd_resp_set_type(req, "application/json");
@@ -429,54 +461,16 @@ esp_err_t api_emulator_program_start(httpd_req_t *req)
         return httpd_resp_send(req, "{\"error\":\"FSM snapshot non disponibile\"}", -1);
     }
 
-    if (snapshot.credit_cents < (int32_t)entry->price_units) {
+    if (snapshot.state == FSM_STATE_CREDIT &&
+        snapshot.credit_cents < (int32_t)entry->price_units) {
         httpd_resp_set_status(req, "409 Conflict");
         httpd_resp_set_type(req, "application/json");
         return httpd_resp_send(req, "{\"error\":\"Credito insufficiente per il programma\"}", -1);
     }
 
-    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
-        bool on = ((entry->relay_mask & (1U << (relay - 1))) != 0);
-        (void)web_ui_virtual_relay_control(relay, on, (uint32_t)entry->duration_sec * 1000U);
-    }
-
-    if (snapshot.state == FSM_STATE_RUNNING || snapshot.state == FSM_STATE_PAUSED) {
-        /* cambio programma a macchina accesa: scala il tempo residuo, non fermare */
-        fsm_input_event_t sw_ev = {
-            .from = AGN_ID_WEB_UI,
-            .to = {AGN_ID_FSM},
-            .action = ACTION_ID_PROGRAM_SELECTED,
-            .type = FSM_INPUT_EVENT_PROGRAM_SWITCH,
-            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-            .value_i32 = (int32_t)entry->price_units,
-            .value_u32 = (uint32_t)entry->pause_max_suspend_sec * 1000U,
-            .aux_u32   = (uint32_t)entry->duration_sec * 1000U,
-            .text = {0},
-        };
-        snprintf(sw_ev.text, sizeof(sw_ev.text), "%s", entry->name);
-        if (!fsm_event_publish(&sw_ev, pdMS_TO_TICKS(20))) {
-            httpd_resp_set_status(req, "503 Service Unavailable");
-            httpd_resp_set_type(req, "application/json");
-            return httpd_resp_send(req, "{\"error\":\"Coda FSM piena\"}", -1);
-        }
-    } else {
-        fsm_input_event_t event = {
-            .from = AGN_ID_WEB_UI,
-            .to = {AGN_ID_FSM},
-            .action = ACTION_ID_PROGRAM_SELECTED,
-            .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
-            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-            .value_i32 = (int32_t)entry->price_units,
-            .value_u32 = (uint32_t)entry->pause_max_suspend_sec * 1000U,
-            .aux_u32   = (uint32_t)entry->duration_sec * 1000U,
-            .text = {0},
-        };
-        snprintf(event.text, sizeof(event.text), "%s", entry->name);
-        if (!fsm_event_publish(&event, pdMS_TO_TICKS(20))) {
-            httpd_resp_set_status(req, "503 Service Unavailable");
-            httpd_resp_set_type(req, "application/json");
-            return httpd_resp_send(req, "{\"error\":\"Coda FSM piena\"}", -1);
-        }
+    esp_err_t publish_err = tasks_publish_program_button_action(pid, AGN_ID_WEB_UI);
+    if (publish_err != ESP_OK) {
+        return web_ui_program_action_send_error(req, publish_err);
     }
 
     char response[256];
@@ -528,10 +522,6 @@ esp_err_t api_emulator_program_stop(httpd_req_t *req)
                 cJSON_Delete(root);
             }
         }
-    }
-
-    for (uint8_t relay = 1; relay <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay) {
-        (void)web_ui_virtual_relay_control(relay, false, 0);
     }
 
     fsm_input_event_t event = {
