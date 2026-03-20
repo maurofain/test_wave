@@ -7562,7 +7562,7 @@
       "label": "lvgl.programs.name_05",
       "text": {
         "it": "Programma 5",
-        "en": "Program 5",
+        "en": "Brushing",
         "fr": "Programme 5",
         "de": "Programm 5",
         "es": "Programa 5"
@@ -7573,10 +7573,10 @@
       "label": "lvgl.programs.name_06",
       "text": {
         "it": "Programma 6",
-        "en": "Program 6",
-        "fr": "Programme 6",
-        "de": "Programm 6",
-        "es": "Programa 6"
+        "en": "Intense cycle",
+        "fr": "Cycle intense",
+        "de": "Intensiver Zyklus",
+        "es": "Ciclo intenso"
       }
     },
     "program_name_07": {
@@ -7584,10 +7584,10 @@
       "label": "lvgl.programs.name_07",
       "text": {
         "it": "Programma 7",
-        "en": "Program 7",
-        "fr": "Programme 7",
-        "de": "Programm 7",
-        "es": "Programa 7"
+        "en": "Prog. 7",
+        "fr": "Prog. 7",
+        "de": "Prog. 7",
+        "es": "Prog. 7"
       }
     },
     "program_name_08": {
@@ -7595,10 +7595,10 @@
       "label": "lvgl.programs.name_08",
       "text": {
         "it": "Programma 8",
-        "en": "Program 8",
-        "fr": "Programme 8",
-        "de": "Programm 8",
-        "es": "Programa 8"
+        "en": "Prog. 8",
+        "fr": "Prog. 8",
+        "de": "Prog. 8",
+        "es": "Prog. 8"
       }
     },
     "program_name_09": {
@@ -7606,10 +7606,10 @@
       "label": "lvgl.programs.name_09",
       "text": {
         "it": "Programma 9",
-        "en": "Program 9",
-        "fr": "Programme 9",
-        "de": "Programm 9",
-        "es": "Programa 9"
+        "en": "Prog. 9",
+        "fr": "Prog. 9",
+        "de": "Prog. 9",
+        "es": "Prog. 9"
       }
     },
     "program_name_10": {
@@ -7617,10 +7617,10 @@
       "label": "lvgl.programs.name_10",
       "text": {
         "it": "Programma 10",
-        "en": "Program 10",
-        "fr": "Programme 10",
-        "de": "Programm 10",
-        "es": "Programa 10"
+        "en": "Drying",
+        "fr": "Séchage",
+        "de": "Trocknen",
+        "es": "Secado"
       }
     },
     "program_confirm_cancel": {
@@ -7650,10 +7650,10 @@
       "label": "lvgl.program.suspend",
       "text": {
         "it": "Sospendi",
-        "en": "Suspend",
-        "fr": "Suspendre",
-        "de": "Aussetzen",
-        "es": "Suspender"
+        "en": "Restart",
+        "fr": "Redémarrage",
+        "de": "Neustart",
+        "es": "Reinicie"
       }
     },
     "program_zero": {

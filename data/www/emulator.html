@@ -110,7 +110,7 @@
       position: absolute;
       top: 14px;
       left: 18px;
-      font-size: 40px;
+      font-size: 35px;
       font-weight: 700;
       letter-spacing: 1px;
       font-variant-numeric: tabular-nums;
@@ -118,7 +118,7 @@
 
     .chrome-icons {
       position: absolute;
-      top: 18px;
+      top: 44px;
       right: 18px;
       display: flex;
       gap: 12px;
@@ -205,6 +205,32 @@
       overflow: hidden;
     }
 
+    .program-popup {
+      position: absolute;
+      left: 74px;
+      top: 148px;
+      width: 572px;
+      height: 48px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--text-main);
+      border-radius: 24px;
+      background: var(--accent);
+      color: #000;
+      font-size: 35px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 0 16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .program-popup.is-visible {
+      display: flex;
+    }
+
     .credit-label {
       position: absolute;
       top: 16px;
@@ -225,7 +251,7 @@
       align-items: center;
       justify-content: flex-end;
       color: var(--text-main);
-      font-size: 168px;
+      font-size: 140px;
       line-height: 1;
       font-weight: 700;
       text-align: right;
@@ -248,16 +274,19 @@
 
     .program-grid {
       --emu-program-rows: 5;
+      --emu-program-row-h: 98px;
+      --emu-program-gap-y: 6px;
       position: absolute;
       left: 14px;
       top: 536px;
       width: 692px;
-      height: 600px;
+      height: 642px;
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      grid-template-rows: repeat(var(--emu-program-rows), minmax(0, 1fr));
-      gap: 8px 10px;
-      padding: 8px 14px;
+      grid-template-rows: repeat(var(--emu-program-rows), var(--emu-program-row-h));
+      align-content: start;
+      gap: var(--emu-program-gap-y) 10px;
+      padding: 0 14px;
     }
 
     .program-grid.single-column {
@@ -270,17 +299,53 @@
       border: 0;
       border-radius: 55px;
       background: var(--accent-dark);
-      color: var(--text-main);
-      font-size: 35px;
-      font-weight: 700;
-      line-height: 1.05;
-      text-align: center;
-      padding: 10px 18px;
+      color: #000;
+      padding: 8px 12px;
       cursor: pointer;
       box-shadow: none;
       transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
-      white-space: normal;
-      overflow-wrap: anywhere;
+      overflow: hidden;
+    }
+
+    .prog-btn-inner {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .prog-btn.is-right-column .prog-btn-inner {
+      flex-direction: row-reverse;
+    }
+
+    .prog-btn-num-badge {
+      width: 60px;
+      height: 60px;
+      min-width: 60px;
+      border-radius: 30px;
+      background: var(--text-main);
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 35px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .prog-btn-name {
+      min-width: 0;
+      flex: 1;
+      color: #000;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1.05;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
     }
 
     .prog-btn.is-enabled {
@@ -495,6 +560,8 @@
           <div id="gtext" class="gauge-text">0%</div>
         </div>
 
+        <div id="programPopup" class="program-popup"></div>
+
         <div id="creditBox" class="credit-box">
           <div id="creditLabel" class="credit-label">Credito</div>
           <div id="credit" class="credit-value">0</div>
@@ -566,6 +633,6 @@
 
   <script src="/js/emulator_01.js?v=20260320b"></script>
   <script src="/js/emulator_03.js?v=20260320b"></script>
-  <script src="/js/emulator_02.js?v=20260320c"></script>
+  <script src="/js/emulator_02.js?v=20260320h"></script>
 </body>
 </html>

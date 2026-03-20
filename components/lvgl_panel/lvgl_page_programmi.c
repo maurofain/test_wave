@@ -39,6 +39,7 @@ static const char *TAG = "lvgl_panel";
 #define COL_TIMER_NORMAL lv_color_make(0x27, 0xd7, 0xb2)
 #define COL_TIMER_WARN lv_color_make(0xb0, 0x0f, 0x6b)
 #define COL_WHITE lv_color_make(0xEE, 0xEE, 0xEE)
+#define COL_BLACK lv_color_make(0x00, 0x00, 0x00)
 #define COL_RED lv_color_make(0xEE, 0x00, 0x00)
 #define COL_GREY lv_color_make(0x88, 0x88, 0x99)
 #define COL_STATE_IDL lv_color_make(0x20, 0x20, 0x48)
@@ -48,8 +49,8 @@ static const char *TAG = "lvgl_panel";
 
 #define PANEL_W 720
 #define PANEL_H 1280
-#define PANEL_PAD_X 14
-#define PANEL_PAD_Y 14
+#define PANEL_PAD_X 2
+#define PANEL_PAD_Y 2
 #define PANEL_COL_GAP 10
 #define PANEL_LEFT_W 120
 #define PANEL_RIGHT_W 120
@@ -66,10 +67,12 @@ static const char *TAG = "lvgl_panel";
 
 // Costanti per layout pulsanti programma
 #define PROG_BTN_SIDE_PAD 14    /* margine orizzontale */
-#define PROG_BTN_ROW_PAD 8      /* margine verticale */
+#define PROG_BTN_ROW_PAD 6      /* margine verticale */
 #define PROG_BTN_COL_GAP 10     /* spazio tra colonne */
-#define PROG_BTN_ROW_GAP 8      /* spazio tra righe */
-#define PROG_BUTTONS_AREA_H 600 /* altezza area pulsanti richiesta */
+#define PROG_BTN_ROW_GAP 6      /* spazio tra righe */
+#define PROG_BUTTONS_AREA_H 640 /* altezza area pulsanti richiesta */
+#define PROG_NUM_BADGE_SIZE 60
+#define PROG_SELECTED_POPUP_MS 2500U
 #define PROG_BTN_RADIUS 55      /* metà dell'altezza minima del pulsante con layout a 5 righe */
 
 #define FONT_TIME (&GoogleSans40)
@@ -95,6 +98,8 @@ static lv_obj_t *s_gauge_time_lbl = NULL;
 static lv_obj_t *s_counter_fill = NULL;
 static lv_obj_t *s_stop_btn = NULL;  /* Flag image inside the button */
 static lv_obj_t *s_stop_lbl = NULL;  /* label inside stop button */
+static lv_obj_t *s_program_popup = NULL;
+static lv_obj_t *s_program_popup_lbl = NULL;
 static lv_obj_t *s_prog_btns[PROG_COUNT];
 static lv_obj_t *s_prog_lbls[PROG_COUNT];
 static lv_timer_t *s_panel_timer = NULL;
@@ -105,6 +110,7 @@ static char s_current_language[8] = "it";  /* [C] Current language code (default
 static char s_prog_label_cache[PROG_COUNT][WEB_UI_PROGRAM_NAME_MAX] = {{0}};
 static bool s_prog_label_cache_valid = false;
 static char s_prog_label_cache_lang[8] = "";
+static uint32_t s_program_popup_until_ms = 0U;
 
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
@@ -358,6 +364,44 @@ static void set_program_label_text(lv_obj_t *label, uint8_t pid)
     }
 
     lv_label_set_text(label, target_text);
+}
+
+static void get_program_label_text(uint8_t pid, char *out, size_t out_len)
+{
+    if (!out || out_len == 0) {
+        return;
+    }
+
+    out[0] = '\0';
+    if (pid == 0 || pid > PROG_COUNT) {
+        return;
+    }
+
+    rebuild_program_label_cache_if_needed();
+    const char *target_text = s_prog_label_cache[(int)pid - 1];
+    if (target_text && target_text[0] != '\0') {
+        snprintf(out, out_len, "%s", target_text);
+        return;
+    }
+
+    snprintf(out, out_len, "%u", (unsigned)pid);
+}
+
+static void show_selected_program_popup(uint8_t pid)
+{
+    if (!s_program_popup || !s_program_popup_lbl || pid == 0 || pid > PROG_COUNT) {
+        return;
+    }
+
+    char popup_text[WEB_UI_PROGRAM_NAME_MAX] = {0};
+    get_program_label_text(pid, popup_text, sizeof(popup_text));
+    if (popup_text[0] == '\0') {
+        return;
+    }
+
+    lv_label_set_text(s_program_popup_lbl, popup_text);
+    lv_obj_clear_flag(s_program_popup, LV_OBJ_FLAG_HIDDEN);
+    s_program_popup_until_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()) + PROG_SELECTED_POPUP_MS;
 }
 
 static bool program_is_active_for_snapshot(const web_ui_program_entry_t *entry, const fsm_ctx_t *snap)
@@ -689,6 +733,14 @@ static void update_state(const fsm_ctx_t *snap)
         }
     }
 
+    if (s_program_popup) {
+        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+        if (s_program_popup_until_ms > 0U && now_ms >= s_program_popup_until_ms) {
+            lv_obj_add_flag(s_program_popup, LV_OBJ_FLAG_HIDDEN);
+            s_program_popup_until_ms = 0U;
+        }
+    }
+
     /* [C] Gestione STOP + avviso scadenza credito monete */
     bool ecd_warning_active = false;
     uint32_t ecd_rem_s = 0;
@@ -896,6 +948,8 @@ static void on_prog_btn(lv_event_t *e)
         ESP_LOGI(TAG, "[C] Programma disabilitato pid=%u", (unsigned)pid);
         return;
     }
+
+    show_selected_program_popup(pid);
 
     esp_err_t err = tasks_publish_program_button_action(pid, AGN_ID_LVGL);
     if (err != ESP_OK) {
@@ -1108,6 +1162,27 @@ static void build_status(lv_obj_t *scr)
     lv_obj_add_flag(s_credit_box, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(s_credit_box, on_credit_box_touch, LV_EVENT_CLICKED, NULL);
 
+    s_program_popup = lv_obj_create(scr);
+    lv_obj_set_size(s_program_popup, PANEL_FULL_W - 120, 48);
+    lv_obj_align_to(s_program_popup, s_credit_box, LV_ALIGN_OUT_TOP_MID, 0, -8);
+    lv_obj_set_style_bg_color(s_program_popup, COL_TIMER_NORMAL, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_program_popup, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_program_popup, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_program_popup, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_program_popup, 24, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_program_popup, 6, LV_PART_MAIN);
+    lv_obj_remove_flag(s_program_popup, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(s_program_popup, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(s_program_popup, LV_OBJ_FLAG_HIDDEN);
+
+    s_program_popup_lbl = lv_label_create(s_program_popup);
+    lv_label_set_text(s_program_popup_lbl, "");
+    lv_obj_set_style_text_color(s_program_popup_lbl, COL_BLACK, LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_program_popup_lbl, FONT_LABEL, LV_PART_MAIN);
+    lv_label_set_long_mode(s_program_popup_lbl, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(s_program_popup_lbl, PANEL_FULL_W - 150);
+    lv_obj_center(s_program_popup_lbl);
+
     s_status_box = lv_obj_create(scr);
     lv_obj_set_pos(s_status_box, PANEL_PAD_X, status_y);
     lv_obj_set_size(s_status_box, PANEL_FULL_W, status_h);
@@ -1217,17 +1292,43 @@ static void create_prog_button(lv_obj_t *parent, uint8_t pid, int32_t x, int32_t
     lv_obj_set_pos(btn, x, y);
     lv_obj_set_size(btn, w, h);
     btn_style(btn, COL_PROG);
+
+    bool is_full_width = (w >= (PANEL_FULL_W - (2 * PROG_BTN_SIDE_PAD)));
+    bool is_right_column = (!is_full_width) && (x > (PANEL_FULL_W / 2));
     
     // ESP_LOGI(TAG, "[C] create_prog_button: btn=%p created and positioned for pid=%u", (void*)btn, (unsigned)pid);
 
     lv_obj_t *lbl = lv_label_create(btn);
-    lv_obj_set_style_text_color(lbl, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl, COL_BLACK, LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, FONT_PROG_BTN, LV_PART_MAIN);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-    lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(lbl, w - 8);
+    lv_obj_set_style_text_align(lbl, is_right_column ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(lbl, w - (PROG_NUM_BADGE_SIZE + 36));
     set_program_label_text(lbl, pid);
-    lv_obj_center(lbl);
+
+    lv_obj_t *badge = lv_obj_create(btn);
+    lv_obj_set_size(badge, PROG_NUM_BADGE_SIZE, PROG_NUM_BADGE_SIZE);
+    lv_obj_set_style_bg_color(badge, COL_WHITE, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(badge, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(badge, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(badge, PROG_NUM_BADGE_SIZE / 2, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(badge, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
+
+    lv_obj_t *badge_lbl = lv_label_create(badge);
+    lv_label_set_text_fmt(badge_lbl, "%u", (unsigned)pid);
+    lv_obj_set_style_text_color(badge_lbl, COL_BLACK, LV_PART_MAIN);
+    lv_obj_set_style_text_font(badge_lbl, FONT_PROG_BTN, LV_PART_MAIN);
+    lv_obj_center(badge_lbl);
+
+    if (is_right_column) {
+        lv_obj_align(lbl, LV_ALIGN_LEFT_MID, 12, 0);
+        lv_obj_align(badge, LV_ALIGN_RIGHT_MID, -12, 0);
+    } else {
+        lv_obj_align(badge, LV_ALIGN_LEFT_MID, 12, 0);
+        lv_obj_align_to(lbl, badge, LV_ALIGN_OUT_RIGHT_MID, 14, 0);
+    }
     
     // ESP_LOGI(TAG, "[C] create_prog_button: label=%p created with text='%s' for pid=%u", 
             //  (void*)lbl, lv_label_get_text(lbl), (unsigned)pid);
@@ -1272,9 +1373,10 @@ static void build_prog_buttons(void)
         return;
     }
     
-    // Usa le costanti definite invece di leggere dimensioni dinamiche
-    const int32_t status_h = PROG_BUTTONS_AREA_H;
-    // ESP_LOGI(TAG, "[C] build_prog_buttons: using constants - h=%d", (int)status_h);
+    int32_t status_h = lv_obj_get_height(s_status_box);
+    if (status_h <= 0) {
+        status_h = PROG_BUTTONS_AREA_H;
+    }
 
     /* Legge numero programmi dalla configurazione */
     device_config_t *cfg = device_config_get();
@@ -1300,13 +1402,21 @@ static void build_prog_buttons(void)
         /* Layout a colonna singola per 1-5 pulsanti */
         int32_t btn_w = PANEL_FULL_W - 2 * PROG_BTN_SIDE_PAD;
         int32_t usable_h = status_h - 2 * PROG_BTN_ROW_PAD - (num_progs - 1) * PROG_BTN_ROW_GAP;
+        if (usable_h < (int32_t)num_progs) {
+            usable_h = (int32_t)num_progs;
+        }
         int32_t btn_h = usable_h / num_progs;
+        int32_t total_h = (btn_h * num_progs) + ((num_progs - 1) * PROG_BTN_ROW_GAP);
+        int32_t y_start = (status_h - total_h) / 2;
+        if (y_start < PROG_BTN_ROW_PAD) {
+            y_start = PROG_BTN_ROW_PAD;
+        }
         
         // ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COLUMN - num_progs=%d, btn_w=%d, btn_h=%d", 
         //          (int)num_progs, (int)btn_w, (int)btn_h);
         
         for (int i = 0; i < num_progs; i++) {
-            int32_t y = PROG_BTN_ROW_PAD + i * (btn_h + PROG_BTN_ROW_GAP);
+            int32_t y = y_start + i * (btn_h + PROG_BTN_ROW_GAP);
             uint8_t pid = (uint8_t)(i + 1);
             // ESP_LOGI(TAG, "[C] build_prog_buttons: SINGLE COL - creating button pid=%d at y=%d", 
             //          (int)pid, (int)y);
@@ -1317,7 +1427,15 @@ static void build_prog_buttons(void)
         int32_t n_rows = (int32_t)(num_progs / 2);
         int32_t col_w  = (PANEL_FULL_W - 2 * PROG_BTN_SIDE_PAD - PROG_BTN_COL_GAP) / 2;
         int32_t usable_h = status_h - 2 * PROG_BTN_ROW_PAD - (n_rows - 1) * PROG_BTN_ROW_GAP;
+        if (usable_h < n_rows) {
+            usable_h = n_rows;
+        }
         int32_t btn_h  = usable_h / n_rows;
+        int32_t total_h = (btn_h * n_rows) + ((n_rows - 1) * PROG_BTN_ROW_GAP);
+        int32_t y_start = (status_h - total_h) / 2;
+        if (y_start < PROG_BTN_ROW_PAD) {
+            y_start = PROG_BTN_ROW_PAD;
+        }
         int32_t x_left  = PROG_BTN_SIDE_PAD;
         int32_t x_right = PROG_BTN_SIDE_PAD + col_w + PROG_BTN_COL_GAP;
         
@@ -1328,7 +1446,7 @@ static void build_prog_buttons(void)
 
         int buttons_created = 0;
         for (int32_t row = 0; row < n_rows; row++) {
-            int32_t y      = PROG_BTN_ROW_PAD + row * (btn_h + PROG_BTN_ROW_GAP);
+            int32_t y      = y_start + row * (btn_h + PROG_BTN_ROW_GAP);
             uint8_t p_left  = (uint8_t)(row * 2 + 1);
             uint8_t p_right = (uint8_t)(row * 2 + 2);
             
@@ -1374,6 +1492,9 @@ static void clear_panel_handles(void)
     s_gauge = NULL;
     s_gauge_time_lbl = NULL;
     s_stop_btn = NULL;
+    s_program_popup = NULL;
+    s_program_popup_lbl = NULL;
+    s_program_popup_until_ms = 0U;
     /* s_language_flag_btn e s_flag_img rimossi su richiesta dell'utente */
 
     for (int i = 0; i < PROG_COUNT; i++) {

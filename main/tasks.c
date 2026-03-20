@@ -1030,9 +1030,9 @@ static void ws2812_task(void *arg)
     const uint8_t run_r = 0U;
     const uint8_t run_g = 170U;
     const uint8_t run_b = 70U;
-    const uint8_t prefine_r = 128U;
+    const uint8_t prefine_r = 64U;
     const uint8_t prefine_g = 0U;
-    const uint8_t prefine_b = 128U;
+    const uint8_t prefine_b = 64U;
     const uint32_t idle_effect_cycle_ms = 10000U;
     uint32_t clear_after_idle_until_ms = 0U;
     const uint32_t finish_blink_toggle_ms = 250U;

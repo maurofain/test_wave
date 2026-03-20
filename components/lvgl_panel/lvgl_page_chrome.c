@@ -59,6 +59,21 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
     const int32_t right_margin = 18;
     const int32_t top_margin = 18;
 
+    const char *lang = lvgl_panel_get_runtime_language();
+    if (!lang || lang[0] == '\0') {
+        lang = "it";
+    }
+
+    lv_obj_t *flag = lv_image_create(scr);
+    lv_image_set_src(flag, get_flag_src_for_language(lang));
+    lv_image_set_scale(flag, 256);
+    lv_obj_align(flag, LV_ALIGN_TOP_RIGHT, -18, top_margin + 30);
+
+    int32_t flag_top = lv_obj_get_y(flag);
+    int32_t flag_h = lv_obj_get_height(flag);
+    const int32_t circles_offset_y = 8;
+    int32_t circles_top = flag_top + ((flag_h - circle_size) / 2) + circles_offset_y;
+
     for (int i = 0; i < 4; i++) {
         lv_obj_t *dot = lv_obj_create(scr);
         lv_obj_set_size(dot, circle_size, circle_size);
@@ -71,18 +86,8 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
         lv_obj_align(dot,
                      LV_ALIGN_TOP_RIGHT,
                      -(right_margin + (3 - i) * (circle_size + gap)),
-                     top_margin);
+                     circles_top);
     }
-
-    const char *lang = lvgl_panel_get_runtime_language();
-    if (!lang || lang[0] == '\0') {
-        lang = "it";
-    }
-
-    lv_obj_t *flag = lv_image_create(scr);
-    lv_image_set_src(flag, get_flag_src_for_language(lang));
-    lv_image_set_scale(flag, 256);
-    lv_obj_align(flag, LV_ALIGN_TOP_RIGHT, -18, top_margin + 30);
 
     /* [C] Se la pagina ha registrato un callback, rende la bandiera cliccabile */
     if (s_flag_cb) {

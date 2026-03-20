@@ -15,6 +15,7 @@
   const stopBtn = document.getElementById('stopButton');
   const stopLabel = document.getElementById('stopLabel');
   const programGrid = document.getElementById('programGrid');
+  const programPopup = document.getElementById('programPopup');
   const cardSwitch = document.getElementById('cardSwitch');
 
   let credit = 0;
@@ -37,6 +38,11 @@
   let programsById = {};
   let programMetaByButton = {};
   let pendingCreditSync = null;
+  let programPopupHideTimer = null;
+  let configuredProgramCount = 10;
+
+  const STOP_TEXT_DEFAULT = 'STOP';
+  const STOP_TEXT_CONFIRM = 'Conferma annullamento';
 
   function pad2(value) {
     return String(value).padStart(2, '0');
@@ -47,7 +53,8 @@
       return;
     }
     const now = new Date();
-    chromeTimeEl.textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    chromeTimeEl.textContent =
+      pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
   }
 
   function updateChromeLanguageUi() {
@@ -163,11 +170,72 @@
       return;
     }
 
+    const ROW_PAD = 6;
+    const ROW_GAP = 6;
+
     const count = getVisibleProgramButtons().length;
     const singleColumn = count > 0 && count <= 5;
     const rows = singleColumn ? Math.max(1, count) : Math.max(1, Math.ceil(count / 2));
+
+    const gridHeight = programGrid.clientHeight || 642;
+    let usableHeight = gridHeight - (2 * ROW_PAD) - ((rows - 1) * ROW_GAP);
+    if (usableHeight < rows) {
+      usableHeight = rows;
+    }
+
+    let rowHeight = Math.floor(usableHeight / rows);
+
+    const totalHeight = (rowHeight * rows) + ((rows - 1) * ROW_GAP);
+    let yPad = Math.floor((gridHeight - totalHeight) / 2);
+    if (yPad < ROW_PAD) {
+      yPad = ROW_PAD;
+    }
+
     programGrid.classList.toggle('single-column', singleColumn);
     programGrid.style.setProperty('--emu-program-rows', String(rows));
+    programGrid.style.setProperty('--emu-program-row-h', rowHeight + 'px');
+    programGrid.style.setProperty('--emu-program-gap-y', ROW_GAP + 'px');
+    programGrid.style.paddingTop = yPad + 'px';
+    programGrid.style.paddingBottom = yPad + 'px';
+
+    buttons.forEach(function (btn) {
+      const id = parseInt(btn.dataset.id || '0', 10);
+      const isRightColumn = !singleColumn && id > 0 && (id % 2 === 0);
+      btn.classList.toggle('is-right-column', isRightColumn);
+    });
+  }
+
+  function setProgramButtonContent(btn, id, name) {
+    if (!btn) {
+      return;
+    }
+
+    const programName = name && String(name).trim() ? String(name).trim() : String(id);
+    btn.innerHTML =
+      '<span class="prog-btn-inner">' +
+        '<span class="prog-btn-num-badge">' + String(id) + '</span>' +
+        '<span class="prog-btn-name">' + escapeHtml(programName) + '</span>' +
+      '</span>';
+  }
+
+  function showSelectedProgramPopup(programId) {
+    if (!programPopup || !programId) {
+      return;
+    }
+
+    const program = programMetaByButton[programId];
+    const popupText = program && program.name ? program.name : ('Programma ' + programId);
+    programPopup.textContent = popupText;
+    programPopup.classList.add('is-visible');
+
+    if (programPopupHideTimer) {
+      clearTimeout(programPopupHideTimer);
+    }
+
+    programPopupHideTimer = setTimeout(function () {
+      programPopup.classList.remove('is-visible');
+      programPopupHideTimer = null;
+    }, 2500);
   }
 
   function paintProgramButton(btn, state) {
@@ -297,7 +365,7 @@
       stopBtn.classList.add('is-visible');
       stopBtn.style.backgroundColor = preFineActive ? 'var(--warn)' : 'var(--danger)';
       stopBtn.style.borderColor = preFineActive ? 'var(--text-main)' : '#ff8080';
-      stopLabel.textContent = stopConfirm ? 'Conferma annullamento' : 'STOP';
+      stopLabel.textContent = stopConfirm ? STOP_TEXT_CONFIRM : STOP_TEXT_DEFAULT;
       return;
     }
 
@@ -312,7 +380,37 @@
 
     stopBtn.style.backgroundColor = 'var(--danger-dark)';
     stopBtn.style.borderColor = '#ff8080';
-    stopLabel.textContent = 'STOP';
+    stopLabel.textContent = STOP_TEXT_DEFAULT;
+  }
+
+  function sanitizeProgramCount(value, fallbackValue) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallbackValue;
+    }
+    const rounded = Math.floor(parsed);
+    if (rounded < 1) {
+      return fallbackValue;
+    }
+    if (rounded > 10) {
+      return 10;
+    }
+    return rounded;
+  }
+
+  async function loadConfiguredProgramCount() {
+    try {
+      const response = await fetch('/api/config');
+      if (!response.ok) {
+        return configuredProgramCount;
+      }
+      const payload = await response.json();
+      configuredProgramCount = sanitizeProgramCount(payload && payload.n_prg, configuredProgramCount);
+      return configuredProgramCount;
+    } catch (error) {
+      console.warn('config fetch failed', error);
+      return configuredProgramCount;
+    }
   }
 
   function updateProgramAvailability() {
@@ -351,25 +449,14 @@
     const runningOrPaused = fsmState === 'running' || fsmState === 'paused';
     const shownRunningMs = getShownRunningElapsedMs();
     const shownPauseMs = getShownPauseElapsedMs();
-    const remainingSeconds = Math.round(getRemainingMs() / 1000);
     const ecdWarningActive = isEcdWarningActive();
 
     if (creditLabel) {
-      if (runningOrPaused && !preFineActive) {
-        creditLabel.textContent = 'Secondi   ' + formatElapsed(shownRunningMs);
-      } else if (runningOrPaused && preFineActive) {
-        creditLabel.textContent = 'Crediti';
-      } else {
-        creditLabel.textContent = 'Credito';
-      }
+      creditLabel.textContent = 'Crediti';
     }
 
     if (creditEl) {
-      if (runningOrPaused && !preFineActive && runningTargetMs > 0) {
-        creditEl.textContent = String(Math.max(0, remainingSeconds));
-      } else {
-        creditEl.textContent = String(Math.max(0, credit));
-      }
+      creditEl.textContent = String(Math.max(0, credit));
     }
 
     if (pauseElapsedEl) {
@@ -469,6 +556,8 @@
 
   async function loadProgramsMeta() {
     try {
+      await loadConfiguredProgramCount();
+
       const response = await fetch('/api/programs');
       if (!response.ok) {
         return;
@@ -488,6 +577,13 @@
 
       buttons.forEach(function (btn) {
         const id = parseInt(btn.dataset.id || '0', 10);
+        if (id > configuredProgramCount) {
+          btn.dataset.available = '0';
+          btn.style.display = 'none';
+          btn.disabled = true;
+          return;
+        }
+
         const program = programsById[id];
         if (!program) {
           btn.dataset.available = '0';
@@ -500,7 +596,7 @@
         btn.dataset.available = '1';
         btn.dataset.price = String(program.price_units || 0);
         btn.dataset.enabled = program.enabled ? '1' : '0';
-        btn.textContent = program.name || String(id);
+        setProgramButtonContent(btn, id, program.name || String(id));
       });
 
       syncRunningProgramIdentity();
@@ -609,6 +705,8 @@
       }
 
       try {
+        showSelectedProgramPopup(programId);
+
         if (activeProgram === programId && (fsmState === 'running' || fsmState === 'paused')) {
           dispatchHardwareCommand('program_pause_toggle', {
             program: programId,
@@ -719,9 +817,12 @@
       try {
         if (!stopConfirm) {
           stopConfirm = true;
-          stopLabel.textContent = 'Conferma annullamento';
-          if (fsmState === 'running') {
-            await requestPauseToggle(programId);
+          await requestPauseToggle(programId);
+          if (fsmState === 'paused') {
+            fsmState = 'running';
+            pauseElapsedMs = 0;
+            pauseElapsedSyncAt = 0;
+          } else {
             fsmState = 'paused';
             pauseElapsedSyncAt = Date.now();
           }
