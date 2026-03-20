@@ -265,6 +265,7 @@ esp_err_t api_emulator_coin_event(httpd_req_t *req)
     }
 
     int value = coin->valueint;
+    int value_cents = value * 100;
 
     /* campo source opzionale: 'qr', 'card', 'cash' */
     char source[16] = "qr";
@@ -292,21 +293,26 @@ esp_err_t api_emulator_coin_event(httpd_req_t *req)
             .action = ACTION_ID_PAYMENT_ACCEPTED,
             .type = ev_type,
             .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-            .value_i32 = value,
+            .value_i32 = value_cents,
             .value_u32 = 0,
             .aux_u32 = 0,
             .text = {0},
         };
         strncpy(ev.text, ev_text, sizeof(ev.text)-1);
         if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            ESP_LOGW(TAG, "Queue FSM piena/non disponibile per coin=%d", value);
+            ESP_LOGW(TAG, "[C] Queue FSM piena/non disponibile per coin=%d (cents=%d)", value, value_cents);
             httpd_resp_set_status(req, "503 Service Unavailable");
             return httpd_resp_send(req, "Coda FSM piena", -1);
         }
     }
 
-    char response[128];
-    snprintf(response, sizeof(response), "{\"status\":\"ok\",\"coin\":%d,\"source\":\"%s\"}", value, source);
+    char response[160];
+    snprintf(response,
+             sizeof(response),
+             "{\"status\":\"ok\",\"coin\":%d,\"credit_cents\":%d,\"source\":\"%s\"}",
+             value,
+             value_cents,
+             source);
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, response, -1);
 }

@@ -451,7 +451,7 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             btn_style(btn, btn_color);
             lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_style_border_width(btn, is_active ? 5 : 0, LV_PART_MAIN);
-            lv_obj_set_style_border_color(btn, COL_RED LV_PART_MAIN);
+            lv_obj_set_style_border_color(btn, COL_RED, LV_PART_MAIN);
             lv_obj_set_style_border_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
             
             // Update clickability

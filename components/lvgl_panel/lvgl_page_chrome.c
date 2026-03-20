@@ -17,14 +17,14 @@ static void chrome_update_time_label(void)
         return;
     }
 
-    char time_buf[8] = "--:--";
+    char time_buf[9] = "--:--:--";
     time_t now = time(NULL);
     if (now > 0) {
         struct tm tm_now;
         localtime_r(&now, &tm_now);
         /* Mostra l'ora solo se l'anno è plausibile (NTP sincronizzato) */
         if (tm_now.tm_year + 1900 >= 2020) {
-            strftime(time_buf, sizeof(time_buf), "%H:%M", &tm_now);
+            strftime(time_buf, sizeof(time_buf), "%H:%M:%S", &tm_now);
         }
     }
     lv_label_set_text(s_chrome_time_lbl, time_buf);

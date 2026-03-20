@@ -99,7 +99,10 @@ static bool is_modbus_available(const device_config_t *cfg)
         return false;
     }
 
-    return (cfg->sensors.rs485_enabled && cfg->modbus.enabled);
+    /* [C] Per il layer digital_io basta che il bus RS485 sia disponibile:
+       i controlli programma e la pagina /test usano accessi coil diretti anche
+       quando il servizio Modbus polling non e' abilitato in config. */
+    return cfg->sensors.rs485_enabled;
 }
 
 static esp_err_t ensure_local_io_ready(const device_config_t *cfg)
@@ -409,7 +412,7 @@ size_t digital_io_get_input_infos(digital_io_input_info_t *out_list, size_t max_
 
     const device_config_t *cfg = device_config_get();
     bool local_available = (cfg != NULL && cfg->sensors.io_expander_enabled);
-    bool modbus_available = (cfg != NULL && cfg->sensors.rs485_enabled && cfg->modbus.enabled);
+    bool modbus_available = is_modbus_available(cfg);
 
     size_t count = (max_items < total_inputs) ? max_items : total_inputs;
     for (size_t index = 0; index < count; ++index) {
