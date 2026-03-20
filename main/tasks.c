@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "led_strip.h"
+#include "led.h"
 #include "device_config.h"
 #include "digital_io.h"
 #include "sht40.h"
@@ -1013,32 +1014,185 @@ static BaseType_t task_create(task_param_t *t)
 static void ws2812_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
-    
-    // Disabilita questo task per evitare conflitti con il modulo LED dedicato
-    ESP_LOGW(TAG, "[M] ws2812_task disabilitato per evitare conflitti con modulo LED");
-    vTaskDelete(NULL);
-    return;
-    
-    led_strip_handle_t strip = init_get_ws2812_handle();
+
+    TickType_t period_ticks = (param && param->period_ticks > 0)
+                                ? param->period_ticks
+                                : pdMS_TO_TICKS(100);
     TickType_t last_wake = xTaskGetTickCount();
-    uint8_t color = 0;
+    fsm_state_t last_state = FSM_STATE_IDLE;
+    uint8_t last_progress = 255U;
+    bool last_prefine = false;
+    uint32_t last_count = 0U;
+
+    const uint8_t idle_r = 0U;
+    const uint8_t idle_g = 0U;
+    const uint8_t idle_b = 48U;
+    const uint8_t run_r = 0U;
+    const uint8_t run_g = 170U;
+    const uint8_t run_b = 70U;
+    const uint8_t prefine_r = 128U;
+    const uint8_t prefine_g = 0U;
+    const uint8_t prefine_b = 128U;
+    const uint32_t idle_effect_cycle_ms = 10000U;
+    uint32_t clear_after_idle_until_ms = 0U;
+    const uint32_t finish_blink_toggle_ms = 250U;
+    bool finish_blink_active = false;
+    bool finish_blink_on = false;
+    uint8_t finish_blink_toggles_left = 0U;
+    uint32_t finish_blink_next_toggle_ms = 0U;
 
     while (true) {
-        if (!strip) {
-            if (!device_config_get()->sensors.led_enabled) {
-                vTaskDelay(pdMS_TO_TICKS(5000));
-                strip = init_get_ws2812_handle();
-                continue;
-            }
-            ESP_LOGW(TAG, "[M] Handle WS2812 non pronto");
-            vTaskDelay(pdMS_TO_TICKS(500));
-            strip = init_get_ws2812_handle();
+        vTaskDelayUntil(&last_wake, period_ticks);
+
+        device_config_t *cfg = device_config_get();
+        if (!cfg || !cfg->sensors.led_enabled) {
             continue;
         }
-        color += 25;
-        led_strip_set_pixel(strip, 0, color, 0, 255 - color);
-        led_strip_refresh(strip);
-        vTaskDelayUntil(&last_wake, param->period_ticks);
+
+        if (led_init() != ESP_OK) {
+            continue;
+        }
+
+        uint32_t led_count = led_get_count();
+        if (led_count == 0U) {
+            continue;
+        }
+
+        fsm_ctx_t snap = {0};
+        bool has_snap = fsm_runtime_snapshot(&snap);
+
+        fsm_state_t state = has_snap ? snap.state : FSM_STATE_IDLE;
+        bool running_or_paused = has_snap && (state == FSM_STATE_RUNNING || state == FSM_STATE_PAUSED);
+        bool idle_effect_state = !running_or_paused;
+        bool last_running_or_paused = (last_state == FSM_STATE_RUNNING || last_state == FSM_STATE_PAUSED);
+        bool last_idle_effect_state = (last_state != FSM_STATE_RUNNING && last_state != FSM_STATE_PAUSED);
+        bool prefine_active = running_or_paused && snap.pre_fine_ciclo_active;
+        uint8_t progress = 0U;
+        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+
+        if (running_or_paused && snap.running_target_ms > 0U) {
+            uint32_t pct = (uint32_t)((snap.running_elapsed_ms * 100U) / snap.running_target_ms);
+            if (pct > 100U) {
+                pct = 100U;
+            }
+            progress = (uint8_t)pct;
+        }
+
+        if (last_running_or_paused && !running_or_paused) {
+            finish_blink_active = true;
+            finish_blink_on = false;
+            finish_blink_toggles_left = 10U;
+            finish_blink_next_toggle_ms = now_ms;
+        }
+
+        if (finish_blink_active) {
+            if (now_ms >= finish_blink_next_toggle_ms) {
+                finish_blink_on = !finish_blink_on;
+                if (finish_blink_on) {
+                    (void)led_fill_color(255U, 255U, 255U);
+                } else {
+                    (void)led_clear();
+                }
+
+                finish_blink_next_toggle_ms = now_ms + finish_blink_toggle_ms;
+                if (finish_blink_toggles_left > 0U) {
+                    --finish_blink_toggles_left;
+                }
+                if (finish_blink_toggles_left == 0U) {
+                    finish_blink_active = false;
+                    last_state = (fsm_state_t)(-1);
+                    last_progress = 255U;
+                    last_prefine = false;
+                    last_count = 0U;
+                }
+            }
+
+            last_state = state;
+            last_progress = progress;
+            last_prefine = prefine_active;
+            last_count = led_count;
+            continue;
+        }
+
+        if (last_idle_effect_state && !idle_effect_state) {
+            clear_after_idle_until_ms = now_ms + 500U;
+            (void)led_clear();
+            last_state = state;
+            last_progress = progress;
+            last_prefine = prefine_active;
+            last_count = led_count;
+            continue;
+        }
+
+        if (clear_after_idle_until_ms != 0U && now_ms < clear_after_idle_until_ms) {
+            (void)led_clear();
+            continue;
+        }
+
+        if (state == last_state &&
+            progress == last_progress &&
+            prefine_active == last_prefine &&
+            led_count == last_count &&
+            !idle_effect_state) {
+            continue;
+        }
+
+        if (idle_effect_state) {
+            uint32_t slot_ms = idle_effect_cycle_ms / led_count;
+            if (slot_ms == 0U) {
+                slot_ms = 1U;
+            }
+
+            uint32_t cycle_pos = now_ms % idle_effect_cycle_ms;
+            uint32_t active_led = cycle_pos / slot_ms;
+            if (active_led >= led_count) {
+                active_led = led_count - 1U;
+            }
+
+            uint32_t led_phase_ms = cycle_pos % slot_ms;
+            uint32_t half_phase_ms = slot_ms / 2U;
+            if (half_phase_ms == 0U) {
+                half_phase_ms = 1U;
+            }
+
+            uint32_t active_brightness_pct = 100U;
+            if (led_phase_ms <= half_phase_ms) {
+                active_brightness_pct = 100U - ((80U * led_phase_ms) / half_phase_ms);
+            } else {
+                uint32_t rise_window = slot_ms - half_phase_ms;
+                if (rise_window == 0U) {
+                    rise_window = 1U;
+                }
+                active_brightness_pct = 20U + ((80U * (led_phase_ms - half_phase_ms)) / rise_window);
+            }
+
+            for (uint32_t i = 0; i < led_count; ++i) {
+                uint32_t brightness_pct = (i == active_led) ? active_brightness_pct : 100U;
+                uint8_t blue = (uint8_t)(((uint32_t)idle_b * brightness_pct) / 100U);
+                (void)led_set_pixel(i, idle_r, idle_g, blue);
+            }
+            (void)led_refresh();
+        } else {
+            uint32_t leds_on = (led_count * progress) / 100U;
+
+            uint8_t on_r = prefine_active ? prefine_r : run_r;
+            uint8_t on_g = prefine_active ? prefine_g : run_g;
+            uint8_t on_b = prefine_active ? prefine_b : run_b;
+
+            for (uint32_t i = 0; i < led_count; ++i) {
+                if (i < leds_on) {
+                    (void)led_set_pixel(i, on_r, on_g, on_b);
+                } else {
+                    (void)led_set_pixel(i, 0U, 0U, 0U);
+                }
+            }
+            (void)led_refresh();
+        }
+
+        last_state = state;
+        last_progress = progress;
+        last_prefine = prefine_active;
+        last_count = led_count;
     }
 }
 #endif /* DNA_LED_STRIP == 0 */

@@ -718,7 +718,7 @@ static struct {
 #define LED_BAR_COLOR_IDLE_G     50
 #define LED_BAR_COLOR_IDLE_B     100
 #define LED_BAR_COLOR_RUN_R      0
-#define LED_BAR_COLOR_RUN_G      255
+#define LED_BAR_COLOR_RUN_G      180
 #define LED_BAR_COLOR_RUN_B      0
 #define LED_BAR_COLOR_PREFINE_R  128
 #define LED_BAR_COLOR_PREFINE_G  0

@@ -45,6 +45,7 @@ void io_expander_set_config_enabled(bool enabled) {
 
 static i2c_master_dev_handle_t io_out_dev, io_in_dev;
 static bool s_io_exp_ready = false;
+static const uint8_t IO_EXP_INIT_MAX_ATTEMPTS = 3U;
 
 
 /**
@@ -60,6 +61,32 @@ static void io_expander_reset_handles(void)
     io_out_dev = NULL;
     io_in_dev = NULL;
     s_io_exp_ready = false;
+}
+
+static bool io_expander_is_recoverable_i2c_error(esp_err_t err)
+{
+    return (err == ESP_ERR_INVALID_STATE || err == ESP_ERR_TIMEOUT || err == ESP_FAIL);
+}
+
+static esp_err_t io_expander_recover_bus(i2c_master_bus_handle_t bus, const char *reason)
+{
+    if (bus == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t reset_err = i2c_master_bus_reset(bus);
+    if (reset_err != ESP_OK) {
+        ESP_LOGW(TAG,
+                 "[C] Recovery bus I2C fallita (%s): %s",
+                 reason ? reason : "n/a",
+                 esp_err_to_name(reset_err));
+        return reset_err;
+    }
+
+    ESP_LOGW(TAG,
+             "[C] Recovery bus I2C eseguita (%s)",
+             reason ? reason : "n/a");
+    return ESP_OK;
 }
 
 
@@ -164,19 +191,29 @@ if (!s_io_expander_config_enabled) {
     return ESP_ERR_INVALID_STATE;
 }
 
-    esp_err_t ret;
+    esp_err_t ret = ESP_FAIL;
+    esp_err_t last_err = ESP_FAIL;
     i2c_master_bus_handle_t bus = NULL;
-    for (int attempt = 0; attempt < 2; attempt++) {
+    for (uint8_t attempt = 0; attempt < IO_EXP_INIT_MAX_ATTEMPTS; attempt++) {
         ret = io_expander_prepare_bus(&bus);
         if (ret != ESP_OK) {
             return ret;
         }
+
+        if (attempt > 0U) {
+            (void)io_expander_recover_bus(bus, "retry_init");
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
         ret = io_expander_attach_devices(bus);
         if (ret != ESP_OK) {
-            if (ret == ESP_ERR_INVALID_STATE && attempt == 0) {
+            last_err = ret;
+            if (io_expander_is_recoverable_i2c_error(ret) && (attempt + 1U) < IO_EXP_INIT_MAX_ATTEMPTS) {
+                (void)io_expander_recover_bus(bus, "attach_devices");
+                vTaskDelay(pdMS_TO_TICKS(10));
                 continue;
             }
-            return ESP_ERR_NOT_FOUND;
+            return last_err;
         }
 
         ret = write_reg(io_out_dev, REG_DIRECTION, 0xFF); // Tutti i pin come output
@@ -186,15 +223,19 @@ if (!s_io_expander_config_enabled) {
 
         ESP_LOGE(TAG, "[C] Errore comunicazione chip OUTPUT (0x%02X): %s",
                  FXL6408_ADDR_OUT, esp_err_to_name(ret));
+        last_err = ret;
         io_expander_reset_handles();
-        if (ret == ESP_ERR_INVALID_STATE && attempt == 0) {
+
+        if (io_expander_is_recoverable_i2c_error(ret) && (attempt + 1U) < IO_EXP_INIT_MAX_ATTEMPTS) {
+            (void)io_expander_recover_bus(bus, "write_direction_out");
+            vTaskDelay(pdMS_TO_TICKS(10));
             continue;
         }
-        return ESP_ERR_NOT_FOUND;
+        return last_err;
     }
 
     if (io_out_dev == NULL || io_in_dev == NULL) {
-        return ESP_ERR_NOT_FOUND;
+        return (last_err != ESP_FAIL) ? last_err : ESP_ERR_NOT_FOUND;
     }
 
     write_reg(io_out_dev, REG_OUTPUT_TRISTATE, 0x00); // Disabilita High-Z (attiva driver)
@@ -205,7 +246,7 @@ if (!s_io_expander_config_enabled) {
         ESP_LOGE(TAG, "[C] Errore comunicazione chip INPUT (0x%02X): %s",
                  FXL6408_ADDR_IN, esp_err_to_name(ret));
         io_expander_reset_handles();
-        return ESP_ERR_NOT_FOUND;
+        return ret;
     }
     // Abilita Pull-up su tutti i pin di input per stabilizzare bit flottanti (come il bit 4)
     write_reg(io_in_dev, REG_PULL_SELECT, 0xFF); // 1 = Pull-up
