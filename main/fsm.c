@@ -373,7 +373,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
             break;
 
         case FSM_STATE_CREDIT:
-            if (event == FSM_EVENT_PROGRAM_SELECTED && ctx->credit_cents > 0) {
+            if (event == FSM_EVENT_PROGRAM_SELECTED) {
                 ctx->state = FSM_STATE_RUNNING;
                 ctx->program_running = true;
                 ctx->running_elapsed_ms = 0;
@@ -552,6 +552,20 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
 
+            int32_t prev_credit_cents = ctx->credit_cents;
+            int32_t prev_ecd_coins = ctx->ecd_coins;
+            int32_t prev_vcd_coins = ctx->vcd_coins;
+            int32_t prev_ecd_used = ctx->ecd_used;
+            int32_t prev_vcd_used = ctx->vcd_used;
+            uint32_t prev_pause_max_ms = ctx->pause_max_ms;
+            uint32_t prev_running_target_ms = ctx->running_target_ms;
+            int32_t prev_running_price_units = ctx->running_price_units;
+            char prev_running_program_name[FSM_EVENT_TEXT_MAX_LEN] = {0};
+            snprintf(prev_running_program_name,
+                     sizeof(prev_running_program_name),
+                     "%s",
+                     ctx->running_program_name);
+
             if (ctx->credit_cents <= 0) {
                 fsm_append_message("Credito a zero: selezione programma non consentita");
                 return false;
@@ -568,6 +582,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             ctx->running_price_units = (event->value_i32 > 0) ? event->value_i32 : 0;
             snprintf(ctx->running_program_name, sizeof(ctx->running_program_name), "%s", event->text[0] ? event->text : "programma");
 
+            bool charged = false;
             if (ctx->running_price_units > 0) {
                 if (ctx->credit_cents < ctx->running_price_units) {
                     fsm_append_message("Credito insufficiente per avvio programma");
@@ -578,10 +593,30 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                         fsm_append_message("Credito insufficiente per avvio programma");
                         return false;
                     }
+                    charged = true;
                 }
             }
 
-            return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_SELECTED);
+            if (!fsm_handle_event(ctx, FSM_EVENT_PROGRAM_SELECTED)) {
+                if (charged) {
+                    ctx->credit_cents = prev_credit_cents;
+                    ctx->ecd_coins = prev_ecd_coins;
+                    ctx->vcd_coins = prev_vcd_coins;
+                    ctx->ecd_used = prev_ecd_used;
+                    ctx->vcd_used = prev_vcd_used;
+                }
+                ctx->pause_max_ms = prev_pause_max_ms;
+                ctx->running_target_ms = prev_running_target_ms;
+                ctx->running_price_units = prev_running_price_units;
+                snprintf(ctx->running_program_name,
+                         sizeof(ctx->running_program_name),
+                         "%s",
+                         prev_running_program_name);
+                fsm_append_message("Avvio programma fallito: credito ripristinato");
+                return false;
+            }
+
+            return true;
 
         case FSM_INPUT_EVENT_PROGRAM_STOP:
             return fsm_handle_event(ctx, FSM_EVENT_PROGRAM_STOP);

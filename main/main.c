@@ -347,6 +347,13 @@ void app_main(void)
     tasks_load_config("/spiffs/tasks.json");
     web_ui_program_table_init();
     tasks_start_all();
+
+    esp_err_t boot_done_ret = init_mark_boot_completed();
+    if (boot_done_ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " impossibile azzerare contatore reboot consecutivi: %s", esp_err_to_name(boot_done_ret));
+    }
+
     if (BOOT_COUNTER_RESET_DELAYED)
     {
         ESP_LOGI(TAG, LOG_CTX_PREFIX " reset contatore reboot posticipato di %d ms", BOOT_COUNTER_STABLE_WINDOW_MS);
@@ -398,12 +405,6 @@ void app_main(void)
 
     if (!tasks_start_named("fsm")) {
         ESP_LOGE(TAG, LOG_CTX_PREFIX " impossibile avviare task FSM dopo bootstrap UI");
-    }
-
-    esp_err_t boot_done_ret = init_mark_boot_completed();
-    if (boot_done_ret != ESP_OK)
-    {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " impossibile azzerare contatore reboot consecutivi: %s", esp_err_to_name(boot_done_ret));
     }
     ESP_LOGI(TAG, LOG_CTX_PREFIX " App pronta: endpoint HTTP /status e /ota disponibili");
 

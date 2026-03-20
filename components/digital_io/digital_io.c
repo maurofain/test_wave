@@ -105,11 +105,11 @@ static bool is_modbus_available(const device_config_t *cfg)
 static esp_err_t ensure_local_io_ready(const device_config_t *cfg)
 {
     if (cfg == NULL) {
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_CONFIG_NOT_READY;
     }
 
     if (!cfg->sensors.io_expander_enabled) {
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_LOCAL_IO_DISABLED;
     }
 
     return io_expander_init();
@@ -118,7 +118,7 @@ static esp_err_t ensure_local_io_ready(const device_config_t *cfg)
 static esp_err_t ensure_modbus_ready(const device_config_t *cfg)
 {
     if (!is_modbus_available(cfg)) {
-        return ESP_ERR_INVALID_STATE;
+        return DIGITAL_IO_ERR_MODBUS_DISABLED;
     }
 
     return modbus_relay_init();

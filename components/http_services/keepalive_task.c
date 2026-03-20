@@ -47,6 +47,11 @@ static esp_err_t keepalive_send_message(void)
     char outputstates[DIGITAL_IO_LOCAL_OUTPUT_COUNT + 1] = {0};
     float temp_float = 0.0f;
     float hum_float = 0.0f;
+    http_services_keepalive_response_t *response = calloc(1, sizeof(http_services_keepalive_response_t));
+    if (response == NULL) {
+        ESP_LOGE(TAG, "[C] Keepalive: allocazione risposta fallita");
+        return ESP_ERR_NO_MEM;
+    }
 
     esp_err_t snapshot_err = digital_io_get_snapshot(&snapshot);
     if (snapshot_err != ESP_OK) {
@@ -77,17 +82,16 @@ static esp_err_t keepalive_send_message(void)
     int32_t hum_hundredths = (int32_t)(hum_float * 100.0f);
     s_stats.total_sent++;
 
-    http_services_keepalive_response_t response = {0};
     esp_err_t err = http_services_keepalive("OK",
                                             inputstates,
                                             outputstates,
                                             temp_hundredths,
                                             hum_hundredths,
-                                            &response);
+                                            response);
     if (err != ESP_OK) {
         s_stats.failed++;
         s_stats.last_failure_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
-        const char *err_text = response.common.deserror[0] ? response.common.deserror : esp_err_to_name(err);
+        const char *err_text = response->common.deserror[0] ? response->common.deserror : esp_err_to_name(err);
         strncpy(s_stats.last_error, err_text, sizeof(s_stats.last_error) - 1);
         s_stats.last_error[sizeof(s_stats.last_error) - 1] = '\0';
         ESP_LOGW(TAG,
@@ -95,6 +99,7 @@ static esp_err_t keepalive_send_message(void)
                  s_stats.last_error,
                  inputstates,
                  outputstates);
+        free(response);
         return err;
     }
 
@@ -109,8 +114,10 @@ static esp_err_t keepalive_send_message(void)
              outputstates,
              (long)temp_hundredths,
              (long)hum_hundredths,
-             (unsigned)response.activity_count,
+             (unsigned)response->activity_count,
              (unsigned)s_keepalive_count);
+
+    free(response);
 
     return ESP_OK;
 }
@@ -126,9 +133,8 @@ static void keepalive_timer_callback(TimerHandle_t xTimer)
         return;
     }
 
-    esp_err_t err = keepalive_send_message();
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "[C] Keepalive fallito, nuovo tentativo al prossimo ciclo");
+    if (s_keepalive_task_handle != NULL) {
+        xTaskNotifyGive(s_keepalive_task_handle);
     }
 }
 
@@ -165,13 +171,23 @@ static void keepalive_task(void *parameter)
     
     ESP_LOGI(TAG, "[C] Keepalive timer started (10-second intervals)");
     
-    // Task main loop - just wait and monitor
+    TickType_t last_stats_log = xTaskGetTickCount();
+
+    // Task main loop - attende eventi timer ed esegue keepalive nel contesto task
     while (s_keepalive_running) {
-        vTaskDelay(pdMS_TO_TICKS(30000)); // Check every 30 seconds
-        
-        // Log periodic statistics
-        ESP_LOGI(TAG, "[C] Keepalive stats - Sent: %u, Success: %u, Failed: %u, Refresh: %u",
-                 s_stats.total_sent, s_stats.successful, s_stats.failed, s_stats.token_refreshes);
+        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) > 0) {
+            esp_err_t err = keepalive_send_message();
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "[C] Keepalive fallito, nuovo tentativo al prossimo ciclo");
+            }
+        }
+
+        TickType_t now = xTaskGetTickCount();
+        if ((now - last_stats_log) >= pdMS_TO_TICKS(30000)) {
+            ESP_LOGI(TAG, "[C] Keepalive stats - Sent: %u, Success: %u, Failed: %u, Refresh: %u",
+                     s_stats.total_sent, s_stats.successful, s_stats.failed, s_stats.token_refreshes);
+            last_stats_log = now;
+        }
     }
     
     // Cleanup
@@ -201,7 +217,7 @@ esp_err_t keepalive_task_start(void)
     BaseType_t result = xTaskCreate(
         keepalive_task,
         "keepalive_task",
-        4096,  // Stack size
+        8192,  // Stack size
         NULL,
         5,    // Priority (medium)
         &s_keepalive_task_handle

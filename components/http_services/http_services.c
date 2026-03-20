@@ -724,7 +724,7 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
     /* response buffer that will be filled inside the attempt loop */
     char *resp = NULL;
     size_t total = 0;
-    bool use_fallback_headers = false;
+    bool use_fallback_headers = true;
     char *generated_auth_header = NULL;
 
     if ((!auth_header || auth_header[0] == '\0') && g_auth_token[0] != '\0') {
@@ -812,17 +812,22 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 #endif
         }
 
-        /* perform (enable verbose http/tls logs briefly to help debug read failures) */
-        esp_log_level_set("esp_http_client", ESP_LOG_DEBUG);
-        esp_log_level_set("esp_tls", ESP_LOG_DEBUG);
+        /* perform (riduce rumore log da parser chunked del client IDF) */
+        esp_log_level_t prev_http_client_level = esp_log_level_get("HTTP_CLIENT");
+        esp_log_level_t prev_esp_http_client_level = esp_log_level_get("esp_http_client");
+        esp_log_level_t prev_esp_tls_level = esp_log_level_get("esp_tls");
+        esp_log_level_set("HTTP_CLIENT", ESP_LOG_NONE);
+        esp_log_level_set("esp_http_client", ESP_LOG_NONE);
+        esp_log_level_set("esp_tls", ESP_LOG_WARN);
         err = esp_http_client_perform(client);
         status = esp_http_client_get_status_code(client);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "esp_http_client_perform returned %s (attempt %d)", esp_err_to_name(err), attempt + 1);
         }
-        /* restore default levels (keep noise low) */
-        esp_log_level_set("esp_http_client", ESP_LOG_INFO);
-        esp_log_level_set("esp_tls", ESP_LOG_WARN);
+        /* ripristina i livelli precedenti */
+        esp_log_level_set("HTTP_CLIENT", prev_http_client_level);
+        esp_log_level_set("esp_http_client", prev_esp_http_client_level);
+        esp_log_level_set("esp_tls", prev_esp_tls_level);
 
         /* log response headers we care about (may help debug chunking issues).
            esp_http_client_get_header() returns a pointer to the client's internal header value — DO NOT free it. */
