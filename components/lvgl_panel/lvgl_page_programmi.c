@@ -725,7 +725,14 @@ static void update_state(const fsm_ctx_t *snap)
             lv_obj_add_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_set_style_bg_color(s_stop_btn, prefine_active ? COL_TIMER_WARN : COL_PROG_LOW, LV_PART_MAIN);
             char stop_text[64];
-            (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
+            if (s_stop_confirm) {
+                (void)lvgl_i18n_get_text("program_confirm_cancel",
+                                         "Conferma annullamento",
+                                         stop_text,
+                                         sizeof(stop_text));
+            } else {
+                (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
+            }
             lv_label_set_text(s_stop_lbl, stop_text);
         } else if (ecd_warning_active) {
             lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_HIDDEN);

@@ -40,6 +40,7 @@ function cacheDom() {
   dom.searchStatus = document.getElementById("search-status");
   dom.saveBtn = document.getElementById("save-btn");
   dom.addKeyBtn = document.getElementById("add-key-btn");
+  dom.reloadBtn = document.getElementById("reload-btn");
   dom.translateAllBtn = document.getElementById("translate-all-btn");
   // dom.translateAllScopesBtn removed: functionality merged into translateAllBtn (Ctrl+click / Ctrl+right-click)
   dom.newKeyLabel = document.getElementById("new-key-label");
@@ -91,6 +92,17 @@ function bindEvents() {
       return;
     }
     showToast(result.error ?? "Errore durante il salvataggio", "error", 5000);
+  });
+
+  dom.reloadBtn.addEventListener("click", async () => {
+    try {
+      await window.editorApi.reload();
+      await initialize();
+      setHasChanges(false);
+      showToast("Dati ricaricati con successo.", "success");
+    } catch (error) {
+      showToast(`Errore durante il ricaricamento: ${error.message}`, "error", 5000);
+    }
   });
 
   dom.addKeyBtn.addEventListener("click", async () => {

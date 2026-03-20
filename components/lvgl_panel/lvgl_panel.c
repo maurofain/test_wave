@@ -321,6 +321,11 @@ void lvgl_panel_refresh_texts(void)
         return;
     }
 
+    esp_err_t reload_err = lvgl_i18n_reload();
+    if (reload_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Reload i18n LVGL fallito: %s", esp_err_to_name(reload_err));
+    }
+
     // Aggiorna la lingua nel nuovo sistema i18n LVGL
     const char *lang = lvgl_panel_get_runtime_language();
     if (lang && lang[0]) {

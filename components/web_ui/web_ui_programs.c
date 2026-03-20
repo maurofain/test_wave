@@ -45,6 +45,20 @@ static void program_name_build_key(uint8_t program_id, char *key_out, size_t key
     snprintf(key_out, key_out_len, "program_name_%02u", (unsigned)program_id);
 }
 
+static void program_name_build_legacy_key(uint8_t program_id, char *key_out, size_t key_out_len)
+{
+    if (!key_out || key_out_len == 0) {
+        return;
+    }
+
+    if (program_id == 0) {
+        key_out[0] = '\0';
+        return;
+    }
+
+    snprintf(key_out, key_out_len, "%u", (unsigned)(800U + program_id));
+}
+
 static void program_name_build_fallback(uint8_t program_id, char *fallback_out, size_t fallback_out_len)
 {
     if (!fallback_out || fallback_out_len == 0) {
@@ -61,14 +75,23 @@ static void program_entry_refresh_name(web_ui_program_entry_t *entry)
     }
 
     char key[PROGRAM_NAME_KEY_MAX] = {0};
+    char legacy_key[PROGRAM_NAME_KEY_MAX] = {0};
     char fallback[WEB_UI_PROGRAM_NAME_MAX] = {0};
     char localized[WEB_UI_PROGRAM_NAME_MAX] = {0};
 
     program_name_build_key(entry->program_id, key, sizeof(key));
+    program_name_build_legacy_key(entry->program_id, legacy_key, sizeof(legacy_key));
     program_name_build_fallback(entry->program_id, fallback, sizeof(fallback));
 
     if (key[0] != '\0' &&
         device_config_get_ui_text_scoped("lvgl", key, fallback, localized, sizeof(localized)) == ESP_OK &&
+        localized[0] != '\0') {
+        snprintf(entry->name, sizeof(entry->name), "%s", localized);
+        return;
+    }
+
+    if (legacy_key[0] != '\0' &&
+        device_config_get_ui_text_scoped("lvgl", legacy_key, fallback, localized, sizeof(localized)) == ESP_OK &&
         localized[0] != '\0') {
         snprintf(entry->name, sizeof(entry->name), "%s", localized);
         return;
@@ -281,9 +304,8 @@ static char *programs_table_to_json_internal(bool include_display_name)
         }
 
         cJSON_AddNumberToObject(item, "program_id", entry->program_id);
-        if (include_display_name) {
-            cJSON_AddStringToObject(item, "name", entry->name);
-        }
+        cJSON_AddStringToObject(item, "name", entry->name);
+        (void)include_display_name;
         cJSON_AddBoolToObject(item, "enabled", entry->enabled);
         cJSON_AddNumberToObject(item, "price_units", entry->price_units);
         cJSON_AddNumberToObject(item, "duration_sec", entry->duration_sec);
@@ -384,6 +406,7 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         web_ui_program_entry_t *entry = &next.programs[index];
 
         cJSON *program_id = cJSON_GetObjectItem(item, "program_id");
+        cJSON *name = cJSON_GetObjectItem(item, "name");
         cJSON *enabled = cJSON_GetObjectItem(item, "enabled");
         cJSON *price_units = cJSON_GetObjectItem(item, "price_units");
         cJSON *duration_sec = cJSON_GetObjectItem(item, "duration_sec");
@@ -420,9 +443,15 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         entry->duration_sec = (uint16_t)duration;
         entry->pause_max_suspend_sec = (uint16_t)pause_max;
         entry->relay_mask = (uint16_t)mask;
+        if (cJSON_IsString(name) && name->valuestring && name->valuestring[0] != '\0') {
+            snprintf(entry->name, sizeof(entry->name), "%s", name->valuestring);
+        } else {
+            entry->name[0] = '\0';
+        }
     }
 
     s_program_table = next;
+    programs_refresh_names_from_i18n();
     cJSON_Delete(root);
 
     if (programs_save_to_storage() != ESP_OK) {

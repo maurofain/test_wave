@@ -27,6 +27,14 @@ class I18nService {
     this.entriesByScope = new Map();
   }
 
+  reload() {
+    this.catalog = null;
+    this.languages = [];
+    this.scopes = [];
+    this.entriesByScope = new Map();
+    this.loadAllFiles();
+  }
+
   loadIdNameMap() {
     return true;
   }

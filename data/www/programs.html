@@ -23,6 +23,24 @@
 		.status { margin: 12px 0; padding: 10px; border-radius: 5px; display: none; }
 		.status.ok { display: block; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
 		.status.err { display: block; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+		.program-name-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 6px; }
+		.program-name-lang-btn {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			padding: 6px 10px;
+			border: 1px solid #d0d7de;
+			border-radius: 999px;
+			background: #f8fafc;
+			color: #2c3e50;
+			cursor: pointer;
+			font-size: 14px;
+			font-weight: bold;
+		}
+		.program-name-lang-btn:hover { background: #eaf2f8; }
+		.program-name-lang-btn.active { background: #3498db; color: white; border-color: #3498db; }
+		.program-name-lang-flag { font-size: 18px; line-height: 1; }
+		.program-name-lang-code { font-size: 12px; letter-spacing: 0.05em; }
 
 		.relay-check-editor { display: flex; flex-direction: column; gap: 8px; min-width: 360px; }
 		.relay-check-line { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -165,6 +183,7 @@
 				{{036}}
 			</p>
 			<div id="status" class="status"></div>
+			<div id="programNameToolbar" class="program-name-toolbar"></div>
 
 			<table>
 				<thead>

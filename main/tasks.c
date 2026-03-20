@@ -1017,7 +1017,7 @@ static void ws2812_task(void *arg)
 
     TickType_t period_ticks = (param && param->period_ticks > 0)
                                 ? param->period_ticks
-                                : pdMS_TO_TICKS(100);
+                                : pdMS_TO_TICKS(40);
     TickType_t last_wake = xTaskGetTickCount();
     fsm_state_t last_state = FSM_STATE_IDLE;
     uint8_t last_progress = 255U;
@@ -1144,45 +1144,65 @@ static void ws2812_task(void *arg)
             }
 
             uint32_t cycle_pos = now_ms % idle_effect_cycle_ms;
-            uint32_t active_led = cycle_pos / slot_ms;
-            if (active_led >= led_count) {
-                active_led = led_count - 1U;
+            uint32_t active_led_index = cycle_pos / slot_ms;
+            if (active_led_index >= led_count) {
+                active_led_index = led_count - 1U;
             }
 
             uint32_t led_phase_ms = cycle_pos % slot_ms;
-            uint32_t half_phase_ms = slot_ms / 2U;
-            if (half_phase_ms == 0U) {
-                half_phase_ms = 1U;
-            }
-
-            uint32_t active_brightness_pct = 100U;
-            if (led_phase_ms <= half_phase_ms) {
-                active_brightness_pct = 100U - ((80U * led_phase_ms) / half_phase_ms);
-            } else {
-                uint32_t rise_window = slot_ms - half_phase_ms;
-                if (rise_window == 0U) {
-                    rise_window = 1U;
-                }
-                active_brightness_pct = 20U + ((80U * (led_phase_ms - half_phase_ms)) / rise_window);
-            }
 
             for (uint32_t i = 0; i < led_count; ++i) {
-                uint32_t brightness_pct = (i == active_led) ? active_brightness_pct : 100U;
+                uint32_t brightness_pct;
+                if (i == active_led_index) {
+                    // Fading logic for the active LED: 50% -> 10% -> 90% -> 50%
+                    uint32_t half_phase_ms = slot_ms / 2U;
+                    if (half_phase_ms == 0U) half_phase_ms = 1U;
+
+                    if (led_phase_ms < half_phase_ms) {
+                        // First half: 50% up to 100%
+                        brightness_pct = 50U + ((50U * led_phase_ms) / half_phase_ms);
+                    } else {
+                        // Second half: 100% down to 10%
+                        uint32_t second_half_progress = led_phase_ms - half_phase_ms;
+                        uint32_t second_half_duration = slot_ms - half_phase_ms;
+                        if (second_half_duration == 0U) second_half_duration = 1U;
+                        brightness_pct = 100U - ((90U * second_half_progress) / second_half_duration);
+                    }
+                } else {
+                    // Inactive LEDs are at a constant 10%
+                    brightness_pct = 10U;
+                }
                 uint8_t blue = (uint8_t)(((uint32_t)idle_b * brightness_pct) / 100U);
                 (void)led_set_pixel(i, idle_r, idle_g, blue);
             }
             (void)led_refresh();
         } else {
-            uint32_t leds_on = (led_count * progress) / 100U;
+            uint32_t leds_on_target = (led_count * progress) / 100U;
 
             uint8_t on_r = prefine_active ? prefine_r : run_r;
             uint8_t on_g = prefine_active ? prefine_g : run_g;
             uint8_t on_b = prefine_active ? prefine_b : run_b;
 
             for (uint32_t i = 0; i < led_count; ++i) {
-                if (i < leds_on) {
+                if (i < leds_on_target) {
+                    // This LED is fully on
                     (void)led_set_pixel(i, on_r, on_g, on_b);
+                } else if (i == leds_on_target && progress < 100) {
+                    // This is the currently progressing LED, let's fade it in
+                    uint32_t progress_per_led = 100 / led_count;
+                    uint32_t led_start_progress = i * progress_per_led;
+                    uint32_t led_progress_slice = progress - led_start_progress;
+                    
+                    uint32_t brightness_pct = 10 + (led_progress_slice * 90 / progress_per_led);
+                    if (brightness_pct > 100) brightness_pct = 100;
+                    if (brightness_pct < 10) brightness_pct = 10;
+
+                    uint8_t r = (uint8_t)(((uint32_t)on_r * brightness_pct) / 100U);
+                    uint8_t g = (uint8_t)(((uint32_t)on_g * brightness_pct) / 100U);
+                    uint8_t b = (uint8_t)(((uint32_t)on_b * brightness_pct) / 100U);
+                    (void)led_set_pixel(i, r, g, b);
                 } else {
+                    // This LED is off
                     (void)led_set_pixel(i, 0U, 0U, 0U);
                 }
             }

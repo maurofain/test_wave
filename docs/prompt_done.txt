@@ -1,4 +1,5 @@
 [ ] aggiungiamo alla struttura dei messaggi per la mailbox un campo timestramp che viene popolato al momento dell'inserimento nella coda. In FSM eliminiamo i messaggi non consumati entro 1100ms dalla immissione in coda
+[ ]il pulsante s_stop_btn va nascosto dopo la richiesta di stop se si annulla la pausa e anche se si conferma l'annullamento
 [ ] Va fatta chiarezza sulla differenza tra Crediti e Euro: abbiamo 2 distinti valori : il cliente fornisce Euro tramite:
  vcd : in questo caso si preleva 1 euro per ogni credito utilizzato
  ecd :  in questo caso vanno conteggi9ate le monete e per ogni euro ricevuto si aumenta di 1 credito. L'uso di monete in centesimi impone di sommare tutte le monete e al raggiungimento di un valore => a 1 euro generare un credito.

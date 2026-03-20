@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("editorApi", {
   addKey: (payload) => ipcRenderer.invoke("editor:add-key", payload),
   search: (searchText) => ipcRenderer.invoke("editor:search", searchText),
   save: (opts) => ipcRenderer.invoke("editor:save", opts),
+  reload: () => ipcRenderer.invoke("editor:reload"),
   setTranslatorEnabled: (enabled) => ipcRenderer.invoke("editor:set-translator-enabled", enabled),
   translate: (payload) => ipcRenderer.invoke("editor:translate", payload),
 });

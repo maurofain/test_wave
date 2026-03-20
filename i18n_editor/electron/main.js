@@ -117,6 +117,11 @@ ipcMain.handle("editor:save", async (_event, opts) => {
   return i18nService.saveAllFiles(createBackup);
 });
 
+ipcMain.handle("editor:reload", async () => {
+  i18nService.reload();
+  return { success: true };
+});
+
 ipcMain.handle("editor:set-translator-enabled", async (_event, enabled) => {
   translatorConfigService.setEnabled(Boolean(enabled));
   return {

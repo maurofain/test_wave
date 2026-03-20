@@ -643,8 +643,12 @@ esp_err_t device_config_update_program_text_i18n(const char *program_key, const 
 
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "[C] Aggiornato testo programma '%s' per lingua '%s': '%s'", program_key, language, new_text);
-        
-        // Invalida cache i18n per forzare ricaricamento
+
+        // Invalida le cache i18n locali prima delle prossime letture.
+        _i18n_v2_clear_cache();
+        _i18n_lookup_cache_clear();
+
+        // Invalida anche la cache lato web UI per forzare ricaricamento.
         extern void web_ui_i18n_cache_invalidate(void);
         web_ui_i18n_cache_invalidate();
     }

@@ -7517,44 +7517,44 @@
       "legacyId": "2.801",
       "label": "lvgl.programs.name_01",
       "text": {
-        "it": "Programma 1",
-        "en": "Program 1",
-        "fr": "Programme 1",
-        "de": "Programm 1",
-        "es": "Programa 1"
+        "it": "Lavaggio",
+        "en": "Washing",
+        "fr": "Lavage",
+        "de": "Waschen",
+        "es": "Lavado"
       }
     },
     "program_name_02": {
       "legacyId": "2.802",
       "label": "lvgl.programs.name_02",
       "text": {
-        "it": "Programma 2",
-        "en": "Program 2",
-        "fr": "Programme 2",
-        "de": "Programm 2",
-        "es": "Programa 2"
+        "it": "Lavagg. + Detergente",
+        "en": "Wash + detergent",
+        "fr": "Lavage + détergent",
+        "de": "Waschen + Waschmittel",
+        "es": "Lavado + detergente"
       }
     },
     "program_name_03": {
       "legacyId": "2.803",
       "label": "lvgl.programs.name_03",
       "text": {
-        "it": "Programma 3",
-        "en": "Program 3",
-        "fr": "Programme 3",
-        "de": "Programm 3",
-        "es": "Programa 3"
+        "it": "Risciacquo",
+        "en": "Rinse",
+        "fr": "Rincer",
+        "de": "Spülen",
+        "es": "Aclarar"
       }
     },
     "program_name_04": {
       "legacyId": "2.804",
       "label": "lvgl.programs.name_04",
       "text": {
-        "it": "Programma 4",
-        "en": "Program 4",
-        "fr": "Programme 4",
-        "de": "Programm 4",
-        "es": "Programa 4"
+        "it": "Ceratura",
+        "en": "Waxing",
+        "fr": "Épilation à la cire",
+        "de": "Wachsen",
+        "es": "Depilación"
       }
     },
     "program_name_05": {
