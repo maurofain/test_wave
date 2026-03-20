@@ -1515,11 +1515,11 @@
       "013": {
         "label": "config.text.013",
         "text": {
-          "it": "🆔 Identità Dispositivo",
-          "en": "📁 Mini File Manager (root only)",
-          "fr": "Mini File Manager (uniquement pour les utilisateurs root)",
-          "de": "📁 Mini-Dateimanager (nur Root)",
-          "es": "📁 Mini gestor de archivos (sólo root)"
+          "it": "🆔 Dispositivo",
+          "en": "🆔 Device",
+          "fr": "🆔 Dispositif",
+          "de": "🆔 Gerät",
+          "es": "🆔 Dispositivo"
         }
       },
       "014": {
@@ -7687,6 +7687,39 @@
         "fr": "Erreur sorties",
         "de": "Ausgangsfehler",
         "es": "Error salidas"
+      }
+    },
+    "program_end_title": {
+      "legacyId": "2.824",
+      "label": "lvgl.program.end_title",
+      "text": {
+        "it": "Programma concluso",
+        "en": "Program completed",
+        "fr": "Programme terminé",
+        "de": "Programm abgeschlossen",
+        "es": "Programa finalizado"
+      }
+    },
+    "program_end_credits_fmt": {
+      "legacyId": "2.825",
+      "label": "lvgl.program.end_credits_fmt",
+      "text": {
+        "it": "%ld crediti residui",
+        "en": "%ld remaining credits",
+        "fr": "%ld crédits restants",
+        "de": "%ld verbleibende Guthaben",
+        "es": "%ld créditos restantes"
+      }
+    },
+    "program_end_message": {
+      "legacyId": "2.826",
+      "label": "lvgl.program.end_message",
+      "text": {
+        "it": "Grazie per aver scelto il nostro autolavaggio",
+        "en": "Thank you for choosing our car wash",
+        "fr": "Merci d'avoir choisi notre station de lavage",
+        "de": "Danke, dass Sie unsere Waschanlage gewählt haben",
+        "es": "Gracias por elegir nuestro autolavado"
       }
     },
     "ecd_expire_line1_fmt": {

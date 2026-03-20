@@ -1373,6 +1373,19 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(sensors, "temp", cfg->sensors.temperature_enabled);
     cJSON_AddBoolToObject(sensors, "led", cfg->sensors.led_enabled);
     cJSON_AddNumberToObject(sensors, "led_n", cfg->sensors.led_count);
+    cJSON_AddNumberToObject(sensors, "led_run_r", cfg->sensors.led_run_r);
+    cJSON_AddNumberToObject(sensors, "led_run_g", cfg->sensors.led_run_g);
+    cJSON_AddNumberToObject(sensors, "led_run_b", cfg->sensors.led_run_b);
+    cJSON_AddNumberToObject(sensors, "led_prefine_r", cfg->sensors.led_prefine_r);
+    cJSON_AddNumberToObject(sensors, "led_prefine_g", cfg->sensors.led_prefine_g);
+    cJSON_AddNumberToObject(sensors, "led_prefine_b", cfg->sensors.led_prefine_b);
+    cJSON_AddNumberToObject(sensors, "led_standby_r", cfg->sensors.led_standby_r);
+    cJSON_AddNumberToObject(sensors, "led_standby_g", cfg->sensors.led_standby_g);
+    cJSON_AddNumberToObject(sensors, "led_standby_b", cfg->sensors.led_standby_b);
+    cJSON_AddNumberToObject(sensors, "led_flash_r", cfg->sensors.led_flash_r);
+    cJSON_AddNumberToObject(sensors, "led_flash_g", cfg->sensors.led_flash_g);
+    cJSON_AddNumberToObject(sensors, "led_flash_b", cfg->sensors.led_flash_b);
+    cJSON_AddNumberToObject(sensors, "led_flash_count", cfg->sensors.led_flash_count);
     cJSON_AddBoolToObject(sensors, "rs232", cfg->sensors.rs232_enabled);
     cJSON_AddBoolToObject(sensors, "rs485", cfg->sensors.rs485_enabled);
     cJSON_AddBoolToObject(sensors, "mdb", cfg->sensors.mdb_enabled);
@@ -1488,6 +1501,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON *ui = cJSON_CreateObject();
     cJSON_AddStringToObject(ui, "ulang", cfg->ui.user_language);
     cJSON_AddStringToObject(ui, "blang", cfg->ui.backend_language);
+    cJSON_AddNumberToObject(ui, "program_end_message_sec", cfg->ui.program_end_message_sec);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
     cJSON_AddStringToObject(root, "ui_language", cfg->ui.user_language);
@@ -1731,6 +1745,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON *ui = cJSON_CreateObject();
     cJSON_AddStringToObject(ui, "ulang", cfg->ui.user_language);
     cJSON_AddStringToObject(ui, "blang", cfg->ui.backend_language);
+    cJSON_AddNumberToObject(ui, "program_end_message_sec", cfg->ui.program_end_message_sec);
     cJSON_AddStringToObject(ui, "storage", "spiffs");
     cJSON_AddItemToObject(root, "ui", ui);
     cJSON_AddStringToObject(root, "ui_language", cfg->ui.user_language);
@@ -1908,6 +1923,102 @@ esp_err_t api_config_save(httpd_req_t *req)
         cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_n");
         if (!lc) lc = cJSON_GetObjectItem(sensors_obj, "led_count"); /* compat */
         if (lc) cfg->sensors.led_count = (uint32_t)lc->valueint;
+
+        cJSON *led_run_r = cJSON_GetObjectItem(sensors_obj, "led_run_r");
+        if (led_run_r && cJSON_IsNumber(led_run_r)) {
+            int val = led_run_r->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_run_r = (uint8_t)val;
+        }
+        cJSON *led_run_g = cJSON_GetObjectItem(sensors_obj, "led_run_g");
+        if (led_run_g && cJSON_IsNumber(led_run_g)) {
+            int val = led_run_g->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_run_g = (uint8_t)val;
+        }
+        cJSON *led_run_b = cJSON_GetObjectItem(sensors_obj, "led_run_b");
+        if (led_run_b && cJSON_IsNumber(led_run_b)) {
+            int val = led_run_b->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_run_b = (uint8_t)val;
+        }
+
+        cJSON *led_prefine_r = cJSON_GetObjectItem(sensors_obj, "led_prefine_r");
+        if (led_prefine_r && cJSON_IsNumber(led_prefine_r)) {
+            int val = led_prefine_r->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_prefine_r = (uint8_t)val;
+        }
+        cJSON *led_prefine_g = cJSON_GetObjectItem(sensors_obj, "led_prefine_g");
+        if (led_prefine_g && cJSON_IsNumber(led_prefine_g)) {
+            int val = led_prefine_g->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_prefine_g = (uint8_t)val;
+        }
+        cJSON *led_prefine_b = cJSON_GetObjectItem(sensors_obj, "led_prefine_b");
+        if (led_prefine_b && cJSON_IsNumber(led_prefine_b)) {
+            int val = led_prefine_b->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_prefine_b = (uint8_t)val;
+        }
+
+        cJSON *led_standby_r = cJSON_GetObjectItem(sensors_obj, "led_standby_r");
+        if (led_standby_r && cJSON_IsNumber(led_standby_r)) {
+            int val = led_standby_r->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_standby_r = (uint8_t)val;
+        }
+        cJSON *led_standby_g = cJSON_GetObjectItem(sensors_obj, "led_standby_g");
+        if (led_standby_g && cJSON_IsNumber(led_standby_g)) {
+            int val = led_standby_g->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_standby_g = (uint8_t)val;
+        }
+        cJSON *led_standby_b = cJSON_GetObjectItem(sensors_obj, "led_standby_b");
+        if (led_standby_b && cJSON_IsNumber(led_standby_b)) {
+            int val = led_standby_b->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_standby_b = (uint8_t)val;
+        }
+
+        cJSON *led_flash_r = cJSON_GetObjectItem(sensors_obj, "led_flash_r");
+        if (led_flash_r && cJSON_IsNumber(led_flash_r)) {
+            int val = led_flash_r->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_flash_r = (uint8_t)val;
+        }
+        cJSON *led_flash_g = cJSON_GetObjectItem(sensors_obj, "led_flash_g");
+        if (led_flash_g && cJSON_IsNumber(led_flash_g)) {
+            int val = led_flash_g->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_flash_g = (uint8_t)val;
+        }
+        cJSON *led_flash_b = cJSON_GetObjectItem(sensors_obj, "led_flash_b");
+        if (led_flash_b && cJSON_IsNumber(led_flash_b)) {
+            int val = led_flash_b->valueint;
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            cfg->sensors.led_flash_b = (uint8_t)val;
+        }
+
+        cJSON *led_flash_count = cJSON_GetObjectItem(sensors_obj, "led_flash_count");
+        if (led_flash_count && cJSON_IsNumber(led_flash_count)) {
+            int val = led_flash_count->valueint;
+            if (val < 1) val = 1;
+            if (val > 20) val = 20;
+            cfg->sensors.led_flash_count = (uint8_t)val;
+        }
         
         cfg->sensors.rs232_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232")) ||
             cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "rs232_enabled")); /* compat */
@@ -2234,6 +2345,15 @@ esp_err_t api_config_save(httpd_req_t *req)
         if (!backend_lang) backend_lang = cJSON_GetObjectItem(ui_obj, "backend_language"); /* compat */
         if (backend_lang && cJSON_IsString(backend_lang) && backend_lang->valuestring) {
             strncpy(cfg->ui.backend_language, backend_lang->valuestring, sizeof(cfg->ui.backend_language) - 1);
+        }
+
+        cJSON *program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_message_sec");
+        if (!program_end_sec) program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_sec"); /* compat */
+        if (program_end_sec && cJSON_IsNumber(program_end_sec)) {
+            int sec = program_end_sec->valueint;
+            if (sec < 0) sec = 0;
+            if (sec > 10) sec = 10;
+            cfg->ui.program_end_message_sec = (uint8_t)sec;
         }
 
         cJSON *records = cJSON_GetObjectItem(ui_obj, "records");

@@ -100,11 +100,6 @@ static lv_obj_t *s_stop_btn = NULL;  /* Flag image inside the button */
 static lv_obj_t *s_stop_lbl = NULL;  /* label inside stop button */
 static lv_obj_t *s_program_popup = NULL;
 static lv_obj_t *s_program_popup_lbl = NULL;
-static lv_obj_t *s_program_end_overlay = NULL;
-static lv_obj_t *s_program_end_card = NULL;
-static lv_obj_t *s_program_end_title_lbl = NULL;
-static lv_obj_t *s_program_end_credit_lbl = NULL;
-static lv_obj_t *s_program_end_msg_lbl = NULL;
 static lv_obj_t *s_prog_btns[PROG_COUNT];
 static lv_obj_t *s_prog_lbls[PROG_COUNT];
 static lv_timer_t *s_panel_timer = NULL;
@@ -116,8 +111,6 @@ static char s_prog_label_cache[PROG_COUNT][WEB_UI_PROGRAM_NAME_MAX] = {{0}};
 static bool s_prog_label_cache_valid = false;
 static char s_prog_label_cache_lang[8] = "";
 static uint32_t s_program_popup_until_ms = 0U;
-static bool s_program_popup_running_seen = false;
-static uint32_t s_program_end_effect_until_ms = 0U;
 
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
@@ -150,56 +143,6 @@ static char s_tr_pause_fmt[32] = "Pausa: %s";
 static char s_tr_ecd_expire_fmt[64] = "Il credito scadrà tra %lu secondi";
 static char s_tr_ecd_touch_hint[96] = "tocca il numero del credito per continuare";
 static char s_tr_program_outputs_error[64] = "Errore uscite";
-static char s_tr_program_end_title[64] = "Programma concluso";
-static char s_tr_program_end_credits_fmt[64] = "%ld crediti residui";
-static char s_tr_program_end_msg[96] = "Grazie per aver scelto il nostro autolavaggio";
-
-static uint32_t get_program_end_effect_ms(void)
-{
-    uint8_t sec = 3U;
-    device_config_t *cfg = device_config_get();
-    if (cfg) {
-        sec = cfg->ui.program_end_message_sec;
-    }
-    if (sec > 10U) {
-        sec = 10U;
-    }
-    return (uint32_t)sec * 1000U;
-}
-
-static void hide_program_end_effect(void)
-{
-    if (!s_program_end_overlay) {
-        return;
-    }
-    lv_obj_add_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
-    s_program_end_effect_until_ms = 0U;
-}
-
-static void show_program_end_effect(int32_t residual_credit)
-{
-    if (!s_program_end_overlay || !s_program_end_title_lbl || !s_program_end_credit_lbl || !s_program_end_msg_lbl) {
-        return;
-    }
-
-    uint32_t effect_ms = get_program_end_effect_ms();
-    if (effect_ms == 0U) {
-        hide_program_end_effect();
-        return;
-    }
-
-    char credit_line[96] = {0};
-    snprintf(credit_line, sizeof(credit_line), s_tr_program_end_credits_fmt, (long)residual_credit);
-
-    lv_label_set_text(s_program_end_title_lbl, s_tr_program_end_title);
-    lv_label_set_text(s_program_end_credit_lbl, credit_line);
-    lv_label_set_text(s_program_end_msg_lbl, s_tr_program_end_msg);
-
-    lv_obj_clear_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(s_program_end_overlay);
-    lv_obj_invalidate(s_program_end_overlay);
-    s_program_end_effect_until_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()) + effect_ms;
-}
 
 #define MAIN_PAGE_IDLE_TO_ADS_MS 60000U
 
@@ -231,7 +174,6 @@ static void on_credit_box_touch(lv_event_t *e)
     (void)e;
     mark_user_interaction();
     s_ecd_warning_dismissed = true;
-    hide_program_end_effect();
 }
 
 /**
@@ -308,36 +250,6 @@ static void panel_load_translations(void)
         ESP_LOGD(TAG, "[C] LVGL i18n: program_outputs_error -> '%s'", s_tr_program_outputs_error);
     } else {
         ESP_LOGD(TAG, "[C] LVGL i18n: program_outputs_error fallback -> '%s'", s_tr_program_outputs_error);
-    }
-
-    ret = lvgl_i18n_get_text("program_end_title",
-                             "Programma concluso",
-                             s_tr_program_end_title,
-                             sizeof(s_tr_program_end_title));
-    if (ret == ESP_OK) {
-        ESP_LOGD(TAG, "[C] LVGL i18n: program_end_title -> '%s'", s_tr_program_end_title);
-    } else {
-        ESP_LOGD(TAG, "[C] LVGL i18n: program_end_title fallback -> '%s'", s_tr_program_end_title);
-    }
-
-    ret = lvgl_i18n_get_text("program_end_credits_fmt",
-                             "%ld crediti residui",
-                             s_tr_program_end_credits_fmt,
-                             sizeof(s_tr_program_end_credits_fmt));
-    if (ret == ESP_OK) {
-        ESP_LOGD(TAG, "[C] LVGL i18n: program_end_credits_fmt -> '%s'", s_tr_program_end_credits_fmt);
-    } else {
-        ESP_LOGD(TAG, "[C] LVGL i18n: program_end_credits_fmt fallback -> '%s'", s_tr_program_end_credits_fmt);
-    }
-
-    ret = lvgl_i18n_get_text("program_end_message",
-                             "Grazie per aver scelto il nostro autolavaggio",
-                             s_tr_program_end_msg,
-                             sizeof(s_tr_program_end_msg));
-    if (ret == ESP_OK) {
-        ESP_LOGD(TAG, "[C] LVGL i18n: program_end_message -> '%s'", s_tr_program_end_msg);
-    } else {
-        ESP_LOGD(TAG, "[C] LVGL i18n: program_end_message fallback -> '%s'", s_tr_program_end_msg);
     }
 }
 
@@ -489,10 +401,7 @@ static void show_selected_program_popup(uint8_t pid)
 
     lv_label_set_text(s_program_popup_lbl, popup_text);
     lv_obj_clear_flag(s_program_popup, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(s_program_popup);
-    lv_obj_invalidate(s_program_popup);
-    s_program_popup_until_ms = 0U;
-    s_program_popup_running_seen = false;
+    s_program_popup_until_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()) + PROG_SELECTED_POPUP_MS;
 }
 
 static bool program_is_active_for_snapshot(const web_ui_program_entry_t *entry, const fsm_ctx_t *snap)
@@ -825,21 +734,10 @@ static void update_state(const fsm_ctx_t *snap)
     }
 
     if (s_program_popup) {
-        bool popup_visible = !lv_obj_has_flag(s_program_popup, LV_OBJ_FLAG_HIDDEN);
-        if ((running || paused) && popup_visible) {
-            s_program_popup_running_seen = true;
-        }
-        if (s_program_popup_running_seen && !running && !paused) {
+        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+        if (s_program_popup_until_ms > 0U && now_ms >= s_program_popup_until_ms) {
             lv_obj_add_flag(s_program_popup, LV_OBJ_FLAG_HIDDEN);
             s_program_popup_until_ms = 0U;
-            s_program_popup_running_seen = false;
-        }
-    }
-
-    if (s_program_end_overlay && s_program_end_effect_until_ms > 0U) {
-        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
-        if (now_ms >= s_program_end_effect_until_ms) {
-            hide_program_end_effect();
         }
     }
 
@@ -1040,8 +938,6 @@ static void on_prog_btn(lv_event_t *e)
     }
 
     uint8_t pid = ud->prog_id;
-    show_selected_program_popup(pid);
-
     const web_ui_program_entry_t *entry = find_program_entry(pid);
     if (!entry) {
         ESP_LOGW(TAG, "[C] Programma non trovato pid=%u", (unsigned)pid);
@@ -1053,12 +949,13 @@ static void on_prog_btn(lv_event_t *e)
         return;
     }
 
+    show_selected_program_popup(pid);
+
     esp_err_t err = tasks_publish_program_button_action(pid, AGN_ID_LVGL);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "[C] Azione programma pid=%u non pubblicata: %s", (unsigned)pid, tasks_err_to_name(err));
     } else {
         s_active_prog = pid;
-        s_stop_pressed = false;
         if (s_pause_lbl) {
             lv_label_set_text(s_pause_lbl, "");
             s_last_pause_text[0] = '\0';
@@ -1265,62 +1162,9 @@ static void build_status(lv_obj_t *scr)
     lv_obj_add_flag(s_credit_box, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(s_credit_box, on_credit_box_touch, LV_EVENT_CLICKED, NULL);
 
-    s_program_end_overlay = lv_obj_create(scr);
-    lv_obj_set_size(s_program_end_overlay, PANEL_W, PANEL_H);
-    lv_obj_set_style_bg_color(s_program_end_overlay, lv_color_make(0x10, 0x12, 0x18), LV_PART_MAIN);
-    lv_obj_set_style_bg_grad_color(s_program_end_overlay, lv_color_make(0x1f, 0x24, 0x2f), LV_PART_MAIN);
-    lv_obj_set_style_bg_grad_dir(s_program_end_overlay, LV_GRAD_DIR_VER, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_program_end_overlay, LV_OPA_60, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_program_end_overlay, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_program_end_overlay, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(s_program_end_overlay, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(s_program_end_overlay, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_event_cb(s_program_end_overlay, on_credit_box_touch, LV_EVENT_CLICKED, NULL);
-
-    s_program_end_card = lv_obj_create(s_program_end_overlay);
-    lv_obj_set_size(s_program_end_card, PANEL_FULL_W - 140, 760);
-    lv_obj_center(s_program_end_card);
-    lv_obj_set_style_bg_color(s_program_end_card, lv_color_make(0xEE, 0xEE, 0xEE), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_program_end_card, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_program_end_card, 4, LV_PART_MAIN);
-    lv_obj_set_style_border_color(s_program_end_card, COL_BLACK, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_program_end_card, 90, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(s_program_end_card, 90, LV_PART_MAIN);
-    lv_obj_set_style_pad_bottom(s_program_end_card, 70, LV_PART_MAIN);
-    lv_obj_set_style_pad_left(s_program_end_card, 60, LV_PART_MAIN);
-    lv_obj_set_style_pad_right(s_program_end_card, 60, LV_PART_MAIN);
-    lv_obj_remove_flag(s_program_end_card, LV_OBJ_FLAG_SCROLLABLE);
-
-    s_program_end_title_lbl = lv_label_create(s_program_end_card);
-    lv_label_set_text(s_program_end_title_lbl, "");
-    lv_obj_set_style_text_color(s_program_end_title_lbl, COL_BLACK, LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_program_end_title_lbl, FONT_TIME, LV_PART_MAIN);
-    lv_label_set_long_mode(s_program_end_title_lbl, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(s_program_end_title_lbl, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-    lv_obj_set_width(s_program_end_title_lbl, PANEL_FULL_W - 260);
-    lv_obj_align(s_program_end_title_lbl, LV_ALIGN_TOP_LEFT, 0, 0);
-
-    s_program_end_credit_lbl = lv_label_create(s_program_end_card);
-    lv_label_set_text(s_program_end_credit_lbl, "");
-    lv_obj_set_style_text_color(s_program_end_credit_lbl, COL_BLACK, LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_program_end_credit_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_obj_set_style_text_align(s_program_end_credit_lbl, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-    lv_obj_set_width(s_program_end_credit_lbl, PANEL_FULL_W - 260);
-    lv_obj_align(s_program_end_credit_lbl, LV_ALIGN_TOP_LEFT, 0, 280);
-
-    s_program_end_msg_lbl = lv_label_create(s_program_end_card);
-    lv_label_set_text(s_program_end_msg_lbl, "");
-    lv_obj_set_style_text_color(s_program_end_msg_lbl, COL_BLACK, LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_program_end_msg_lbl, FONT_LABEL, LV_PART_MAIN);
-    lv_label_set_long_mode(s_program_end_msg_lbl, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(s_program_end_msg_lbl, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-    lv_obj_set_width(s_program_end_msg_lbl, PANEL_FULL_W - 260);
-    lv_obj_align(s_program_end_msg_lbl, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-
-    s_program_popup = lv_obj_create(s_credit_box);
+    s_program_popup = lv_obj_create(scr);
     lv_obj_set_size(s_program_popup, PANEL_FULL_W - 120, 48);
-    lv_obj_align(s_program_popup, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+    lv_obj_align_to(s_program_popup, s_credit_box, LV_ALIGN_OUT_TOP_MID, 0, -8);
     lv_obj_set_style_bg_color(s_program_popup, COL_TIMER_NORMAL, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_program_popup, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_program_popup, 2, LV_PART_MAIN);
@@ -1650,14 +1494,7 @@ static void clear_panel_handles(void)
     s_stop_btn = NULL;
     s_program_popup = NULL;
     s_program_popup_lbl = NULL;
-    s_program_end_overlay = NULL;
-    s_program_end_card = NULL;
-    s_program_end_title_lbl = NULL;
-    s_program_end_credit_lbl = NULL;
-    s_program_end_msg_lbl = NULL;
     s_program_popup_until_ms = 0U;
-    s_program_popup_running_seen = false;
-    s_program_end_effect_until_ms = 0U;
     /* s_language_flag_btn e s_flag_img rimossi su richiesta dell'utente */
 
     for (int i = 0; i < PROG_COUNT; i++) {
@@ -1718,14 +1555,7 @@ static void panel_timer_cb(lv_timer_t *t)
         bool was_running = (last_snap.state == FSM_STATE_RUNNING || last_snap.state == FSM_STATE_PAUSED);
         bool is_now_idle = (snap.state == FSM_STATE_CREDIT);
 
-        if (was_running && is_now_idle) {
-            show_program_end_effect(panel_effective_credit_cents(&snap));
-        }
-
-        bool end_effect_active = (s_program_end_effect_until_ms > 0U) &&
-                                 !lv_obj_has_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
-
-        if (was_running && is_now_idle && s_active_prog > 0 && !s_stop_pressed && snap.credit_cents > 0 && !end_effect_active)
+        if (was_running && is_now_idle && s_active_prog > 0 && !s_stop_pressed && snap.credit_cents > 0)
         {
             const web_ui_program_entry_t *entry = find_program_entry(s_active_prog);
             if (entry && entry->enabled && snap.credit_cents >= (int32_t)entry->price_units) {
@@ -1743,6 +1573,12 @@ static void panel_timer_cb(lv_timer_t *t)
                 ESP_LOGI(TAG, "[C] Auto-restart programma %u non eseguibile (entry/credito)",
                          (unsigned)s_active_prog);
             }
+        }
+
+        /* Reset del blocco auto-restart quando usciamo da CREDIT. */
+        if (!is_now_idle)
+        {
+            s_stop_pressed = false;
         }
 
         s_last_fsm_state = snap.state;

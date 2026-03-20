@@ -50,6 +50,19 @@ typedef struct {
     bool temperature_enabled;   ///< Sensore temperatura
     bool led_enabled;           ///< LED strip
     uint32_t led_count;         ///< Numero di LED nella striscia
+    uint8_t led_run_r;          ///< Colore progressione: componente R
+    uint8_t led_run_g;          ///< Colore progressione: componente G
+    uint8_t led_run_b;          ///< Colore progressione: componente B
+    uint8_t led_prefine_r;      ///< Colore pre-fine ciclo: componente R
+    uint8_t led_prefine_g;      ///< Colore pre-fine ciclo: componente G
+    uint8_t led_prefine_b;      ///< Colore pre-fine ciclo: componente B
+    uint8_t led_standby_r;      ///< Colore standby: componente R
+    uint8_t led_standby_g;      ///< Colore standby: componente G
+    uint8_t led_standby_b;      ///< Colore standby: componente B
+    uint8_t led_flash_r;        ///< Colore flash fine programma: componente R
+    uint8_t led_flash_g;        ///< Colore flash fine programma: componente G
+    uint8_t led_flash_b;        ///< Colore flash fine programma: componente B
+    uint8_t led_flash_count;    ///< Numero flash fine programma
     bool rs232_enabled;         ///< UART RS232
     bool rs485_enabled;         ///< UART RS485
     bool mdb_enabled;           ///< UART MDB
@@ -201,6 +214,7 @@ typedef struct {
 typedef struct {
     char user_language[8];     ///< Lingua Pannello Utente (es: "it", "en")
     char backend_language[8];  ///< Lingua Backend/Web UI (es: "it", "en")
+    uint8_t program_end_message_sec; ///< Durata messaggio fine programma (0=disabilitato, 1..10 secondi)
     char texts_json[512];      ///< Deprecated: non usato (i18n ora su SPIFFS per lingua)
 } device_ui_texts_config_t;
 

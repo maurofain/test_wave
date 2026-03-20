@@ -36,14 +36,86 @@
           '</label>' +
         '</div>' +
         '<div class="form-group">' +
-          '<label for="cfg_modbus_modules">Moduli Waveshare installati</label>' +
+          '<label for="cfg_modbus_modules">Numero expander connessi</label>' +
           '<input type="text" id="cfg_modbus_modules" value="1" inputmode="numeric">' +
         '</div>' +
       '</div>';
 
-    var firstSection = container.querySelector('.section');
-    if (firstSection) {
-      container.insertBefore(section, firstSection.nextSibling);
+    function getDirectChildUnderContainer(node) {
+      var cur = node;
+      while (cur && cur.parentElement && cur.parentElement !== container) {
+        cur = cur.parentElement;
+      }
+      return (cur && cur.parentElement === container) ? cur : null;
+    }
+
+    function normalizeText(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function findSectionByTitle(needles) {
+      var sections = container.querySelectorAll('.section');
+      for (var si = 0; si < sections.length; si++) {
+        var h2 = sections[si].querySelector('h2');
+        if (!h2) continue;
+        var title = normalizeText(h2.textContent);
+        for (var ni = 0; ni < needles.length; ni++) {
+          if (title.indexOf(needles[ni]) !== -1) {
+            return getDirectChildUnderContainer(sections[si]);
+          }
+        }
+      }
+      return null;
+    }
+
+    var peripheralsAnchor = findSectionByTitle(['periferiche']);
+    if (peripheralsAnchor) {
+      var nextAfterPeripherals = peripheralsAnchor.nextElementSibling;
+      if (nextAfterPeripherals) {
+        container.insertBefore(section, nextAfterPeripherals);
+      } else {
+        container.appendChild(section);
+      }
+      return;
+    }
+
+    var commandAnchor = null;
+    var buttons = container.querySelectorAll('button');
+    for (var bi = 0; bi < buttons.length; bi++) {
+      var txt = String(buttons[bi].textContent || '').toLowerCase();
+      if (txt.indexOf('salva configurazione') !== -1 ||
+          txt.indexOf('backup') !== -1 ||
+          txt.indexOf('aggiorna dati') !== -1 ||
+          txt.indexOf('reset fabbrica') !== -1) {
+        commandAnchor = getDirectChildUnderContainer(buttons[bi]);
+        if (commandAnchor) break;
+      }
+    }
+
+    if (commandAnchor) {
+      container.insertBefore(section, commandAnchor);
+      return;
+    }
+
+    var firstDirectSection = null;
+    for (var i = 0; i < container.children.length; i++) {
+      var child = container.children[i];
+      if (child && child.classList && child.classList.contains('section')) {
+        firstDirectSection = child;
+        break;
+      }
+    }
+
+    if (firstDirectSection) {
+      var next = firstDirectSection.nextElementSibling;
+      if (next) {
+        container.insertBefore(section, next);
+      } else {
+        container.appendChild(section);
+      }
     } else {
       container.appendChild(section);
     }
