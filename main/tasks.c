@@ -40,6 +40,9 @@ static float s_temperature = 0.0f;
 static float s_humidity = 0.0f;
 static const uint8_t DIGITAL_IO_FIRST_CHANNEL_ID = 1U;
 static const uint32_t DIGITAL_IO_POLL_DEFAULT_MS = 50U;
+static const uint8_t PROGRAM_OUTPUT_VERIFY_MAX_ATTEMPTS = 3U;
+static const uint32_t PROGRAM_OUTPUT_VERIFY_WAIT_MS = 100U;
+static volatile bool s_program_outputs_verify_error_active = false;
 
 #define SCANNER_QR_COOLDOWN_DEFAULT_MS 10000U
 #define SCANNER_QR_COOLDOWN_MIN_MS 500U
@@ -86,6 +89,11 @@ const char *tasks_err_to_name(esp_err_t err)
     }
 }
 
+bool tasks_program_outputs_verify_error_active(void)
+{
+    return s_program_outputs_verify_error_active;
+}
+
 static bool tasks_is_fsm_context(void)
 {
     const char *task_name = pcTaskGetName(NULL);
@@ -120,6 +128,32 @@ static bool tasks_publish_io_process_event(agn_id_t sender,
     }
 
     return fsm_event_publish(&event, pdMS_TO_TICKS(20));
+}
+
+static bool tasks_publish_cctalk_control_event(action_id_t action)
+{
+    if (action != ACTION_ID_CCTALK_START && action != ACTION_ID_CCTALK_STOP) {
+        return false;
+    }
+
+    if (!fsm_event_queue_init(0)) {
+        return false;
+    }
+
+    fsm_input_event_t event = {
+        .from = AGN_ID_FSM,
+        .to = {AGN_ID_CCTALK},
+        .action = action,
+        .type = FSM_INPUT_EVENT_NONE,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .data_ptr = NULL,
+        .text = {0},
+    };
+
+    return fsm_event_publish(&event, pdMS_TO_TICKS(30));
 }
 
 static uint8_t tasks_find_program_id_for_input(uint8_t input_id)
@@ -553,6 +587,41 @@ static const web_ui_program_entry_t *tasks_find_running_program_entry(const fsm_
     return web_ui_program_find_by_name(ctx->running_program_name);
 }
 
+static esp_err_t tasks_verify_program_outputs_state(const web_ui_program_entry_t *entry)
+{
+    if (!entry) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    for (uint8_t output_id = DIGITAL_IO_FIRST_CHANNEL_ID;
+         output_id <= DIGITAL_IO_OUTPUT_COUNT;
+         ++output_id) {
+        bool expected = ((entry->relay_mask >> (output_id - 1U)) & 0x01U) != 0U;
+        bool actual = false;
+        esp_err_t err = tasks_digital_io_get_output_via_agent(output_id,
+                                                               &actual,
+                                                               pdMS_TO_TICKS(120));
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG,
+                     "[M] Verifica output fallita su OUT%u: %s",
+                     (unsigned)output_id,
+                     esp_err_to_name(err));
+            return err;
+        }
+
+        if (actual != expected) {
+            ESP_LOGW(TAG,
+                     "[M] Mismatch output OUT%u atteso=%u letto=%u",
+                     (unsigned)output_id,
+                     expected ? 1U : 0U,
+                     actual ? 1U : 0U);
+            return ESP_FAIL;
+        }
+    }
+
+    return ESP_OK;
+}
+
 static void tasks_apply_running_program_outputs(const fsm_ctx_t *ctx)
 {
     const web_ui_program_entry_t *entry = tasks_find_running_program_entry(ctx);
@@ -563,18 +632,71 @@ static void tasks_apply_running_program_outputs(const fsm_ctx_t *ctx)
         return;
     }
 
-    esp_err_t err = web_ui_program_apply_outputs(entry);
-    if (err != ESP_OK) {
+    s_program_outputs_verify_error_active = false;
+
+    for (uint8_t attempt = 1; attempt <= PROGRAM_OUTPUT_VERIFY_MAX_ATTEMPTS; ++attempt) {
+        esp_err_t apply_err = web_ui_program_apply_outputs(entry);
+        if (apply_err != ESP_OK) {
+            ESP_LOGW(TAG,
+                     "[M] Applicazione output programma '%s' tentativo %u/%u fallita: %s",
+                     entry->name,
+                     (unsigned)attempt,
+                     (unsigned)PROGRAM_OUTPUT_VERIFY_MAX_ATTEMPTS,
+                     esp_err_to_name(apply_err));
+            if (attempt == PROGRAM_OUTPUT_VERIFY_MAX_ATTEMPTS) {
+                s_program_outputs_verify_error_active = true;
+            }
+            continue;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(PROGRAM_OUTPUT_VERIFY_WAIT_MS));
+        esp_err_t verify_err = tasks_verify_program_outputs_state(entry);
+        if (verify_err == ESP_OK) {
+            ESP_LOGI(TAG,
+                     "[M] Output programma '%s' verificati (tentativo %u/%u, mask=0x%04x)",
+                     entry->name,
+                     (unsigned)attempt,
+                     (unsigned)PROGRAM_OUTPUT_VERIFY_MAX_ATTEMPTS,
+                     (unsigned)entry->relay_mask);
+            s_program_outputs_verify_error_active = false;
+            return;
+        }
+
         ESP_LOGW(TAG,
-                 "[M] Applicazione output per programma '%s' fallita: %s",
+                 "[M] Verifica output programma '%s' fallita al tentativo %u/%u: %s",
                  entry->name,
-                 esp_err_to_name(err));
-    } else {
-        ESP_LOGI(TAG,
-                 "[M] Output programma '%s' applicati (mask=0x%04x)",
-                 entry->name,
-                 (unsigned)entry->relay_mask);
+                 (unsigned)attempt,
+                 (unsigned)PROGRAM_OUTPUT_VERIFY_MAX_ATTEMPTS,
+                 esp_err_to_name(verify_err));
+
+        if (attempt == PROGRAM_OUTPUT_VERIFY_MAX_ATTEMPTS) {
+            s_program_outputs_verify_error_active = true;
+        }
     }
+}
+
+static esp_err_t tasks_read_local_inputs_mask(uint16_t *out_mask)
+{
+    if (!out_mask) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint16_t mask = 0U;
+    for (uint8_t input_id = DIGITAL_IO_FIRST_CHANNEL_ID;
+         input_id <= DIGITAL_IO_LOCAL_INPUT_COUNT;
+         ++input_id) {
+        bool state = false;
+        esp_err_t err = digital_io_get_input(input_id, &state);
+        if (err != ESP_OK) {
+            return err;
+        }
+        if (state) {
+            mask |= (uint16_t)(1U << (input_id - 1U));
+        }
+    }
+
+    *out_mask = mask;
+    return ESP_OK;
 }
 
 static void digital_io_task(void *arg)
@@ -584,7 +706,7 @@ static void digital_io_task(void *arg)
     TickType_t period_ticks = (param && param->period_ticks > 0)
                                 ? param->period_ticks
                                 : pdMS_TO_TICKS(DIGITAL_IO_POLL_DEFAULT_MS);
-    digital_io_snapshot_t previous_snapshot = {0};
+    uint16_t previous_inputs_mask = 0U;
     bool previous_valid = false;
 
     while (true) {
@@ -597,8 +719,8 @@ static void digital_io_task(void *arg)
             continue;
         }
 
-        digital_io_snapshot_t snapshot = {0};
-        esp_err_t snapshot_err = digital_io_get_snapshot(&snapshot);
+        uint16_t inputs_mask = 0U;
+        esp_err_t snapshot_err = tasks_read_local_inputs_mask(&inputs_mask);
         if (snapshot_err != ESP_OK) {
             // Gestione differenziata per i nuovi codici di errore
             switch (snapshot_err) {
@@ -620,18 +742,18 @@ static void digital_io_task(void *arg)
         }
 
         if (!previous_valid) {
-            previous_snapshot = snapshot;
+            previous_inputs_mask = inputs_mask;
             previous_valid = true;
             continue;
         }
 
-        uint16_t rising_mask = (uint16_t)((~previous_snapshot.inputs_mask) & snapshot.inputs_mask);
-        previous_snapshot = snapshot;
+        uint16_t rising_mask = (uint16_t)((~previous_inputs_mask) & inputs_mask);
+        previous_inputs_mask = inputs_mask;
         if (rising_mask == 0U) {
             continue;
         }
 
-        for (uint8_t input_id = DIGITAL_IO_FIRST_CHANNEL_ID; input_id <= DIGITAL_IO_INPUT_COUNT; ++input_id) {
+        for (uint8_t input_id = DIGITAL_IO_FIRST_CHANNEL_ID; input_id <= DIGITAL_IO_LOCAL_INPUT_COUNT; ++input_id) {
             uint16_t input_mask = (uint16_t)(1U << (input_id - 1U));
             if ((rising_mask & input_mask) == 0U) {
                 continue;
@@ -1171,6 +1293,7 @@ static void fsm_task(void *arg)
     /* contatore per il log "alive" ogni 10 secondi */
     uint32_t alive_ms = 0;
     static const uint32_t ALIVE_INTERVAL_MS = 10000;
+    bool cctalk_forced_stop_for_vcd = false;
 
     while (true) {
         fsm_input_event_t event;
@@ -1198,6 +1321,33 @@ static void fsm_task(void *arg)
         prev_tick = now_tick;
 
         changed = fsm_tick(&fsm, elapsed_ms) || changed;
+
+        bool vcd_locked_session =
+            (fsm.session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) &&
+            (fsm.session_source == FSM_SESSION_SOURCE_QR ||
+             fsm.session_source == FSM_SESSION_SOURCE_CARD) &&
+            !fsm.allow_additional_payments;
+
+        if (cfg && cfg->sensors.cctalk_enabled) {
+            if (vcd_locked_session && !cctalk_forced_stop_for_vcd) {
+                if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_STOP)) {
+                    cctalk_forced_stop_for_vcd = true;
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK disabilitata durante sessione VCD");
+                } else {
+                    ESP_LOGW(TAG, "[M] Richiesta stop gettoniera CCTALK non pubblicata (sessione VCD)");
+                }
+            } else if (cctalk_forced_stop_for_vcd && !vcd_locked_session &&
+                       (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS)) {
+                if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_START)) {
+                    cctalk_forced_stop_for_vcd = false;
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo sessione VCD");
+                } else {
+                    ESP_LOGW(TAG, "[M] Richiesta start gettoniera CCTALK non pubblicata (fine sessione VCD)");
+                }
+            }
+        } else {
+            cctalk_forced_stop_for_vcd = false;
+        }
 
         if (event_received &&
             ((event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED &&

@@ -47,6 +47,7 @@ esp_err_t tasks_digital_io_set_output_via_agent(uint8_t output_id, bool value, T
 esp_err_t tasks_digital_io_get_output_via_agent(uint8_t output_id, bool *out_value, TickType_t timeout_ticks);
 esp_err_t tasks_digital_io_get_input_via_agent(uint8_t input_id, bool *out_value, TickType_t timeout_ticks);
 esp_err_t tasks_digital_io_get_snapshot_via_agent(digital_io_snapshot_t *out_snapshot, TickType_t timeout_ticks);
+bool tasks_program_outputs_verify_error_active(void);
 const char *tasks_err_to_name(esp_err_t err);
 void tasks_suspend_peripherals_for_lvgl_test(void);
 void tasks_resume_peripherals_after_lvgl_test(void);

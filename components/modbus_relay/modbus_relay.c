@@ -45,6 +45,12 @@ typedef struct {
 static modbus_relay_ctx_t s_ctx = {0};
 static SemaphoreHandle_t s_lock = NULL;
 
+enum {
+    MODBUS_RELAY_CID_COILS = 0,
+    MODBUS_RELAY_CID_DISCRETE = 1,
+    MODBUS_RELAY_CID_COUNT
+};
+
 static size_t bits_to_bytes(uint16_t count)
 {
     return (size_t)((count + 7U) / 8U);
@@ -238,6 +244,53 @@ static esp_err_t start_locked(void)
         return err;
     }
 
+    mb_parameter_descriptor_t descriptors[MODBUS_RELAY_CID_COUNT] = {
+        {
+            .cid = MODBUS_RELAY_CID_COILS,
+            .param_key = "relay_coils",
+            .param_units = "bits",
+            .mb_slave_addr = comm.ser_opts.uid,
+            .mb_param_type = MB_PARAM_COIL,
+            .mb_reg_start = cfg->modbus.relay_start,
+            .mb_size = sanitize_count(cfg->modbus.relay_count),
+            .param_offset = 0,
+            .param_type = PARAM_TYPE_U16,
+            .param_size = PARAM_SIZE_U16,
+            .param_opts = {
+                .opt1 = 0,
+                .opt2 = 0,
+                .opt3 = 0,
+            },
+            .access = PAR_PERMS_READ_WRITE,
+        },
+        {
+            .cid = MODBUS_RELAY_CID_DISCRETE,
+            .param_key = "relay_inputs",
+            .param_units = "bits",
+            .mb_slave_addr = comm.ser_opts.uid,
+            .mb_param_type = MB_PARAM_DISCRETE,
+            .mb_reg_start = cfg->modbus.input_start,
+            .mb_size = sanitize_count(cfg->modbus.input_count),
+            .param_offset = 0,
+            .param_type = PARAM_TYPE_U16,
+            .param_size = PARAM_SIZE_U16,
+            .param_opts = {
+                .opt1 = 0,
+                .opt2 = 0,
+                .opt3 = 0,
+            },
+            .access = PAR_PERMS_READ,
+        },
+    };
+
+    err = mbc_master_set_descriptor(handler, descriptors, MODBUS_RELAY_CID_COUNT);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "[C] mbc_master_set_descriptor fallita: %s", esp_err_to_name(err));
+        (void)mbc_master_delete(handler);
+        s_ctx.status.last_error = (int32_t)err;
+        return err;
+    }
+
     err = mbc_master_start(handler);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "[C] mbc_master_start fallita: %s", esp_err_to_name(err));
@@ -312,7 +365,7 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
     esp_err_t last_err = ESP_FAIL;
     for (uint8_t attempt = 0; attempt <= retries; ++attempt) {
         // Log pacchetto in uscita
-        ESP_LOGI(TAG, "[C] Modbus TX attempt %u/%u: slave=%u cmd=0x%02X start=%u size=%u", 
+        ESP_LOGD(TAG, "[C] Modbus TX attempt %u/%u: slave=%u cmd=0x%02X start=%u size=%u", 
                  attempt + 1, retries + 1, request->slave_addr, request->command, 
                  request->reg_start, request->reg_size);
         
@@ -329,22 +382,22 @@ static esp_err_t send_request_with_retry_locked(mb_param_request_t *request, voi
             if (data_ptr && request->command == MB_FUNC_READ_COILS) {
                 uint8_t *bytes = (uint8_t*)data_ptr;
                 size_t byte_count = bits_to_bytes(request->reg_size);
-                ESP_LOGI(TAG, "[C] Modbus RX OK: %zu bytes", byte_count);
+                ESP_LOGD(TAG, "[C] Modbus RX OK: %zu bytes", byte_count);
                 
                 // Hexdump manuale
                 char hex_str[64] = {0};
                 for (size_t i = 0; i < byte_count && i < 16; i++) {
                     snprintf(hex_str + (i * 3), sizeof(hex_str) - (i * 3), "%02X ", bytes[i]);
                 }
-                ESP_LOGI(TAG, "[C] RX Data: %s", hex_str);
+                ESP_LOGD(TAG, "[C] RX Data: %s", hex_str);
             } else if (data_ptr) {
-                ESP_LOGI(TAG, "[C] Modbus RX OK");
+                ESP_LOGD(TAG, "[C] Modbus RX OK");
                 uint8_t *bytes = (uint8_t*)data_ptr;
                 char hex_str[32] = {0};
                 for (int i = 0; i < 4 && i < 8; i++) {
                     snprintf(hex_str + (i * 3), sizeof(hex_str) - (i * 3), "%02X ", bytes[i]);
                 }
-                ESP_LOGI(TAG, "[C] RX Data: %s", hex_str);
+                ESP_LOGD(TAG, "[C] RX Data: %s", hex_str);
             }
             return ESP_OK;
         } else {

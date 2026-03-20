@@ -36,6 +36,7 @@
   let ecdWarningDismissed = false;
   let programsById = {};
   let programMetaByButton = {};
+  let pendingCreditSync = null;
 
   function pad2(value) {
     return String(value).padStart(2, '0');
@@ -193,6 +194,55 @@
     return remainingSeconds > 0 && remainingSeconds <= 60;
   }
 
+  function hasPendingCreditSync() {
+    return !!(pendingCreditSync && pendingCreditSync.expiresAt > Date.now());
+  }
+
+  function clearPendingCreditSync() {
+    pendingCreditSync = null;
+  }
+
+  function markPendingCreditSync() {
+    pendingCreditSync = {
+      creditFloor: Math.max(0, credit),
+      ecdFloor: Math.max(0, ecd),
+      vcdFloor: Math.max(0, vcd),
+      expiresAt: Date.now() + 2000,
+    };
+  }
+
+  function applySyncedCreditValue(localValue, incomingValue, floorKey) {
+    if (!hasPendingCreditSync()) {
+      return incomingValue;
+    }
+
+    const floor = pendingCreditSync && typeof pendingCreditSync[floorKey] === 'number'
+      ? pendingCreditSync[floorKey]
+      : 0;
+
+    if (incomingValue < floor) {
+      return localValue;
+    }
+
+    return incomingValue;
+  }
+
+  function finalizePendingCreditSync() {
+    if (!pendingCreditSync) {
+      return;
+    }
+
+    const expired = pendingCreditSync.expiresAt <= Date.now();
+    const satisfied =
+      credit >= pendingCreditSync.creditFloor &&
+      ecd >= pendingCreditSync.ecdFloor &&
+      vcd >= pendingCreditSync.vcdFloor;
+
+    if (expired || satisfied) {
+      clearPendingCreditSync();
+    }
+  }
+
   function updateCreditStateUi() {
     if (!creditBox) {
       return;
@@ -340,13 +390,16 @@
 
   function syncFromFsm(payload) {
     if (payload && typeof payload.credit_cents === 'number') {
-      credit = Math.max(0, Math.floor(payload.credit_cents));
+      const nextCredit = Math.max(0, Math.floor(payload.credit_cents));
+      credit = applySyncedCreditValue(credit, nextCredit, 'creditFloor');
     }
     if (payload && typeof payload.ecd_coins === 'number') {
-      ecd = Math.max(0, Math.floor(payload.ecd_coins));
+      const nextEcd = Math.max(0, Math.floor(payload.ecd_coins));
+      ecd = applySyncedCreditValue(ecd, nextEcd, 'ecdFloor');
     }
     if (payload && typeof payload.vcd_coins === 'number') {
-      vcd = Math.max(0, Math.floor(payload.vcd_coins));
+      const nextVcd = Math.max(0, Math.floor(payload.vcd_coins));
+      vcd = applySyncedCreditValue(vcd, nextVcd, 'vcdFloor');
     }
     if (payload && typeof payload.state === 'string') {
       fsmState = payload.state;
@@ -396,6 +449,7 @@
       applyRelayIndicators(payload.relays);
     }
 
+    finalizePendingCreditSync();
     render();
     renderQueueMessages(payload && payload.messages ? payload.messages : []);
   }
@@ -483,9 +537,26 @@
     });
   }
 
-  function applyOptimisticCreditDelta(delta) {
+  function applyOptimisticCreditDelta(delta, source) {
     credit = Math.max(0, credit + delta);
+    if (source === 'card' || source === 'qr') {
+      vcd = Math.max(0, vcd + delta);
+    } else {
+      ecd = Math.max(0, ecd + delta);
+    }
     ecdWarningDismissed = false;
+    markPendingCreditSync();
+    render();
+  }
+
+  function rollbackOptimisticCreditDelta(delta, source) {
+    credit = Math.max(0, credit - delta);
+    if (source === 'card' || source === 'qr') {
+      vcd = Math.max(0, vcd - delta);
+    } else {
+      ecd = Math.max(0, ecd - delta);
+    }
+    clearPendingCreditSync();
     render();
   }
 
@@ -696,7 +767,7 @@
         cardSwitch.checked = true;
       }
 
-      applyOptimisticCreditDelta(delta);
+      applyOptimisticCreditDelta(delta, source);
       msgEl.textContent = sourceLabel + ' +' + delta + ' coin';
 
       try {
@@ -706,15 +777,13 @@
           body: JSON.stringify({ coin: delta, source: source }),
         });
         if (!response.ok) {
-          credit = Math.max(0, credit - delta);
-          render();
+          rollbackOptimisticCreditDelta(delta, source);
           msgEl.textContent = 'Errore inserimento credito: HTTP ' + response.status;
           return;
         }
         await refreshQueueMessages();
       } catch (error) {
-        credit = Math.max(0, credit - delta);
-        render();
+        rollbackOptimisticCreditDelta(delta, source);
         msgEl.textContent = 'Errore credito: ' + (error && error.message ? error.message : error);
       }
     });

@@ -136,6 +136,7 @@ static char s_tr_elapsed_fmt[32] = "Secondi   %s";
 static char s_tr_pause_fmt[32] = "Pausa: %s";
 static char s_tr_ecd_expire_fmt[64] = "Il credito scadrà tra %lu secondi";
 static char s_tr_ecd_touch_hint[96] = "tocca il numero del credito per continuare";
+static char s_tr_program_outputs_error[64] = "Errore uscite";
 
 #define MAIN_PAGE_IDLE_TO_ADS_MS 60000U
 
@@ -233,6 +234,16 @@ static void panel_load_translations(void)
         ESP_LOGD(TAG, "[C] LVGL i18n: ecd_expire_line2_hint -> '%s'", s_tr_ecd_touch_hint);
     } else {
         ESP_LOGD(TAG, "[C] LVGL i18n: ecd_expire_line2_hint fallback -> '%s'", s_tr_ecd_touch_hint);
+    }
+
+    ret = lvgl_i18n_get_text("program_outputs_error",
+                             "Errore uscite",
+                             s_tr_program_outputs_error,
+                             sizeof(s_tr_program_outputs_error));
+    if (ret == ESP_OK) {
+        ESP_LOGD(TAG, "[C] LVGL i18n: program_outputs_error -> '%s'", s_tr_program_outputs_error);
+    } else {
+        ESP_LOGD(TAG, "[C] LVGL i18n: program_outputs_error fallback -> '%s'", s_tr_program_outputs_error);
     }
 }
 
@@ -450,8 +461,8 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             }
             btn_style(btn, btn_color);
             lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
-            lv_obj_set_style_border_width(btn, is_active ? 5 : 0, LV_PART_MAIN);
-            lv_obj_set_style_border_color(btn, COL_RED, LV_PART_MAIN);
+            lv_obj_set_style_border_width(btn, is_active ? 10: 0, LV_PART_MAIN);
+            lv_obj_set_style_border_color(btn, COL_GREY, LV_PART_MAIN);
             lv_obj_set_style_border_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
             
             // Update clickability
@@ -700,8 +711,16 @@ static void update_state(const fsm_ctx_t *snap)
         }
     }
 
+    bool outputs_error_active = tasks_program_outputs_verify_error_active();
+
     if (s_stop_btn && s_stop_lbl) {
-        if (running || paused) {
+        if ((running || paused) && outputs_error_active) {
+            lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_style_bg_color(s_stop_btn, COL_RED, LV_PART_MAIN);
+            lv_obj_set_style_border_color(s_stop_btn, COL_WHITE, LV_PART_MAIN);
+            lv_label_set_text(s_stop_lbl, s_tr_program_outputs_error);
+        } else if (running || paused) {
             lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_set_style_bg_color(s_stop_btn, prefine_active ? COL_TIMER_WARN : COL_PROG_LOW, LV_PART_MAIN);

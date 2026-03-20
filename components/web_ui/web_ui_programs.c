@@ -1,6 +1,7 @@
 #include "web_ui_programs.h"
 #include "fsm.h"
 #include "device_config.h"
+#include "digital_io.h"
 #include "tasks.h"
 
 #include "cJSON.h"
@@ -446,24 +447,15 @@ esp_err_t web_ui_program_apply_outputs(const web_ui_program_entry_t *entry)
     }
 
     programs_init_defaults();
-
-    esp_err_t err = web_ui_program_clear_outputs();
-    if (err != ESP_OK) {
-        return err;
-    }
-
-    uint32_t duration_ms = (uint32_t)entry->duration_sec * 1000U;
     esp_err_t first_err = ESP_OK;
 
-    for (uint8_t relay_number = 1; relay_number <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay_number) {
-        bool enabled = ((entry->relay_mask >> (relay_number - 1U)) & 0x01U) != 0U;
-        if (!enabled) {
-            continue;
-        }
-
-        esp_err_t relay_err = web_ui_virtual_relay_control(relay_number, true, duration_ms);
-        if (relay_err != ESP_OK && first_err == ESP_OK) {
-            first_err = relay_err;
+    for (uint8_t output_id = 1; output_id <= DIGITAL_IO_OUTPUT_COUNT; ++output_id) {
+        bool enabled = ((entry->relay_mask >> (output_id - 1U)) & 0x01U) != 0U;
+        esp_err_t io_err = tasks_digital_io_set_output_via_agent(output_id,
+                                                                  enabled,
+                                                                  pdMS_TO_TICKS(250));
+        if (io_err != ESP_OK && first_err == ESP_OK) {
+            first_err = io_err;
         }
     }
 
@@ -476,10 +468,12 @@ esp_err_t web_ui_program_clear_outputs(void)
 
     esp_err_t first_err = ESP_OK;
 
-    for (uint8_t relay_number = 1; relay_number <= WEB_UI_VIRTUAL_RELAY_MAX; ++relay_number) {
-        esp_err_t relay_err = web_ui_virtual_relay_control(relay_number, false, 0U);
-        if (relay_err != ESP_OK && first_err == ESP_OK) {
-            first_err = relay_err;
+    for (uint8_t output_id = 1; output_id <= DIGITAL_IO_OUTPUT_COUNT; ++output_id) {
+        esp_err_t io_err = tasks_digital_io_set_output_via_agent(output_id,
+                                                                  false,
+                                                                  pdMS_TO_TICKS(250));
+        if (io_err != ESP_OK && first_err == ESP_OK) {
+            first_err = io_err;
         }
     }
 

@@ -740,6 +740,22 @@ static bool is_relative_path_safe(const char *relative_path)
     return true;
 }
 
+static bool normalize_relative_path(const char *relative_path, char *out_path, size_t out_path_len)
+{
+    if (!relative_path || !out_path || out_path_len == 0) {
+        return false;
+    }
+
+    size_t len = strcspn(relative_path, "?#");
+    if (len == 0 || len >= out_path_len) {
+        return false;
+    }
+
+    memcpy(out_path, relative_path, len);
+    out_path[len] = '\0';
+    return true;
+}
+
 
 /**
  * @brief Invia un file in blocchi attraverso una richiesta HTTP.
@@ -805,7 +821,12 @@ esp_err_t webpages_try_send_external(httpd_req_t *req, const char *relative_path
     if (!webpages_storage_ready()) {
         return ESP_ERR_INVALID_STATE;
     }
-    if (!is_relative_path_safe(relative_path)) {
+    char normalized_path[192];
+    if (!normalize_relative_path(relative_path, normalized_path, sizeof(normalized_path))) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!is_relative_path_safe(normalized_path)) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -815,17 +836,17 @@ esp_err_t webpages_try_send_external(httpd_req_t *req, const char *relative_path
     }
 
     char full_path[256];
-    int n = snprintf(full_path, sizeof(full_path), "%s/%s", base, relative_path);
+    int n = snprintf(full_path, sizeof(full_path), "%s/%s", base, normalized_path);
     if (n <= 0 || n >= (int)sizeof(full_path)) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (is_html_path(relative_path)) {
-        esp_err_t localized_ret = send_html_localized_cached(req, full_path, relative_path);
+    if (is_html_path(normalized_path)) {
+        esp_err_t localized_ret = send_html_localized_cached(req, full_path, normalized_path);
         if (localized_ret == ESP_OK) {
             return ESP_OK;
         }
-        ESP_LOGW(TAG, "[C] Localized send failed for %s: %s. Fallback raw file.", relative_path, esp_err_to_name(localized_ret));
+        ESP_LOGW(TAG, "[C] Localized send failed for %s: %s. Fallback raw file.", normalized_path, esp_err_to_name(localized_ret));
     }
 
     return send_file_as_chunks(req, full_path, content_type);

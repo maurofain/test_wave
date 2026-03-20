@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "service": "deepl",
   "openai": {
     "api_key": "",

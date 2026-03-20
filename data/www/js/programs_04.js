@@ -1,7 +1,7 @@
 let programs = [];
 
 const RELAY_LAYOUT = {
-    totalOutputs: 12,
+    totalOutputs: 16,
     localOutputs: 4,
     modbusGroupOutputs: 8,
 };
@@ -13,9 +13,6 @@ const I18N_DEFAULTS = {
     'programs.js.031': 'Errore caricamento: ',
     'programs.js.032': 'Tabella programmi salvata',
     'programs.js.033': 'Errore salvataggio: ',
-    'programs.js.037': 'Relay 1-{end} (MH1001)',
-    'programs.js.038': 'Relay {start}-{end} (Waveshare Modbus {idx})',
-    'programs.js.039': 'Ogni editbox: 4 bit (0/1), completamento automatico con trailing zeroes.',
 };
 
 function tr(key) {
@@ -63,96 +60,56 @@ function showStatus(msg, ok) {
     status.className = 'status ' + (ok ? 'ok' : 'err');
 }
 
-function sanitizeRelaySegment(raw, fill = false) {
-    let value = String(raw || '').replace(/[^01]/g, '');
-    if (value.length > 4) value = value.slice(0, 4);
-    if (fill) value = value.padEnd(4, '0');
-    return value;
+const PROGRAM_RELAY_ITEMS = [
+    { label: 'R1', outputId: 6, hover: 'R1 / MH1001 O6' },
+    { label: 'R2', outputId: 5, hover: 'R2 / MH1001 O5' },
+    { label: 'R3', outputId: 3, hover: 'R3 / MH1001 O3' },
+    { label: 'R4', outputId: 4, hover: 'R4 / MH1001 O4' },
+    { label: 'R5', outputId: 9, hover: 'R5 / MODBUS01 O1' },
+    { label: 'R6', outputId: 10, hover: 'R6 / MODBUS01 O2' },
+    { label: 'R7', outputId: 11, hover: 'R7 / MODBUS01 O3' },
+    { label: 'R8', outputId: 12, hover: 'R8 / MODBUS01 O4' },
+    { label: 'R9', outputId: 13, hover: 'R9 / MODBUS01 O5' },
+    { label: 'R10', outputId: 14, hover: 'R10 / MODBUS01 O6' },
+    { label: 'R11', outputId: 15, hover: 'R11 / MODBUS01 O7' },
+    { label: 'R12', outputId: 16, hover: 'R12 / MODBUS01 O8' },
+];
+
+const SERVICE_OUTPUT_ITEMS = [
+    { label: 'LED1', outputId: 1, hover: 'LED1 / MH1001 O1' },
+    { label: 'LED2', outputId: 2, hover: 'LED2 / MH1001 O2' },
+    { label: 'LED3', outputId: 7, hover: 'LED3 / MH1001 O7' },
+    { label: 'HEATER', outputId: 8, hover: 'HEATER / MH1001 O8' },
+];
+
+function outputIsEnabled(mask, outputId) {
+    const bitPos = outputId - 1;
+    return (((mask >>> 0) >> bitPos) & 0x01) !== 0;
 }
 
-function relayBit(mask, relayNumber) {
-    return (((mask >>> 0) >> (relayNumber - 1)) & 0x01) ? '1' : '0';
-}
-
-function maskSegmentFromRange(mask, startRelay, validBits) {
-    let bits = '';
-    for (let i = 0; i < validBits; i += 1) {
-        bits += relayBit(mask, startRelay + i);
-    }
-    return bits.padEnd(4, '0');
-}
-
-function applySegmentToMask(mask, segmentValue, startRelay, validBits) {
-    let nextMask = (toInt(mask, 0) >>> 0);
-    for (let i = 0; i < validBits; i += 1) {
-        const bit = (segmentValue.charAt(i) === '1');
-        const bitPos = startRelay + i - 1;
-        const bitMask = (1 << bitPos);
-        if (bit) {
-            nextMask |= bitMask;
-        } else {
-            nextMask &= ~bitMask;
-        }
+function setOutputEnabled(mask, outputId, enabled) {
+    let nextMask = (mask >>> 0);
+    const bitMask = (1 << (outputId - 1));
+    if (enabled) {
+        nextMask |= bitMask;
+    } else {
+        nextMask &= ~bitMask;
     }
     return (nextMask >>> 0);
 }
 
-function buildDeviceGroups() {
-    const groups = [];
-    const total = Math.max(1, toInt(RELAY_LAYOUT.totalOutputs, 12));
-    const local = Math.max(1, Math.min(total, toInt(RELAY_LAYOUT.localOutputs, 4)));
-    const modbusSpan = Math.max(1, toInt(RELAY_LAYOUT.modbusGroupOutputs, 8));
-
-    groups.push({
-        start: 1,
-        end: local,
-        label: trf('programs.js.037', { end: local }),
-        isLocal: true,
+function buildCheckboxLine(items, rowIndex, mask, cssClass) {
+    const checks = items.map((item) => {
+        const checked = outputIsEnabled(mask, item.outputId) ? 'checked' : '';
+        return `<label class="relay-check" title="${escapeHtml(item.hover)}"><input type="checkbox" ${checked} data-row-idx="${rowIndex}" data-output-id="${item.outputId}" onchange="onProgramOutputToggle(this)"></label>`;
     });
 
-    let nextStart = local + 1;
-    let modbusIdx = 1;
-
-    while (nextStart <= total) {
-        const nextEnd = Math.min(total, nextStart + modbusSpan - 1);
-        groups.push({
-            start: nextStart,
-            end: nextEnd,
-            label: trf('programs.js.038', {
-                start: nextStart,
-                end: nextEnd,
-                idx: modbusIdx,
-            }),
-            isLocal: false,
-        });
-        nextStart = nextEnd + 1;
-        modbusIdx += 1;
-    }
-
-    return groups;
+    return `<div class="relay-check-line ${cssClass}">${checks.join('')}</div>`;
 }
 
 function buildRelayMaskEditor(mask, rowIndex) {
-    const groups = buildDeviceGroups();
     const normalizedMask = (toInt(mask, 0) >>> 0);
-
-    const rows = groups.map((group) => {
-        const groupLen = group.end - group.start + 1;
-        const segmentCount = Math.ceil(groupLen / 4);
-
-        let inputsHtml = '';
-        for (let segmentIdx = 0; segmentIdx < segmentCount; segmentIdx += 1) {
-            const segmentStart = group.start + (segmentIdx * 4);
-            const validBits = Math.min(4, group.end - segmentStart + 1);
-            const segmentValue = maskSegmentFromRange(normalizedMask, segmentStart, validBits);
-
-            inputsHtml += `<input class="relay-mask-box" type="text" maxlength="4" minlength="4" pattern="[01]{4}" value="${segmentValue}" data-row-idx="${rowIndex}" data-seg-start="${segmentStart}" data-valid-bits="${validBits}" oninput="onRelayMaskSegmentInput(this)" onblur="onRelayMaskSegmentBlur(this)" onchange="onRelayMaskSegmentChange(this)">`;
-        }
-
-        return `<div class="relay-mask-device"><div class="relay-mask-label">${group.label}</div><div class="relay-mask-boxes">${inputsHtml}</div></div>`;
-    });
-
-    return `<div class="relay-mask-editor">${rows.join('')}<div class="relay-mask-help">${escapeHtml(tr('programs.js.039'))}</div></div>`;
+    return `<div class="relay-check-editor">${buildCheckboxLine(PROGRAM_RELAY_ITEMS, rowIndex, normalizedMask, 'relay-check-line-relays')}${buildCheckboxLine(SERVICE_OUTPUT_ITEMS, rowIndex, normalizedMask, 'relay-check-line-service')}</div>`;
 }
 
 function normalizeProgram(program, idx) {
@@ -193,28 +150,16 @@ function render() {
     });
 }
 
-window.onRelayMaskSegmentInput = function onRelayMaskSegmentInput(element) {
-    element.value = sanitizeRelaySegment(element.value, false);
-};
-
-window.onRelayMaskSegmentBlur = function onRelayMaskSegmentBlur(element) {
-    element.value = sanitizeRelaySegment(element.value, true);
-};
-
-window.onRelayMaskSegmentChange = function onRelayMaskSegmentChange(element) {
+window.onProgramOutputToggle = function onProgramOutputToggle(element) {
     const rowIndex = toInt(element.dataset.rowIdx, -1);
-    const segmentStart = toInt(element.dataset.segStart, 1);
-    const validBits = toInt(element.dataset.validBits, 4);
+    const outputId = toInt(element.dataset.outputId, 0);
 
-    if (rowIndex < 0 || rowIndex >= programs.length) {
+    if (rowIndex < 0 || rowIndex >= programs.length || outputId <= 0) {
         return;
     }
 
-    const normalizedValue = sanitizeRelaySegment(element.value, true);
-    element.value = normalizedValue;
-
     const current = normalizeProgram(programs[rowIndex], rowIndex);
-    const nextMask = applySegmentToMask(current.relay_mask, normalizedValue, segmentStart, validBits);
+    const nextMask = setOutputEnabled(current.relay_mask, outputId, !!element.checked);
 
     programs[rowIndex] = {
         ...current,

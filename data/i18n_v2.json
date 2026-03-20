@@ -865,11 +865,11 @@
       "100": {
         "label": "config.text.100",
         "text": {
-          "it": "(TAG) Porte Seriali",
-          "en": "(TAG) Serial Ports",
-          "fr": "(TAG) Ports série",
-          "de": "(TAG) Serielle Ports",
-          "es": "(TAG) Puertos serie"
+          "it": "Porte Seriali",
+          "en": "Serial Ports",
+          "fr": "Ports série",
+          "de": "Serielle Ports",
+          "es": "Puertos serie"
         }
       },
       "101": {
@@ -963,13 +963,13 @@
         }
       },
       "110": {
-        "label": "config.attr.110",
+        "label": "config.text.110",
         "text": {
-          "it": "it",
-          "en": "en",
-          "fr": "fr",
-          "de": "en",
-          "es": "en"
+          "it": "Soglia PreFineCiclo (%)",
+          "en": "PreFineCiclo threshold (%)",
+          "fr": "Seuil PreFineCiclo (%)",
+          "de": "PreFineCiclo Schwellenwert (%)",
+          "es": "Umbral PreFineCiclo (%)"
         }
       },
       "111": {
@@ -2125,11 +2125,11 @@
       "077": {
         "label": "config.text.077",
         "text": {
-          "it": "Massima sospensione programma (s)",
-          "en": "Maximum program suspension (s)",
-          "fr": "Suspension maximale du programme (s)",
-          "de": "Maximale Programmsuspension (s)",
-          "es": "Suspensión máxima del programa (s)"
+          "it": "Pagina Principale",
+          "es": "Descarga remota (consulta)",
+          "en": "Main Page",
+          "fr": "Page principale",
+          "de": "Hauptseite"
         }
       },
       "074": {
@@ -2160,16 +2160,6 @@
           "fr": "Botte avec logo",
           "de": "Logo-Stiefel",
           "es": "Bota con logotipo"
-        }
-      },
-      "077": {
-        "label": "config.text.077",
-        "text": {
-          "it": "Pagina Principale",
-          "es": "Descarga remota (consulta)",
-          "en": "Main Page",
-          "fr": "Page principale",
-          "de": "Hauptseite"
         }
       },
       "078": {
@@ -2390,16 +2380,6 @@
           "fr": "Configuration fixe du pilote CCTalk (GPIO20/GPIO21, 9600 8N1).",
           "de": "Feste CCTalk-Treiberkonfiguration (GPIO20/GPIO21, 9600 8N1).",
           "es": "Configuración fija del controlador CCTalk (GPIO20/GPIO21, 9600 8N1)."
-        }
-      },
-      "110": {
-        "label": "config.text.110",
-        "text": {
-          "it": "Soglia PreFineCiclo (%)",
-          "en": "PreFineCiclo threshold (%)",
-          "fr": "Seuil PreFineCiclo (%)",
-          "de": "PreFineCiclo Schwellenwert (%)",
-          "es": "Umbral PreFineCiclo (%)"
         }
       }
     },
@@ -7435,6 +7415,16 @@
     }
   },
   "lvgl": {
+    "100": {
+      "label": "test.text.100",
+      "text": {
+        "it": "Test barra LED completato",
+        "en": "LED bar test completed",
+        "fr": "Test barre LED terminé",
+        "de": "LED-Leiste-Test abgeschlossen",
+        "es": "Test de barra LED completado"
+      }
+    },
     "time_not_available": {
       "legacyId": "2.2",
       "label": "lvgl.status.time_not_available",
@@ -7688,6 +7678,17 @@
         "es": ""
       }
     },
+    "program_outputs_error": {
+      "legacyId": "2.823",
+      "label": "lvgl.program.outputs_error",
+      "text": {
+        "it": "Errore uscite",
+        "en": "Output error",
+        "fr": "Erreur sorties",
+        "de": "Ausgangsfehler",
+        "es": "Error salidas"
+      }
+    },
     "ecd_expire_line1_fmt": {
       "legacyId": "2.821",
       "label": "lvgl.credit.ecd_expire_line1_fmt",
@@ -7892,16 +7893,6 @@
         "fr": "Test barre LED en cours...",
         "de": "LED-Leiste-Test läuft...",
         "es": "Test de barra LED en progreso..."
-      }
-    },
-    "100": {
-      "label": "test.text.100",
-      "text": {
-        "it": "Test barra LED completato",
-        "en": "LED bar test completed",
-        "fr": "Test barre LED terminé",
-        "de": "LED-Leiste-Test abgeschlossen",
-        "es": "Test de barra LED completado"
       }
     },
     "language_select_title": {
