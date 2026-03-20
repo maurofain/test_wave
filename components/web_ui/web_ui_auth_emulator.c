@@ -351,9 +351,13 @@ esp_err_t api_emulator_fsm_messages_get(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "vcd_coins", has_snapshot ? (double)snapshot.vcd_coins : 0.0);
     cJSON_AddStringToObject(root, "state", has_snapshot ? fsm_state_to_string(snapshot.state) : "unknown");
     cJSON_AddNumberToObject(root, "running_elapsed_ms", has_snapshot ? (double)snapshot.running_elapsed_ms : 0.0);
-    cJSON_AddNumberToObject(root, "running_target_ms",  has_snapshot ? (double)snapshot.running_target_ms  : 0.0);
+    cJSON_AddNumberToObject(root, "running_target_ms", has_snapshot ? (double)snapshot.running_target_ms : 0.0);
     cJSON_AddNumberToObject(root, "running_price_units", has_snapshot ? (double)snapshot.running_price_units : 0.0);
     cJSON_AddNumberToObject(root, "pause_elapsed_ms", has_snapshot ? (double)snapshot.pause_elapsed_ms : 0.0);
+    cJSON_AddBoolToObject(root, "pre_fine_ciclo_active", has_snapshot ? snapshot.pre_fine_ciclo_active : false);
+    cJSON_AddNumberToObject(root, "inactivity_ms", has_snapshot ? (double)snapshot.inactivity_ms : 0.0);
+    cJSON_AddNumberToObject(root, "splash_screen_time_ms", has_snapshot ? (double)snapshot.splash_screen_time_ms : 0.0);
+    cJSON_AddStringToObject(root, "running_program_name", has_snapshot ? snapshot.running_program_name : "");
 
     cJSON *relays = cJSON_CreateArray();
     if (!relays) {

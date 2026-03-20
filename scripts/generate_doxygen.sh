@@ -7,7 +7,7 @@ set -euo pipefail
 
 WORKDIR="$(cd "$(dirname "$0")/.." && pwd)"
 DOXYFILE="$WORKDIR/Doxyfile"
-OUTDIR="$WORKDIR/docs/doxygen"
+OUTDIR="$WORKDIR/doxygen"
 MD_OUTDIR="$OUTDIR/markdown"
 
 command -v doxygen >/dev/null 2>&1 || { echo "doxygen non trovato nel PATH. Installa doxygen e riprova." >&2; exit 1; }

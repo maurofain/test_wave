@@ -505,13 +505,24 @@ esp_err_t web_ui_virtual_relay_control(uint8_t relay_number, bool status, uint32
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_err_t io_err = tasks_digital_io_set_output_via_agent(relay_number,
+    uint8_t output_id = 0U;
+    esp_err_t map_err = digital_io_program_relay_to_output_id(relay_number, &output_id);
+    if (map_err != ESP_OK) {
+        ESP_LOGW(TAG,
+                 "[C] Mappatura relay R%u non valida: %s",
+                 (unsigned)relay_number,
+                 esp_err_to_name(map_err));
+        return map_err;
+    }
+
+    esp_err_t io_err = tasks_digital_io_set_output_via_agent(output_id,
                                                               status,
                                                               pdMS_TO_TICKS(250));
     if (io_err != ESP_OK) {
         ESP_LOGW(TAG,
-                 "[C] Relay R%u non aggiornato su hardware: %s",
+                 "[C] Relay R%u (OUT%u) non aggiornato su hardware: %s",
                  (unsigned)relay_number,
+                 (unsigned)output_id,
                  esp_err_to_name(io_err));
         return io_err;
     }
@@ -548,8 +559,13 @@ bool web_ui_virtual_relay_get(uint8_t relay_number, web_ui_virtual_relay_state_t
         return false;
     }
 
+    uint8_t output_id = 0U;
+    if (digital_io_program_relay_to_output_id(relay_number, &output_id) != ESP_OK) {
+        return false;
+    }
+
     bool hw_status = false;
-    esp_err_t io_err = tasks_digital_io_get_output_via_agent(relay_number,
+    esp_err_t io_err = tasks_digital_io_get_output_via_agent(output_id,
                                                               &hw_status,
                                                               pdMS_TO_TICKS(250));
     if (io_err == ESP_OK) {

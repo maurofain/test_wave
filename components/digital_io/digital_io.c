@@ -466,12 +466,36 @@ esp_err_t digital_io_program_relay_to_output_id(uint8_t relay_number, uint8_t *o
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (!is_valid_output_id(relay_number)) {
+    switch (relay_number) {
+        case 1:
+            *out_output_id = DIGITAL_IO_OUTPUT_RELAY1;
+            return ESP_OK;
+        case 2:
+            *out_output_id = DIGITAL_IO_OUTPUT_RELAY2;
+            return ESP_OK;
+        case 3:
+            *out_output_id = DIGITAL_IO_OUTPUT_RELAY3;
+            return ESP_OK;
+        case 4:
+            *out_output_id = DIGITAL_IO_OUTPUT_RELAY4;
+            return ESP_OK;
+        default:
+            break;
+    }
+
+    if (relay_number >= 5U && relay_number <= 12U) {
+        *out_output_id = (uint8_t)(DIGITAL_IO_FIRST_MODBUS_OUTPUT + (relay_number - 5U));
+        if (is_valid_output_id(*out_output_id)) {
+            return ESP_OK;
+        }
+    }
+
+    *out_output_id = 0U;
+    if (relay_number == 0U) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    *out_output_id = relay_number;
-    return ESP_OK;
+    return ESP_ERR_NOT_SUPPORTED;
 }
 
 esp_err_t digital_io_input_get_code(uint8_t input_id, char *out_code, size_t out_code_len)

@@ -1,18 +1,9 @@
 [ ]  il timeout della pagina programmi, quello che resetta il credito, si deve resettare se il touch viene toccato anche in aree non legate ad azioni e il credito ecd non deve essere azzerato. Il credito vcd è a consumo effettivo e non è interessato da questo problema.Se l credito è ecd mostra nell'area in basso (zona errori) un messaggio su 2 righe (da mettere in i18n) 'Il credito scadrà tra xx secondi' - 'tocca il numero del credito per continuare'il testo no va nell'area credit ma nel area del pulsante STOP.
 I pulsanti dei programmi continuano a funzionare normalmente dopo la pressione dell'area credit e si disabilitano se il credito scade
 ora quando inserisco una moneta vieve valorizzato il credito (2 euro) ma appare subito la scritta in ocra 'Il credito scadrà...)mentre anche se rimangono meno di  60 secondi non appare il pulsante in basso s_stop_btn. inoltre il ciclo si ripete anche se il credito è 0: riappare il countdown per la scadenza del credito
-[ ] Riepilogo logica attesa scelta programmi:
-- il cliente ha un credito ECD: non succede nulla - al timeout la schermata siresetta o va in ads ma il cliente paga solo il consumato, quindi solo se sceglie un programma
-- il cliente paga in monete : 60 secondi prima della scadenza della pagina deve apparire un messaggio in s_stop_btn di avvertimento con la richiesta di toccare l'area credito: se la tocca il timer si resetta, altrimentio alla scadenza il credito viene trattenuto e azzerato
-[ ]In esecuzionr programma il tempo rimanate deve apparire nella barra di progressione a sx
-[ ] i18n non cambia le lingue ne in lvgl ne in web
-[ ] le lingue in /config vanno trattate cosi : 
-lingua Pannello: definisce la lingua di defaul del pannello touch (modificabile dal cliente) : va persistita ma non modificata subito nel display
-lingua backend: definisce la lingua da usarfe per l'interfaccia web : va persistita e cambiata subito rinfrescando invalidanto la lingua e le pagine
 [ ] Tasto STOP si esecuzione programma : alla prima pressione devi mostrare il messaggio di conferma : se premuto devi proseguire con il programma in corso ma alla fine devi disabilitare la ripetizione automatica del programma a fine ciclo anche con credito disponibile. 
-[ ] Allinea la grafica di Emulator con quella lvgl, tenedo invariata la parte a dx del pannello
-[ ] In /test -> I/O expander lo stato degli inmput non viene rilevato per DIP1 2 3
 [ ]Controlla lo logica della FSM : 
+
 - all'avvio deve inizializzare tutto l'hardware e sincronizzarsi con il server remoto e NTP : va introdotto un nuovo stato FSM_STATE_INIT
 - poi deve passare in attesa di presenza cliente (tramite tocco del touch) mostrando lo slideshow nel riquadro centrale della pagina con il tasto con il tasto Selezione Lavaggio e il messaggio di errore opzionale in basso : va introdotto un nuovo stato FSM_STATE_SLIDESHOW
 - alla pressione di selezione lavaggio deve andare alla pagina programmi
@@ -23,7 +14,7 @@ lingua backend: definisce la lingua da usarfe per l'interfaccia web : va persist
 [ ] i pulsanti programma devono cambiare colore al raggiungimento del 70%
 [ ] il caricamento delle immagini per lo slideshow segue questo ordine: se ci sono file imgxx.jpg in SPIFFS vanno caricate da SPIFFS, se non ci sono in SPIFFS le cerchiamo in SDCARD. se non ci sono in SDCARD saltiamo la pagina pubblicità e passiamo direttamente a scelta programmi
 [ ] Font da utilizzare : pagina ads : testo nome impianto GoogleSans70, Selezione lavaggio GoogleSans50, messaggio errore GoogleSans40
-
+[ ] visualizzare il credito in euro in carattere 24px giallo sotto il credito principale 
 [ ] Far eseguire le funzioni tra moduli diversi (ad esempio un comando cctalk lanciato da una funzione lvgl) tramite la coda messaggi e non con chiamate dirette. Verificare il codice attuale se sono implementate funzioni che fanno chiamate a scope diversi e creare un'elenco con la descrizione di ogni operazione trans-scope
 [ ] al termine della schermata di init con il logo va effettuato l'invio della sequenza CCTALK cctalk_driver_start_acceptor()
 [ ]-definire la maschera di attivazione dei relays nelle righe dei programmi in /config/programs mediante più gruppi di editbox da 4 caratteri  ciascuno (accettano 0 o 1 - 4 caratteri obbligatori fillati con trailing-zeroes) in base al numero di porte di out disponibili. a sx degli editbox ci sarà l'indicazione del numero relauys (1-4, 5-12, ecc.)  1 relays 1-4 sono quelli sulla MH1001,  i successi gruppi di 8 sulle schede waveshare RS485 in modbus. Formattare gli editbox su più righe nella stessa DIV (1 riga per device)
@@ -42,40 +33,3 @@ IN  : DIP1, DIP2, DIP3 , SERVICE_SWITCH, OPTO2, OPTO1, OPTO4, OPTO3
 Dobbiamo mappare tutti gli input nel device considerando gli input OPTOx come possibili tasti e gli altri come segnali da far processare al task io_process (per ora non agisce) , gli out considerando RELAYx come relay da pilotare e da usare nella lista programmi e i LED come segnali da utilizzare per eventi usando come consumer task il io_process (per ora non agisce), lo stato di HEATER va processato dal task io_process (per ora non agisce)
 
 -----------------
-le due lingue sono completamente separate e gestite con logiche diverse:
-LVGL : cambio su richiesta dell'utente e stringhe da caricare in PSRAM all'avvio
-WEB : Scelta effettuata dal manutentore con rilettura del file i18n ed adeguamento dell'interfaccia web
-Non c'è relazione tra le 2 lingue e non posso settarle uguali
-Dobbiamo verificare le operazioni al boot per :
-Caricamento lingue per LVGL in PSRAM ed attivazione della lingua di default definita in config
-Caricamento di 1 sola lingua per backend in base al config
-Cambiamento della lingua LVGL in base alla scelta utente usando la tabella in PSRAM
-Cambiamento della lingua di backend in base alla richiesta utente web (manutentore) e rilettura del json con successiva invalidazione pagine .
-Per ora prepara un report della situazione e il programma per la correzzione che salverai in 260319_LANGUAGE_ISSUES.md
-------------------
-
-------------------
-!IMPORTANT
-ca completata l'unificazione della gestione di config che ha parti in wen_ui.c
-------------------
-
-------------------
-I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
-I (19254) APP: [F] [M] Cmd1 - Address Poll: OK
-I (19334) APP: [F] [M] Cmd2 - Modify Inhibit Status (all channels): OK
-I (19404) APP: [F] [M] Cmd3 - Modify Master Inhibit (accept enabled): OK
-I (19474) APP: [F] [M] Cmd4 - Request Inhibit Status: OK (mask=0xFFFF)
-I (19474) APP: [F] [M] Sequenza CCTalk completata
-
-
-[ ] gestione brightness:
-L'utilizzo dell'**ESP32-P4** per controllare questo monitor tramite MIPI-DSI e I2C è un'ottima scelta, data la potenza del chip nel gestire flussi video. Per la luminosità, Waveshare espone un'interfaccia I2C specifica che funge da "ponte" verso il driver della retroilluminazione.
-
-Ecco i dettagli tecnici per implementare il controllo sul tuo ESP32-P4.
-
----
-
-❯ in precedenza usavamo per la gestione delle pagine html e i relativi javascript il sistema che prevedeva che nel file wepages_embedded.c ci fossero i sorgenti html e js delle pagine stesse, che poi venivano estratti da uno script python. Poi abbiamo cambiato con una gestioen diretta di html e js ma il file
-  webpages_embedde.c è rimansto. Fai un report sull'attuale impiego di questo file e verifica se possiamo toglierlo dal codice e dalla documentazione  
-
-

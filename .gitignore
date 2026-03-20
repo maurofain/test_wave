@@ -34,9 +34,7 @@ managed_components/
 .LSOverride
 
 # Documentation
-docs/doxygen/
-exec.log
-
+doxygen/
 exec.log
 
 # i18n editor generated/dependency folders

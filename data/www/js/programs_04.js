@@ -279,7 +279,7 @@ async function savePrograms() {
             throw new Error(text || ('HTTP ' + response.status));
         }
 
-        showStatus(tr('programs.js.032'), true);
+        window.alert(tr('programs.js.032'));
         render();
     } catch (error) {
         showStatus(tr('programs.js.033') + error.message, false);

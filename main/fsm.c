@@ -18,6 +18,8 @@ static const char *TAG = "FSM_MB";
 #define FSM_DEFAULT_EVENT_QUEUE_LEN (32U)
 #define FSM_DEFAULT_AD_ROTATION_MS (30000U)
 #define FSM_DEFAULT_CREDIT_RESET_TIMEOUT_MS (300000U)
+#define FSM_CENTS_PER_CREDIT (100)
+#define FSM_MAILBOX_TTL_MS (1100U)
 
 /* mailbox-based event bus replaces the old FreeRTOS queue */
 static SemaphoreHandle_t s_fsm_pending_lock = NULL;
@@ -33,6 +35,7 @@ static size_t s_fsm_pending_count = 0;
 typedef struct {
     fsm_input_event_t ev;
     uint32_t to_mask;
+    uint32_t enqueue_timestamp_ms;
 } mailbox_slot_t;
 
 static mailbox_slot_t s_mailbox[FSM_MAILBOX_SIZE];
@@ -44,12 +47,85 @@ static SemaphoreHandle_t s_mb_mutex = NULL;
 static SemaphoreHandle_t s_mb_signal = NULL;
 
 static uint32_t to_mask_from_event(const fsm_input_event_t *e);
+static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type);
 static void fsm_reset_runtime_locked(fsm_ctx_t *ctx);
 static void fsm_close_session(fsm_ctx_t *ctx, bool clear_credit);
 static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source);
 static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source);
 static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost);
 static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx);
+static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
+                                      int32_t amount_cents,
+                                      bool is_ecd,
+                                      const char *source_tag);
+static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms);
+
+static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms)
+{
+    size_t dropped = 0;
+
+    for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
+        if (s_mailbox[i].to_mask == 0U) {
+            continue;
+        }
+
+        uint32_t age_ms = now_ms - s_mailbox[i].enqueue_timestamp_ms;
+        if (age_ms > FSM_MAILBOX_TTL_MS) {
+#ifdef LOG_QUEUE
+            ESP_LOGW(TAG,
+                     "DROP_EXPIRED[%zu] type=%s action=%d from=%d age_ms=%lu",
+                     i,
+                     fsm_input_event_type_to_string(s_mailbox[i].ev.type),
+                     (int)s_mailbox[i].ev.action,
+                     (int)s_mailbox[i].ev.from,
+                     (unsigned long)age_ms);
+#endif
+            s_mailbox[i].to_mask = 0U;
+            dropped++;
+        }
+    }
+
+    while (s_mb_head != s_mb_tail && s_mailbox[s_mb_head].to_mask == 0U) {
+        s_mb_head = (s_mb_head + 1) % FSM_MAILBOX_SIZE;
+    }
+
+    return dropped;
+}
+
+static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
+                                      int32_t amount_cents,
+                                      bool is_ecd,
+                                      const char *source_tag)
+{
+    if (!ctx || amount_cents <= 0) {
+        return;
+    }
+
+    int32_t *bucket_credits = is_ecd ? &ctx->ecd_coins : &ctx->vcd_coins;
+    int32_t *bucket_residual = is_ecd ? &ctx->ecd_cents_residual : &ctx->vcd_cents_residual;
+    const char *bucket_name = is_ecd ? "ecd" : "vcd";
+
+    int32_t total_cents = *bucket_residual + amount_cents;
+    int32_t credits_add = total_cents / FSM_CENTS_PER_CREDIT;
+    int32_t cents_residual = total_cents % FSM_CENTS_PER_CREDIT;
+
+    *bucket_residual = cents_residual;
+    if (credits_add > 0) {
+        *bucket_credits += credits_add;
+        ctx->credit_cents += credits_add;
+    }
+
+    ESP_LOGI(TAG,
+             "[M] [ADD_CREDIT] src=%s type=%s in_cents=%ld add_credits=%ld residual_cents=%ld ecd=%ld vcd=%ld credit=%ld",
+             source_tag ? source_tag : "payment",
+             bucket_name,
+             (long)amount_cents,
+             (long)credits_add,
+             (long)cents_residual,
+             (long)ctx->ecd_coins,
+             (long)ctx->vcd_coins,
+             (long)ctx->credit_cents);
+}
 
 static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
 {
@@ -79,6 +155,8 @@ static void fsm_close_session(fsm_ctx_t *ctx, bool clear_credit)
         ctx->vcd_coins = 0;
         ctx->ecd_used  = 0;
         ctx->vcd_used  = 0;
+        ctx->ecd_cents_residual = 0;
+        ctx->vcd_cents_residual = 0;
     }
     ctx->session_mode = FSM_SESSION_MODE_NONE;
     ctx->session_source = FSM_SESSION_SOURCE_NONE;
@@ -129,7 +207,7 @@ static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
     ctx->ecd_used     += f_ecd;
     ctx->vcd_used     += f_vcd;
     ctx->credit_cents -= cost;
-    ESP_LOGI(TAG, "[USE_COIN] cost=%ld from_ecd=%ld from_vcd=%ld ecd_rem=%ld vcd_rem=%ld credit=%ld",
+    ESP_LOGI(TAG, "[M] [USE_CREDIT] cost=%ld from_ecd=%ld from_vcd=%ld ecd_rem=%ld vcd_rem=%ld credit=%ld",
              (long)cost, (long)f_ecd, (long)f_vcd,
              (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->credit_cents);
     return true;
@@ -154,6 +232,7 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
     ctx->pause_elapsed_ms = 0;
     ctx->pause_limit_reached = false;
     ctx->program_running = true;
+    ctx->pre_fine_ciclo_active = false;
     fsm_append_message("Rinnovo automatico programma");
     return true;
 }
@@ -311,6 +390,8 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->vcd_coins = 0;
     ctx->ecd_used  = 0;
     ctx->vcd_used  = 0;
+    ctx->ecd_cents_residual = 0;
+    ctx->vcd_cents_residual = 0;
     ctx->program_running = false;
     ctx->running_elapsed_ms = 0;
     ctx->pause_elapsed_ms = 0;
@@ -383,14 +464,21 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
             } else if (event == FSM_EVENT_USER_ACTIVITY) {
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_TIMEOUT) {
-                if (ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
-                    fsm_close_session(ctx, true);
-                } else {
-                    /* Timeout in sessione open-payments:
-                     * non azzerare il credito ECD; chiudi solo la sessione runtime.
-                     */
-                    fsm_close_session(ctx, false);
-                }
+                bool virtual_locked_session =
+                    (ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) &&
+                    (ctx->session_source == FSM_SESSION_SOURCE_QR ||
+                     ctx->session_source == FSM_SESSION_SOURCE_CARD);
+                bool coin_session =
+                    (ctx->session_mode == FSM_SESSION_MODE_OPEN_PAYMENTS) &&
+                    (ctx->session_source == FSM_SESSION_SOURCE_COIN);
+
+                /* Timeout finestra credito:
+                 * - sessione virtuale (QR/CARD): chiudi sessione e azzera credito
+                 * - sessione moneta/gettone: trattieni e azzera credito residuo
+                 * - altri casi: chiudi sessione senza azzeramento forzato
+                 */
+                bool clear_credit = virtual_locked_session || coin_session;
+                fsm_close_session(ctx, clear_credit);
             } else if (event == FSM_EVENT_PAYMENT_ACCEPTED) {
                 ctx->inactivity_ms = 0;
             }
@@ -497,10 +585,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (event->value_i32 > 0) {
-                ctx->ecd_coins    += event->value_i32;
-                ctx->credit_cents += event->value_i32;
-                ESP_LOGI(TAG, "[ADD_COIN] type=ecd value=%ld ecd=%ld credit=%ld",
-                         (long)event->value_i32, (long)ctx->ecd_coins, (long)ctx->credit_cents);
+                fsm_add_credit_from_cents(ctx,
+                                          event->value_i32,
+                                          true,
+                                          (event->text[0] != '\0') ? event->text : "coin");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -511,8 +599,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (event->value_i32 > 0) {
-                ctx->ecd_coins    += event->value_i32;
-                ctx->credit_cents += event->value_i32;
+                fsm_add_credit_from_cents(ctx,
+                                          event->value_i32,
+                                          true,
+                                          (event->text[0] != '\0') ? event->text : "token");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -524,10 +614,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_QR);
             if (event->value_i32 > 0) {
-                ctx->vcd_coins    += event->value_i32;
-                ctx->credit_cents += event->value_i32;
-                ESP_LOGI(TAG, "[ADD_COIN] type=qr_vcd value=%ld vcd=%ld credit=%ld",
-                         (long)event->value_i32, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+                fsm_add_credit_from_cents(ctx,
+                                          event->value_i32,
+                                          false,
+                                          (event->text[0] != '\0') ? event->text : "qr_vcd");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -539,10 +629,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_CARD);
             if (event->value_i32 > 0) {
-                ctx->vcd_coins    += event->value_i32;
-                ctx->credit_cents += event->value_i32;
-                ESP_LOGI(TAG, "[ADD_COIN] type=vcd value=%ld vcd=%ld credit=%ld",
-                         (long)event->value_i32, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+                fsm_add_credit_from_cents(ctx,
+                                          event->value_i32,
+                                          false,
+                                          (event->text[0] != '\0') ? event->text : "card_vcd");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
         }
@@ -636,6 +726,8 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             ctx->vcd_coins = 0;
             ctx->ecd_used  = 0;
             ctx->vcd_used  = 0;
+            ctx->ecd_cents_residual = 0;
+            ctx->vcd_cents_residual = 0;
             return fsm_handle_event(ctx, FSM_EVENT_CREDIT_ENDED);
 
         case FSM_INPUT_EVENT_PROGRAM_SWITCH: {
@@ -903,6 +995,7 @@ bool fsm_event_publish(const fsm_input_event_t *event, TickType_t timeout_ticks)
         size_t slot = s_mb_tail;
         s_mailbox[slot].ev = *event;
         s_mailbox[slot].to_mask = to_mask_from_event(event);
+        s_mailbox[slot].enqueue_timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
         s_mb_tail = next;
         ok = true;
 #ifdef LOG_QUEUE
@@ -950,6 +1043,7 @@ bool fsm_event_publish_from_isr(const fsm_input_event_t *event, BaseType_t *task
         if (next != s_mb_head) {
             s_mailbox[s_mb_tail].ev = *event;
             s_mailbox[s_mb_tail].to_mask = to_mask_from_event(event);
+            s_mailbox[s_mb_tail].enqueue_timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCountFromISR());
             s_mb_tail = next;
             xSemaphoreGiveFromISR(s_mb_mutex, &higher);
             /* BUG4 fix: task_woken va letto DOPO xSemaphoreGiveFromISR */
@@ -1010,7 +1104,11 @@ bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_
     }
 
     while (true) {
+        size_t dropped = 0;
         if (xSemaphoreTake(s_mb_mutex, mutex_wait) == pdTRUE) {
+            uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+            dropped = fsm_mailbox_drop_expired_locked(now_ms);
+
             for (size_t i = s_mb_head; i != s_mb_tail; i = (i + 1) % FSM_MAILBOX_SIZE) {
                 if (s_mailbox[i].to_mask & mybit) {
                     bool slot_fully_consumed = false;
@@ -1034,10 +1132,22 @@ bool fsm_event_receive(fsm_input_event_t *event, agn_id_t receiver_id, TickType_
                     if (slot_fully_consumed) {
                         (void)xSemaphoreTake(s_mb_signal, 0);
                     }
+
+                    for (size_t d = 0; d < dropped; ++d) {
+                        if (xSemaphoreTake(s_mb_signal, 0) != pdTRUE) {
+                            break;
+                        }
+                    }
                     return true;
                 }
             }
             xSemaphoreGive(s_mb_mutex);
+
+            for (size_t d = 0; d < dropped; ++d) {
+                if (xSemaphoreTake(s_mb_signal, 0) != pdTRUE) {
+                    break;
+                }
+            }
         }
 
         if (timeout_ticks == 0) {

@@ -1,3 +1,24 @@
+[ ] aggiungiamo alla struttura dei messaggi per la mailbox un campo timestramp che viene popolato al momento dell'inserimento nella coda. In FSM eliminiamo i messaggi non consumati entro 1100ms dalla immissione in coda
+[ ] Va fatta chiarezza sulla differenza tra Crediti e Euro: abbiamo 2 distinti valori : il cliente fornisce Euro tramite:
+ vcd : in questo caso si preleva 1 euro per ogni credito utilizzato
+ ecd :  in questo caso vanno conteggi9ate le monete e per ogni euro ricevuto si aumenta di 1 credito. L'uso di monete in centesimi impone di sommare tutte le monete e al raggiungimento di un valore => a 1 euro generare un credito.
+Nel log Alive va mostrato il credito ECD VCD  e gli eventuali centesimi in giacenza
+ Esecuzione programmi : l'esecuzione di un programma sottrae 1 o più crediti come da tabella programmi, non agisce sul conto degli euro. Se esiste un saldo euro < 1 euro questo rimane fino al reset  della sessione. 
+Ora succede che il programma non sottrae Crediti ma centesimi di euro.
+Nell'area Crediti non va mostrato il tempo ma il credito e la scritta 'Secondi' non deve apparire ma rimanerte 'Crediti'
+
+[ ] Riepilogo logica attesa scelta programmi:
+
+- il cliente ha un credito ECD: non succede nulla - al timeout la schermata si resetta o va in ads ma il cliente paga solo il consumato, quindi solo se sceglie un programma
+- il cliente paga in monete : 60 secondi prima della scadenza della pagina deve apparire un messaggio in s_stop_btn di avvertimento con la richiesta di toccare l'area credito: se la tocca il timer si resetta, altrimentio alla scadenza il credito viene trattenuto e azzerato
+  [ ]In esecuzionr programma il tempo rimanate deve apparire nella barra di progressione a sx
+  [ ] i18n non cambia le lingue ne in lvgl ne in web
+
+[ ] Allinea la grafica di Emulator con quella lvgl, tenedo invariata la parte a dx del pannello
+[ ] In /test -> I/O expander lo stato degli inmput non viene rilevato per DIP1 2 3
+
+[ ] aggiungiamo alla struttura dei messaggi per la mailbox un campo timestramp che viene popolato al momento dell'inserimento nella coda. In FSM eliminiamo i messaggi non consumati entro 1100ms dalla immissione in coda
+
 [X]all'avvio della app, dopo la connessione alla rete ethernet , verificahiamo che l'interfaccia cctalk sia abilitata ed inviamo la sequenza di inizializzazione:
 .02.00.01.FE.FF/.01.00.02.00.FD
 .02.02.01.E7.FF.FF.16/.01.00.02.00.FD
@@ -5,7 +26,9 @@
 .02.00.01.E6.17/.01.02.02.00.FF.FF.FD
 Ripetiamo la sequeza prima di ogni caricamento della pagina programmi
 [X]saltiamo la schermata con le lingue e passiamo direttamente alla scelta programmi, mettiamo in alto a dx la bandiera della lingua corrente (default italiano)  e se premuta attiviamo la pagina scelta lingua. In base alla lingra scelta cambiamo la bandierina in alto a dx. dopo il periodo di inattività con la FSM in stato 2 azeriamno i crediti CVD e ECD (se monete/gettoni non utilizzati vengono egualmente azzerati) e ritorniamo alla lingua italiana. dopo un altro tempo di attesa in scelta programmi (defaulto 60sec ed editabile in /config/timeouts)usciamo ad una pagina pubblicità dove mostriamo delle immagini (di dimensione non predefinita e visualizzate centrate su sfondo nero) nominate img01.jpg, img02.jpg a rotazione con intervallo di 30 secondi (editabile in /config/timeouts) e che su tocco dello schermo passa alla schermata programmi
-
+[X] le lingue in /config vanno trattate cosi : 
+lingua Pannello: definisce la lingua di defaul del pannello touch (modificabile dal cliente) : va persistita ma non modificata subito nel display
+lingua backend: definisce la lingua da usarfe per l'interfaccia web : va persistita e cambiata subito rinfrescando invalidanto la lingua e le pagine
 [X]La bandierina in se è troppo piccola, va raddoppita in x e y, il bordo va raddoppiato in orizzontale come schermata di timeout non appare lo slideshow ma la scelta lingue, che deve apparire solo alla pression della bandiera
 
 [X]Crea uno stato nella FSM chiamato LVGL_PAGES_TEST per permettere la visualizzazione delle grafiche delle varie pagine senza l'operatività di pulsanti o altri elementi grafici. Entrando in questo stato vanno fermati i task delle periferiche ws2812 io_expander sht40 rs232 rs485 mdb pwm usb_scanner cctalk 
@@ -35,13 +58,20 @@ durante il run segue aumenta a partire dal primo led ad accendere progressivamen
 al raggiugimento di PreFineCiclo commuta in porpora e a ciclo finito rimane completamente accesa lampeggioante a 2hz in colore porpora fino a che la macchina ritorna in IDLE o viene premuto qualsiasi funzione sui tasti o touch che la portano a spegnersi
 [ ] lvgl: in ads i messaggi dio errore in basso deve apparire solo se ci sono errori
 [X]Nella cartella i18n_editor Crea webuna app electron da far girare su un pc windows o linux che permetta di editare i file delle lingue:
+
 - si sceglie lo scope ed appaiono tutte le stringhe di quello scope incolonnate per lingua, la prima colonna è l'ID. la prima lingua è ITALIANO, Ogni voce è editabile e di fianco alla textbox ha un button per la traduzione automatica da fare interrogando un servizio web definito in un file di configurazione. In alto a sx abbiamo la scelta dello scope e a destra i tasti SALVA e ESCI. Il salvataggio crea automaticamente un json con tutti i dati di tutte le lingue con nome 'i18n_{tiomestamp}.json'
 [X] vedo che lo stato ESP_ERR_INVALID_STATE è usato per molte motivazioni diverse: crea degli stati più specifici
 [X] se ADS è disabilitato la pagina programmi non ha u8n timeou per tornare a ADS , rimane sempre attiva, e la pagina ADS non va mai renderizzata
 
 
 -----------------------
+❯ in precedenza usavamo per la gestione delle pagine html e i relativi javascript il sistema che prevedeva che nel file wepages_embedded.c ci fossero i sorgenti html e js delle pagine stesse, che poi venivano estratti da uno script python. Poi abbiamo cambiato con una gestioen diretta di html e js ma il file
+  webpages_embedde.c è rimansto. Fai un report sull'attuale impiego di questo file e verifica se possiamo toglierlo dal codice e dalla documentazione  
+
+
+
 ## refactor i18n v2 (decisioni aggiornate)
+
 - Pipeline web primaria: HTML-first su SPIFFS (`data/www/*.html` + `data/www/js/*.js`), senza passaggio di conversione embedded->html nel flusso principale.
 - Localizzazione web: preload al boot (o su cambio lingua) con cache pagine localizzate in PSRAM; nessun parsing JSON durante la singola richiesta HTTP.
 - Placeholder web: numerici compatti a 3 cifre (`{{001}}..{{999}}`) con validazione formale.
@@ -124,3 +154,41 @@ esp_err_t set_backlight_brightness(uint8_t level) {
 Questo video mostra l'interfaccia e i collegamenti fisici necessari per far funzionare correttamente i display Waveshare DSI, inclusa la gestione della luminosità.
 
 Vuoi che ti aiuti a integrare questo codice con l'inizializzazione del driver video MIPI-DSI specifico per l'ESP32-P4?
+
+le due lingue sono completamente separate e gestite con logiche diverse:
+LVGL : cambio su richiesta dell'utente e stringhe da caricare in PSRAM all'avvio
+WEB : Scelta effettuata dal manutentore con rilettura del file i18n ed adeguamento dell'interfaccia web
+Non c'è relazione tra le 2 lingue e non posso settarle uguali
+Dobbiamo verificare le operazioni al boot per :
+Caricamento lingue per LVGL in PSRAM ed attivazione della lingua di default definita in config
+Caricamento di 1 sola lingua per backend in base al config
+Cambiamento della lingua LVGL in base alla scelta utente usando la tabella in PSRAM
+Cambiamento della lingua di backend in base alla richiesta utente web (manutentore) e rilettura del json con successiva invalidazione pagine .
+
+Per ora prepara un report della situazione e il programma per la correzzione che salverai in 260319_LANGUAGE_ISSUES.md
+------------------
+
+------------------
+
+!IMPORTANT
+
+ca completata l'unificazione della gestione di config che ha parti in wen_ui.c
+------------------
+
+------------------
+
+I (19234) APP: [F] [M] Inizio sequenza di inizializzazione CCTalk...
+I (19254) APP: [F] [M] Cmd1 - Address Poll: OK
+I (19334) APP: [F] [M] Cmd2 - Modify Inhibit Status (all channels): OK
+I (19404) APP: [F] [M] Cmd3 - Modify Master Inhibit (accept enabled): OK
+I (19474) APP: [F] [M] Cmd4 - Request Inhibit Status: OK (mask=0xFFFF)
+I (19474) APP: [F] [M] Sequenza CCTalk completata
+
+
+[ ] gestione brightness:
+L'utilizzo dell'**ESP32-P4** per controllare questo monitor tramite MIPI-DSI e I2C è un'ottima scelta, data la potenza del chip nel gestire flussi video. Per la luminosità, Waveshare espone un'interfaccia I2C specifica che funge da "ponte" verso il driver della retroilluminazione.
+
+Ecco i dettagli tecnici per implementare il controllo sul tuo ESP32-P4.
+
+---
+

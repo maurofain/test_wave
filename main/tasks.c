@@ -399,6 +399,19 @@ static esp_err_t tasks_dispatch_digital_io_agent_request(action_id_t action,
             return ESP_ERR_INVALID_ARG;
     }
 
+    /* Le operazioni di sola lettura non devono passare dalla mailbox FSM:
+     * sotto polling web possono saturare la coda senza necessità.
+     * Eseguiamo quindi GET_* direttamente sul componente digital_io. */
+    if (action == ACTION_ID_DIGITAL_IO_GET_OUTPUT ||
+        action == ACTION_ID_DIGITAL_IO_GET_INPUT ||
+        action == ACTION_ID_DIGITAL_IO_GET_SNAPSHOT) {
+        return tasks_execute_digital_io_action(action,
+                                               value_u32,
+                                               aux_u32,
+                                               out_bool,
+                                               out_snapshot);
+    }
+
     if (tasks_is_fsm_context()) {
         return tasks_execute_digital_io_action(action,
                                                value_u32,

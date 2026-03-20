@@ -124,10 +124,11 @@ static bool s_btn_last_prefine[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
 static bool s_prog_suspended[PROG_COUNT] = {0};
 static fsm_state_t s_last_fsm_state = FSM_STATE_IDLE;  /* Track last FSM state for credit reset */
-static uint32_t s_credit_inactivity_start_ms = 0;      /* When CREDIT state was entered */
 static uint32_t s_last_user_interaction_ms = 0;
 static uint32_t s_last_ads_disabled_log_ms = 0;
 static lv_obj_t *s_touch_reset_bound_scr = NULL;
+
+static int32_t panel_effective_credit_cents(const fsm_ctx_t *snap);
 
 static char s_tr_credit[32] = "Credito";
 static char s_tr_credits[32] = "Crediti";
@@ -377,10 +378,32 @@ static bool program_is_clickable_for_snapshot(const web_ui_program_entry_t *entr
     }
 
     if (snap->state == FSM_STATE_CREDIT) {
-        return (snap->credit_cents >= (int32_t)entry->price_units);
+        int32_t effective_credit = panel_effective_credit_cents(snap);
+        return (effective_credit >= (int32_t)entry->price_units);
     }
 
     return false;
+}
+
+/**
+ * @brief Ritorna il credito effettivo da mostrare/valutare in UI.
+ */
+static int32_t panel_effective_credit_cents(const fsm_ctx_t *snap)
+{
+    if (!snap) {
+        return 0;
+    }
+
+    if (snap->credit_cents > 0) {
+        return snap->credit_cents;
+    }
+
+    int32_t buckets = snap->ecd_coins + snap->vcd_coins;
+    if (buckets > 0) {
+        return buckets;
+    }
+
+    return snap->credit_cents;
 }
 
 /**
@@ -428,7 +451,7 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             btn_style(btn, btn_color);
             lv_obj_set_style_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_style_border_width(btn, is_active ? 5 : 0, LV_PART_MAIN);
-            lv_obj_set_style_border_color(btn, COL_WHITE, LV_PART_MAIN);
+            lv_obj_set_style_border_color(btn, COL_RED LV_PART_MAIN);
             lv_obj_set_style_border_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
             
             // Update clickability
@@ -516,6 +539,7 @@ static void update_state(const fsm_ctx_t *snap)
 
     bool running = (snap->state == FSM_STATE_RUNNING);
     bool paused = (snap->state == FSM_STATE_PAUSED);
+    int32_t effective_credit_cents = panel_effective_credit_cents(snap);
     bool prefine_active = false;
     uint32_t rem_ms = 0;
     int32_t remaining_pct = 0;
@@ -545,14 +569,7 @@ static void update_state(const fsm_ctx_t *snap)
     {
         char buf[16] = {0};
 
-        if ((running || paused) && snap->running_target_ms > 0 && !prefine_active)
-        {
-            snprintf(buf, sizeof(buf), "%lu", (unsigned long)(rem_ms / 1000));
-        }
-        else
-        {
-            snprintf(buf, sizeof(buf), "%ld", (long)snap->credit_cents / 100);
-        }
+        snprintf(buf, sizeof(buf), "%ld", (long)effective_credit_cents);
 
         if (strcmp(s_last_credit_text, buf) != 0)
         {
@@ -566,20 +583,10 @@ static void update_state(const fsm_ctx_t *snap)
     {
         char buf[32] = {0};
 
-        if ((running || paused) && !prefine_active)
-        {
-            char mm[10] = {0};
-            fmt_mm_ss(mm, sizeof(mm), snap->running_elapsed_ms);
-            snprintf(buf, sizeof(buf), s_tr_elapsed_fmt, mm);
-        }
-        else if (running || paused)
-        {
-            snprintf(buf, sizeof(buf), "%s", s_tr_credits);
-        }
-        else
-        {
-            snprintf(buf, sizeof(buf), "%s", s_tr_credit);
-        }
+        (void)running;
+        (void)paused;
+        (void)prefine_active;
+        snprintf(buf, sizeof(buf), "%s", s_tr_credits);
 
         if (strcmp(s_last_elapsed_text, buf) != 0)
         {
@@ -620,12 +627,12 @@ static void update_state(const fsm_ctx_t *snap)
         if (running || paused)
         {
             /* Durante il programma, mostra il credito residuo (totale disponibile) */
-            snprintf(buf, sizeof(buf), "%ld €", (long)snap->credit_cents / 100);
+            snprintf(buf, sizeof(buf), "%ld", (long)effective_credit_cents);
         }
         else
         {
             /* A riposo, mostra il credito disponibile per il prossimo programma */
-            snprintf(buf, sizeof(buf), "%ld €", (long)snap->credit_cents / 100);
+            snprintf(buf, sizeof(buf), "%ld", (long)effective_credit_cents);
         }
 
         if (strcmp(s_last_residual_credit_text, buf) != 0)
@@ -671,16 +678,20 @@ static void update_state(const fsm_ctx_t *snap)
         }
     }
 
-    /* [C] Gestione STOP + avviso scadenza credito monete (ECD) */
+    /* [C] Gestione STOP + avviso scadenza credito monete */
     bool ecd_warning_active = false;
     uint32_t ecd_rem_s = 0;
     const uint32_t ecd_warning_threshold_s = 60U;
+    bool coin_credit_session = (snap->state == FSM_STATE_CREDIT) &&
+                               (snap->session_mode == FSM_SESSION_MODE_OPEN_PAYMENTS) &&
+                               (snap->session_source == FSM_SESSION_SOURCE_COIN) &&
+                               (snap->ecd_coins > 0);
 
-    if (snap->state != FSM_STATE_CREDIT || snap->ecd_coins <= 0 || running || paused) {
+    if (!coin_credit_session || running || paused) {
         s_ecd_warning_dismissed = false;
     }
 
-    if (snap->state == FSM_STATE_CREDIT && snap->ecd_coins > 0 && !s_ecd_warning_dismissed) {
+    if (coin_credit_session && !s_ecd_warning_dismissed) {
         if (snap->splash_screen_time_ms > snap->inactivity_ms) {
             ecd_rem_s = (snap->splash_screen_time_ms - snap->inactivity_ms) / 1000U;
             if (ecd_rem_s <= ecd_warning_threshold_s) {
@@ -978,11 +989,10 @@ static void on_lang_btn(lv_event_t *e)
 
 static void update_language_flag(const char *lang_code)
 {
-    /* Bandiera lingua rimossa su richiesta dell'utente */
     if (lang_code) {
         strncpy(s_current_language, lang_code, sizeof(s_current_language) - 1);
         s_current_language[sizeof(s_current_language) - 1] = '\0';
-        ESP_LOGI(TAG, "[C] Lingua aggiornata (senza bandiera): %s", lang_code);
+        ESP_LOGI(TAG, "[C] Lingua aggiornata: %s", lang_code);
     }
 }
 
@@ -1002,12 +1012,11 @@ static void sync_language_from_config(void)
  */
 static void build_header(lv_obj_t *scr)
 {
-    lv_obj_t *parent = s_center_box ? s_center_box : (s_status_box ? s_status_box : scr);
+    (void)scr;
 
-    /* s_time_lbl rimosso su richiesta dell'utente */
-    /* Pulsante bandiera lingua rimosso su richiesta dell'utente */
+    /* Header locale: ora e bandiera sono gestite dal chrome comune. */
 
-    ESP_LOGI(TAG, "[H] Header creato senza bandiera lingua");
+    ESP_LOGI(TAG, "[H] Header creato (bandiera lingua gestita da chrome)");
 }
 
 /** @brief Costruisce lo stato dell'interfaccia utente.
@@ -1239,8 +1248,7 @@ static void build_prog_buttons(void)
     
     // Usa le costanti definite invece di leggere dimensioni dinamiche
     const int32_t status_h = PROG_BUTTONS_AREA_H;
-    const int32_t status_w = PANEL_FULL_W;
-    // ESP_LOGI(TAG, "[C] build_prog_buttons: using constants - w=%d, h=%d", (int)status_w, (int)status_h);
+    // ESP_LOGI(TAG, "[C] build_prog_buttons: using constants - h=%d", (int)status_h);
 
     /* Legge numero programmi dalla configurazione */
     device_config_t *cfg = device_config_get();
@@ -1394,67 +1402,34 @@ static void panel_timer_cb(lv_timer_t *t)
             }
         }
 
-        /* [C] Detect CREDIT state entry and track inactivity for credit reset */
-        if (snap.state == FSM_STATE_CREDIT && s_last_fsm_state != FSM_STATE_CREDIT) {
-            /* Just entered CREDIT state */
-            s_credit_inactivity_start_ms = snap.inactivity_ms;
-            ESP_LOGI(TAG, "[C] Entrato nello stato CREDIT, inizio timeout reset crediti");
-        }
-
-        /* [C] Check for credit reset timeout in CREDIT state */
-        if (snap.state == FSM_STATE_CREDIT) {
-            uint32_t reset_timeout_ms = 300000;  /* Default 5 minutes */
-            if (cfg && cfg->timeouts.credit_reset_timeout_ms > 0) {
-                reset_timeout_ms = cfg->timeouts.credit_reset_timeout_ms;
-            }
-
-            /* Evita overflow quando s_credit_inactivity_start_ms non è stato inizializzato */
-            if (s_credit_inactivity_start_ms == 0) {
-                s_credit_inactivity_start_ms = snap.inactivity_ms;
-                ESP_LOGI(TAG, "[C] Inizializzato s_credit_inactivity_start_ms=%u", s_credit_inactivity_start_ms);
-            }
-
-            uint32_t time_in_credit = snap.inactivity_ms - s_credit_inactivity_start_ms;
-            if (time_in_credit >= reset_timeout_ms && snap.credit_cents > 0) {
-                ESP_LOGI(TAG, "[C] Timeout reset crediti raggiunto (%u ms >= %u ms), azzerando crediti e reimpostando lingua",
-                         time_in_credit, reset_timeout_ms);
-                
-                /* Reset credits by publishing zero credit event (or through FSM) */
-                // For now, we'll just log and reset; actual credit reset would need FSM event
-                
-                /* Reset language to Italian */
-                update_language_flag("it");
-                
-                /* Show advertisement page if available */
-                lvgl_page_ads_show();
-                
-                return;  /* Exit early, don't process normal updates */
-            }
-        }
-
-        /* [C] Auto-restart logic: se il programma è terminato e c'è credito,
-           riavvia automaticamente lo stesso programma a meno che STOP sia stato premuto */
+        /* [C] Auto-restart: se il programma termina e c'è credito sufficiente,
+           ripubblica la selezione dello stesso programma (salvo STOP manuale). */
         static fsm_ctx_t last_snap = {0};
         bool was_running = (last_snap.state == FSM_STATE_RUNNING || last_snap.state == FSM_STATE_PAUSED);
         bool is_now_idle = (snap.state == FSM_STATE_CREDIT);
 
         if (was_running && is_now_idle && s_active_prog > 0 && !s_stop_pressed && snap.credit_cents > 0)
         {
-            /* Condizioni per auto-restart soddisfatte */
-            // Temporarily disabled until web_ui integration is fixed
-            // const web_ui_program_entry_t *entry = find_program_entry(s_active_prog);
-            // if (entry && entry->enabled && snap.credit_cents >= (int32_t)entry->price_units)
-            if (snap.credit_cents > 0) // Simplified condition
-            {
-                ESP_LOGI(TAG, "[C] Auto-restart del programma %u (credito residuo: %ld cents)", 
-                         s_active_prog, snap.credit_cents);
-                // publish_program(s_active_prog, false, entry);
-                ESP_LOGI(TAG, "[C] Auto-restart temporarily disabled");
+            const web_ui_program_entry_t *entry = find_program_entry(s_active_prog);
+            if (entry && entry->enabled && snap.credit_cents >= (int32_t)entry->price_units) {
+                esp_err_t restart_err = tasks_publish_program_button_action(s_active_prog, AGN_ID_LVGL);
+                if (restart_err == ESP_OK) {
+                    ESP_LOGI(TAG, "[C] Auto-restart programma %u pubblicato (credito=%ld)",
+                             (unsigned)s_active_prog,
+                             (long)snap.credit_cents);
+                } else {
+                    ESP_LOGW(TAG, "[C] Auto-restart programma %u fallito: %s",
+                             (unsigned)s_active_prog,
+                             tasks_err_to_name(restart_err));
+                }
+            } else {
+                ESP_LOGI(TAG, "[C] Auto-restart programma %u non eseguibile (entry/credito)",
+                         (unsigned)s_active_prog);
             }
         }
 
-        /* Reset s_stop_pressed quando torniamo a CREDIT (fine del programma) */
-        if (is_now_idle)
+        /* Reset del blocco auto-restart quando usciamo da CREDIT. */
+        if (!is_now_idle)
         {
             s_stop_pressed = false;
         }

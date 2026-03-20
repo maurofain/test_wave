@@ -2,6 +2,7 @@
 #include "http_services.h"
 #include "digital_io.h"
 #include "sht40.h"
+#include "fsm.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -43,6 +44,8 @@ static void keepalive_build_bit_string(uint16_t mask, uint8_t count, char *out, 
 static esp_err_t keepalive_send_message(void)
 {
     digital_io_snapshot_t snapshot = {0};
+    fsm_ctx_t fsm_snapshot = {0};
+    bool has_fsm_snapshot = fsm_runtime_snapshot(&fsm_snapshot);
     char inputstates[DIGITAL_IO_LOCAL_INPUT_COUNT + 1] = {0};
     char outputstates[DIGITAL_IO_LOCAL_OUTPUT_COUNT + 1] = {0};
     float temp_float = 0.0f;
@@ -109,13 +112,18 @@ static esp_err_t keepalive_send_message(void)
     s_keepalive_count++;
 
     ESP_LOGI(TAG,
-             "[C] Keepalive remoto inviato: inputs=%s outputs=%s temp=%ld hum=%ld activities=%u count=%u",
+             "[C] Keepalive remoto inviato: inputs=%s outputs=%s temp=%ld hum=%ld activities=%u count=%u ecd=%ld vcd=%ld credit=%ld ecd_res=%ld vcd_res=%ld",
              inputstates,
              outputstates,
              (long)temp_hundredths,
              (long)hum_hundredths,
              (unsigned)response->activity_count,
-             (unsigned)s_keepalive_count);
+             (unsigned)s_keepalive_count,
+             has_fsm_snapshot ? (long)fsm_snapshot.ecd_coins : -1L,
+             has_fsm_snapshot ? (long)fsm_snapshot.vcd_coins : -1L,
+             has_fsm_snapshot ? (long)fsm_snapshot.credit_cents : -1L,
+             has_fsm_snapshot ? (long)fsm_snapshot.ecd_cents_residual : -1L,
+             has_fsm_snapshot ? (long)fsm_snapshot.vcd_cents_residual : -1L);
 
     free(response);
 

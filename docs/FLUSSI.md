@@ -67,11 +67,14 @@
 4. si passa alla scelta programmi abilitando i programmi che hanno una richiesta di credito <=  a quello letto nella fase 3, continuando ad accettare nuovo credito 
    1. se si è rilevato la pressionetouch/tasto o l'inserimento di una moneta: ogni tipo di pagamento
    2. se si è rilevato QRCode o card (credito virtuale): non si accettano ulteriori crediti
+   3. dall'ultimo evento di accettazione credito parte un timer per la finestra di utilizzo del credito:
+      1. il cliente ha un credito ECD: non succede nulla - al timeout la schermata si resetta o va in ads ma il cliente paga solo il consumato, quindi solo se sceglie un programma
+      2. il cliente paga in monete : 60 secondi prima della scadenza della pagina deve apparire un messaggio in s_stop_btn di avvertimento con la richiesta di toccare l'area credito: se la tocca il timer si resetta, altrimenti alla scadenza il credito viene trattenuto e azzerato
 5. Si esegue il programma attivando i relays definiti nella tabella programmi per il tempo definito nella stessa tabella
    1. Si preleva il credito (prima il credito effettivo e poi il virtuale) e si procede all'esecuzione del programma scelto per più cicli finché c'è disponibilità di credito (terminato il credito effettivo si preleva dal virtuale quanto necessario all'esecuzione del programma )
    2. Si può cambiare il programma premendo su un altro tasto e il sistema adegua il tempo rimanente in base al rateo credito residuo / tempo.x.1.credito
    3. Si può sospendere il programma per un tempo massimo come definito in tabella programmi. La sospensione si ottiene premendo lo stesso programma e la riattivazione premendo un programma qualsiasi
-   4. Il tasto stop ferma l'esecuzione del programma corrente e si azzera il tempo rimanente
-      1. se il credito è effettivo lo schermo rimane in scelta programmi per il tempo definito in Config->Timeouts , dopo di che azzera il credito effettivo e ritorna in ads o scelta programmi con credito azzerato.
+   4. Il tasto stop il sistema completa il programma in corso e poi ferma l'esecuzione del programma corrente e si azzera il tempo rimanente
+      1. se il credito è effettivo si ritorna al punti 4.
       2. se il credito rimanente è virtuale la sessione è conclusa ritorna in ads o scelta programmi con credito azzerato.
 6. In ogni momento è possibile cambiare la lingua premendo la bandierina in alto a dx
