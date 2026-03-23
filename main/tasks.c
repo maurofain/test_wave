@@ -1552,9 +1552,21 @@ static void fsm_task(void *arg)
                      (unsigned long)esp_get_free_heap_size());
         }
 
-        if ((state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) && fsm.state == FSM_STATE_CREDIT) {
+        bool left_program_state = (state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) &&
+                                  (fsm.state == FSM_STATE_IDLE || fsm.state == FSM_STATE_CREDIT);
+        bool forced_stop_requested = event_received &&
+                                     event.type == FSM_INPUT_EVENT_PROGRAM_STOP &&
+                                     event.aux_u32 == 0U;
+        bool credit_forced_end = event_received &&
+                                 event.type == FSM_INPUT_EVENT_CREDIT_ENDED;
+
+        if (left_program_state && (forced_stop_requested || credit_forced_end)) {
             (void)web_ui_program_clear_outputs();
-            fsm_append_message("Programma terminato: reset relay/schermata");
+            fsm_append_message("Reset relay eseguito su stop forzato/credito finito");
+            ESP_LOGI(TAG,
+                     "[M] Reset relay applicato (stop_forzato=%d, credito_finito=%d)",
+                     forced_stop_requested ? 1 : 0,
+                     credit_forced_end ? 1 : 0);
         }
 
         if ((state_before != fsm.state) && cfg && cfg->display.enabled) {

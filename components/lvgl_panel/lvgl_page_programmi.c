@@ -520,11 +520,17 @@ static bool program_is_clickable_for_snapshot(const web_ui_program_entry_t *entr
     }
 
     if (snap->state == FSM_STATE_RUNNING || snap->state == FSM_STATE_PAUSED) {
-        return true;
+        if (snap->running_price_units <= 0) {
+            return false;
+        }
+        return ((int32_t)entry->price_units <= snap->running_price_units);
     }
 
     if (snap->state == FSM_STATE_CREDIT) {
         int32_t effective_credit = panel_effective_credit_cents(snap);
+        if (effective_credit <= 0) {
+            return false;
+        }
         return (effective_credit >= (int32_t)entry->price_units);
     }
 
@@ -746,10 +752,14 @@ static void update_state(const fsm_ctx_t *snap)
     {
         char buf[192] = {0};
 
-        if (paused && snap->pause_elapsed_ms > 0)
+        if (paused && snap->pause_max_ms > 0)
         {
             char mm[10] = {0};
-            fmt_mm_ss(mm, sizeof(mm), snap->pause_elapsed_ms);
+            uint32_t pause_remaining_ms =
+                (snap->pause_max_ms > snap->pause_elapsed_ms)
+                    ? (snap->pause_max_ms - snap->pause_elapsed_ms)
+                    : 0U;
+            fmt_mm_ss(mm, sizeof(mm), pause_remaining_ms);
             snprintf(buf, sizeof(buf), s_tr_pause_fmt, mm);
         }
         else
@@ -1033,6 +1043,15 @@ static void on_prog_btn(lv_event_t *e)
 {
     mark_user_interaction();
 
+    if (s_stop_confirm) {
+        s_stop_confirm = false;
+        if (s_stop_lbl) {
+            char stop_text[64];
+            (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
+            lv_label_set_text(s_stop_lbl, stop_text);
+        }
+    }
+
     lv_obj_t *btn = lv_event_get_target(e);
     prog_btn_ud_t *ud = (prog_btn_ud_t *)lv_obj_get_user_data(btn);
     if (!ud) {
@@ -1059,6 +1078,12 @@ static void on_prog_btn(lv_event_t *e)
     } else {
         s_active_prog = pid;
         s_stop_pressed = false;
+        s_stop_confirm = false;
+        if (s_stop_lbl) {
+            char stop_text[64];
+            (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
+            lv_label_set_text(s_stop_lbl, stop_text);
+        }
         if (s_pause_lbl) {
             lv_label_set_text(s_pause_lbl, "");
             s_last_pause_text[0] = '\0';
@@ -1097,9 +1122,18 @@ static void on_stop_btn(lv_event_t *e)
         }
     }
 
+    bool running = has_snap && (snap.state == FSM_STATE_RUNNING);
+    bool paused = has_snap && (snap.state == FSM_STATE_PAUSED);
+
+    if (!running && !paused) {
+        ESP_LOGI(TAG, "[C] STOP ignorato: stato FSM non running/paused");
+        return;
+    }
+
     if (!s_stop_confirm) {
         /* First press: ask for confirmation and suspend program */
         s_stop_confirm = true;
+        s_stop_pressed = true;
         char stop_confirm_text[64];
         (void)lvgl_i18n_get_text("program_confirm_cancel",
                                  "Conferma annullamento",
@@ -1107,30 +1141,39 @@ static void on_stop_btn(lv_event_t *e)
                                  sizeof(stop_confirm_text));
         lv_label_set_text(s_stop_lbl, stop_confirm_text);
 
-        fsm_input_event_t ev = {
-            .from = AGN_ID_LVGL,
-            .to = {AGN_ID_FSM},
-            .action = ACTION_ID_PROGRAM_PAUSE_TOGGLE,
-            .type = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE,
-            .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-            .value_i32 = (int32_t)pid,
-            .value_u32 = 0,
-            .aux_u32 = 0,
-            .data_ptr = NULL,
-            .text = {0},
-        };
-        if (pid) {
-            const web_ui_program_entry_t *entry = find_program_entry(pid);
-            if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
-        }
-        if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            ESP_LOGW(TAG, "[C] publish pause_toggle from stop failed for pid=%u", (unsigned)pid);
+        if (running) {
+            fsm_input_event_t ev = {
+                .from = AGN_ID_LVGL,
+                .to = {AGN_ID_FSM},
+                .action = ACTION_ID_PROGRAM_PAUSE_TOGGLE,
+                .type = FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE,
+                .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+                .value_i32 = (int32_t)pid,
+                .value_u32 = 0,
+                .aux_u32 = 0,
+                .data_ptr = NULL,
+                .text = {0},
+            };
+            if (pid) {
+                const web_ui_program_entry_t *entry = find_program_entry(pid);
+                if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
+            }
+            if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
+                ESP_LOGW(TAG, "[C] publish pause_toggle from stop failed for pid=%u", (unsigned)pid);
+            }
+        } else {
+            ESP_LOGI(TAG, "[C] Conferma annullamento attiva con programma già in pausa");
         }
     } else {
-        /* Second press: confirm cancellation => publish STOP */
+        /* Second press: conferma stop automatico a fine ciclo, senza interrompere subito */
         s_stop_confirm = false;
-        if (s_stop_lbl) lv_label_set_text(s_stop_lbl, "STOP");
+        if (s_stop_lbl) {
+            char stop_text[64];
+            (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
+            lv_label_set_text(s_stop_lbl, stop_text);
+        }
 
+        s_stop_pressed = true;
         fsm_input_event_t ev = {
             .from = AGN_ID_LVGL,
             .to = {AGN_ID_FSM},
@@ -1139,7 +1182,7 @@ static void on_stop_btn(lv_event_t *e)
             .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
             .value_i32 = (int32_t)pid,
             .value_u32 = 0,
-            .aux_u32 = 0,
+            .aux_u32 = 1U,
             .data_ptr = NULL,
             .text = {0},
         };
@@ -1148,9 +1191,12 @@ static void on_stop_btn(lv_event_t *e)
             if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
         }
         if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            ESP_LOGW(TAG, "[C] publish program stop/cancel failed for pid=%u", (unsigned)pid);
+            ESP_LOGW(TAG, "[C] publish stop-at-end failed for pid=%u", (unsigned)pid);
         } else {
-            s_stop_pressed = true;
+            ESP_LOGI(TAG,
+                     "[C] Stop a fine ciclo richiesto pid=%u (paused=%d)",
+                     (unsigned)pid,
+                     (int)paused);
         }
     }
 }
@@ -1375,9 +1421,9 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_text_color(s_pause_lbl, COL_PROG_PAUSE, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_pause_lbl, FONT_LABEL, LV_PART_MAIN);
     lv_label_set_long_mode(s_pause_lbl, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(s_pause_lbl, PANEL_FULL_W - 48);
+    lv_obj_set_width(s_pause_lbl, PANEL_FULL_W - 220);
     lv_obj_set_style_text_align(s_pause_lbl, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
-    lv_obj_align(s_pause_lbl, LV_ALIGN_BOTTOM_LEFT, 20, -12);
+    lv_obj_align(s_pause_lbl, LV_ALIGN_TOP_LEFT, 20, 74);
 
     /* [C] Pulsante STOP rosso in basso */
     s_stop_btn = lv_button_create(scr);
@@ -1724,16 +1770,17 @@ static void panel_timer_cb(lv_timer_t *t)
 
         bool end_effect_active = (s_program_end_effect_until_ms > 0U) &&
                                  !lv_obj_has_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
+        int32_t effective_credit_cents = panel_effective_credit_cents(&snap);
 
-        if (was_running && is_now_idle && s_active_prog > 0 && !s_stop_pressed && snap.credit_cents > 0 && !end_effect_active)
+        if (was_running && is_now_idle && s_active_prog > 0 && !s_stop_pressed && !s_stop_confirm && effective_credit_cents > 0 && !end_effect_active)
         {
             const web_ui_program_entry_t *entry = find_program_entry(s_active_prog);
-            if (entry && entry->enabled && snap.credit_cents >= (int32_t)entry->price_units) {
+            if (entry && entry->enabled && effective_credit_cents >= (int32_t)entry->price_units) {
                 esp_err_t restart_err = tasks_publish_program_button_action(s_active_prog, AGN_ID_LVGL);
                 if (restart_err == ESP_OK) {
                     ESP_LOGI(TAG, "[C] Auto-restart programma %u pubblicato (credito=%ld)",
                              (unsigned)s_active_prog,
-                             (long)snap.credit_cents);
+                             (long)effective_credit_cents);
                 } else {
                     ESP_LOGW(TAG, "[C] Auto-restart programma %u fallito: %s",
                              (unsigned)s_active_prog,
@@ -1743,6 +1790,16 @@ static void panel_timer_cb(lv_timer_t *t)
                 ESP_LOGI(TAG, "[C] Auto-restart programma %u non eseguibile (entry/credito)",
                          (unsigned)s_active_prog);
             }
+        }
+
+        if (s_last_fsm_state == FSM_STATE_PAUSED && snap.state == FSM_STATE_RUNNING) {
+            s_stop_confirm = false;
+            if (s_stop_lbl) {
+                char stop_text[64];
+                (void)lvgl_i18n_get_text("program_stop", "STOP", stop_text, sizeof(stop_text));
+                lv_label_set_text(s_stop_lbl, stop_text);
+            }
+            ESP_LOGI(TAG, "[C] Ripristino stato STOP dopo ripresa programma");
         }
 
         s_last_fsm_state = snap.state;
