@@ -55,7 +55,7 @@
     var section = document.createElement('div');
     section.className = 'section';
     section.innerHTML =
-      '<h2>Striscia LED</h2>' +
+      '<h2>💡 Striscia LED</h2>' +
       '<div class="form-row">' +
         '<div class="form-group">' +
           '<label style="display:flex;align-items:center;gap:10px;">' +

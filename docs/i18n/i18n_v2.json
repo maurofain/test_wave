@@ -865,11 +865,11 @@
       "100": {
         "label": "config.text.100",
         "text": {
-          "it": "(TAG) Porte Seriali",
-          "en": "(TAG) Serial Ports",
-          "fr": "(TAG) Ports série",
-          "de": "(TAG) Serielle Ports",
-          "es": "(TAG) Puertos serie"
+          "it": "Porte Seriali",
+          "en": "Serial Ports",
+          "fr": "Ports série",
+          "de": "Serielle Ports",
+          "es": "Puertos serie"
         }
       },
       "101": {
