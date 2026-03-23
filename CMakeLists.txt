@@ -15,7 +15,7 @@ set(EXTRA_COMPONENT_DIRS components/waveshare__esp32_p4_nano)
 set(F_LVGL            0)
 set(F_ETHERNET        0)
 set(F_WIFI            0)
-set(F_SD_CARD         0)
+set(F_SD_CARD         1)
 set(F_TOUCHSCREEN     0)
 set(F_USB_SCANNER     0)
 # Se F_EXPANSION_BOARD=1 (board assente), tutti i sotto-componenti vengono

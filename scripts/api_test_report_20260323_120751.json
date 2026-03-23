@@ -1,0 +1,725 @@
+{
+  "timestamp": "2026-03-23T12:07:51",
+  "base_url": "http://192.168.2.153",
+  "source_root": "/media/mauro/code/Progetti/0.Clienti/MicroHard/test_wave",
+  "active_methods": false,
+  "total_discovered": 66,
+  "tested": 66,
+  "skipped_active": 0,
+  "errors": 5,
+  "error_items": [
+    {
+      "uri": "/api/tasks",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/tasks/apply",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/tasks/save",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/test/probe",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/version",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    }
+  ],
+  "all_items": [
+    {
+      "uri": "/api",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>API Endpoints</title><style>body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}.container{max-width:1000px;margin:20px"
+    },
+    {
+      "uri": "/api/",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>API Endpoints</title><style>body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}.container{max-width:1000px;margin:20px"
+    },
+    {
+      "uri": "/api/activity",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/cctalk/log_txrx",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"status\":\"ok\",\"enabled\":false}"
+    },
+    {
+      "uri": "/api/cctalk/log_txrx",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/config",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\n\t\"dname\":\t\"TestWave-Device\",\n\t\"loc\":\t\"\",\n\t\"image_source\":\t\"spiffs\",\n\t\"n_prg\":\t5,\n\t\"lat\":\t0,\n\t\"lon\":\t0,\n\t\"eth\":\t{\n\t\t\"en\":\ttrue,\n\t\t\"dhcp\":\tfalse,\n\t\t\"ip\":\t\"192.168.2.153\",\n\t\t\"sub\":\t\"255.255.255.0\",\n\t\t\"gw\":\t\"192.168.2.209\"\n\t},\n\t\"wifi\":\t{\n\t\t\"sta\":\tfalse,\n\t\t\"dhcp\":\ttrue,\n\t\t\"ssid\":\t\"\",\n\t\t\"pwd\":\t\"\",\n\t\t\"ip"
+    },
+    {
+      "uri": "/api/config/backup",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/config/reset",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/config/save",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/config/timeouts",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\n\t\"t_prg\":\t120000,\n\t\"t_lang\":\t20000,\n\t\"idle_before_ads_ms\":\t60000,\n\t\"ad_rotation_ms\":\t30000,\n\t\"credit_reset_timeout_ms\":\t300000\n}"
+    },
+    {
+      "uri": "/api/config/timeouts",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/debug/crash",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/debug/promote_factory",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/debug/restore",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/debug/usb/enumerate",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"count\":1,\"addresses\":[1],\"client\":\"register_failed\"}"
+    },
+    {
+      "uri": "/api/debug/usb/restart",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/deviceactivity",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/display/lvgl_test",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/emulator/coin",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/emulator/fsm/messages",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"count\":0,\"credit_cents\":0,\"ecd_coins\":0,\"vcd_coins\":0,\"state\":\"idle\",\"running_elapsed_ms\":0,\"running_target_ms\":0,\"running_price_units\":0,\"pause_elapsed_ms\":0,\"relays\":[{\"relay_number\":1,\"status\":false,\"duration\":0},{\"relay_number\":2,\"status\":false,\"duration\":0},{\"relay_number\":3,\"status\":false,\"d"
+    },
+    {
+      "uri": "/api/emulator/program/pause_toggle",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/emulator/program/start",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/emulator/program/stop",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/emulator/relay",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/files/copy",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/files/delete",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/files/download",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 400,
+      "ok": true,
+      "error": "",
+      "detail": "missing_query"
+    },
+    {
+      "uri": "/api/files/list",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"storage\":\"spiffs\",\"files\":[{\"name\":\"img12.jpg\",\"size\":99928},{\"name\":\"logo.jpg\",\"size\":12183},{\"name\":\"img06.jpg\",\"size\":164510},{\"name\":\"i18n_v2.json\",\"size\":217329},{\"name\":\"img18.jpg\",\"size\":102038},{\"name\":\"tasks.json\",\"size\":1977},{\"name\":\"img01.jpg\",\"size\":82622},{\"name\":\".gitkeep\",\"size\":77"
+    },
+    {
+      "uri": "/api/files/upload",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/getconfig",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/getcustomers",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/getfirmware",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/getimages",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/getoperators",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/gettranslations",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/keepalive",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/login",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/logs",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "[{\n\t\t\"timestamp\":\t\"00:00:01\",\n\t\t\"level\":\t\"INFO\",\n\t\t\"tag\":\t\"ESP_LOG\",\n\t\t\"message\":\t\"I (2274) INIT: [M] remote_logging early init attivo (log pre-rete catturati)\"\n\t}, {\n\t\t\"timestamp\":\t\"00:00:01\",\n\t\t\"level\":\t\"INFO\",\n\t\t\"tag\":\t\"ESP_LOG\",\n\t\t\"message\":\t\"E (2284) esp-tls: [sock=49] connect() error: Host is "
+    },
+    {
+      "uri": "/api/logs/level",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": ""
+    },
+    {
+      "uri": "/api/logs/levels",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "[{\n\t\t\"tag\":\t\"ESP_LOG\",\n\t\t\"level\":\t3\n\t}, {\n\t\t\"tag\":\t\"HTTP_SERVICES\",\n\t\t\"level\":\t3\n\t}]"
+    },
+    {
+      "uri": "/api/logs/network",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"enabled\":false,\"port\":9514}"
+    },
+    {
+      "uri": "/api/logs/network",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": ""
+    },
+    {
+      "uri": "/api/logs/probe",
+      "declared_method": "OPTIONS",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": ""
+    },
+    {
+      "uri": "/api/logs/receive",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": ""
+    },
+    {
+      "uri": "/api/ntp/sync",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/payment",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/paymentoffline",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/programs",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"programs\":[{\"program_id\":1,\"name\":\"__i18n__programma_1\",\"enabled\":true,\"price_units\":10,\"duration_sec\":60,\"pause_max_suspend_sec\":60,\"relay_mask\":1},{\"program_id\":2,\"name\":\"__i18n__programma_2\",\"enabled\":true,\"price_units\":10,\"duration_sec\":60,\"pause_max_suspend_sec\":60,\"relay_mask\":2},{\"program_i"
+    },
+    {
+      "uri": "/api/programs/save",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/remote/files/delete",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/remote/files/download",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 400,
+      "ok": true,
+      "error": "",
+      "detail": "missing_query"
+    },
+    {
+      "uri": "/api/remote/files/list",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"storage\":\"spiffs\",\"files\":[{\"name\":\"img12.jpg\",\"size\":99928},{\"name\":\"logo.jpg\",\"size\":12183},{\"name\":\"img06.jpg\",\"size\":164510},{\"name\":\"i18n_v2.json\",\"size\":217329},{\"name\":\"img18.jpg\",\"size\":102038},{\"name\":\"tasks.json\",\"size\":1977},{\"name\":\"img01.jpg\",\"size\":82622},{\"name\":\".gitkeep\",\"size\":77"
+    },
+    {
+      "uri": "/api/remote/files/upload",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/runtime/enable_api_log",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"enabled\":false}"
+    },
+    {
+      "uri": "/api/runtime/enable_api_log",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/runtime_stats",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "Task                          RunTime      CPU\n------------------------------------------------\nIDLE1                      1712315902      99%\nIDLE0                      1675539343      97%\ntaskLVGL                     15481168       0%\nesp_timer                     6945587       0%\ntouchscreen     "
+    },
+    {
+      "uri": "/api/security/password",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/serviceused",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/http_services/http_services.c",
+      "status_code": 405,
+      "ok": true,
+      "error": "",
+      "detail": "Specified method is invalid for this resource"
+    },
+    {
+      "uri": "/api/sysinfo",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"heap\":{\"dram_free\":96391,\"dram_total\":403831,\"spiram_free\":26107668,\"spiram_total\":33554432},\"cpu\":{\"available\":true,\"core0_pct\":3,\"core1_pct\":1},\"uptime_s\":1716}"
+    },
+    {
+      "uri": "/api/tasks",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/tasks/apply",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/tasks/save",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/test/probe",
+      "declared_method": "POST",
+      "tested_method": "OPTIONS",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    },
+    {
+      "uri": "/api/ui/languages",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"languages\":[{\"code\":\"v2\",\"label\":\"V2\",\"file\":\"/spiffs/i18n_v2.json\"},{\"code\":\"it\",\"label\":\"Italiano (IT)\",\"file\":\"/spiffs/i18n_it.json\"}]}"
+    },
+    {
+      "uri": "/api/ui/texts",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 200,
+      "ok": true,
+      "error": "",
+      "detail": "{\"language\":\"en\",\"storage\":\"spiffs\",\"file\":\"/spiffs/i18n_en.json\",\"records\":[{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"home\",\"text\":\"Home\"},{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"config\",\"text\":\"Config\"},{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"stats\",\"text\":\"Statistiche\"},{\"lang\":\"it\",\"scope\":\"nav\",\"key\":\"tasks\",\"text"
+    },
+    {
+      "uri": "/api/version",
+      "declared_method": "GET",
+      "tested_method": "GET",
+      "source_file": "components/web_ui/web_ui.c",
+      "status_code": 404,
+      "ok": false,
+      "error": "missing_endpoint",
+      "detail": "404 Non Trovato"
+    }
+  ],
+  "skipped_items": []
+}

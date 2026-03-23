@@ -7649,7 +7649,7 @@
       "legacyId": "2.813",
       "label": "lvgl.program.suspend",
       "text": {
-        "it": "Sospendi",
+        "it": "Riprendi",
         "en": "Restart",
         "fr": "Redémarrage",
         "de": "Neustart",

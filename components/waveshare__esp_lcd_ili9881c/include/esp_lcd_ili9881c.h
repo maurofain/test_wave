@@ -102,7 +102,7 @@ esp_err_t esp_lcd_new_panel_ili9881c(const esp_lcd_panel_io_handle_t io, const e
 #define ILI9881C_720_1280_PANEL_60HZ_DPI_CONFIG(px_format) \
     {                                                      \
         .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,       \
-        .dpi_clock_freq_mhz = 80,                          \
+        .dpi_clock_freq_mhz = 65,                          \
         .virtual_channel = 0,                              \
         .pixel_format = px_format,                         \
         .num_fbs = 1,                                      \

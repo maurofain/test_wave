@@ -105,7 +105,7 @@ dependencies:
   waveshare/esp32_p4_nano:
     dependencies: []
     source:
-      path: /home/mauro/1P/MicroHard/test_wave/components/waveshare__esp32_p4_nano
+      path: /media/mauro/code/Progetti/0.Clienti/MicroHard/test_wave/components/waveshare__esp32_p4_nano
       type: local
     version: 1.2.0
   waveshare/esp_lcd_dsi:
@@ -151,7 +151,7 @@ dependencies:
   waveshare/esp_lcd_ili9881c:
     dependencies: []
     source:
-      path: /home/mauro/1P/MicroHard/test_wave/components/waveshare__esp_lcd_ili9881c
+      path: /media/mauro/code/Progetti/0.Clienti/MicroHard/test_wave/components/waveshare__esp_lcd_ili9881c
       type: local
     version: 1.0.4
   waveshare/esp_lcd_jd9365:

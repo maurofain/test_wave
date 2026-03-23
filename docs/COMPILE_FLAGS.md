@@ -86,6 +86,11 @@ componenti.
 - **Valori:** definito/non definito
 - **Impatto:** include/esclude il logging esteso verso `web_ui_add_log` nei percorsi HTTP services.
 
+### `FSM_BLOCK_VCD_WHEN_ECD_PRESENT`
+- **File:** `main/fsm.c`
+- **Valori:** `1` = blocca crediti VCD quando è presente sessione monete (`OPEN_PAYMENTS`) con crediti ECD; `0` = consente ingresso VCD anche in tale condizione.
+- **Impatto:** condiziona la validazione nei rami `FSM_INPUT_EVENT_QR_CREDIT` e `FSM_INPUT_EVENT_CARD_CREDIT`.
+
 ### `DNA_SHT40`
 - **File:** `components/sht40/sht40.c`
 - **Valori:** `1` = mockup attivo (nessun hardware I2C/SHT40), `0` = driver reale

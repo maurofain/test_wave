@@ -80,6 +80,9 @@ esp_err_t api_version_get(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, OPTIONS");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_hdr(req, "Expires", "0");
     
     cJSON *root = cJSON_CreateObject();
     if (!root) {
@@ -88,6 +91,7 @@ esp_err_t api_version_get(httpd_req_t *req)
     }
     
     cJSON_AddStringToObject(root, "version", APP_VERSION);
+
     cJSON_AddStringToObject(root, "build_timestamp", __DATE__ " " __TIME__);
     
     char *json_str = cJSON_PrintUnformatted(root);
