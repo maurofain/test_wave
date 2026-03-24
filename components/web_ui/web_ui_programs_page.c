@@ -1,96 +1,14 @@
 #include "web_ui_internal.h"
 #include "web_ui_programs.h"
-#include "device_config.h"
 #include "digital_io.h"
 #include "lvgl_panel.h"
 #include "esp_http_server.h"
-#include "esp_log.h"
 #include "cJSON.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define TAG "WEB_UI_PROGRAMS_PAGE"
-
-static bool programs_page_is_valid_language_code(const char *language)
-{
-    return language && strlen(language) == 2;
-}
-
-static esp_err_t programs_page_apply_name_translations(cJSON *root, bool *refresh_lvgl, char *err_msg, size_t err_msg_len)
-{
-    if (refresh_lvgl) {
-        *refresh_lvgl = false;
-    }
-
-    if (!root) {
-        if (err_msg && err_msg_len > 0) {
-            snprintf(err_msg, err_msg_len, "payload traduzioni non valido");
-        }
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    cJSON *translations = cJSON_GetObjectItemCaseSensitive(root, "program_name_translations");
-    if (!translations) {
-        return ESP_OK;
-    }
-
-    if (!cJSON_IsObject(translations)) {
-        if (err_msg && err_msg_len > 0) {
-            snprintf(err_msg, err_msg_len, "program_name_translations non valido");
-        }
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    const device_config_t *cfg = device_config_get();
-    const char *user_language = (cfg && cfg->ui.user_language[0] != '\0') ? cfg->ui.user_language : "it";
-
-    cJSON *language_item = NULL;
-    cJSON_ArrayForEach(language_item, translations) {
-        const char *language = language_item->string;
-        if (!programs_page_is_valid_language_code(language) || !cJSON_IsObject(language_item)) {
-            if (err_msg && err_msg_len > 0) {
-                snprintf(err_msg, err_msg_len, "lingua traduzioni non valida");
-            }
-            return ESP_ERR_INVALID_ARG;
-        }
-
-        cJSON *program_item = NULL;
-        cJSON_ArrayForEach(program_item, language_item) {
-            if (!program_item->string || !cJSON_IsString(program_item) || !program_item->valuestring) {
-                if (err_msg && err_msg_len > 0) {
-                    snprintf(err_msg, err_msg_len, "nome programma tradotto non valido");
-                }
-                return ESP_ERR_INVALID_ARG;
-            }
-
-            char *end_ptr = NULL;
-            long program_id = strtol(program_item->string, &end_ptr, 10);
-            if (!end_ptr || *end_ptr != '\0' || program_id <= 0 || program_id > WEB_UI_PROGRAM_MAX) {
-                if (err_msg && err_msg_len > 0) {
-                    snprintf(err_msg, err_msg_len, "id programma tradotto fuori range");
-                }
-                return ESP_ERR_INVALID_ARG;
-            }
-
-            char program_key[24] = {0};
-            snprintf(program_key, sizeof(program_key), "program_name_%02ld", program_id);
-            esp_err_t err = device_config_update_program_text_i18n(program_key, language, program_item->valuestring);
-            if (err != ESP_OK) {
-                if (err_msg && err_msg_len > 0) {
-                    snprintf(err_msg, err_msg_len, "salvataggio traduzioni programma fallito");
-                }
-                return err;
-            }
-
-            if (refresh_lvgl && strcmp(language, user_language) == 0) {
-                *refresh_lvgl = true;
-            }
-        }
-    }
-
-    return ESP_OK;
-}
 
 /**
  * @brief Genera la pagina HTML di editing della tabella programmi
@@ -187,20 +105,8 @@ esp_err_t api_programs_save(httpd_req_t *req)
         received += r;
     }
 
-    cJSON *root = cJSON_ParseWithLength(payload, (size_t)received);
-    if (!root) {
-        free(payload);
-        httpd_resp_set_status(req, "400 Bad Request");
-        return httpd_resp_send(req, "JSON non valido", -1);
-    }
-
     char err_msg[128] = {0};
     esp_err_t err = web_ui_program_table_update_from_json(payload, (size_t)received, err_msg, sizeof(err_msg));
-    bool refresh_lvgl = false;
-    if (err == ESP_OK) {
-        err = programs_page_apply_name_translations(root, &refresh_lvgl, err_msg, sizeof(err_msg));
-    }
-    cJSON_Delete(root);
     free(payload);
 
     if (err != ESP_OK) {
@@ -209,9 +115,7 @@ esp_err_t api_programs_save(httpd_req_t *req)
     }
 
     (void)web_ui_program_table_get();
-    if (refresh_lvgl) {
-        lvgl_panel_refresh_texts();
-    }
+    lvgl_panel_refresh_texts();
 
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, "{\"status\":\"ok\"}", -1);

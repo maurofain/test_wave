@@ -254,6 +254,7 @@ typedef struct {
     uint32_t ads_rotation_ms;
     uint32_t credit_reset_timeout_ms;
     bool ads_enabled;
+    bool qr_credit_pending;      /* true dopo scansione QR, false quando arriva il credito VCD */
     bool allow_additional_payments;
     bool stop_after_cycle_requested; /* true se richiesto stop al termine del ciclo corrente */
     bool pre_fine_ciclo_active;  /* true quando la soglia PreFineCiclo è stata raggiunta */

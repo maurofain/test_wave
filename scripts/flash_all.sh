@@ -19,8 +19,8 @@ CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset 
     0x2000 build/bootloader/bootloader.bin \
     0x8000 build/partition_table/partition-table.bin \
     0x10000 build/test_wave.bin \
-  0xe7e000 build/ota_data_initial.bin \
-  0xe80000 build/storage.bin"
+  0x93e000 build/ota_data_initial.bin \
+  0x940000 build/storage.bin"
 
 echo "🚀 Avvio flash completo su $PORT a $BAUD baud..."
 echo "📝 Comando: $CMD"

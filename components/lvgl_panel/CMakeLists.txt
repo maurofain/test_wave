@@ -6,6 +6,7 @@ idf_component_register(
          "GoogleSans70.c"
          "GoogleSans140.c"
          "language_flags.c"
+         "program_repeat_icon.c"
          "lvgl_i18n.c"
          "lvgl_page_chrome.c"
          "lvgl_panel.c"

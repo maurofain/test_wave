@@ -1,9 +1,6 @@
 let programs = [];
 let programNameLanguages = [];
 let selectedProgramNameLanguage = 'it';
-const loadedProgramNameLanguages = new Set();
-const dirtyProgramNameLanguages = new Set();
-const programNameTranslationsByLang = Object.create(null);
 
 const RELAY_LAYOUT = {
     totalOutputs: 16,
@@ -128,11 +125,22 @@ function buildRelayMaskEditor(mask, rowIndex) {
 function normalizeProgram(program, idx) {
     const entry = program || {};
     const programId = toInt(entry.program_id, idx + 1);
+    const fallbackName = String(entry.name_it || entry.name || entry.display_name || ('Programma ' + programId));
+    const nameIt = String(entry.name_it || entry.name || fallbackName);
+    const nameEn = String(entry.name_en || nameIt);
+    const nameFr = String(entry.name_fr || nameIt);
+    const nameDe = String(entry.name_de || nameIt);
+    const nameEs = String(entry.name_es || nameIt);
 
     return {
         program_id: programId,
+        name_it: nameIt,
+        name_en: nameEn,
+        name_fr: nameFr,
+        name_de: nameDe,
+        name_es: nameEs,
         name: String(entry.name || ''),
-        display_name: String(entry.display_name || entry.name || ''),
+        display_name: String(entry.display_name || ''),
         enabled: !!entry.enabled,
         price_units: toInt(entry.price_units, 0),
         duration_sec: toInt(entry.duration_sec, 0),
@@ -141,33 +149,49 @@ function normalizeProgram(program, idx) {
     };
 }
 
-function getProgramNameStore(language) {
-    if (!programNameTranslationsByLang[language]) {
-        programNameTranslationsByLang[language] = Object.create(null);
-    }
-    return programNameTranslationsByLang[language];
-}
-
 function getProgramLanguageFallback(program) {
     const normalized = normalizeProgram(program, 0);
-    return normalized.display_name || normalized.name || String(normalized.program_id);
+    return normalized.name_it || String(normalized.program_id);
 }
 
 function getProgramNameForLanguage(program, language) {
     const normalized = normalizeProgram(program, 0);
-    const store = getProgramNameStore(language);
-    const key = String(normalized.program_id);
-
-    if (Object.prototype.hasOwnProperty.call(store, key)) {
-        return String(store[key] || '');
+    if (language === 'it') {
+        return normalized.name_it;
+    }
+    if (language === 'en') {
+        return normalized.name_en;
+    }
+    if (language === 'fr') {
+        return normalized.name_fr;
+    }
+    if (language === 'de') {
+        return normalized.name_de;
+    }
+    if (language === 'es') {
+        return normalized.name_es;
     }
 
     return getProgramLanguageFallback(normalized);
 }
 
-function setProgramNameForLanguage(programId, language, value) {
-    const store = getProgramNameStore(language);
-    store[String(programId)] = String(value || '');
+function setProgramNameForLanguage(program, language, value) {
+    const text = String(value || '');
+    if (language === 'it') {
+        program.name_it = text;
+    } else if (language === 'en') {
+        program.name_en = text;
+    } else if (language === 'fr') {
+        program.name_fr = text;
+    } else if (language === 'de') {
+        program.name_de = text;
+    } else if (language === 'es') {
+        program.name_es = text;
+    }
+
+    if (!program.name_it || !program.name_it.length) {
+        program.name_it = text;
+    }
 }
 
 function languageFlag(language) {
@@ -240,14 +264,12 @@ window.onProgramNameInput = function onProgramNameInput(rowIndex, value) {
     }
 
     const current = normalizeProgram(programs[rowIndex], rowIndex);
+    setProgramNameForLanguage(current, selectedProgramNameLanguage, value);
     programs[rowIndex] = {
         ...current,
-        name: String(value || ''),
-        display_name: String(value || ''),
+        name: getProgramNameForLanguage(current, selectedProgramNameLanguage),
+        display_name: getProgramNameForLanguage(current, selectedProgramNameLanguage),
     };
-
-    setProgramNameForLanguage(current.program_id, selectedProgramNameLanguage, value);
-    dirtyProgramNameLanguages.add(selectedProgramNameLanguage);
 };
 
 async function loadProgramNameLanguages() {
@@ -267,77 +289,8 @@ async function loadProgramNameLanguages() {
     }
 }
 
-function parseProgramNameRecords(records) {
-    function parseProgramIdFromKey(recordKey) {
-        if (typeof recordKey === 'string') {
-            if (recordKey.startsWith('program_name_')) {
-                return toInt(recordKey.slice('program_name_'.length), 0);
-            }
-            if (/^\d+$/.test(recordKey)) {
-                const numericKey = toInt(recordKey, 0);
-                if (numericKey >= 801 && numericKey <= 899) {
-                    return numericKey - 800;
-                }
-                return numericKey;
-            }
-            return 0;
-        }
-
-        if (typeof recordKey === 'number' && Number.isFinite(recordKey)) {
-            const numericKey = toInt(recordKey, 0);
-            if (numericKey >= 801 && numericKey <= 899) {
-                return numericKey - 800;
-            }
-            return numericKey;
-        }
-
-        return 0;
-    }
-
-    const names = Object.create(null);
-    if (!Array.isArray(records)) {
-        return names;
-    }
-
-    records.forEach((record) => {
-        if (!record || typeof record.text !== 'string') {
-            return;
-        }
-
-        const scopeId = toInt(record.scope_id ?? record.scope, 0);
-        if (scopeId !== 2) {
-            return;
-        }
-
-        const programId = parseProgramIdFromKey(record.key);
-        if (programId <= 0) {
-            return;
-        }
-
-        names[String(programId)] = record.text;
-    });
-
-    return names;
-}
-
-async function loadProgramNamesForLanguage(language, forceReload) {
-    if (!forceReload && loadedProgramNameLanguages.has(language)) {
-        return;
-    }
-
-    const response = await fetch(`/api/ui/texts?lang=${encodeURIComponent(language)}`, { cache: 'no-store' });
-    if (!response.ok) {
-        throw new Error('HTTP ' + response.status);
-    }
-
-    const payload = await response.json();
-    programNameTranslationsByLang[language] = parseProgramNameRecords(payload.records);
-    loadedProgramNameLanguages.add(language);
-}
-
 window.selectProgramNameLanguage = async function selectProgramNameLanguage(language) {
     try {
-        await loadProgramNamesForLanguage(language, false);
         selectedProgramNameLanguage = language;
         render();
     } catch (error) {
@@ -367,27 +320,11 @@ async function loadPrograms() {
         RELAY_LAYOUT.localOutputs = Math.max(1, Math.min(RELAY_LAYOUT.totalOutputs, localOutputs));
         RELAY_LAYOUT.modbusGroupOutputs = Math.max(1, modbusGroupOutputs);
 
-        await loadProgramNamesForLanguage(selectedProgramNameLanguage, true);
         render();
         showStatus(tr('programs.js.030'), true);
     } catch (error) {
         showStatus(tr('programs.js.031') + error.message, false);
     }
-}
-
-function buildProgramNameTranslationsPayload() {
-    const payload = Object.create(null);
-
-    dirtyProgramNameLanguages.forEach((language) => {
-        const names = Object.create(null);
-        programs.forEach((program, idx) => {
-            const normalized = normalizeProgram(program, idx);
-            names[String(normalized.program_id)] = getProgramNameForLanguage(normalized, language);
-        });
-        payload[language] = names;
-    });
-
-    return payload;
 }
 
 async function savePrograms() {
@@ -405,7 +342,11 @@ async function savePrograms() {
 
         const payloadPrograms = programs.map((program) => ({
             program_id: program.program_id,
-            name: program.name,
+            name_it: String(program.name_it || ''),
+            name_en: String(program.name_en || ''),
+            name_fr: String(program.name_fr || ''),
+            name_de: String(program.name_de || ''),
+            name_es: String(program.name_es || ''),
             enabled: program.enabled,
             price_units: program.price_units,
             duration_sec: program.duration_sec,
@@ -418,7 +359,6 @@ async function savePrograms() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 programs: payloadPrograms,
-                program_name_translations: buildProgramNameTranslationsPayload(),
             }),
         });
 
@@ -427,7 +367,6 @@ async function savePrograms() {
             throw new Error(text || ('HTTP ' + response.status));
         }
 
-        dirtyProgramNameLanguages.clear();
         showStatus(tr('programs.js.032'), true);
         window.alert(tr('programs.js.032'));
         render();

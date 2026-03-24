@@ -389,6 +389,7 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->ads_rotation_ms = FSM_DEFAULT_AD_ROTATION_MS;
     ctx->credit_reset_timeout_ms = FSM_DEFAULT_CREDIT_RESET_TIMEOUT_MS;
     ctx->ads_enabled = true;
+    ctx->qr_credit_pending = false;
     ctx->allow_additional_payments = false;
     ctx->stop_after_cycle_requested = false;
     ctx->pre_fine_ciclo_active = false;
@@ -450,7 +451,8 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_TIMEOUT) {
                 /* Timeout scelta programma:
-                 * trattiene ECD, azzera VCD e torna in IDLE. */
+                 * trattiene ECD, azzera VCD e torna in ADS (se abilitato)
+                 * oppure in IDLE. */
                 int32_t retained_ecd = (ctx->ecd_coins > 0) ? ctx->ecd_coins : 0;
                 fsm_reset_runtime_locked(ctx);
                 ctx->ecd_coins = retained_ecd;
@@ -463,7 +465,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->session_mode = FSM_SESSION_MODE_NONE;
                 ctx->session_source = FSM_SESSION_SOURCE_NONE;
                 ctx->allow_additional_payments = false;
-                ctx->state = FSM_STATE_IDLE;
+                ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_PAYMENT_ACCEPTED) {
                 ctx->inactivity_ms = 0;
@@ -477,7 +479,23 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_elapsed_ms = 0;
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
-            } else if (event == FSM_EVENT_PROGRAM_STOP || event == FSM_EVENT_CREDIT_ENDED) {
+            } else if (event == FSM_EVENT_PROGRAM_STOP) {
+                bool has_credit = (ctx->credit_cents > 0) ||
+                                  ((ctx->ecd_coins + ctx->vcd_coins) > 0);
+                fsm_reset_runtime_locked(ctx);
+                if (has_credit) {
+                    ctx->state = FSM_STATE_CREDIT;
+                    if (ctx->credit_cents <= 0) {
+                        ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;
+                    }
+                } else {
+                    ctx->session_mode = FSM_SESSION_MODE_NONE;
+                    ctx->session_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->allow_additional_payments = false;
+                    ctx->state = FSM_STATE_IDLE;
+                }
+                ctx->inactivity_ms = 0;
+            } else if (event == FSM_EVENT_CREDIT_ENDED) {
                 fsm_reset_runtime_locked(ctx);
                 ctx->session_mode = FSM_SESSION_MODE_NONE;
                 ctx->session_source = FSM_SESSION_SOURCE_NONE;
@@ -494,7 +512,23 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_elapsed_ms = 0;
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
-            } else if (event == FSM_EVENT_PROGRAM_STOP || event == FSM_EVENT_CREDIT_ENDED) {
+            } else if (event == FSM_EVENT_PROGRAM_STOP) {
+                bool has_credit = (ctx->credit_cents > 0) ||
+                                  ((ctx->ecd_coins + ctx->vcd_coins) > 0);
+                fsm_reset_runtime_locked(ctx);
+                if (has_credit) {
+                    ctx->state = FSM_STATE_CREDIT;
+                    if (ctx->credit_cents <= 0) {
+                        ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;
+                    }
+                } else {
+                    ctx->session_mode = FSM_SESSION_MODE_NONE;
+                    ctx->session_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->allow_additional_payments = false;
+                    ctx->state = FSM_STATE_IDLE;
+                }
+                ctx->inactivity_ms = 0;
+            } else if (event == FSM_EVENT_CREDIT_ENDED) {
                 fsm_reset_runtime_locked(ctx);
                 ctx->session_mode = FSM_SESSION_MODE_NONE;
                 ctx->session_source = FSM_SESSION_SOURCE_NONE;
@@ -562,6 +596,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_QR_SCANNED:
+            ctx->qr_credit_pending = true;
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_COIN:
@@ -593,6 +628,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
         case FSM_INPUT_EVENT_QR_CREDIT:
+            ctx->qr_credit_pending = false;
             if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
                 ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");
@@ -608,6 +644,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
         case FSM_INPUT_EVENT_CARD_CREDIT: {
+            ctx->qr_credit_pending = false;
             if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
                 ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");

@@ -386,9 +386,12 @@ void app_main(void)
         ESP_LOGI(TAG, LOG_CTX_PREFIX " init CCTALK pre-logo skip (disabilitato da config)");
     }
 
+    if (cfg && cfg->sensors.cctalk_enabled) {
+        main_cctalk_start_acceptor_async();
+    }
+
     if (cfg && cfg->display.enabled) {
         /* [M] Check if ADS is enabled before loading images and showing slideshow */
-        main_cctalk_start_acceptor_async();
         if (cfg->display.ads_enabled) {
             lvgl_page_ads_preload_images();
             lvgl_panel_show_ads_page();  /* [M] usa lock + preload imagini fuori lock */

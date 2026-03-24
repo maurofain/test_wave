@@ -2,6 +2,7 @@
 #include "fsm.h"
 #include "device_config.h"
 #include "digital_io.h"
+#include "lvgl_panel.h"
 #include "tasks.h"
 
 #include "cJSON.h"
@@ -22,7 +23,6 @@
 
 #define TAG "WEB_UI_PROGRAMS"
 #define PROGRAMS_STORAGE_PATH "/spiffs/programs.json"
-#define PROGRAM_NAME_KEY_MAX 32
 
 static web_ui_program_table_t s_program_table;
 static web_ui_virtual_relay_state_t s_virtual_relays[WEB_UI_VIRTUAL_RELAY_MAX + 1];
@@ -31,41 +31,43 @@ static bool s_storage_loaded = false;
 
 static char *programs_table_to_json_internal(bool include_display_name);
 
-static void program_name_build_key(uint8_t program_id, char *key_out, size_t key_out_len)
-{
-    if (!key_out || key_out_len == 0) {
-        return;
-    }
-
-    if (program_id == 0) {
-        key_out[0] = '\0';
-        return;
-    }
-
-    snprintf(key_out, key_out_len, "program_name_%02u", (unsigned)program_id);
-}
-
-static void program_name_build_legacy_key(uint8_t program_id, char *key_out, size_t key_out_len)
-{
-    if (!key_out || key_out_len == 0) {
-        return;
-    }
-
-    if (program_id == 0) {
-        key_out[0] = '\0';
-        return;
-    }
-
-    snprintf(key_out, key_out_len, "%u", (unsigned)(800U + program_id));
-}
-
 static void program_name_build_fallback(uint8_t program_id, char *fallback_out, size_t fallback_out_len)
 {
     if (!fallback_out || fallback_out_len == 0) {
         return;
     }
 
+    if (program_id == 0) {
+        fallback_out[0] = '\0';
+        return;
+    }
+
     snprintf(fallback_out, fallback_out_len, "Programma %u", (unsigned)program_id);
+}
+
+static const char *program_entry_name_for_language(const web_ui_program_entry_t *entry, const char *language)
+{
+    if (!entry) {
+        return NULL;
+    }
+
+    const char *lang = (language && language[0] != '\0') ? language : "it";
+    if (strcmp(lang, "it") == 0) {
+        return entry->name_it;
+    }
+    if (strcmp(lang, "en") == 0) {
+        return entry->name_en;
+    }
+    if (strcmp(lang, "fr") == 0) {
+        return entry->name_fr;
+    }
+    if (strcmp(lang, "de") == 0) {
+        return entry->name_de;
+    }
+    if (strcmp(lang, "es") == 0) {
+        return entry->name_es;
+    }
+    return entry->name_it;
 }
 
 static void program_entry_refresh_name(web_ui_program_entry_t *entry)
@@ -74,33 +76,88 @@ static void program_entry_refresh_name(web_ui_program_entry_t *entry)
         return;
     }
 
-    char key[PROGRAM_NAME_KEY_MAX] = {0};
-    char legacy_key[PROGRAM_NAME_KEY_MAX] = {0};
     char fallback[WEB_UI_PROGRAM_NAME_MAX] = {0};
-    char localized[WEB_UI_PROGRAM_NAME_MAX] = {0};
-
-    program_name_build_key(entry->program_id, key, sizeof(key));
-    program_name_build_legacy_key(entry->program_id, legacy_key, sizeof(legacy_key));
     program_name_build_fallback(entry->program_id, fallback, sizeof(fallback));
 
-    if (key[0] != '\0' &&
-        device_config_get_ui_text_scoped("lvgl", key, fallback, localized, sizeof(localized)) == ESP_OK &&
-        localized[0] != '\0') {
-        snprintf(entry->name, sizeof(entry->name), "%s", localized);
+    const char *runtime_language = lvgl_panel_get_runtime_language();
+    const device_config_t *cfg = device_config_get();
+    const char *user_language = (cfg && cfg->ui.user_language[0] != '\0') ? cfg->ui.user_language : "it";
+    const char *selected_language = (runtime_language && runtime_language[0] != '\0')
+                                       ? runtime_language
+                                       : user_language;
+    const char *selected_name = program_entry_name_for_language(entry, selected_language);
+    if (selected_name && selected_name[0] != '\0') {
+        snprintf(entry->name, sizeof(entry->name), "%s", selected_name);
+    } else if (entry->name_it[0] != '\0') {
+        snprintf(entry->name, sizeof(entry->name), "%s", entry->name_it);
+    } else {
+        snprintf(entry->name, sizeof(entry->name), "%s", fallback);
+    }
+}
+
+static void program_entry_init_names(web_ui_program_entry_t *entry)
+{
+    if (!entry) {
         return;
     }
 
-    if (legacy_key[0] != '\0' &&
-        device_config_get_ui_text_scoped("lvgl", legacy_key, fallback, localized, sizeof(localized)) == ESP_OK &&
-        localized[0] != '\0') {
-        snprintf(entry->name, sizeof(entry->name), "%s", localized);
-        return;
-    }
+    char fallback[WEB_UI_PROGRAM_NAME_MAX] = {0};
+    program_name_build_fallback(entry->program_id, fallback, sizeof(fallback));
 
+    snprintf(entry->name_it, sizeof(entry->name_it), "%s", fallback);
+    snprintf(entry->name_en, sizeof(entry->name_en), "%s", fallback);
+    snprintf(entry->name_fr, sizeof(entry->name_fr), "%s", fallback);
+    snprintf(entry->name_de, sizeof(entry->name_de), "%s", fallback);
+    snprintf(entry->name_es, sizeof(entry->name_es), "%s", fallback);
     snprintf(entry->name, sizeof(entry->name), "%s", fallback);
 }
 
-static void programs_refresh_names_from_i18n(void)
+static void program_entry_set_language_name(web_ui_program_entry_t *entry, const char *language, const char *value)
+{
+    if (!entry || !language || !value || value[0] == '\0') {
+        return;
+    }
+
+    if (strcmp(language, "it") == 0) {
+        snprintf(entry->name_it, sizeof(entry->name_it), "%s", value);
+    } else if (strcmp(language, "en") == 0) {
+        snprintf(entry->name_en, sizeof(entry->name_en), "%s", value);
+    } else if (strcmp(language, "fr") == 0) {
+        snprintf(entry->name_fr, sizeof(entry->name_fr), "%s", value);
+    } else if (strcmp(language, "de") == 0) {
+        snprintf(entry->name_de, sizeof(entry->name_de), "%s", value);
+    } else if (strcmp(language, "es") == 0) {
+        snprintf(entry->name_es, sizeof(entry->name_es), "%s", value);
+    }
+}
+
+static void program_entry_apply_name_fallbacks(web_ui_program_entry_t *entry)
+{
+    if (!entry) {
+        return;
+    }
+
+    char fallback[WEB_UI_PROGRAM_NAME_MAX] = {0};
+    program_name_build_fallback(entry->program_id, fallback, sizeof(fallback));
+
+    if (entry->name_it[0] == '\0') {
+        snprintf(entry->name_it, sizeof(entry->name_it), "%s", fallback);
+    }
+    if (entry->name_en[0] == '\0') {
+        snprintf(entry->name_en, sizeof(entry->name_en), "%s", entry->name_it);
+    }
+    if (entry->name_fr[0] == '\0') {
+        snprintf(entry->name_fr, sizeof(entry->name_fr), "%s", entry->name_it);
+    }
+    if (entry->name_de[0] == '\0') {
+        snprintf(entry->name_de, sizeof(entry->name_de), "%s", entry->name_it);
+    }
+    if (entry->name_es[0] == '\0') {
+        snprintf(entry->name_es, sizeof(entry->name_es), "%s", entry->name_it);
+    }
+}
+
+static void programs_refresh_names(void)
 {
     for (uint8_t index = 0; index < s_program_table.count; ++index) {
         program_entry_refresh_name(&s_program_table.programs[index]);
@@ -207,7 +264,7 @@ static void programs_init_defaults(void)
     for (uint8_t index = 0; index < s_program_table.count; ++index) {
         web_ui_program_entry_t *entry = &s_program_table.programs[index];
         entry->program_id = (uint8_t)(index + 1);
-        entry->name[0] = '\0';
+        program_entry_init_names(entry);
         entry->enabled = true;
         entry->price_units = 10;
         entry->duration_sec = 60;
@@ -215,7 +272,7 @@ static void programs_init_defaults(void)
         entry->relay_mask = (uint16_t)(1U << index);
     }
 
-    programs_refresh_names_from_i18n();
+    programs_refresh_names();
 
     memset(s_virtual_relays, 0, sizeof(s_virtual_relays));
     s_initialized = true;
@@ -241,14 +298,14 @@ esp_err_t web_ui_program_table_init(void)
 const web_ui_program_table_t *web_ui_program_table_get(void)
 {
     programs_init_defaults();
-    programs_refresh_names_from_i18n();
+    programs_refresh_names();
     return &s_program_table;
 }
 
 const web_ui_program_entry_t *web_ui_program_find_by_id(uint8_t program_id)
 {
     programs_init_defaults();
-    programs_refresh_names_from_i18n();
+    programs_refresh_names();
 
     if (program_id == 0U) {
         return NULL;
@@ -267,7 +324,7 @@ const web_ui_program_entry_t *web_ui_program_find_by_id(uint8_t program_id)
 const web_ui_program_entry_t *web_ui_program_find_by_name(const char *program_name)
 {
     programs_init_defaults();
-    programs_refresh_names_from_i18n();
+    programs_refresh_names();
 
     if (program_name == NULL || program_name[0] == '\0') {
         return NULL;
@@ -286,7 +343,7 @@ const web_ui_program_entry_t *web_ui_program_find_by_name(const char *program_na
 static char *programs_table_to_json_internal(bool include_display_name)
 {
     programs_init_defaults();
-    programs_refresh_names_from_i18n();
+    programs_refresh_names();
 
     cJSON *root = cJSON_CreateObject();
     cJSON *programs = cJSON_CreateArray();
@@ -304,8 +361,15 @@ static char *programs_table_to_json_internal(bool include_display_name)
         }
 
         cJSON_AddNumberToObject(item, "program_id", entry->program_id);
-        cJSON_AddStringToObject(item, "name", entry->name);
-        (void)include_display_name;
+        cJSON_AddStringToObject(item, "name_it", entry->name_it);
+        cJSON_AddStringToObject(item, "name_en", entry->name_en);
+        cJSON_AddStringToObject(item, "name_fr", entry->name_fr);
+        cJSON_AddStringToObject(item, "name_de", entry->name_de);
+        cJSON_AddStringToObject(item, "name_es", entry->name_es);
+        if (include_display_name) {
+            cJSON_AddStringToObject(item, "name", entry->name);
+            cJSON_AddStringToObject(item, "display_name", entry->name);
+        }
         cJSON_AddBoolToObject(item, "enabled", entry->enabled);
         cJSON_AddNumberToObject(item, "price_units", entry->price_units);
         cJSON_AddNumberToObject(item, "duration_sec", entry->duration_sec);
@@ -407,6 +471,12 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
 
         cJSON *program_id = cJSON_GetObjectItem(item, "program_id");
         cJSON *name = cJSON_GetObjectItem(item, "name");
+        cJSON *name_it = cJSON_GetObjectItem(item, "name_it");
+        cJSON *name_en = cJSON_GetObjectItem(item, "name_en");
+        cJSON *name_fr = cJSON_GetObjectItem(item, "name_fr");
+        cJSON *name_de = cJSON_GetObjectItem(item, "name_de");
+        cJSON *name_es = cJSON_GetObjectItem(item, "name_es");
+        cJSON *name_translations = cJSON_GetObjectItemCaseSensitive(item, "name_translations");
         cJSON *enabled = cJSON_GetObjectItem(item, "enabled");
         cJSON *price_units = cJSON_GetObjectItem(item, "price_units");
         cJSON *duration_sec = cJSON_GetObjectItem(item, "duration_sec");
@@ -443,15 +513,45 @@ esp_err_t web_ui_program_table_update_from_json(const char *json_payload, size_t
         entry->duration_sec = (uint16_t)duration;
         entry->pause_max_suspend_sec = (uint16_t)pause_max;
         entry->relay_mask = (uint16_t)mask;
-        if (cJSON_IsString(name) && name->valuestring && name->valuestring[0] != '\0') {
-            snprintf(entry->name, sizeof(entry->name), "%s", name->valuestring);
-        } else {
-            entry->name[0] = '\0';
+        entry->name[0] = '\0';
+        entry->name_it[0] = '\0';
+        entry->name_en[0] = '\0';
+        entry->name_fr[0] = '\0';
+        entry->name_de[0] = '\0';
+        entry->name_es[0] = '\0';
+
+        if (cJSON_IsString(name_it) && name_it->valuestring && name_it->valuestring[0] != '\0') {
+            snprintf(entry->name_it, sizeof(entry->name_it), "%s", name_it->valuestring);
+        } else if (cJSON_IsString(name) && name->valuestring && name->valuestring[0] != '\0') {
+            snprintf(entry->name_it, sizeof(entry->name_it), "%s", name->valuestring);
         }
+        if (cJSON_IsString(name_en) && name_en->valuestring && name_en->valuestring[0] != '\0') {
+            snprintf(entry->name_en, sizeof(entry->name_en), "%s", name_en->valuestring);
+        }
+        if (cJSON_IsString(name_fr) && name_fr->valuestring && name_fr->valuestring[0] != '\0') {
+            snprintf(entry->name_fr, sizeof(entry->name_fr), "%s", name_fr->valuestring);
+        }
+        if (cJSON_IsString(name_de) && name_de->valuestring && name_de->valuestring[0] != '\0') {
+            snprintf(entry->name_de, sizeof(entry->name_de), "%s", name_de->valuestring);
+        }
+        if (cJSON_IsString(name_es) && name_es->valuestring && name_es->valuestring[0] != '\0') {
+            snprintf(entry->name_es, sizeof(entry->name_es), "%s", name_es->valuestring);
+        }
+
+        if (cJSON_IsObject(name_translations)) {
+            cJSON *lang_item = NULL;
+            cJSON_ArrayForEach(lang_item, name_translations) {
+                if (lang_item->string && cJSON_IsString(lang_item) && lang_item->valuestring) {
+                    program_entry_set_language_name(entry, lang_item->string, lang_item->valuestring);
+                }
+            }
+        }
+
+        program_entry_apply_name_fallbacks(entry);
     }
 
     s_program_table = next;
-    programs_refresh_names_from_i18n();
+    programs_refresh_names();
     cJSON_Delete(root);
 
     if (programs_save_to_storage() != ESP_OK) {

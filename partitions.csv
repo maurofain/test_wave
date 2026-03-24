@@ -2,27 +2,25 @@
 # Partition table — 16 MB flash, OTA dual, strict alignment
 # - Total flash: 16_777_216 bytes (0x1000000)
 # Layout decisions:
-#  - factory / ota_0 / ota_1 allineate alla stessa dimensione
-#  - storage = 1.50 MB (0x180000) at flash end (requested)
+#  - factory / ota_0 / ota_1 allineate a 3 MB (0x300000)
+#  - storage allargata al massimo spazio disponibile in coda
 #  - otadata placed immediately before `storage`
 #  - app partitions aligned to 0x10000 (64 KB)
 # Calculations:
-#  app area: 0x010000 .. 0x0E50000 => 0x0E40000 bytes
-#  slot size uguale: 0x0E40000 / 3 = 0x04C0000
-#  factory: 0x010000, size 0x04C0000 -> end 0x04D0000
-#  ota_0:   0x04D0000, size 0x04C0000 -> end 0x0990000
-#  ota_1:   0x0990000, size 0x04C0000 -> end 0x0E50000
-#  coredump:0x0E50000, size 0x02E000 -> end 0x0E7E000
-#  otadata: 0xE7E000, size 0x2000
-#  storage: 0xE80000, size 0x180000 (exactly 1.5 MB)
-# End of layout = 0xE80000 + 0x180000 = 0x1000000 (full flash)
+#  factory: 0x010000, size 0x300000 -> end 0x310000
+#  ota_0:   0x310000, size 0x300000 -> end 0x610000
+#  ota_1:   0x610000, size 0x300000 -> end 0x910000
+#  coredump:0x910000, size 0x02E000 -> end 0x93E000
+#  otadata: 0x93E000, size 0x2000  -> end 0x940000
+#  storage: 0x940000, size 0x6C0000 (6.75 MB)
+# End of layout = 0x940000 + 0x6C0000 = 0x1000000 (full flash)
 
 nvs,      data, nvs,     0x9000,   0x6000
 phy_init, data, phy,     0xF000,   0x1000
-factory,  app,  factory, 0x10000,  0x4C0000
-ota_0,    app,  ota_0,   0x4D0000, 0x4C0000
-ota_1,    app,  ota_1,   0x990000, 0x4C0000
-coredump, data, coredump,0xE50000, 0x2E000
-otadata,  data, ota,     0xE7E000, 0x2000
-storage,  data, spiffs,  0xE80000, 0x180000
+factory,  app,  factory, 0x10000,  0x300000
+ota_0,    app,  ota_0,   0x310000, 0x300000
+ota_1,    app,  ota_1,   0x610000, 0x300000
+coredump, data, coredump,0x910000, 0x2E000
+otadata,  data, ota,     0x93E000, 0x2000
+storage,  data, spiffs,  0x940000, 0x6C0000
 

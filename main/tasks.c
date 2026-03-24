@@ -837,8 +837,12 @@ static uint32_t fsm_get_language_return_timeout_ms(void)
 {
     uint32_t timeout_ms = FSM_LANGUAGE_RETURN_DEFAULT_MS;
     device_config_t *cfg = device_config_get();
-    if (cfg && cfg->timeouts.exit_programs_ms > 0U) {
-        timeout_ms = cfg->timeouts.exit_programs_ms;
+    if (cfg) {
+        if (cfg->timeouts.idle_before_ads_ms > 0U) {
+            timeout_ms = cfg->timeouts.idle_before_ads_ms;
+        } else if (cfg->timeouts.exit_programs_ms > 0U) {
+            timeout_ms = cfg->timeouts.exit_programs_ms;
+        }
     }
 
     if (timeout_ms < FSM_LANGUAGE_RETURN_MIN_MS) {
@@ -1435,7 +1439,9 @@ static void fsm_task(void *arg)
     fsm_init(&fsm);
     device_config_t *cfg = device_config_get();
     if (cfg) {
-        if (cfg->timeouts.exit_programs_ms > 0U) {
+        if (cfg->timeouts.idle_before_ads_ms > 0U) {
+            fsm.splash_screen_time_ms = cfg->timeouts.idle_before_ads_ms;
+        } else if (cfg->timeouts.exit_programs_ms > 0U) {
             fsm.splash_screen_time_ms = cfg->timeouts.exit_programs_ms;
         }
         if (cfg->timeouts.ad_rotation_ms > 0U) {
@@ -1559,14 +1565,22 @@ static void fsm_task(void *arg)
                                      event.aux_u32 == 0U;
         bool credit_forced_end = event_received &&
                                  event.type == FSM_INPUT_EVENT_CREDIT_ENDED;
+        bool natural_cycle_end = left_program_state && !forced_stop_requested && !credit_forced_end;
 
-        if (left_program_state && (forced_stop_requested || credit_forced_end)) {
-            (void)web_ui_program_clear_outputs();
-            fsm_append_message("Reset relay eseguito su stop forzato/credito finito");
-            ESP_LOGI(TAG,
-                     "[M] Reset relay applicato (stop_forzato=%d, credito_finito=%d)",
-                     forced_stop_requested ? 1 : 0,
-                     credit_forced_end ? 1 : 0);
+        if (left_program_state) {
+            esp_err_t clear_err = web_ui_program_clear_outputs();
+            if (clear_err == ESP_OK) {
+                fsm_append_message("Reset relay eseguito in uscita da RUNNING/PAUSED");
+                ESP_LOGI(TAG,
+                         "[M] Reset relay applicato (stop_forzato=%d, credito_finito=%d, fine_ciclo=%d)",
+                         forced_stop_requested ? 1 : 0,
+                         credit_forced_end ? 1 : 0,
+                         natural_cycle_end ? 1 : 0);
+            } else {
+                ESP_LOGW(TAG,
+                         "[M] Reset relay fallito in uscita da programma: %s",
+                         esp_err_to_name(clear_err));
+            }
         }
 
         if ((state_before != fsm.state) && cfg && cfg->display.enabled) {
@@ -2772,8 +2786,21 @@ static void tasks_set_state_idle_for_mocks(void)
 void tasks_start_all(void)
 {
     tasks_set_state_idle_for_mocks();
+    device_config_t *cfg = device_config_get();
+
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
+
+        if (cfg && strcmp(t->name, "usb_scanner") == 0) {
+            t->state = cfg->scanner.enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
+        }
+
+        if (cfg && strcmp(t->name, "cctalk_task") == 0) {
+            t->state = cfg->sensors.cctalk_enabled
+                           ? TASK_STATE_RUN
+                           : TASK_STATE_IDLE;
+        }
+
         if (strcmp(t->name, "fsm") == 0) {
             ESP_LOGI(TAG, "[M] Task saltato %s (avvio differito post-bootstrap UI)", t->name);
             continue;

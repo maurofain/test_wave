@@ -20,6 +20,11 @@
 typedef struct {
     uint8_t program_id;
     char name[WEB_UI_PROGRAM_NAME_MAX];
+    char name_it[WEB_UI_PROGRAM_NAME_MAX];
+    char name_en[WEB_UI_PROGRAM_NAME_MAX];
+    char name_fr[WEB_UI_PROGRAM_NAME_MAX];
+    char name_de[WEB_UI_PROGRAM_NAME_MAX];
+    char name_es[WEB_UI_PROGRAM_NAME_MAX];
     bool enabled;
     uint16_t price_units;
     uint16_t duration_sec;

@@ -78,3 +78,32 @@
       1. se il credito è effettivo si ritorna al punti 4.
       2. se il credito rimanente è virtuale la sessione è conclusa ritorna in ads o scelta programmi con credito azzerato.
 6. In ogni momento è possibile cambiare la lingua premendo la bandierina in alto a dx
+
+7. Riassunto stati FSM
+   - IDLE : appare ADS o PROGRAMMI senza che accada nulla fino a che : viene premuto Seleziona Lavaggio o viene aggiunto credito: in questi casi passa in RUN
+   - RUN : attende la scelta di un programma o del 'timeout scelta programmi'; 
+      - se viene scelto prima il programma lo esegue per il  tepmpo impostato in Tabella Programmi
+         - se viene premuto il tasto scelto per l'avvia si passa in pausa
+         - se viene scelto un altro programma si cambia il programmaok e poi rivedi il codice
+         - se viene premuto STOP si va in pausa 
+            - se dopo STOP si preme 'riprendi' entro il timeuto pausa si torna in RUN 
+            - se si preme 'conferma annullamento' o si raggiunge il 'timeout pausa' si riprende il countdown del programma
+            - se si è premuto 'conferma annullamento' si resetta il flag di ripartenza automatica
+      - se interviene il 'timeout scelta programmi' trattiene il credito ECD e Azzera il credito VCD in memoria, poi ritorna in IDLE
+      alla fine del programma si torna in IDLE se il rinnovo automatico è FALSE o se il credito è finito
+## Riordino sezioni /config 
+1. Identità
+2. Password Emulatore
+3. Periferche Hardware
+4. Ethernet
+5. Wifi
+6. Server Remoto
+7. NTP
+8. Logging remoto
+9. Timeouts
+10. Display
+11. Striscia LED
+12. Porte Seriali
+13. CCtalk
+14. modbus
+15. GPIO ausiliario

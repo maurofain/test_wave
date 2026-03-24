@@ -23,10 +23,11 @@ This document describes all Bash and Python scripts in the `scripts/` directory 
 ```
 0x2000       → bootloader/bootloader.bin
 0x8000       → partition_table/partition-table.bin
-0x10000      → build/test_wave_factory.bin (FACTORY)
-0x2C0000     → build/test_wave_ota0.bin (OTA_0)
-0x4C0000     → build/test_wave_ota1.bin (OTA_1)
-0xE80000     → build/storage.bin (SPIFFS)
+0x10000      → build/test_wave.bin (FACTORY)
+0x310000     → build/test_wave.bin (OTA_0)
+0x610000     → build/test_wave.bin (OTA_1)
+0x93E000     → build/ota_data_initial.bin
+0x940000     → build/storage.bin (SPIFFS)
 ```
 
 #### `flash_factory.sh`
@@ -36,13 +37,13 @@ This document describes all Bash and Python scripts in the `scripts/` directory 
 - Validates app version from `app_version.h`
 - Supports same options as `flash_all.sh`: `-p`, `-b`, `-m`
 - Used for factory/system image flashing
-- Writes at offset `0x10000` (4 MB partition size)
+- Writes at offset `0x10000` (3 MB partition size)
 
 #### `flash_ota0.sh`
 **Purpose**: Flash only the OTA_0 partition (first OTA slot).
 
 **Features**:
-- Partition size: ~4.75 MB at offset `0x4C0000`
+- Partition size: 3 MB at offset `0x310000`
 - Same command-line options: `-p`, `-b`, `-m`
 - Used for OTA (Over-The-Air) updates on primary slot
 
@@ -58,7 +59,7 @@ This document describes all Bash and Python scripts in the `scripts/` directory 
 **Purpose**: Flash only the SPIFFS (file storage) partition.
 
 **Features**:
-- Writes filesystem at offset `0xE80000`
+- Writes filesystem at offset `0x940000`
 - Contains application data, configurations, and embedded assets
 - Same command-line options: `-p`, `-b`, `-m`
 

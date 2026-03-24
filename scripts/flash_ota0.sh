@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script per il flash della sola partizione OTA_0 (0x4C0000 ≈ 4.75 MB)
+# Script per il flash della sola partizione OTA_0 (0x300000 = 3 MB)
 # Utilizzo: ./scripts/flash_ota0.sh [-p /dev/ttyPORT] [-b BAUD] [-m]
 
 PORT="/dev/ttyACM0"
@@ -52,13 +52,13 @@ if [ "$MAIN_MODE" != "1" ]; then
   exit 1
 fi
 
-CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0x4D0000 build/test_wave.bin"
+CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0x310000 build/test_wave.bin"
 
 echo "🚀 Avvio flash partizione OTA_0"
 echo "   Porta: $PORT"
 echo "   Baud: $BAUD"
-echo "   Offset: 0x4D0000"
-echo "   Size: 0x4C0000 (≈ 4.75 MB)"
+echo "   Offset: 0x310000"
+echo "   Size: 0x300000 (3 MB)"
 echo "   Immagine: build/test_wave.bin"
 echo "📝 Comando: $CMD"
 echo ""

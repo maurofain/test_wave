@@ -21,41 +21,19 @@ ora quando inserisco una moneta vieve valorizzato il credito (2 euro) ma appare 
 [ ] Utilizzare i testi delle chiavi program_name_* peer la compilazione dei nomi dei programmi, ed aggiungere in /programs la scelta della lingua 
 [ ] Spostare la voce Abilita log POST da /test alla sezione Remote Logging di /config
 [ ] invece di utilizzare  bsp_display_brightness_set crea una funzione in device_config per effettuare la chiamata i2c sul bus i2c in uso al display
-[ ] il pulsante programma selezionato deve apparire con un bordo bianco 5px, se viene messo in pausa lo sfondo deve diventare blu
+
 [ ] Gestione di digital_io:
 1. Input : la lettura di un cabio stato 0->1 su un input digitale deve portare an un controllo se l'input sia associato ad un tasto programma del touch e se si deve generare la stessa azione. Se non è associato deve chiamare una funzione de elaborazione degli altri input (per ora senza implementare nulla)
 2. output : all'avviamento di un programma vanno attivati gli output negli stati definiti in tabella programmi fino al termine del programma o fino alla sua interruzione definitiva (STOP)
 3. gli eventi digital_io vanno reinseriti nella mailbox e trattati come descritoo in questa nota
-[ ]  dobbiamo rivedere digital_io : la scheda una gli expander interni i2c in questo modo: 
-innanzitutto creiamo un task 'io_process' che sarà il consumer di tutti gli eventi digital_io non già consumati da altri moduli
-OUT : WHITE_LED, BLUE_LED,RELAY3,RELAY4,RELAY2,RELAY1,RED_LED,HEATHER1
-IN  : DIP1, DIP2, DIP3 , SERVICE_SWITCH, OPTO2, OPTO1, OPTO4, OPTO3
-Dobbiamo mappare tutti gli input nel device considerando gli input OPTOx come possibili tasti e gli altri come segnali da far processare al task io_process (per ora non agisce) , gli out considerando RELAYx come relay da pilotare e da usare nella lista programmi e i LED come segnali da utilizzare per eventi usando come consumer task il io_process (per ora non agisce), lo stato di HEATER va processato dal task io_process (per ora non agisce)
-[ ] Riassunto stati FSM
-IDLE : appare ADS o PROGRAMMI senza che accada nulla fino a che : viene premuto Seleziona Lavaggio o viene aggiunto credito: in questi casi passa in RUN
-RUN : attende la scelta di un programma o del 'timeout scelta programmi'; 
-	- se viene scelto prima il programma lo esegue per il  tepmpo impostato in Tabella Programmi
-		- se viene premuto il tasto scelto per l'avvia si passa in pausa
-		- se viene scelto un altro programma si cambia il programmaok e poi rivedi il codice
-		- se viene premuto STOP si va in pausa 
-			- se dopo STOP si preme 'riprendi' entro il timeuto pausa si torna in RUN 
-			- se si preme 'conferma annullamento' o si raggiunge il 'timeout pausa' si riprende il countdown del programma
-			- se si è premuto 'conferma annullamento' si resetta il flag di ripartenza automatica
-	- se interviene il 'timeout scelta programmi' trattiene il credito ECD e Azzera il credito VCD in memoria, poi ritorna in IDLE
-alla fine del programma si torna in IDLE de il rinnovo automatico è FALSE o se il credito è finito
+[ ] il pulsante programma selezionato deve apparire con un bordo bianco 5px, se viene messo in pausa lo sfondo deve diventare blu
 
-[ ] Riordino sezioni /config 
-1. Identità
-2. Password Emulatore
-3. Periferche Hardware
-4. Ethernet
-5. Wifi
-6. Server Remoto
-7. NTP
-8. Logging remoto
-9. Timeouts
-10. Porte Seriali
-11. CCtalk
-12. modbus
-13. GPIO ausiliario
+
+
+
 -----------------
+
+
+
+
+221 882

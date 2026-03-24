@@ -1631,13 +1631,6 @@ esp_err_t api_ui_languages_get(httpd_req_t *req)
 esp_err_t api_config_backup(httpd_req_t *req)
 {
     if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/config/backup");
-    
-    if (!sd_card_is_mounted()) {
-        const char *resp_str = "{\"error\":\"Scheda SD non montata\"}";
-        httpd_resp_set_status(req, "500");
-        httpd_resp_send(req, resp_str, strlen(resp_str));
-        return ESP_OK;
-    }
 
     device_config_t *cfg = device_config_get();
     cJSON *root = cJSON_CreateObject();
@@ -1755,18 +1748,64 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddStringToObject(root, "ui_language", cfg->ui.user_language);
 
     char *json = cJSON_Print(root);
-    esp_err_t err = sd_card_write_file("/sdcard/config.jsn", json);
-    
-    char response[128];
-    if (err == ESP_OK) {
-        snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Backup salvato in /sdcard/config.jsn\"}");
-    } else {
-        snprintf(response, sizeof(response), "{\"error\":\"Errore scrittura file\"}");
+
+    char response[256] = {0};
+    bool spiffs_ok = false;
+    bool sd_attempted = false;
+    bool sd_ok = false;
+
+    if (json) {
+        FILE *f = fopen("/spiffs/config.jsn", "w");
+        if (f) {
+            if (fputs(json, f) >= 0) {
+                spiffs_ok = true;
+            }
+            fclose(f);
+        } else {
+            ESP_LOGE(TAG, "[C] Backup config: impossibile aprire /spiffs/config.jsn in scrittura");
+        }
+
+        if (sd_card_is_mounted()) {
+            sd_attempted = true;
+            sd_ok = (sd_card_write_file("/sdcard/config.jsn", json) == ESP_OK);
+            if (!sd_ok) {
+                ESP_LOGW(TAG, "[C] Backup config: scrittura su SD fallita");
+            }
+        }
     }
-    
-    free(json);
+
+    if (json) {
+        free(json);
+    }
     cJSON_Delete(root);
-    
+
+    if (!spiffs_ok) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        if (sd_attempted && sd_ok) {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"error\":\"Backup SPIFFS fallito; backup SD eseguito in /sdcard/config.jsn\"}");
+        } else {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"error\":\"Backup SPIFFS fallito\"}");
+        }
+    } else {
+        if (sd_attempted && sd_ok) {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"status\":\"ok\",\"message\":\"Backup salvato in /spiffs/config.jsn e /sdcard/config.jsn\"}");
+        } else if (sd_attempted && !sd_ok) {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"status\":\"ok\",\"message\":\"Backup salvato in /spiffs/config.jsn; backup SD non riuscito\"}");
+        } else {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"status\":\"ok\",\"message\":\"Backup salvato in /spiffs/config.jsn (SD non montata)\"}");
+        }
+    }
+
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, response, strlen(response));
 }

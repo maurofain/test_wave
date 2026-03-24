@@ -1,0 +1,45 @@
+Sì, dal log di oggi (docs/260320 LOG.md) le correzioni principali fatte sono queste.
+
+Correzioni chiave (ultima parte della giornata, legate ai regressi)
+
+STOP/CONTINUA/CONFERMA allineati tra LVGL e FSM: conferma annullamento ora completa il ciclo corrente ma blocca auto-riavvio, con gestione corretta bucket ECD/VCD (main/fsm.c, components/lvgl_panel/lvgl_page_programmi.c).
+Timeout VCD corretto: allo scadere timeout in CREDIT viene azzerato davvero il residuo VCD, evitando riuso credito virtuale sporco (main/fsm.c).
+Policy scanner VCD-after-ECD: scanner forzato OFF/ON in base al flag di blocco compile-time (main/tasks.c + helper runtime in main/fsm.c/.h).
+Pulsanti programma ripristinati: tornati verdi/arrotondati, rimossa resa porpora/spigoli stretti (components/lvgl_panel/lvgl_page_programmi.c).
+Gettoniera al boot: prima fix one-shot, poi fix robusto con retry periodico start CCTALK finché realmente abilitata (main/tasks.c).
+Stringhe {{xxx}} non espanse su /files: fix fallback allocazione localizzazione (PSRAM -> heap), evitando pagina raw (components/web_ui/webpages.c).
+Parte API/test fatta oggi
+
+Creato scripts/api_test_all.py per test automatico endpoint API con report errori.
+Fix parsing --base-url senza schema (192.168... -> http://192.168...).
+Hardening script: in runtime APP salta endpoint factory-only (/api/tasks*, /api/test/*) e non considera errore bloccante OPTIONS 404/405 in safe-mode.
+Nota specifica su OTA0
+
+Il fatto che fosse partito in OTA0 è coerente con la diagnosi: parte dei 404 che hai visto può dipendere da runtime/partition non allineata al sorgente atteso.
+Dal log: /api/version nel codice è sempre registrata; se sul device è 404, il log stesso conclude che c’è mismatch immagine/runtime.
+Ho seguito la regola memoria del progetto usando il log giornaliero come fonte unica di riepilogo.
+
+Se vuoi, nel prossimo step ti preparo una checklist secca in 6 comandi per verificare subito allineamento running partition + endpoint critici dopo ogni flash.
+
+
+Programma correzioni (ordine consigliato)
+
+CCTALK boot robusto in main/tasks.c
+	ripristino retry ACTION_ID_CCTALK_START ogni 2s fino ad acceptor enabled.
+STOP/CONFERMA corretto in lvgl_page_programmi.c + fsm.c
+	Continua ripristina stato normale; conferma annullamento completa ciclo corrente senza auto-riavvio.
+VCD/ECD policy in fsm.c + tasks.c
+	macro FSM_BLOCK_VCD_WHEN_ECD_PRESENT, timeout VCD pulito, policy scanner coerente.
+/config
+	spostare Modbus prima dei pulsanti
+se credito totale 0 
+	tutti i programmi devono essere disabilitati
+
+UI Programmi in lvgl_page_programmi.c
+	verde/arrotondato legacy, niente bordo attivo “spesso”.
+LED runtime da config in main/tasks.c
+usare cfg->sensors.led_run_*, led_prefine_*, led_standby_*, led_flash_*, led_flash_count.
+Verifica finale
+build get_idf && idfc -b, test API con scripts/api_test_all.py, check rapido endpoint chiave + comportamento device.
+Se vuoi, parto subito con i punti 1+2 (più critici per gettoniera e UX stop) e poi ti mando patch incrementale.
+Ho seguito la memoria/regola progetto sul log giornaliero e ho aggiornato docs/260320 LOG.md.

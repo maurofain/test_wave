@@ -5,9 +5,11 @@
 #include "fsm.h"
 #include "lvgl_panel.h"
 #include "language_flags.h"
+#include "program_repeat_icon.h"
 #include "lvgl_page_chrome.h"
 #include "main.h"
 #include "tasks.h"
+#include "usb_cdc_scanner.h"
 #include "web_ui_programs.h"
 
 #include "lvgl.h"
@@ -100,6 +102,7 @@ static lv_obj_t *s_stop_btn = NULL;  /* Flag image inside the button */
 static lv_obj_t *s_stop_lbl = NULL;  /* label inside stop button */
 static lv_obj_t *s_program_popup = NULL;
 static lv_obj_t *s_program_popup_lbl = NULL;
+static lv_obj_t *s_program_popup_repeat_img = NULL;
 static lv_obj_t *s_program_end_overlay = NULL;
 static lv_obj_t *s_program_end_card = NULL;
 static lv_obj_t *s_program_end_title_lbl = NULL;
@@ -139,6 +142,7 @@ static bool s_prog_suspended[PROG_COUNT] = {0};
 static fsm_state_t s_last_fsm_state = FSM_STATE_IDLE;  /* Track last FSM state for credit reset */
 static uint32_t s_last_user_interaction_ms = 0;
 static uint32_t s_last_ads_disabled_log_ms = 0;
+static uint32_t s_last_program_timeout_log_ms = 0;
 static lv_obj_t *s_touch_reset_bound_scr = NULL;
 
 static int32_t panel_effective_credit_cents(const fsm_ctx_t *snap);
@@ -383,6 +387,46 @@ static void invalidate_program_label_cache(void)
     s_prog_label_cache_lang[0] = '\0';
 }
 
+static void panel_enable_payment_devices_on_programs_open(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg) {
+        ESP_LOGW(TAG, "[C] Config non disponibile: impossibile riabilitare scanner/gettoniera");
+        return;
+    }
+
+    bool scanner_was_enabled = cfg->scanner.enabled;
+    bool coin_was_enabled = cfg->mdb.coin_acceptor_en;
+
+    cfg->scanner.enabled = true;
+    cfg->mdb.coin_acceptor_en = true;
+
+    tasks_apply_n_run();
+
+    esp_err_t on_err = usb_cdc_scanner_send_on_command();
+    if (on_err != ESP_OK) {
+        esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
+        esp_err_t retry_on_err = ESP_FAIL;
+        if (setup_err == ESP_OK) {
+            retry_on_err = usb_cdc_scanner_send_on_command();
+        }
+        if (!(setup_err == ESP_OK && retry_on_err == ESP_OK)) {
+            ESP_LOGW(TAG,
+                     "[C] Riabilitazione scanner in apertura programmi fallita (on=%s setup=%s retry_on=%s)",
+                     esp_err_to_name(on_err),
+                     esp_err_to_name(setup_err),
+                     esp_err_to_name(retry_on_err));
+        }
+    }
+
+    ESP_LOGI(TAG,
+             "[C] Apertura programmi: scanner=%d->%d gettoniera=%d->%d",
+             scanner_was_enabled ? 1 : 0,
+             cfg->scanner.enabled ? 1 : 0,
+             coin_was_enabled ? 1 : 0,
+             cfg->mdb.coin_acceptor_en ? 1 : 0);
+}
+
 static void rebuild_program_label_cache_if_needed(void)
 {
     const char *runtime_lang = lvgl_panel_get_runtime_language();
@@ -397,19 +441,11 @@ static void rebuild_program_label_cache_if_needed(void)
     for (uint8_t pid = 1; pid <= PROG_COUNT; ++pid)
     {
         char fallback[8] = {0};
-        char keyname[24] = {0};
-        char resolved[WEB_UI_PROGRAM_NAME_MAX] = {0};
         const char *target_text = NULL;
         const web_ui_program_entry_t *entry = find_program_entry(pid);
 
         snprintf(fallback, sizeof(fallback), "%u", (unsigned)pid);
-        snprintf(keyname, sizeof(keyname), "program_name_%02u", (unsigned)pid);
-
-        if (lvgl_i18n_get_text(keyname, fallback, resolved, sizeof(resolved)) == ESP_OK && resolved[0] != '\0')
-        {
-            target_text = resolved;
-        }
-        else if (entry && entry->name[0] != '\0')
+        if (entry && entry->name[0] != '\0')
         {
             target_text = entry->name;
         }
@@ -720,8 +756,11 @@ static void update_state(const fsm_ctx_t *snap)
     if (s_credit_lbl)
     {
         char buf[16] = {0};
+        lv_color_t credit_color = snap->qr_credit_pending ? COL_RED : COL_WHITE;
 
         snprintf(buf, sizeof(buf), "%ld", (long)effective_credit_cents);
+
+        lv_obj_set_style_text_color(s_credit_lbl, credit_color, LV_PART_MAIN);
 
         if (strcmp(s_last_credit_text, buf) != 0)
         {
@@ -836,6 +875,28 @@ static void update_state(const fsm_ctx_t *snap)
 
     if (s_program_popup) {
         bool popup_visible = !lv_obj_has_flag(s_program_popup, LV_OBJ_FLAG_HIDDEN);
+        bool autorepeat_active = (running || paused) && !snap->stop_after_cycle_requested;
+
+        if (s_program_popup_lbl) {
+            lv_obj_set_style_text_color(s_program_popup_lbl,
+                                        prefine_active ? COL_TIMER_WARN : COL_BLACK,
+                                        LV_PART_MAIN);
+        }
+
+        if (s_program_popup_repeat_img) {
+            lv_color_t text_col = s_program_popup_lbl
+                                  ? lv_obj_get_style_text_color(s_program_popup_lbl, LV_PART_MAIN)
+                                  : COL_BLACK;
+            lv_obj_set_style_image_recolor(s_program_popup_repeat_img, text_col, LV_PART_MAIN);
+            lv_obj_set_style_image_recolor_opa(s_program_popup_repeat_img, LV_OPA_COVER, LV_PART_MAIN);
+
+            if (popup_visible && autorepeat_active) {
+                lv_obj_clear_flag(s_program_popup_repeat_img, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_add_flag(s_program_popup_repeat_img, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+
         if ((running || paused) && popup_visible) {
             s_program_popup_running_seen = true;
         }
@@ -1365,7 +1426,7 @@ static void build_status(lv_obj_t *scr)
     lv_obj_align(s_program_end_msg_lbl, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
     s_program_popup = lv_obj_create(s_credit_box);
-    lv_obj_set_size(s_program_popup, PANEL_FULL_W - 120, 48);
+    lv_obj_set_size(s_program_popup, PANEL_FULL_W - 220, 48);
     lv_obj_align(s_program_popup, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
     lv_obj_set_style_bg_color(s_program_popup, COL_TIMER_NORMAL, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(s_program_popup, LV_OPA_COVER, LV_PART_MAIN);
@@ -1382,8 +1443,15 @@ static void build_status(lv_obj_t *scr)
     lv_obj_set_style_text_color(s_program_popup_lbl, COL_BLACK, LV_PART_MAIN);
     lv_obj_set_style_text_font(s_program_popup_lbl, FONT_LABEL, LV_PART_MAIN);
     lv_label_set_long_mode(s_program_popup_lbl, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(s_program_popup_lbl, PANEL_FULL_W - 150);
+    lv_obj_set_width(s_program_popup_lbl, PANEL_FULL_W - 290);
     lv_obj_center(s_program_popup_lbl);
+
+    s_program_popup_repeat_img = lv_image_create(s_program_popup);
+    lv_image_set_src(s_program_popup_repeat_img, &g_program_repeat_icon_32x32);
+    lv_obj_set_style_image_recolor(s_program_popup_repeat_img, COL_BLACK, LV_PART_MAIN);
+    lv_obj_set_style_image_recolor_opa(s_program_popup_repeat_img, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_align(s_program_popup_repeat_img, LV_ALIGN_BOTTOM_RIGHT, -6, -2);
+    lv_obj_add_flag(s_program_popup_repeat_img, LV_OBJ_FLAG_HIDDEN);
 
     s_status_box = lv_obj_create(scr);
     lv_obj_set_pos(s_status_box, PANEL_PAD_X, status_y);
@@ -1696,6 +1764,7 @@ static void clear_panel_handles(void)
     s_stop_btn = NULL;
     s_program_popup = NULL;
     s_program_popup_lbl = NULL;
+    s_program_popup_repeat_img = NULL;
     s_program_end_overlay = NULL;
     s_program_end_card = NULL;
     s_program_end_title_lbl = NULL;
@@ -1704,6 +1773,7 @@ static void clear_panel_handles(void)
     s_program_popup_until_ms = 0U;
     s_program_popup_running_seen = false;
     s_program_end_effect_until_ms = 0U;
+    s_last_program_timeout_log_ms = 0U;
     /* s_language_flag_btn e s_flag_img rimossi su richiesta dell'utente */
 
     for (int i = 0; i < PROG_COUNT; i++) {
@@ -1741,11 +1811,30 @@ static void panel_timer_cb(lv_timer_t *t)
 
         if (snap.state == FSM_STATE_CREDIT) {
             uint32_t idle_ms = snap.inactivity_ms;
-            uint32_t idle_to_ads_ms = (cfg && cfg->timeouts.exit_programs_ms > 0)
-                ? cfg->timeouts.exit_programs_ms : MAIN_PAGE_IDLE_TO_ADS_MS;
+            uint32_t idle_to_ads_ms = MAIN_PAGE_IDLE_TO_ADS_MS;
+            if (cfg) {
+                if (cfg->timeouts.idle_before_ads_ms > 0) {
+                    idle_to_ads_ms = cfg->timeouts.idle_before_ads_ms;
+                } else if (cfg->timeouts.exit_programs_ms > 0) {
+                    /* compat legacy */
+                    idle_to_ads_ms = cfg->timeouts.exit_programs_ms;
+                }
+            }
+
+            if ((now_ms - s_last_program_timeout_log_ms) >= 1000U) {
+                uint32_t rem_ms = (idle_ms < idle_to_ads_ms) ? (idle_to_ads_ms - idle_ms) : 0U;
+                ESP_LOGI(TAG,
+                         "[C] Timeout programmi rimanente: %lu ms (idle=%lu/%lu)",
+                         (unsigned long)rem_ms,
+                         (unsigned long)idle_ms,
+                         (unsigned long)idle_to_ads_ms);
+                s_last_program_timeout_log_ms = now_ms;
+            }
+
             if (idle_ms >= idle_to_ads_ms) {
                 // Verifica se ADS è abilitato prima di tornare alla slideshow
-                if (cfg && cfg->display.ads_enabled) {
+                bool ads_enabled = cfg ? cfg->display.ads_enabled : snap.ads_enabled;
+                if (ads_enabled) {
                     ESP_LOGI(TAG, "[C] Timeout inattività scelta programmi (%lu ms), ritorno a slideshow ADS", (unsigned long)idle_ms);
                     lvgl_page_ads_show();
                 } else {
@@ -1847,6 +1936,8 @@ void lvgl_page_main_deactivate(void)
 void lvgl_page_main_show(void)
 {
     ESP_LOGI(TAG, "[C] ===== lvgl_page_main_show START =====");
+
+    panel_enable_payment_devices_on_programs_open();
 
     esp_err_t dio_err = digital_io_init();
     if (dio_err != ESP_OK) {

@@ -20,6 +20,7 @@ char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id);
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 static const char *TAG = "DEVICE_CFG";
 static const char *NVS_NAMESPACE = "device_config";
@@ -546,18 +547,47 @@ static esp_err_t _write_text_file(const char *path, const char *content)
         return ESP_ERR_INVALID_ARG;
     }
 
-    FILE *file = fopen(path, "w");
+    char tmp_path[256] = {0};
+    int n = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+    if (n <= 0 || (size_t)n >= sizeof(tmp_path)) {
+        ESP_LOGE(TAG, "[C] Path temporaneo non valido per %s", path);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    FILE *file = fopen(tmp_path, "w");
     if (!file) {
-        ESP_LOGE(TAG, "[C] Impossibile aprire il file %s in scrittura", path);
+        ESP_LOGE(TAG,
+                 "[C] Impossibile aprire il file temporaneo %s in scrittura (errno=%d)",
+                 tmp_path,
+                 errno);
         return ESP_FAIL;
     }
 
     size_t len = strlen(content);
     size_t written = fwrite(content, 1, len, file);
-    fclose(file);
+    int fflush_rc = fflush(file);
+    int fclose_rc = fclose(file);
 
-    if (written != len) {
-        ESP_LOGE(TAG, "[C] Scrittura incompleta su %s: %zu/%zu byte", path, written, len);
+    if (written != len || fflush_rc != 0 || fclose_rc != 0) {
+        ESP_LOGE(TAG,
+                 "[C] Scrittura incompleta su %s: %zu/%zu byte (fflush=%d fclose=%d errno=%d)",
+                 tmp_path,
+                 written,
+                 len,
+                 fflush_rc,
+                 fclose_rc,
+                 errno);
+        (void)remove(tmp_path);
+        return ESP_FAIL;
+    }
+
+    if (rename(tmp_path, path) != 0) {
+        ESP_LOGE(TAG,
+                 "[C] Rename atomico fallito %s -> %s (errno=%d)",
+                 tmp_path,
+                 path,
+                 errno);
+        (void)remove(tmp_path);
         return ESP_FAIL;
     }
 
@@ -1549,21 +1579,21 @@ esp_err_t device_config_load(device_config_t *config)
                     cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_n"); if (!lc) lc = cJSON_GetObjectItem(sensors_obj, "led_count");
                     if (lc) config->sensors.led_count = (uint32_t)lc->valueint;
 
-                    cJSON *led_run_r = cJSON_GetObjectItem(sensors_obj, "led_run_r");
+                    cJSON *led_run_r = cJSON_GetObjectItem(sensors_obj, "lrr"); if (!led_run_r) led_run_r = cJSON_GetObjectItem(sensors_obj, "led_run_r");
                     if (led_run_r && cJSON_IsNumber(led_run_r)) {
                         int val = led_run_r->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_run_r = (uint8_t)val;
                     }
-                    cJSON *led_run_g = cJSON_GetObjectItem(sensors_obj, "led_run_g");
+                    cJSON *led_run_g = cJSON_GetObjectItem(sensors_obj, "lrg"); if (!led_run_g) led_run_g = cJSON_GetObjectItem(sensors_obj, "led_run_g");
                     if (led_run_g && cJSON_IsNumber(led_run_g)) {
                         int val = led_run_g->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_run_g = (uint8_t)val;
                     }
-                    cJSON *led_run_b = cJSON_GetObjectItem(sensors_obj, "led_run_b");
+                    cJSON *led_run_b = cJSON_GetObjectItem(sensors_obj, "lrb"); if (!led_run_b) led_run_b = cJSON_GetObjectItem(sensors_obj, "led_run_b");
                     if (led_run_b && cJSON_IsNumber(led_run_b)) {
                         int val = led_run_b->valueint;
                         if (val < 0) val = 0;
@@ -1571,21 +1601,21 @@ esp_err_t device_config_load(device_config_t *config)
                         config->sensors.led_run_b = (uint8_t)val;
                     }
 
-                    cJSON *led_prefine_r = cJSON_GetObjectItem(sensors_obj, "led_prefine_r");
+                    cJSON *led_prefine_r = cJSON_GetObjectItem(sensors_obj, "lpr"); if (!led_prefine_r) led_prefine_r = cJSON_GetObjectItem(sensors_obj, "led_prefine_r");
                     if (led_prefine_r && cJSON_IsNumber(led_prefine_r)) {
                         int val = led_prefine_r->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_prefine_r = (uint8_t)val;
                     }
-                    cJSON *led_prefine_g = cJSON_GetObjectItem(sensors_obj, "led_prefine_g");
+                    cJSON *led_prefine_g = cJSON_GetObjectItem(sensors_obj, "lpg"); if (!led_prefine_g) led_prefine_g = cJSON_GetObjectItem(sensors_obj, "led_prefine_g");
                     if (led_prefine_g && cJSON_IsNumber(led_prefine_g)) {
                         int val = led_prefine_g->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_prefine_g = (uint8_t)val;
                     }
-                    cJSON *led_prefine_b = cJSON_GetObjectItem(sensors_obj, "led_prefine_b");
+                    cJSON *led_prefine_b = cJSON_GetObjectItem(sensors_obj, "lpb"); if (!led_prefine_b) led_prefine_b = cJSON_GetObjectItem(sensors_obj, "led_prefine_b");
                     if (led_prefine_b && cJSON_IsNumber(led_prefine_b)) {
                         int val = led_prefine_b->valueint;
                         if (val < 0) val = 0;
@@ -1593,21 +1623,21 @@ esp_err_t device_config_load(device_config_t *config)
                         config->sensors.led_prefine_b = (uint8_t)val;
                     }
 
-                    cJSON *led_standby_r = cJSON_GetObjectItem(sensors_obj, "led_standby_r");
+                    cJSON *led_standby_r = cJSON_GetObjectItem(sensors_obj, "lsr"); if (!led_standby_r) led_standby_r = cJSON_GetObjectItem(sensors_obj, "led_standby_r");
                     if (led_standby_r && cJSON_IsNumber(led_standby_r)) {
                         int val = led_standby_r->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_standby_r = (uint8_t)val;
                     }
-                    cJSON *led_standby_g = cJSON_GetObjectItem(sensors_obj, "led_standby_g");
+                    cJSON *led_standby_g = cJSON_GetObjectItem(sensors_obj, "lsg"); if (!led_standby_g) led_standby_g = cJSON_GetObjectItem(sensors_obj, "led_standby_g");
                     if (led_standby_g && cJSON_IsNumber(led_standby_g)) {
                         int val = led_standby_g->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_standby_g = (uint8_t)val;
                     }
-                    cJSON *led_standby_b = cJSON_GetObjectItem(sensors_obj, "led_standby_b");
+                    cJSON *led_standby_b = cJSON_GetObjectItem(sensors_obj, "lsb"); if (!led_standby_b) led_standby_b = cJSON_GetObjectItem(sensors_obj, "led_standby_b");
                     if (led_standby_b && cJSON_IsNumber(led_standby_b)) {
                         int val = led_standby_b->valueint;
                         if (val < 0) val = 0;
@@ -1615,21 +1645,21 @@ esp_err_t device_config_load(device_config_t *config)
                         config->sensors.led_standby_b = (uint8_t)val;
                     }
 
-                    cJSON *led_flash_r = cJSON_GetObjectItem(sensors_obj, "led_flash_r");
+                    cJSON *led_flash_r = cJSON_GetObjectItem(sensors_obj, "lfr"); if (!led_flash_r) led_flash_r = cJSON_GetObjectItem(sensors_obj, "led_flash_r");
                     if (led_flash_r && cJSON_IsNumber(led_flash_r)) {
                         int val = led_flash_r->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_flash_r = (uint8_t)val;
                     }
-                    cJSON *led_flash_g = cJSON_GetObjectItem(sensors_obj, "led_flash_g");
+                    cJSON *led_flash_g = cJSON_GetObjectItem(sensors_obj, "lfg"); if (!led_flash_g) led_flash_g = cJSON_GetObjectItem(sensors_obj, "led_flash_g");
                     if (led_flash_g && cJSON_IsNumber(led_flash_g)) {
                         int val = led_flash_g->valueint;
                         if (val < 0) val = 0;
                         if (val > 255) val = 255;
                         config->sensors.led_flash_g = (uint8_t)val;
                     }
-                    cJSON *led_flash_b = cJSON_GetObjectItem(sensors_obj, "led_flash_b");
+                    cJSON *led_flash_b = cJSON_GetObjectItem(sensors_obj, "lfb"); if (!led_flash_b) led_flash_b = cJSON_GetObjectItem(sensors_obj, "led_flash_b");
                     if (led_flash_b && cJSON_IsNumber(led_flash_b)) {
                         int val = led_flash_b->valueint;
                         if (val < 0) val = 0;
@@ -1637,7 +1667,7 @@ esp_err_t device_config_load(device_config_t *config)
                         config->sensors.led_flash_b = (uint8_t)val;
                     }
 
-                    cJSON *led_flash_count = cJSON_GetObjectItem(sensors_obj, "led_flash_count");
+                    cJSON *led_flash_count = cJSON_GetObjectItem(sensors_obj, "lfc"); if (!led_flash_count) led_flash_count = cJSON_GetObjectItem(sensors_obj, "led_flash_count");
                     if (led_flash_count && cJSON_IsNumber(led_flash_count)) {
                         int val = led_flash_count->valueint;
                         if (val < 1) val = 1;
@@ -1697,17 +1727,11 @@ esp_err_t device_config_load(device_config_t *config)
                 // Analisi config Scanner USB
                 cJSON *scanner_obj = cJSON_GetObjectItem(root, "scanner");
                 if (scanner_obj) {
-                    cJSON *_sc_en = cJSON_GetObjectItem(scanner_obj, "en"); if (!_sc_en) _sc_en = cJSON_GetObjectItem(scanner_obj, "enabled");
-                    if (_sc_en) {
-                        ESP_LOGI(TAG, "[CONFIG] scanner._sc_en found - type: %d, valueint: %d, valuedouble: %f", 
-                                 _sc_en->type, _sc_en->valueint, _sc_en->valuedouble);
-                        ESP_LOGI(TAG, "[CONFIG] cJSON_IsTrue result: %d, cJSON_IsBool: %d", 
-                                 cJSON_IsTrue(_sc_en), cJSON_IsBool(_sc_en));
-                    } else {
-                        ESP_LOGI(TAG, "[CONFIG] scanner._sc_en is NULL!");
-                    }
-                    config->scanner.enabled = cJSON_IsTrue(_sc_en);
-                    ESP_LOGI(TAG, "[CONFIG] scanner.enabled FINAL VALUE: %d", config->scanner.enabled);
+                    config->scanner.enabled = _json_read_bool(
+                        scanner_obj,
+                        "en",
+                        "enabled",
+                        config->scanner.enabled);
                     cJSON *vid = cJSON_GetObjectItem(scanner_obj, "vid");
                     cJSON *pid = cJSON_GetObjectItem(scanner_obj, "pid");
                     cJSON *dual = cJSON_GetObjectItem(scanner_obj, "dpid"); if (!dual) dual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
@@ -1758,9 +1782,21 @@ esp_err_t device_config_load(device_config_t *config)
                 // Analisi config MDB
                 cJSON *mdb_obj = cJSON_GetObjectItem(root, "mdb");
                 if (mdb_obj) {
-                    config->mdb.coin_acceptor_en = cJSON_IsTrue(cJSON_GetObjectItem(mdb_obj, "coin_en"));
-                    config->mdb.bill_validator_en = cJSON_IsTrue(cJSON_GetObjectItem(mdb_obj, "bill_en"));
-                    config->mdb.cashless_en = cJSON_IsTrue(cJSON_GetObjectItem(mdb_obj, "cashless_en"));
+                    config->mdb.coin_acceptor_en = _json_read_bool(
+                        mdb_obj,
+                        "coin_en",
+                        "coin_acceptor_en",
+                        config->mdb.coin_acceptor_en);
+                    config->mdb.bill_validator_en = _json_read_bool(
+                        mdb_obj,
+                        "bill_en",
+                        "bill_validator_en",
+                        config->mdb.bill_validator_en);
+                    config->mdb.cashless_en = _json_read_bool(
+                        mdb_obj,
+                        "cashless_en",
+                        NULL,
+                        config->mdb.cashless_en);
                 }
 
                 // Analisi config Display
@@ -1911,7 +1947,8 @@ esp_err_t device_config_load(device_config_t *config)
                         strncpy(config->ui.backend_language, backend_lang->valuestring, sizeof(config->ui.backend_language) - 1);
                     }
 
-                    cJSON *program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_message_sec");
+                    cJSON *program_end_sec = cJSON_GetObjectItem(ui_obj, "pem");
+                    if (!program_end_sec) program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_message_sec");
                     if (!program_end_sec) program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_sec"); /* compat */
                     if (program_end_sec && cJSON_IsNumber(program_end_sec)) {
                         int sec = program_end_sec->valueint;

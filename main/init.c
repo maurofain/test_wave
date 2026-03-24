@@ -1831,6 +1831,21 @@ esp_err_t init_run_factory(void)
 
   // Display + LVGL (minimal screen) - skip se headless
   device_config_t *cfg = device_config_get();
+
+  if (cfg)
+  {
+    if (!cfg->scanner.enabled)
+    {
+      ESP_LOGW(TAG, "[M] Scanner QR disabilitato in config: forzo abilitazione all'avvio");
+      cfg->scanner.enabled = true;
+    }
+
+    if (!cfg->sensors.cctalk_enabled)
+    {
+      ESP_LOGW(TAG, "[M] CCTALK disabilitato in config: forzo abilitazione all'avvio");
+      cfg->sensors.cctalk_enabled = true;
+    }
+  }
 #if 0
 #if !COMPILE_APP
     /* In FACTORY il display deve rimanere disponibile anche con config salvata headless */
@@ -2025,30 +2040,34 @@ esp_err_t init_run_factory(void)
                esp_err_to_name(rs232_ret));
       cfg->sensors.rs232_enabled = false;
       init_agent_status_set(AGN_ID_RS232, 0, INIT_AGENT_ERR_INIT_FAILED);
-      init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_DEPENDENCY_FAILED);
     }
     else
     {
       init_agent_status_set(AGN_ID_RS232, 1, INIT_AGENT_ERR_NONE);
-      /* Avvia anche il driver CCtalk (se presente) che usa la stessa UART
-       * fisica */
-      esp_err_t cctalk_ret = cctalk_driver_init();
-      if (cctalk_ret != ESP_OK)
-      {
-        ESP_LOGW(TAG, "CCTALK driver non avviato: %s",
-                 esp_err_to_name(cctalk_ret));
-        init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_INIT_FAILED);
-      }
-      else
-      {
-        init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_NONE);
-      }
     }
   }
   else
   {
     ESP_LOGI(TAG, "UART RS232 disabilitato da config");
     init_agent_status_set(AGN_ID_RS232, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+  }
+
+  if (cfg->sensors.cctalk_enabled)
+  {
+    esp_err_t cctalk_ret = cctalk_driver_init();
+    if (cctalk_ret != ESP_OK)
+    {
+      ESP_LOGW(TAG, "CCTALK driver non avviato: %s",
+               esp_err_to_name(cctalk_ret));
+      init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_INIT_FAILED);
+    }
+    else
+    {
+      init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_NONE);
+    }
+  }
+  else
+  {
     init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
   }
 

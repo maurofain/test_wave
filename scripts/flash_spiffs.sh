@@ -15,7 +15,7 @@ while getopts "p:b:m" opt; do
   esac
 done
 
-CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0xe80000 build/storage.bin"
+CMD="python3 -m esptool --chip esp32p4 -p $PORT -b $BAUD --before default_reset --after hard_reset write_flash --force 0x940000 build/storage.bin"
 
 echo "🚀 Avvio flash partizione SPIFFS (storage) su $PORT a $BAUD baud..."
 echo "📝 Comando: $CMD"
