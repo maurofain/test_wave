@@ -1371,6 +1371,14 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddStringToObject(server, "ser", cfg->server.serial);
     cJSON_AddStringToObject(server, "pwd", cfg->server.password);
     cJSON_AddItemToObject(root, "server", server);
+
+    cJSON *ftp = cJSON_CreateObject();
+    cJSON_AddBoolToObject(ftp, "en", cfg->ftp.enabled);
+    cJSON_AddStringToObject(ftp, "server", cfg->ftp.server);
+    cJSON_AddStringToObject(ftp, "user", cfg->ftp.user);
+    cJSON_AddStringToObject(ftp, "password", cfg->ftp.password);
+    cJSON_AddStringToObject(ftp, "path", cfg->ftp.path);
+    cJSON_AddItemToObject(root, "ftp", ftp);
     
     cJSON *sensors = cJSON_CreateObject();
     cJSON_AddBoolToObject(sensors, "io_exp", cfg->sensors.io_expander_enabled);
@@ -1949,6 +1957,20 @@ esp_err_t api_config_save(httpd_req_t *req)
         cJSON *password = cJSON_GetObjectItem(server_obj, "pwd");
         if (!password) password = cJSON_GetObjectItem(server_obj, "password"); /* compat */
         if (password && password->valuestring) strncpy(cfg->server.password, password->valuestring, sizeof(cfg->server.password)-1);
+    }
+
+    cJSON *ftp_obj = cJSON_GetObjectItem(root, "ftp");
+    if (ftp_obj) {
+        cfg->ftp.enabled = cJSON_IsTrue(cJSON_GetObjectItem(ftp_obj, "en")) ||
+                           cJSON_IsTrue(cJSON_GetObjectItem(ftp_obj, "enabled"));
+        cJSON *ftp_server = cJSON_GetObjectItem(ftp_obj, "server");
+        if (ftp_server && ftp_server->valuestring) strncpy(cfg->ftp.server, ftp_server->valuestring, sizeof(cfg->ftp.server)-1);
+        cJSON *ftp_user = cJSON_GetObjectItem(ftp_obj, "user");
+        if (ftp_user && ftp_user->valuestring) strncpy(cfg->ftp.user, ftp_user->valuestring, sizeof(cfg->ftp.user)-1);
+        cJSON *ftp_password = cJSON_GetObjectItem(ftp_obj, "password");
+        if (ftp_password && ftp_password->valuestring) strncpy(cfg->ftp.password, ftp_password->valuestring, sizeof(cfg->ftp.password)-1);
+        cJSON *ftp_path = cJSON_GetObjectItem(ftp_obj, "path");
+        if (ftp_path && ftp_path->valuestring) strncpy(cfg->ftp.path, ftp_path->valuestring, sizeof(cfg->ftp.path)-1);
     }
     
     cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");

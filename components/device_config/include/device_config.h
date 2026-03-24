@@ -180,6 +180,17 @@ typedef struct {
 } device_server_config_t;
 
 /**
+ * @brief Struttura di configurazione agente FTP
+ */
+typedef struct {
+    bool enabled;           ///< Abilita il download FTP automatico da API get*
+    char server[128];       ///< Host FTP (con eventuale :porta)
+    char user[64];          ///< Username FTP
+    char password[64];      ///< Password FTP
+    char path[128];         ///< Path base remoto FTP
+} device_ftp_config_t;
+
+/**
  * @brief Struttura di configurazione NTP
  */
 typedef struct {
@@ -242,6 +253,7 @@ typedef struct {
     bool ntp_enabled;           ///< NTP abilitato
     device_ntp_config_t ntp;
     device_server_config_t server;          ///< Configurazione Server/Cloud (base URL + abilitazione)
+    device_ftp_config_t ftp;                ///< Configurazione agente FTP
     device_remote_log_config_t remote_log;  ///< Configurazione logging remoto
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;

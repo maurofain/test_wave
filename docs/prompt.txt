@@ -20,7 +20,7 @@ ora quando inserisco una moneta vieve valorizzato il credito (2 euro) ma appare 
 [ ]-definire la maschera di attivazione dei relays nelle righe dei programmi in /config/programs mediante più gruppi di editbox da 4 caratteri  ciascuno (accettano 0 o 1 - 4 caratteri obbligatori fillati con trailing-zeroes) in base al numero di porte di out disponibili. a sx degli editbox ci sarà l'indicazione del numero relauys (1-4, 5-12, ecc.)  1 relays 1-4 sono quelli sulla MH1001,  i successi gruppi di 8 sulle schede waveshare RS485 in modbus. Formattare gli editbox su più righe nella stessa DIV (1 riga per device)
 [ ] Utilizzare i testi delle chiavi program_name_* peer la compilazione dei nomi dei programmi, ed aggiungere in /programs la scelta della lingua 
 [ ] Spostare la voce Abilita log POST da /test alla sezione Remote Logging di /config
-[ ] invece di utilizzare  bsp_display_brightness_set crea una funzione in device_config per effettuare la chiamata i2c sul bus i2c in uso al display
+
 
 [ ] Gestione di digital_io:
 1. Input : la lettura di un cabio stato 0->1 su un input digitale deve portare an un controllo se l'input sia associato ad un tasto programma del touch e se si deve generare la stessa azione. Se non è associato deve chiamare una funzione de elaborazione degli altri input (per ora senza implementare nulla)
@@ -28,12 +28,9 @@ ora quando inserisco una moneta vieve valorizzato il credito (2 euro) ma appare 
 3. gli eventi digital_io vanno reinseriti nella mailbox e trattati come descritoo in questa nota
 [ ] il pulsante programma selezionato deve apparire con un bordo bianco 5px, se viene messo in pausa lo sfondo deve diventare blu
 
-
+[ ] Gestione log:  nella pagina /logs verificare i filtri per ESP_LOG e HTTP_SERVICES. Attivare anche il filtraggio dei log su seriale per poter scegliere il livello o bloccare i log : persistiamo i livelli di log in config.json
+[ ] Eliminiamo l'uso della eeprom per il salvataggio di config.jsn ; leggiamo e salviamo in NVS e SPIFFS
 
 
 -----------------
 
-
-
-
-221 882

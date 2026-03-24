@@ -989,6 +989,13 @@ static void _set_defaults(device_config_t *config)
     strncpy(config->server.serial, "AD-34-DFG-333", sizeof(config->server.serial) - 1);
     strncpy(config->server.password, "c1ef6429c5e0f753ff24a114de6ee7d4", sizeof(config->server.password) - 1);
 
+    // Default FTP agent settings
+    config->ftp.enabled = false;
+    config->ftp.server[0] = '\0';
+    config->ftp.user[0] = '\0';
+    config->ftp.password[0] = '\0';
+    config->ftp.path[0] = '\0';
+
     // Default Remote Logging (broadcast disabled by default)
     config->remote_log.server_port = 9514;  // Default port for broadcast
     config->remote_log.use_broadcast = false; // No broadcast by default
@@ -1543,6 +1550,21 @@ esp_err_t device_config_load(device_config_t *config)
                     if (password && password->valuestring) strncpy(config->server.password, password->valuestring, sizeof(config->server.password) - 1);
                 }
 
+                // Analisi config agente FTP
+                cJSON *ftp_obj = cJSON_GetObjectItem(root, "ftp");
+                if (ftp_obj) {
+                    cJSON *_ftp_en = cJSON_GetObjectItem(ftp_obj, "en"); if (!_ftp_en) _ftp_en = cJSON_GetObjectItem(ftp_obj, "enabled");
+                    config->ftp.enabled = cJSON_IsTrue(_ftp_en);
+                    cJSON *ftp_server = cJSON_GetObjectItem(ftp_obj, "server");
+                    if (ftp_server && ftp_server->valuestring) strncpy(config->ftp.server, ftp_server->valuestring, sizeof(config->ftp.server) - 1);
+                    cJSON *ftp_user = cJSON_GetObjectItem(ftp_obj, "user");
+                    if (ftp_user && ftp_user->valuestring) strncpy(config->ftp.user, ftp_user->valuestring, sizeof(config->ftp.user) - 1);
+                    cJSON *ftp_password = cJSON_GetObjectItem(ftp_obj, "password");
+                    if (ftp_password && ftp_password->valuestring) strncpy(config->ftp.password, ftp_password->valuestring, sizeof(config->ftp.password) - 1);
+                    cJSON *ftp_path = cJSON_GetObjectItem(ftp_obj, "path");
+                    if (ftp_path && ftp_path->valuestring) strncpy(config->ftp.path, ftp_path->valuestring, sizeof(config->ftp.path) - 1);
+                }
+
                 // Analisi config Remote Logging
                 cJSON *remote_log_obj = cJSON_GetObjectItem(root, "rlog");
                 if (!remote_log_obj) remote_log_obj = cJSON_GetObjectItem(root, "remote_log"); /* compat */
@@ -2067,6 +2089,15 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddStringToObject(server_obj, "ser", config->server.serial);
     cJSON_AddStringToObject(server_obj, "pwd", config->server.password);
     cJSON_AddItemToObject(root, "server", server_obj);
+
+    // FTP agent
+    cJSON *ftp_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(ftp_obj, "en", config->ftp.enabled);
+    cJSON_AddStringToObject(ftp_obj, "server", config->ftp.server);
+    cJSON_AddStringToObject(ftp_obj, "user", config->ftp.user);
+    cJSON_AddStringToObject(ftp_obj, "password", config->ftp.password);
+    cJSON_AddStringToObject(ftp_obj, "path", config->ftp.path);
+    cJSON_AddItemToObject(root, "ftp", ftp_obj);
 
     // Remote Logging
     cJSON *remote_log_obj = cJSON_CreateObject();

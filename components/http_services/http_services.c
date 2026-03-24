@@ -13,6 +13,12 @@ extern bool send_http_log;
 #include "cJSON.h"
 #include "device_config.h"
 #include "esp_http_client.h"
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <unistd.h>
+#include <lwip/sockets.h>
+#include <lwip/netdb.h>
 #define HTTP_SERVICES_LOG_TO_UI
 
 /* web_ui_add_log is used only when HTTP_SERVICES_LOG_TO_UI is enabled; declare here to
@@ -52,6 +58,501 @@ static esp_err_t http_services_login_if_needed(bool force_refresh);
 static bool http_services_cfg_remote_enabled(const device_config_t *cfg);
 static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header,
                              char **out_resp, int *out_status, size_t *out_len);
+
+static bool http_services_ftp_enabled(const device_config_t *cfg)
+{
+    return (cfg != NULL) &&
+           cfg->ftp.enabled &&
+           (cfg->ftp.server[0] != '\0') &&
+           (cfg->ftp.user[0] != '\0');
+}
+
+static esp_err_t http_services_mkdir_if_missing(const char *path)
+{
+    if (!path || path[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (mkdir(path, 0777) == 0 || errno == EEXIST) {
+        return ESP_OK;
+    }
+    ESP_LOGW(TAG, "[C] mkdir fallita per %s (errno=%d)", path, errno);
+    return ESP_FAIL;
+}
+
+static esp_err_t http_services_ensure_parent_dirs(const char *dir_path)
+{
+    if (!dir_path || dir_path[0] != '/') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char tmp[256] = {0};
+    strncpy(tmp, dir_path, sizeof(tmp) - 1);
+
+    char *cursor = tmp + 1;
+    while (*cursor) {
+        if (*cursor == '/') {
+            *cursor = '\0';
+            if (tmp[0] != '\0') {
+                esp_err_t mk_err = http_services_mkdir_if_missing(tmp);
+                if (mk_err != ESP_OK) {
+                    return mk_err;
+                }
+            }
+            *cursor = '/';
+        }
+        cursor++;
+    }
+
+    return http_services_mkdir_if_missing(tmp);
+}
+
+static int ftp_read_line(int sock, char *buf, size_t buf_len)
+{
+    if (!buf || buf_len < 2) {
+        return -1;
+    }
+
+    size_t used = 0;
+    while (used + 1 < buf_len) {
+        char ch = 0;
+        int r = recv(sock, &ch, 1, 0);
+        if (r <= 0) {
+            break;
+        }
+        buf[used++] = ch;
+        if (ch == '\n') {
+            break;
+        }
+    }
+
+    buf[used] = '\0';
+    return (int)used;
+}
+
+static esp_err_t ftp_read_response_code(int sock, int *out_code, char *out_line, size_t out_line_len)
+{
+    if (!out_code) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char line[256] = {0};
+    if (ftp_read_line(sock, line, sizeof(line)) <= 0) {
+        return ESP_FAIL;
+    }
+
+    if (out_line && out_line_len > 0) {
+        strncpy(out_line, line, out_line_len - 1);
+        out_line[out_line_len - 1] = '\0';
+    }
+
+    if (strlen(line) < 3 || line[0] < '0' || line[0] > '9') {
+        return ESP_FAIL;
+    }
+
+    *out_code = (line[0] - '0') * 100 + (line[1] - '0') * 10 + (line[2] - '0');
+    return ESP_OK;
+}
+
+static esp_err_t ftp_send_command(int sock, const char *fmt, ...)
+{
+    char cmd[320] = {0};
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(cmd, sizeof(cmd), fmt, args);
+    va_end(args);
+
+    size_t len = strlen(cmd);
+    int written = send(sock, cmd, len, 0);
+    if (written != (int)len) {
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+static esp_err_t ftp_open_tcp(const char *host, uint16_t port, int *out_sock)
+{
+    if (!host || !out_sock) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char port_str[8] = {0};
+    snprintf(port_str, sizeof(port_str), "%u", (unsigned)port);
+
+    struct addrinfo hints = {
+        .ai_family = AF_UNSPEC,
+        .ai_socktype = SOCK_STREAM,
+    };
+    struct addrinfo *res = NULL;
+    int gai_ret = getaddrinfo(host, port_str, &hints, &res);
+    if (gai_ret != 0 || !res) {
+        ESP_LOGW(TAG, "[C] FTP DNS fallito host=%s port=%s", host, port_str);
+        return ESP_FAIL;
+    }
+
+    int sock = -1;
+    for (struct addrinfo *it = res; it != NULL; it = it->ai_next) {
+        sock = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
+        if (sock < 0) {
+            continue;
+        }
+        if (connect(sock, it->ai_addr, it->ai_addrlen) == 0) {
+            break;
+        }
+        close(sock);
+        sock = -1;
+    }
+
+    freeaddrinfo(res);
+
+    if (sock < 0) {
+        return ESP_FAIL;
+    }
+
+    *out_sock = sock;
+    return ESP_OK;
+}
+
+static void ftp_split_host_port(const char *server, char *host_out, size_t host_len, uint16_t *port_out)
+{
+    if (!server || !host_out || host_len == 0 || !port_out) {
+        return;
+    }
+
+    *port_out = 21;
+    strncpy(host_out, server, host_len - 1);
+
+    char *colon = strrchr(host_out, ':');
+    if (colon && *(colon + 1) != '\0') {
+        int port_val = atoi(colon + 1);
+        if (port_val > 0 && port_val <= 65535) {
+            *port_out = (uint16_t)port_val;
+            *colon = '\0';
+        }
+    }
+}
+
+static esp_err_t ftp_parse_pasv(const char *line, char *ip_out, size_t ip_len, uint16_t *port_out)
+{
+    if (!line || !ip_out || ip_len < 16 || !port_out) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int h1 = 0, h2 = 0, h3 = 0, h4 = 0, p1 = 0, p2 = 0;
+    const char *p = strchr(line, '(');
+    if (!p) {
+        return ESP_FAIL;
+    }
+
+    if (sscanf(p, "(%d,%d,%d,%d,%d,%d)", &h1, &h2, &h3, &h4, &p1, &p2) != 6) {
+        return ESP_FAIL;
+    }
+
+    snprintf(ip_out, ip_len, "%d.%d.%d.%d", h1, h2, h3, h4);
+    *port_out = (uint16_t)((p1 << 8) | p2);
+    return ESP_OK;
+}
+
+static const char *http_services_filename_from_remote(const char *remote_name)
+{
+    if (!remote_name || remote_name[0] == '\0') {
+        return "";
+    }
+    const char *slash = strrchr(remote_name, '/');
+    return slash ? (slash + 1) : remote_name;
+}
+
+static esp_err_t ftp_download_one_file(int ctrl_sock,
+                                       const char *remote_dir,
+                                       const char *remote_name,
+                                       const char *local_dir)
+{
+    if (!remote_name || !local_dir) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char pasv_line[256] = {0};
+    if (ftp_send_command(ctrl_sock, "PASV\r\n") != ESP_OK) {
+        return ESP_FAIL;
+    }
+
+    int code = 0;
+    if (ftp_read_response_code(ctrl_sock, &code, pasv_line, sizeof(pasv_line)) != ESP_OK || code != 227) {
+        ESP_LOGW(TAG, "[C] FTP PASV fallita: %s", pasv_line);
+        return ESP_FAIL;
+    }
+
+    char data_ip[32] = {0};
+    uint16_t data_port = 0;
+    if (ftp_parse_pasv(pasv_line, data_ip, sizeof(data_ip), &data_port) != ESP_OK) {
+        ESP_LOGW(TAG, "[C] FTP PASV parse fallita: %s", pasv_line);
+        return ESP_FAIL;
+    }
+
+    int data_sock = -1;
+    if (ftp_open_tcp(data_ip, data_port, &data_sock) != ESP_OK) {
+        ESP_LOGW(TAG, "[C] FTP connessione data fallita %s:%u", data_ip, (unsigned)data_port);
+        return ESP_FAIL;
+    }
+
+    char remote_full[320] = {0};
+    if (remote_name[0] == '/') {
+        snprintf(remote_full, sizeof(remote_full), "%s", remote_name);
+    } else if (remote_dir && remote_dir[0] != '\0') {
+        if (remote_dir[strlen(remote_dir) - 1] == '/') {
+            snprintf(remote_full, sizeof(remote_full), "%s%s", remote_dir, remote_name);
+        } else {
+            snprintf(remote_full, sizeof(remote_full), "%s/%s", remote_dir, remote_name);
+        }
+    } else {
+        snprintf(remote_full, sizeof(remote_full), "%s", remote_name);
+    }
+
+    if (ftp_send_command(ctrl_sock, "RETR %s\r\n", remote_full) != ESP_OK) {
+        close(data_sock);
+        return ESP_FAIL;
+    }
+
+    char retr_line[256] = {0};
+    if (ftp_read_response_code(ctrl_sock, &code, retr_line, sizeof(retr_line)) != ESP_OK ||
+        (code != 150 && code != 125)) {
+        ESP_LOGW(TAG, "[C] FTP RETR rifiutato (%d): %s", code, retr_line);
+        close(data_sock);
+        return ESP_FAIL;
+    }
+
+    const char *filename = http_services_filename_from_remote(remote_name);
+    if (filename[0] == '\0') {
+        close(data_sock);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char local_path[320] = {0};
+    snprintf(local_path, sizeof(local_path), "%s/%s", local_dir, filename);
+
+    FILE *fp = fopen(local_path, "wb");
+    if (!fp) {
+        ESP_LOGW(TAG, "[C] Apertura file locale fallita: %s", local_path);
+        close(data_sock);
+        return ESP_FAIL;
+    }
+
+    char buf[1024];
+    while (1) {
+        int rr = recv(data_sock, buf, sizeof(buf), 0);
+        if (rr <= 0) {
+            break;
+        }
+        if (fwrite(buf, 1, (size_t)rr, fp) != (size_t)rr) {
+            fclose(fp);
+            close(data_sock);
+            return ESP_FAIL;
+        }
+    }
+
+    fclose(fp);
+    close(data_sock);
+
+    char done_line[256] = {0};
+    if (ftp_read_response_code(ctrl_sock, &code, done_line, sizeof(done_line)) != ESP_OK ||
+        (code != 226 && code != 250)) {
+        ESP_LOGW(TAG, "[C] FTP completamento RETR fallito (%d): %s", code, done_line);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "[C] FTP file scaricato: %s -> %s", remote_full, local_path);
+    return ESP_OK;
+}
+
+static esp_err_t ftp_download_filelist(const char *server,
+                                       const char *user,
+                                       const char *password,
+                                       const char *remote_dir,
+                                       const char *local_dir,
+                                       cJSON *files_array)
+{
+    if (!server || !user || !password || !local_dir || !files_array || !cJSON_IsArray(files_array)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char host[128] = {0};
+    uint16_t port = 21;
+    ftp_split_host_port(server, host, sizeof(host), &port);
+
+    int ctrl_sock = -1;
+    if (ftp_open_tcp(host, port, &ctrl_sock) != ESP_OK) {
+        ESP_LOGW(TAG, "[C] FTP connessione controllo fallita %s:%u", host, (unsigned)port);
+        return ESP_FAIL;
+    }
+
+    int code = 0;
+    char line[256] = {0};
+    esp_err_t err = ftp_read_response_code(ctrl_sock, &code, line, sizeof(line));
+    if (err != ESP_OK || code != 220) {
+        ESP_LOGW(TAG, "[C] FTP greeting non valido (%d): %s", code, line);
+        close(ctrl_sock);
+        return ESP_FAIL;
+    }
+
+    if (ftp_send_command(ctrl_sock, "USER %s\r\n", user) != ESP_OK) {
+        close(ctrl_sock);
+        return ESP_FAIL;
+    }
+    err = ftp_read_response_code(ctrl_sock, &code, line, sizeof(line));
+    if (err != ESP_OK || (code != 230 && code != 331)) {
+        ESP_LOGW(TAG, "[C] FTP USER fallito (%d): %s", code, line);
+        close(ctrl_sock);
+        return ESP_FAIL;
+    }
+
+    if (code == 331) {
+        if (ftp_send_command(ctrl_sock, "PASS %s\r\n", password) != ESP_OK) {
+            close(ctrl_sock);
+            return ESP_FAIL;
+        }
+        err = ftp_read_response_code(ctrl_sock, &code, line, sizeof(line));
+        if (err != ESP_OK || code != 230) {
+            ESP_LOGW(TAG, "[C] FTP PASS fallito (%d): %s", code, line);
+            close(ctrl_sock);
+            return ESP_FAIL;
+        }
+    }
+
+    if (ftp_send_command(ctrl_sock, "TYPE I\r\n") != ESP_OK) {
+        close(ctrl_sock);
+        return ESP_FAIL;
+    }
+    err = ftp_read_response_code(ctrl_sock, &code, line, sizeof(line));
+    if (err != ESP_OK || code != 200) {
+        ESP_LOGW(TAG, "[C] FTP TYPE I fallito (%d): %s", code, line);
+        close(ctrl_sock);
+        return ESP_FAIL;
+    }
+
+    cJSON *item = NULL;
+    esp_err_t global_err = ESP_OK;
+    cJSON_ArrayForEach(item, files_array) {
+        const char *remote_name = NULL;
+        if (cJSON_IsString(item) && item->valuestring) {
+            remote_name = item->valuestring;
+        } else if (cJSON_IsObject(item)) {
+            cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
+            if (cJSON_IsString(name) && name->valuestring) {
+                remote_name = name->valuestring;
+            }
+        }
+
+        if (!remote_name || remote_name[0] == '\0') {
+            continue;
+        }
+
+        if (ftp_download_one_file(ctrl_sock, remote_dir, remote_name, local_dir) != ESP_OK) {
+            global_err = ESP_FAIL;
+        }
+    }
+
+    ftp_send_command(ctrl_sock, "QUIT\r\n");
+    ftp_read_response_code(ctrl_sock, &code, line, sizeof(line));
+    close(ctrl_sock);
+    return global_err;
+}
+
+static void http_services_sync_ftp_for_endpoint(const char *remote_path, const char *local_dir)
+{
+    device_config_t *cfg = device_config_get();
+    if (!http_services_ftp_enabled(cfg)) {
+        return;
+    }
+
+    if (!remote_path || !local_dir) {
+        return;
+    }
+
+    if (http_services_login_if_needed(false) != ESP_OK) {
+        ESP_LOGW(TAG, "[C] FTP agent skip: login non disponibile per %s", remote_path);
+        return;
+    }
+
+    char *resp = NULL;
+    int status = 0;
+    size_t resp_len = 0;
+    if (remote_post(remote_path, "{}", NULL, &resp, &status, &resp_len) != ESP_OK || !resp) {
+        if (resp) {
+            free(resp);
+        }
+        ESP_LOGW(TAG, "[C] FTP agent skip: risposta remota non disponibile (%s)", remote_path);
+        return;
+    }
+
+    if (status < 200 || status >= 300) {
+        ESP_LOGW(TAG, "[C] FTP agent skip: HTTP %d su %s", status, remote_path);
+        free(resp);
+        return;
+    }
+
+    cJSON *root = cJSON_Parse(resp);
+    free(resp);
+    if (!root) {
+        ESP_LOGW(TAG, "[C] FTP agent skip: JSON non valido per %s", remote_path);
+        return;
+    }
+
+    cJSON *iserror = cJSON_GetObjectItemCaseSensitive(root, "iserror");
+    if (cJSON_IsBool(iserror) && cJSON_IsTrue(iserror)) {
+        ESP_LOGW(TAG, "[C] FTP agent skip: risposta iserror=true per %s", remote_path);
+        cJSON_Delete(root);
+        return;
+    }
+
+    cJSON *files = cJSON_GetObjectItemCaseSensitive(root, "files");
+    if (!files || !cJSON_IsArray(files)) {
+        cJSON_Delete(root);
+        return;
+    }
+
+    char ftp_server[sizeof(cfg->ftp.server)] = {0};
+    char ftp_user[sizeof(cfg->ftp.user)] = {0};
+    char ftp_password[sizeof(cfg->ftp.password)] = {0};
+    char ftp_path[sizeof(cfg->ftp.path)] = {0};
+
+    cJSON *server_item = cJSON_GetObjectItemCaseSensitive(root, "server");
+    cJSON *user_item = cJSON_GetObjectItemCaseSensitive(root, "user");
+    cJSON *password_item = cJSON_GetObjectItemCaseSensitive(root, "password");
+    cJSON *path_item = cJSON_GetObjectItemCaseSensitive(root, "path");
+
+    strncpy(ftp_server,
+            (cJSON_IsString(server_item) && server_item->valuestring) ? server_item->valuestring : cfg->ftp.server,
+            sizeof(ftp_server) - 1);
+    strncpy(ftp_user,
+            (cJSON_IsString(user_item) && user_item->valuestring) ? user_item->valuestring : cfg->ftp.user,
+            sizeof(ftp_user) - 1);
+    strncpy(ftp_password,
+            (cJSON_IsString(password_item) && password_item->valuestring) ? password_item->valuestring : cfg->ftp.password,
+            sizeof(ftp_password) - 1);
+    strncpy(ftp_path,
+            (cJSON_IsString(path_item) && path_item->valuestring) ? path_item->valuestring : cfg->ftp.path,
+            sizeof(ftp_path) - 1);
+
+    if (ftp_server[0] == '\0' || ftp_user[0] == '\0') {
+        ESP_LOGW(TAG, "[C] FTP agent skip: credenziali incomplete per %s", remote_path);
+        cJSON_Delete(root);
+        return;
+    }
+
+    if (http_services_ensure_parent_dirs(local_dir) != ESP_OK) {
+        ESP_LOGW(TAG, "[C] FTP agent: directory locale non disponibile: %s", local_dir);
+        cJSON_Delete(root);
+        return;
+    }
+
+    esp_err_t dl_err = ftp_download_filelist(ftp_server, ftp_user, ftp_password, ftp_path, local_dir, files);
+    if (dl_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] FTP agent: download con errori su %s", remote_path);
+    } else {
+        ESP_LOGI(TAG, "[C] FTP agent: download completato per %s", remote_path);
+    }
+
+    cJSON_Delete(root);
+}
 
 // Temporary implementation of validate_token
 
@@ -1199,7 +1700,11 @@ static esp_err_t api_keepalive_post(httpd_req_t *req)
 static esp_err_t api_getimages_post(httpd_req_t *req)
 {
     if (send_http_log) ESP_LOGI(TAG, "POST /api/getimages -> proxy to remote server");
-    return forward_post(req, "/api/getimages", NULL, false);
+    esp_err_t ret = forward_post(req, "/api/getimages", NULL, false);
+    if (ret == ESP_OK) {
+        http_services_sync_ftp_for_endpoint("/api/getimages", "/spiffs");
+    }
+    return ret;
 }
 
 /**
@@ -1211,7 +1716,11 @@ static esp_err_t api_getimages_post(httpd_req_t *req)
 static esp_err_t api_getconfig_post(httpd_req_t *req)
 {
     if (send_http_log) ESP_LOGI(TAG, "POST /api/getconfig -> proxy to remote server");
-    return forward_post(req, "/api/getconfig", NULL, false);
+    esp_err_t ret = forward_post(req, "/api/getconfig", NULL, false);
+    if (ret == ESP_OK) {
+        http_services_sync_ftp_for_endpoint("/api/getconfig", "/spiffs/config");
+    }
+    return ret;
 }
 
 /**
@@ -1223,7 +1732,11 @@ static esp_err_t api_getconfig_post(httpd_req_t *req)
 static esp_err_t api_gettranslations_post(httpd_req_t *req)
 {
     if (send_http_log) ESP_LOGI(TAG, "POST /api/gettranslations -> proxy to remote server");
-    return forward_post(req, "/api/gettranslations", NULL, false);
+    esp_err_t ret = forward_post(req, "/api/gettranslations", NULL, false);
+    if (ret == ESP_OK) {
+        http_services_sync_ftp_for_endpoint("/api/gettranslations", "/spiffs");
+    }
+    return ret;
 }
 
 /**
@@ -1235,7 +1748,11 @@ static esp_err_t api_gettranslations_post(httpd_req_t *req)
 static esp_err_t api_getfirmware_post(httpd_req_t *req)
 {
     if (send_http_log) ESP_LOGI(TAG, "POST /api/getfirmware -> proxy to remote server");
-    return forward_post(req, "/api/getfirmware", NULL, false);
+    esp_err_t ret = forward_post(req, "/api/getfirmware", NULL, false);
+    if (ret == ESP_OK) {
+        http_services_sync_ftp_for_endpoint("/api/getfirmware", "/spiffs/firmware");
+    }
+    return ret;
 }
 
 /**
