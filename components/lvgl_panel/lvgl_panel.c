@@ -377,6 +377,52 @@ void lvgl_panel_show_out_of_service(uint32_t reboots)
     bsp_display_unlock();
 }
 
+void lvgl_panel_show_out_of_service_message(const char *message_key, const char *fallback_message)
+{
+    if (!bsp_display_lock(pdMS_TO_TICKS(200))) {
+        ESP_LOGW(TAG, "[C] Display non attivo, init forzata per schermata errore");
+        if (init_run_display_only() != ESP_OK) {
+            ESP_LOGE(TAG, "[C] Init display forzata fallita, schermata non disponibile");
+            return;
+        }
+    } else {
+        bsp_display_unlock();
+    }
+
+    if (!bsp_display_lock(0)) {
+        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_out_of_service_message");
+        return;
+    }
+
+    lvgl_page_out_of_service_show_message(message_key, fallback_message);
+
+    bsp_display_unlock();
+}
+
+void lvgl_panel_show_out_of_service_reason(const char *reason_key,
+                                           const char *reason_fallback,
+                                           const char *agent_name)
+{
+    if (!bsp_display_lock(pdMS_TO_TICKS(200))) {
+        ESP_LOGW(TAG, "[C] Display non attivo, init forzata per schermata errore");
+        if (init_run_display_only() != ESP_OK) {
+            ESP_LOGE(TAG, "[C] Init display forzata fallita, schermata non disponibile");
+            return;
+        }
+    } else {
+        bsp_display_unlock();
+    }
+
+    if (!bsp_display_lock(0)) {
+        ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_out_of_service_reason");
+        return;
+    }
+
+    lvgl_page_out_of_service_show_reason(reason_key, reason_fallback, agent_name);
+
+    bsp_display_unlock();
+}
+
 void lvgl_panel_show_main_page(void)
 {
     if (!bsp_display_lock(0)) {

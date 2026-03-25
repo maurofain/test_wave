@@ -85,7 +85,12 @@ static esp_err_t keepalive_send_message(void)
     int32_t hum_hundredths = (int32_t)(hum_float * 100.0f);
     s_stats.total_sent++;
 
-    esp_err_t err = http_services_keepalive("OK",
+    const char *status_text = "OK";
+    if (has_fsm_snapshot && fsm_snapshot.state == FSM_STATE_OUT_OF_SERVICE) {
+        status_text = "OUT_OF_SERVICE";
+    }
+
+    esp_err_t err = http_services_keepalive(status_text,
                                             inputstates,
                                             outputstates,
                                             temp_hundredths,

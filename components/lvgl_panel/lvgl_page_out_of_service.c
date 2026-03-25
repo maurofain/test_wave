@@ -13,17 +13,10 @@ extern const lv_font_t GoogleSans35;
 extern const lv_font_t GoogleSans50;
 extern const lv_font_t GoogleSans140;
 
-
-/**
- * @brief Mostra la pagina di servizio non disponibile.
- *
- * Questa funzione visualizza la pagina di servizio non disponibile
- * quando il sistema ha superato il numero massimo di riavvii consentiti.
- *
- * @param reboots Numero di riavvii effettuati.
- * @return void
- */
-void lvgl_page_out_of_service_show(uint32_t reboots)
+static void lvgl_page_out_of_service_show_internal(uint32_t reboots,
+                                                   const char *message_key,
+                                                   const char *fallback_message,
+                                                   const char *agent_name)
 {
     lv_obj_t *scr = lv_scr_act();
 
@@ -41,7 +34,6 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
 
     lv_obj_set_style_bg_color(scr, lv_color_make(0x6b, 0x00, 0x00), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
-    // lvgl_page_chrome_add(scr);
 
     lv_obj_t *ico = lv_label_create(scr);
     lv_label_set_text(ico, "!");
@@ -61,13 +53,34 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
     lv_obj_align(lbl, LV_ALIGN_CENTER, 0, -40);
 
-    char sub[96] = {0};
-    char out_of_service_body[96] = {0};
-    (void)lvgl_i18n_get_text("out_of_service_body",
-                             "Reboot consecutivi: %lu\nContattare l'assistenza",
-                             out_of_service_body,
-                             sizeof(out_of_service_body));
-    snprintf(sub, sizeof(sub), out_of_service_body, (unsigned long)reboots);
+    char sub[224] = {0};
+    if (message_key && message_key[0] != '\0') {
+        const char *fallback = (fallback_message && fallback_message[0] != '\0')
+                                   ? fallback_message
+                                   : "Errore sistema";
+        char reason_text[96] = {0};
+        (void)lvgl_i18n_get_text(message_key, fallback, reason_text, sizeof(reason_text));
+
+        if (agent_name && agent_name[0] != '\0') {
+            char agent_fmt[64] = {0};
+            char agent_line[96] = {0};
+            (void)lvgl_i18n_get_text("out_of_service_agent_fmt",
+                                     "Agente: %s",
+                                     agent_fmt,
+                                     sizeof(agent_fmt));
+            snprintf(agent_line, sizeof(agent_line), agent_fmt, agent_name);
+            snprintf(sub, sizeof(sub), "%s\n%s", agent_line, reason_text);
+        } else {
+            snprintf(sub, sizeof(sub), "%s", reason_text);
+        }
+    } else {
+        char out_of_service_body[96] = {0};
+        (void)lvgl_i18n_get_text("out_of_service_body",
+                                 "Reboot consecutivi: %lu\nContattare l'assistenza",
+                                 out_of_service_body,
+                                 sizeof(out_of_service_body));
+        snprintf(sub, sizeof(sub), out_of_service_body, (unsigned long)reboots);
+    }
 
     lv_obj_t *sub_lbl = lv_label_create(scr);
     lv_label_set_text(sub_lbl, sub);
@@ -79,4 +92,31 @@ void lvgl_page_out_of_service_show(uint32_t reboots)
     lv_obj_align(sub_lbl, LV_ALIGN_CENTER, 0, 60);
 
     ESP_LOGI(TAG, "[C] Pagina fuori servizio visualizzata (reboots=%lu)", (unsigned long)reboots);
+}
+
+
+/**
+ * @brief Mostra la pagina di servizio non disponibile.
+ *
+ * Questa funzione visualizza la pagina di servizio non disponibile
+ * quando il sistema ha superato il numero massimo di riavvii consentiti.
+ *
+ * @param reboots Numero di riavvii effettuati.
+ * @return void
+ */
+void lvgl_page_out_of_service_show(uint32_t reboots)
+{
+    lvgl_page_out_of_service_show_internal(reboots, NULL, NULL, NULL);
+}
+
+void lvgl_page_out_of_service_show_message(const char *message_key, const char *fallback_message)
+{
+    lvgl_page_out_of_service_show_internal(0, message_key, fallback_message, NULL);
+}
+
+void lvgl_page_out_of_service_show_reason(const char *reason_key,
+                                          const char *reason_fallback,
+                                          const char *agent_name)
+{
+    lvgl_page_out_of_service_show_internal(0, reason_key, reason_fallback, agent_name);
 }

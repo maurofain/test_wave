@@ -51,3 +51,6 @@ bool tasks_program_outputs_verify_error_active(void);
 const char *tasks_err_to_name(esp_err_t err);
 void tasks_suspend_peripherals_for_lvgl_test(void);
 void tasks_resume_peripherals_after_lvgl_test(void);
+void tasks_request_out_of_service(agn_id_t agent_id,
+                                  const char *reason_key,
+                                  const char *reason_fallback);

@@ -60,6 +60,17 @@ void lvgl_panel_refresh_texts(void);
 void lvgl_panel_show_out_of_service(uint32_t reboots);
 
 /**
+ * @brief Mostra una schermata di blocco "Fuori servizio" con motivo custom.
+ *
+ * @param message_key Chiave i18n del messaggio causa da mostrare.
+ * @param fallback_message Testo fallback usato se la chiave non è disponibile.
+ */
+void lvgl_panel_show_out_of_service_message(const char *message_key, const char *fallback_message);
+void lvgl_panel_show_out_of_service_reason(const char *reason_key,
+										   const char *reason_fallback,
+										   const char *agent_name);
+
+/**
  * @brief Mostra la schermata principale.
  */
 void lvgl_panel_show_main_page(void);

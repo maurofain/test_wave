@@ -393,6 +393,8 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->allow_additional_payments = false;
     ctx->stop_after_cycle_requested = false;
     ctx->pre_fine_ciclo_active = false;
+    ctx->out_of_service_agent = (int32_t)AGN_ID_NONE;
+    memset(ctx->out_of_service_reason, 0, sizeof(ctx->out_of_service_reason));
 }
 
 
@@ -538,6 +540,10 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
             }
             break;
 
+        case FSM_STATE_OUT_OF_SERVICE:
+            /* Stato stabile: le transizioni sono gestite da ACTION_ID_SYSTEM_* */
+            break;
+
         case FSM_STATE_LVGL_PAGES_TEST:
             /* In modalità test ignoriamo gli eventi normali; le transizioni
              * sono gestite da ENTER/EXIT sopra. */
@@ -571,6 +577,33 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
      * fallback, permettendo la migrazione graduale senza rompere i caller
      * esistenti. */
     fsm_input_event_type_t etype = event->type;
+
+    if (event->action == ACTION_ID_SYSTEM_ERROR) {
+        fsm_state_t prev = ctx->state;
+        ctx->state = FSM_STATE_OUT_OF_SERVICE;
+        ctx->program_running = false;
+        ctx->out_of_service_agent = event->value_i32;
+        snprintf(ctx->out_of_service_reason,
+                 sizeof(ctx->out_of_service_reason),
+                 "%s",
+                 event->text[0] ? event->text : "out_of_service_reason_generic");
+        fsm_append_message("FSM -> OUT_OF_SERVICE");
+        return prev != ctx->state;
+    }
+
+    if (event->action == ACTION_ID_SYSTEM_RUN) {
+        if (ctx->state == FSM_STATE_OUT_OF_SERVICE) {
+            ctx->state = FSM_STATE_IDLE;
+            ctx->out_of_service_agent = (int32_t)AGN_ID_NONE;
+            memset(ctx->out_of_service_reason, 0, sizeof(ctx->out_of_service_reason));
+            return true;
+        }
+        return false;
+    }
+
+    if (ctx->state == FSM_STATE_OUT_OF_SERVICE) {
+        return false;
+    }
     if (etype == FSM_INPUT_EVENT_NONE && event->action != ACTION_ID_NONE) {
         switch (event->action) {
             case ACTION_ID_USER_ACTIVITY:          etype = FSM_INPUT_EVENT_USER_ACTIVITY;        break;
@@ -834,6 +867,10 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
         return false;
     }
 
+    if (ctx->state == FSM_STATE_OUT_OF_SERVICE) {
+        return false;
+    }
+
     ctx->inactivity_ms += elapsed_ms;
     /* #11 fix: cap inactivity_ms per evitare overflow uint32_t dopo ~49gg
      * in stato IDLE; il tetto è leggermente sopra il timeout splash così
@@ -930,6 +967,10 @@ const char *fsm_state_to_string(fsm_state_t state)
             return "running";
         case FSM_STATE_PAUSED:
             return "paused";
+        case FSM_STATE_OUT_OF_SERVICE:
+            return "out_of_service";
+        case FSM_STATE_LVGL_PAGES_TEST:
+            return "lvgl_pages_test";
         default:
             return "unknown";
     }

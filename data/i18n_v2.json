@@ -7458,6 +7458,83 @@
         "es": "Reinicios consecutivos: %lu\nContactar soporte"
       }
     },
+    "out_of_service_reason_modbus": {
+      "legacyId": "2.468a",
+      "label": "lvgl.status.out_of_service_reason_modbus",
+      "text": {
+        "it": "Errore ModBus\nContattare l'assistenza",
+        "en": "Modbus error\nContact support",
+        "fr": "Erreur Modbus\nContactez le support",
+        "de": "Modbus-Fehler\nSupport kontaktieren",
+        "es": "Error Modbus\nContactar soporte"
+      }
+    },
+    "out_of_service_reason_credit_systems": {
+      "legacyId": "2.468b",
+      "label": "lvgl.status.out_of_service_reason_credit_systems",
+      "text": {
+        "it": "Nessun sistema di acquisizione credito attivo\nContattare l'assistenza",
+        "en": "No active credit acquisition systems\nContact support",
+        "fr": "Aucun système d'acquisition de crédit actif\nContactez le support",
+        "de": "Kein aktives Guthaben-Erfassungssystem\nSupport kontaktieren",
+        "es": "Ningún sistema de adquisición de crédito activo\nContactar soporte"
+      }
+    },
+    "out_of_service_reason_network_down": {
+      "legacyId": "2.468c",
+      "label": "lvgl.status.out_of_service_reason_network_down",
+      "text": {
+        "it": "Rete non disponibile\nControllare la connessione",
+        "en": "Network unavailable\nCheck the connection",
+        "fr": "Réseau indisponible\nVérifiez la connexion",
+        "de": "Netzwerk nicht verfügbar\nVerbindung prüfen",
+        "es": "Red no disponible\nVerificar conexión"
+      }
+    },
+    "out_of_service_reason_remote_unreachable": {
+      "legacyId": "2.468d",
+      "label": "lvgl.status.out_of_service_reason_remote_unreachable",
+      "text": {
+        "it": "Server remoto non raggiungibile\nContattare l'assistenza",
+        "en": "Remote server unreachable\nContact support",
+        "fr": "Serveur distant non joignable\nContactez le support",
+        "de": "Remote-Server nicht erreichbar\nSupport kontaktieren",
+        "es": "Servidor remoto no disponible\nContactar soporte"
+      }
+    },
+    "out_of_service_reason_remote_token": {
+      "legacyId": "2.468e",
+      "label": "lvgl.status.out_of_service_reason_remote_token",
+      "text": {
+        "it": "Errore richiesta token remoto\nContattare l'assistenza",
+        "en": "Remote token request error\nContact support",
+        "fr": "Erreur de requête de jeton distant\nContactez le support",
+        "de": "Fehler bei Remote-Token-Anfrage\nSupport kontaktieren",
+        "es": "Error de solicitud de token remoto\nContactar soporte"
+      }
+    },
+    "out_of_service_agent_fmt": {
+      "legacyId": "2.468f",
+      "label": "lvgl.status.out_of_service_agent_fmt",
+      "text": {
+        "it": "Agente: %s",
+        "en": "Agent: %s",
+        "fr": "Agent: %s",
+        "de": "Agent: %s",
+        "es": "Agente: %s"
+      }
+    },
+    "out_of_service_reason_generic": {
+      "legacyId": "2.468g",
+      "label": "lvgl.status.out_of_service_reason_generic",
+      "text": {
+        "it": "Errore sistema",
+        "en": "System error",
+        "fr": "Erreur système",
+        "de": "Systemfehler",
+        "es": "Error del sistema"
+      }
+    },
     "credit_label": {
       "legacyId": "2.469",
       "label": "lvgl.panel.credit_label",

@@ -8,6 +8,7 @@
 #include "lvgl_panel.h"
 #include "lvgl_panel_pages.h"
 #include "cctalk.h"
+#include "modbus_relay.h"
 #include "app_version.h"
 #include "device_config.h"
 #include "error_log.h"
@@ -245,6 +246,71 @@ static void main_cctalk_start_acceptor_task(void *pv)
     vTaskDelete(NULL);
 }
 
+/**
+ * @brief Esegue un probe Modbus al boot: init + lettura porte configurate.
+ *
+ * @param cfg Configurazione device corrente.
+ * @return ESP_OK se il probe è valido oppure se Modbus è disabilitato.
+ */
+static esp_err_t main_boot_probe_modbus(const device_config_t *cfg)
+{
+    if (!cfg) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    bool modbus_enabled = (cfg->sensors.rs485_enabled && cfg->modbus.enabled);
+    if (!modbus_enabled) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Probe Modbus skip (disabilitato da config)");
+        return ESP_OK;
+    }
+
+    esp_err_t init_err = modbus_relay_init();
+    if (init_err != ESP_OK) {
+        ESP_LOGE(TAG, LOG_CTX_PREFIX " [M] Probe Modbus init fallita: %s", esp_err_to_name(init_err));
+        return init_err;
+    }
+
+    uint8_t bit_buf[MODBUS_RELAY_MAX_BYTES] = {0};
+
+    uint16_t relay_count = cfg->modbus.relay_count;
+    if (relay_count > MODBUS_RELAY_MAX_POINTS) {
+        relay_count = MODBUS_RELAY_MAX_POINTS;
+    }
+    if (relay_count > 0) {
+        esp_err_t relay_err = modbus_relay_read_coils(cfg->modbus.slave_id,
+                                                      cfg->modbus.relay_start,
+                                                      relay_count,
+                                                      bit_buf,
+                                                      sizeof(bit_buf));
+        if (relay_err != ESP_OK) {
+            ESP_LOGE(TAG, LOG_CTX_PREFIX " [M] Probe Modbus lettura relè fallita: %s", esp_err_to_name(relay_err));
+            return relay_err;
+        }
+    }
+
+    uint16_t input_count = cfg->modbus.input_count;
+    if (input_count > MODBUS_RELAY_MAX_POINTS) {
+        input_count = MODBUS_RELAY_MAX_POINTS;
+    }
+    if (input_count > 0) {
+        esp_err_t input_err = modbus_relay_read_discrete_inputs(cfg->modbus.slave_id,
+                                                                 cfg->modbus.input_start,
+                                                                 input_count,
+                                                                 bit_buf,
+                                                                 sizeof(bit_buf));
+        if (input_err != ESP_OK) {
+            ESP_LOGE(TAG, LOG_CTX_PREFIX " [M] Probe Modbus lettura ingressi fallita: %s", esp_err_to_name(input_err));
+            return input_err;
+        }
+    }
+
+    ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Probe Modbus completato (slave=%u, relays=%u, inputs=%u)",
+             (unsigned)cfg->modbus.slave_id,
+             (unsigned)relay_count,
+             (unsigned)input_count);
+    return ESP_OK;
+}
+
 /* Asynchronous wrapper to start cctalk acceptor after boot UI is ready */
 void main_cctalk_start_acceptor_async(void)
 {
@@ -373,17 +439,57 @@ void app_main(void)
 
     device_config_t *cfg = device_config_get();
 
-    if (cfg && cfg->sensors.cctalk_enabled) {
-        esp_err_t cctalk_ret = cctalk_driver_init();
-        if (cctalk_ret != ESP_OK) {
-            ESP_LOGW(TAG,
-                     LOG_CTX_PREFIX " init CCTALK prima uscita logo fallita: %s",
-                     esp_err_to_name(cctalk_ret));
-        } else {
-            ESP_LOGI(TAG, LOG_CTX_PREFIX " init CCTALK completata prima uscita logo");
+    bool enter_out_of_service = false;
+    agn_id_t out_of_service_agent = AGN_ID_NONE;
+    const char *out_of_service_key = NULL;
+    const char *out_of_service_fallback = NULL;
+    esp_err_t cctalk_ret = ESP_OK;
+
+    if (cfg) {
+        esp_err_t modbus_probe_err = main_boot_probe_modbus(cfg);
+        if (modbus_probe_err != ESP_OK) {
+            enter_out_of_service = true;
+            out_of_service_agent = AGN_ID_RS485;
+            out_of_service_key = "out_of_service_reason_modbus";
+            out_of_service_fallback = "Errore ModBus";
         }
-    } else {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " init CCTALK pre-logo skip (disabilitato da config)");
+    }
+
+    if (!enter_out_of_service) {
+        if (cfg && cfg->sensors.cctalk_enabled) {
+            cctalk_ret = cctalk_driver_init();
+            if (cctalk_ret != ESP_OK) {
+                ESP_LOGW(TAG,
+                         LOG_CTX_PREFIX " init CCTALK prima uscita logo fallita: %s",
+                         esp_err_to_name(cctalk_ret));
+            } else {
+                ESP_LOGI(TAG, LOG_CTX_PREFIX " init CCTALK completata prima uscita logo");
+            }
+        } else {
+            ESP_LOGI(TAG, LOG_CTX_PREFIX " init CCTALK pre-logo skip (disabilitato da config)");
+        }
+
+        if (cfg) {
+            bool cctalk_ko = (!cfg->sensors.cctalk_enabled) || (cctalk_ret != ESP_OK);
+            bool scanner_ko = !cfg->scanner.enabled;
+            if (cctalk_ko && scanner_ko) {
+                enter_out_of_service = true;
+                out_of_service_agent = AGN_ID_CCTALK;
+                out_of_service_key = "out_of_service_reason_credit_systems";
+                out_of_service_fallback = "Nessun sistema di acquisizione credito attivo";
+                ESP_LOGE(TAG, LOG_CTX_PREFIX " [M] Nessun sistema credito attivo (CCTalk e Scanner KO)");
+            }
+        }
+    }
+
+    if (enter_out_of_service) {
+        ESP_LOGE(TAG,
+                 LOG_CTX_PREFIX " [M] Avvio in stato FUORI SERVIZIO richiesto (agent=%d, reason=%s)",
+                 (int)out_of_service_agent,
+                 out_of_service_key ? out_of_service_key : "n/a");
+        tasks_request_out_of_service(out_of_service_agent,
+                                     out_of_service_key,
+                                     out_of_service_fallback);
     }
 
     if (cfg && cfg->sensors.cctalk_enabled) {
