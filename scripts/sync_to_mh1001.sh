@@ -28,8 +28,13 @@ trap cleanup EXIT
 cat > "${EXCLUDE_FILE}" <<'EOF'
 .git/
 mh1001/
-docs/
+report/
+versions/
+.github/
+.windsurf/
+crash/
 scripts/
+doxygen/markdown/doxygen/
 index.html
 log/
 logs/
@@ -51,8 +56,19 @@ fi
 RSYNC_OUTPUT=$(
   rsync "${RSYNC_FLAGS[@]}" \
     --include='docs/' \
-    --include='docs/doxygen/' \
-    --include='docs/doxygen/***' \
+    --include='docs/**/' \
+    --include='docs/README.md' \
+    --include='docs/a_*.md' \
+    --exclude='docs/Internal/***' \
+    --exclude='docs/Backup/***' \
+    --include='docs/**/a_*' \
+    --exclude='docs/***' \
+    --include='data/' \
+    --include='data/***' \
+    --include='main/' \
+    --include='main/***' \
+    --include='partition_table/' \
+    --include='partition_table/***' \
     --exclude-from="${EXCLUDE_FILE}" \
     "${SRC_DIR}/" "${DEST_DIR}/" 2>&1
 )

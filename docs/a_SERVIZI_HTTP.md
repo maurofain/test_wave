@@ -2,6 +2,17 @@
 
 Richiesta token per chiamate successive 
 
+## Aggiornamento implementazione (2026-03-26)
+
+- Gli endpoint `POST /api/*` di integrazione cloud sono registrati nel componente `http_services` (`components/http_services/http_services.c`).
+- Gli endpoint file manager remoti (`/api/remote/files/*`) sono registrati nel componente `web_ui` (`components/web_ui/web_ui.c`), non in `http_services`.
+- Flusso applicativo attivo:
+  - lettura scanner -> `http_services_getcustomers(...)`
+  - avvio programma (`FSM` `CREDIT->RUNNING`) -> `http_services_payment(...)`
+  - nessuna `payment` su cambio programma (`PROGRAM_SWITCH`).
+- Login remoto usa credenziali runtime `device_config.server.serial/password`; il componente non ricalcola qui la password MD5.
+- Se `DNA_SERVER_POST=1`, i POST remoti sono disabilitati (debug cloud).
+
 ## Endpoint remoti file manager (local device)
 
 Questi endpoint eseguono sul device le stesse azioni della pagina `/files` e sono utili per client remoti (script, integrazioni, tool esterni).

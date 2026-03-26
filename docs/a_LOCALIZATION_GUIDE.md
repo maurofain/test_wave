@@ -32,8 +32,10 @@ Guida aggiornata al funzionamento reale del progetto `test_wave`, con distinzion
 
 ### 2.3 Programmi (pagina emulator/programs)
 
-- I nomi `__i18n__...` vengono risolti in `web_ui_program_table_to_json()` tramite:
-  `device_config_get_ui_text_scoped("p_emulator", key, fallback, ...)`.
+- I nomi programma non sono più risolti da chiavi `__i18n__`.
+- La sorgente è `programs.json` (persistenza runtime: `/spiffs/programs.json`, seed progetto: `data/programs.json`).
+- Ogni programma contiene i campi per lingua (`name_it`, `name_en`, `name_fr`, `name_de`, `name_es`).
+- In runtime il nome mostrato viene selezionato in base alla lingua attiva pannello/utente con fallback su `name_it`.
 
 ## 3) Funzioni usate in fase di composizione interfacce
 
@@ -102,6 +104,8 @@ Il percorso attivo usa esclusivamente:
 
 Ogni testo mostrato in Web UI o LVGL deve essere censito in `data/i18n_v2.json` (sezione `web` o `lvgl`) con scope corretto (`nav`, `header`, `lvgl`, `p_config`, `p_runtime`, `p_emulator`, ecc.) e recuperato tramite API i18n, evitando stringhe hardcoded nei renderer.
 
+Eccezione attuale: i **nomi dei programmi** sono gestiti nel dataset `programs.json` con campi multilingua dedicati, non nel catalogo `i18n_v2`.
+
 ## 7) Esempio reale: localizzazione stringa nella Home Web
 
 Se la pagina `/` viene servita da `root_get_handler(...)` (file `web_ui_pages_runtime.c`), il percorso di localizzazione di una stringa è questo:
@@ -122,3 +126,18 @@ Se la pagina `/` viene servita da `root_get_handler(...)` (file `web_ui_pages_ru
 5. Dopo il primo rendering, un `MutationObserver` intercetta nuovi nodi aggiunti dinamicamente e rilancia la traduzione.
 
 In pratica, una stringa presente nell'HTML della Home viene sostituita con la versione localizzata quando trova una corrispondenza nella tabella runtime della lingua backend.
+
+## 8) Workflow operativo obbligatorio (i18n)
+
+Per mantenere il comportamento coerente tra Web UI e LVGL:
+
+1. aggiungere/modificare sempre i testi in `data/i18n_v2.json` (mai stringhe hardcoded nei renderer);
+2. valorizzare correttamente `scope`, `key` e `legacyId`;
+3. tradurre tutte le lingue supportate prima del rilascio;
+4. per modifiche sole Web UI/i18n eseguire deploy rapido con `idfc -fs` (flash SPIFFS), senza rebuild firmware completo.
+
+## 9) Policy documentazione approvata
+
+Per la documentazione che deve essere inclusa nei flussi approvati (sync/documentazione generata), usare file con prefisso `a_` nella cartella `docs/`.
+
+Questa regola non cambia il runtime i18n, ma impatta la tracciabilità delle guide operative incluse nei processi di pubblicazione documentale.

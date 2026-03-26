@@ -31,6 +31,11 @@ ora quando inserisco una moneta vieve valorizzato il credito (2 euro) ma appare 
 [ ] Gestione log:  nella pagina /logs verificare i filtri per ESP_LOG e HTTP_SERVICES. Attivare anche il filtraggio dei log su seriale per poter scegliere il livello o bloccare i log : persistiamo i livelli di log in config.json
 [ ] Eliminiamo l'uso della eeprom per il salvataggio di config.jsn ; leggiamo e salviamo in NVS e SPIFFS
 
+ ] Il passaggio in out_of_service deve fornire indicazione di quale agent lo ha causato e questo va riportato sull schermo in  out_of_service.
+Crea uno stato di FSM per la condiz<ione di out_of_servioce in cui mostra la pagina di errore e rimane stabile fino a che l'errore non è ripristinato o viene resettata. in questo stato riprova ogni 30 secondi se il servizio che ha generato out_of_service si è ristabilito (utile specialmente per i servizi in rete).
+Se il problema si risolve il device esegue un reboot 
+Il device deve andare in out_of_service anche se la connessione di rete è down o se il server remoto non è raggiungibile o da errore sulla richiesta token.
 
+[ ] Quando si è in out_of_service si fermano tutti gli agent : cctalk disabilita la ritenzione delle monete , lo scanner non accetta scansioni, il driver Modbus smette di fare chiamate, , restano attivi SHT40, PWM, LED. Se la rete è attiva restano attivi NTP, interfaccia WEB, le chiamate agli htttp_services  in ricezione e rimane attivo il keepalive che indichèrà l'errore
 -----------------
 

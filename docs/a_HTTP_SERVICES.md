@@ -36,6 +36,14 @@ Questo documento descrive le chiamate previste dal file `servizi2.docx`, lo stat
   - transizione FSM `CREDIT -> RUNNING` su `PROGRAM_SELECTED` -> chiamata `payment`
   - nessuna chiamata `payment` su `PROGRAM_SWITCH`.
 
+## Stato corrente (2026-03-26)
+
+- Handler registrati dal componente `http_services`: `POST /api/login`, `POST /api/keepalive`, `POST /api/getimages`, `POST /api/getconfig`, `POST /api/gettranslations`, `POST /api/getfirmware`, `POST /api/payment`, `POST /api/serviceused`, `POST /api/paymentoffline`, `POST /api/getcustomers`, `POST /api/getoperators`, `POST /api/activity`, `POST /api/deviceactivity`.
+- Le chiamate `getimages/getconfig/gettranslations/getfirmware` eseguono anche sync FTP locale su SPIFFS se la risposta remota è OK.
+- Le API C dirette `http_services_getcustomers(...)` e `http_services_payment(...)` forzano login remoto (`http_services_login_if_needed(true)`) e includono gestione retry su `401/403` per `getcustomers`.
+- Login remoto: usa credenziali runtime in `device_config.server` (`serial` + `password` già in formato previsto server), non calcola automaticamente MD5 in questa fase del componente.
+- In presenza del flag `DNA_SERVER_POST=1` i POST remoti sono inibiti (modalità debug/simulazione cloud).
+
 ## Strutture C di risposta
 Definite in `components/http_services/include/http_services.h`.
 
@@ -315,4 +323,5 @@ Per eventi critici (es. crash pre-boot) è previsto l'invio tramite `deviceactiv
 ## File coinvolti
 - `components/http_services/include/http_services.h`
 - `components/http_services/http_services.c`
+- `main/tasks.c` (trigger runtime `getcustomers`/`payment`)
 - `docs/http_services.md`

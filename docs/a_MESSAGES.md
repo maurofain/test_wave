@@ -8,6 +8,7 @@ Questo documento elenca i **messaggi attualmente generati** che transitano nella
 - Sono esclusi file non compilati e helper senza call-site attivo.
 - Le richieste `DIGITAL_IO_SET_OUTPUT`, `DIGITAL_IO_GET_OUTPUT` e `DIGITAL_IO_GET_SNAPSHOT` transitano nella mailbox verso `AGN_ID_FSM`.
 - `ACTION_ID_DIGITAL_IO_GET_INPUT` e' **supportato** dal dispatcher mailbox, ma oggi non ha publisher attivi.
+- `ACTION_ID_SYSTEM_ERROR` e `ACTION_ID_SYSTEM_RUN` sono usati nel flusso OOS, ma vengono iniettati internamente da `tasks_fsm_task()` con chiamata diretta a `fsm_handle_input_event(...)` (non passano dalla mailbox `fsm_event_publish/fsm_event_receive`).
 - Gli ingressi locali `OPTO1..OPTO4` sono gli **unici** touch-mappable.
 - Gli altri ingressi locali (`DIP1`, `DIP2`, `DIP3`, `SERVICE_SWITCH`) vengono inoltrati al consumer `AGN_ID_IO_PROCESS`.
 - Le uscite locali `RELAY1..RELAY4` sono quelle usate dai programmi; `WHITE_LED`, `BLUE_LED`, `RED_LED` e `HEATER1` vengono inoltrate a `io_process` quando passano dal dispatcher digital I/O.
@@ -112,7 +113,7 @@ Questo significa che `(102) ACTION_ID_PROGRAM_PREFINE_CYCLO`, pur essendo pubbli
 | `(12) AGN_ID_CCTALK` | `(0) FSM_INPUT_EVENT_NONE` + `(124) ACTION_ID_CCTALK_STOP` | Ferma l'accettatore CCtalk nel task driver dedicato. |
 | `(12) AGN_ID_CCTALK` | `(0) FSM_INPUT_EVENT_NONE` + `(125) ACTION_ID_CCTALK_MASK` | Applica mask/inhibit canali tramite driver CCtalk. |
 
-## Tipi definiti ma non ancora prodotti
+## Tipi definiti ma non ancora prodotti via mailbox
 
 | Tipo / action o famiglia | Dove definito | Stato attuale | Descrizione breve |
 |---|---|---|---|
@@ -123,7 +124,7 @@ Questo significa che `(102) ACTION_ID_PROGRAM_PREFINE_CYCLO`, pur essendo pubbli
 | `(5) FSM_INPUT_EVENT_COIN` | `main/fsm.h` | Tipo definito, nessun producer diretto attivo | Credito reale in forma legacy; oggi si usano soprattutto `(6) TOKEN`, `(4) QR_CREDIT` e `(3) CARD_CREDIT`. |
 | `(10) FSM_INPUT_EVENT_CREDIT_ENDED` + `(103) ACTION_ID_CREDIT_ENDED` | `main/fsm.h` | Definito ma senza publisher attivo | Evento previsto per azzeramento credito/fine credito. |
 | `(104) ACTION_ID_BUTTON_PRESSED` | `main/fsm.h` | Definito ma senza publisher attivo | Azione generica per pressione pulsante non ancora cablata. |
-| `(105) ACTION_ID_SYSTEM_IDLE`, `(106) ACTION_ID_SYSTEM_RUN`, `(107) ACTION_ID_SYSTEM_ERROR` | `main/fsm.h` | Definiti ma senza publisher attivo | Eventi di stato sistema previsti ma non ancora emessi. |
+| `(105) ACTION_ID_SYSTEM_IDLE`, `(106) ACTION_ID_SYSTEM_RUN`, `(107) ACTION_ID_SYSTEM_ERROR` | `main/fsm.h` | Nessun publisher mailbox attivo | `SYSTEM_ERROR`/`SYSTEM_RUN` sono oggi usati con iniezione diretta interna (OOS) e gestiti da `fsm_handle_input_event(...)`; non transitano nella mailbox. |
 | Famiglia `(112-116) ACTION_ID_GPIO_*` | `main/fsm.h` | Definita ma senza publisher attivo | Operazioni mailbox per GPIO legacy non oggi usate. |
 | Famiglia `(119-125) ACTION_ID_CCTALK_*` | `main/fsm.h` | Definita ma senza publisher attivo | Eventi CCtalk previsti oltre a `(123) START/(124) STOP/(125) MASK`. |
 | Famiglia `(127-134) ACTION_ID_RS232_*` | `main/fsm.h` | Definita ma senza publisher attivo | Eventi mailbox per RS232 non oggi emessi. |
@@ -156,7 +157,7 @@ Questo significa che `(102) ACTION_ID_PROGRAM_PREFINE_CYCLO`, pur essendo pubbli
 | Tipo / action o famiglia | Stato attuale | Descrizione breve |
 |---|---|---|
 | `(104) ACTION_ID_BUTTON_PRESSED` | Definito senza consumer mailbox attivo | Evento pulsante generico previsto ma non ancora gestito. |
-| `(105) ACTION_ID_SYSTEM_IDLE/RUN/ERROR` | Definiti senza consumer mailbox attivo | Eventi stato sistema previsti ma non ancora cablati. |
+| `(105) ACTION_ID_SYSTEM_IDLE/RUN/ERROR` | Nessun consumer mailbox dedicato | La FSM li gestisce internamente (`fsm_handle_input_event(...)`) quando ricevuti come eventi diretti; non esiste un consumer mailbox separato. |
 | Famiglia `(112-116) ACTION_ID_GPIO_*` | Definita senza consumer mailbox attivo | Letture/scritture GPIO legacy previste ma senza handler mailbox dedicato attivo. |
 | Famiglia `(119-125) ACTION_ID_CCTALK_*` | Definita senza consumer mailbox attivo | Il consumer `(12) CCtalk` oggi gestisce solo `(123) START/(124) STOP/(125) MASK`. |
 | Famiglia `(127-134) ACTION_ID_RS232_*` | Definita senza consumer mailbox attivo | Nessun receiver mailbox attivo dedicato a RS232. |

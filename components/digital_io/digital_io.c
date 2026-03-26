@@ -18,6 +18,11 @@
 static SemaphoreHandle_t s_lock = NULL;
 static bool s_initialized = false;
 
+__attribute__((weak)) bool digital_io_modbus_runtime_allowed(void)
+{
+    return true;
+}
+
 static bool is_valid_output_id(uint8_t output_id)
 {
     return (output_id >= DIGITAL_IO_MIN_ID && output_id <= DIGITAL_IO_OUTPUT_COUNT);
@@ -121,6 +126,10 @@ static esp_err_t ensure_local_io_ready(const device_config_t *cfg)
 static esp_err_t ensure_modbus_ready(const device_config_t *cfg)
 {
     if (!is_modbus_available(cfg)) {
+        return DIGITAL_IO_ERR_MODBUS_DISABLED;
+    }
+
+    if (!digital_io_modbus_runtime_allowed()) {
         return DIGITAL_IO_ERR_MODBUS_DISABLED;
     }
 
@@ -241,7 +250,7 @@ esp_err_t digital_io_init(void)
         }
     }
 
-    if (is_modbus_available(cfg)) {
+    if (is_modbus_available(cfg) && digital_io_modbus_runtime_allowed()) {
         esp_err_t modbus_err = modbus_relay_init();
         if (modbus_err != ESP_OK) {
             ESP_LOGW(TAG, "[C] Init Modbus I/O fallita: %s", esp_err_to_name(modbus_err));

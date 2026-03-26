@@ -41,27 +41,31 @@ File: `data/tasks.json` (flashato su SPIFFS in `/spiffs/tasks.json`)
 
 | name | state | priority | core | period_ms | stack_words | stack_caps |
 |------|-------|----------|------|-----------|-------------|------------|
-| ws2812 | run | 5 | 0 | 500 | 4096 | internal |
-| eeprom | idle | 4 | 0 | 1000 | 2048 | spiram |
+| ws2812 | run | 5 | 0 | 100 | 4096 | internal |
+| eeprom | run | 4 | 0 | 1000 | 2048 | spiram |
 | io_expander | run | 4 | 0 | 500 | 2048 | spiram |
-| sht40 | run | 4 | 0 | 2000 | 8192 | spiram |
+| sht40 | run | 4 | 0 | 200000 | 8192 | spiram |
 | rs232 | idle | 5 | 0 | 10 | 4096 | spiram |
-| rs485 | idle | 5 | 0 | 10 | 4096 | spiram |
+| rs485 | idle | 5 | 0 | 100 | 4096 | spiram |
 | mdb | idle | 5 | 0 | 10 | 4096 | spiram |
 | pwm | idle | 4 | 0 | 20 | 2048 | spiram |
 | fsm | run | 4 | 0 | 100 | 32768 | spiram |
+| digital_io | run | 4 | 0 | 50 | 4096 | spiram |
+| io_process | run | 4 | 0 | 100 | 4096 | spiram |
+| http_services | run | 4 | 0 | 100 | 32768 | spiram |
+| scanner_cooldown | run | 4 | 0 | 100 | 4096 | spiram |
 | log_sender | run | 5 | 0 | 1000 | 12288 | internal |
-| touchscreen | idle | 4 | 0 | 20 | 8192 | spiram |
-| lvgl | idle | 5 | 0 | 16 | 32768 | spiram |
+| touchscreen | run | 4 | 0 | 20 | 8192 | spiram |
+| lvgl | run | 10 | 0 | 16 | 65536 | spiram |
 | ntp | run | 3 | 0 | 600000 | 32768 | spiram |
-| usb_scanner | idle | 4 | 0 | 1000 | 32768 | spiram |
-| cctalk_task | idle | 5 | 0 | 100 | 4096 | spiram |
+| usb_scanner | run | 4 | 0 | 1000 | 32768 | spiram |
+| cctalk_task | run | 5 | 0 | 200 | 4096 | spiram |
 | mdb_engine | idle | 5 | 0 | 500 | 4096 | spiram |
 | sd_monitor | run | 5 | 0 | 500 | 4096 | spiram |
 | usb_lib | run | 10 | 0 | 0 | 4096 | internal |
 | usb_host_lib | run | 17 | 0 | 0 | 4096 | internal |
-| usb_monitor | run | 16 | 0 | 0 | 4096 | internal |
-| usb_cdc_open | run | 18 | 0 | 0 | 4096 | internal |
+| usb_monitor | run | 8 | 0 | 0 | 4096 | internal |
+| usb_cdc_open | run | 8 | 0 | 0 | 4096 | internal |
 | rs232_test | idle | 5 | 0 | 0 | 4096 | internal |
 | rs485_test | idle | 5 | 0 | 0 | 4096 | internal |
 | led_test | idle | 5 | 0 | 0 | 4096 | internal |
@@ -77,6 +81,7 @@ File: `data/tasks.json` (flashato su SPIFFS in `/spiffs/tasks.json`)
 ## Note
 
 - `period_ms = 0` indica task event-driven (bloccano su coda/semaforo, non hanno loop periodico)
-- I task `lvgl` e `touchscreen` con `state=idle` vengono avviati solo se `device_config.display.enabled = true` (sovrascrittura in `tasks_apply_n_run()`)
+- La tabella sopra riflette lo snapshot corrente di `data/tasks.json`.
+- In caso di modifica stack (`w`) o policy memoria (`k`) aggiornare **sempre** sia `data/tasks.json` sia questa documentazione.
 - Stack in spiram è più economico in RAM interna ma leggermente più lento; usare internal per task real-time o con stack molto piccolo
 - Il file viene aggiornato via HTTP POST `/tasks` ed è editabile dalla pagina web `/tasks`

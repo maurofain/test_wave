@@ -1,5 +1,11 @@
 # 📋 Messaggi Eventi - Digital I/O e Programmi
 
+## 🆕 Allineamento stato attuale (2026-03-26)
+
+- I nomi dei programmi usati negli eventi non arrivano più da placeholder i18n, ma da `programs.json` (runtime: `/spiffs/programs.json`, seed: `data/programs.json`).
+- Nel flusso OUT_OF_SERVICE, `ACTION_ID_SYSTEM_ERROR` e `ACTION_ID_SYSTEM_RUN` sono gestiti come eventi **diretti** verso `fsm_handle_input_event(...)` nel task FSM (non transitano da `fsm_event_publish/fsm_event_receive`).
+- In uscita da OOS, il task FSM prova la riabilitazione runtime di gettoniera CCTALK e scanner USB CDC.
+
 ## 🔄 Messaggi generati quando premi la partenza di un programma dal touch
 
 ### Flusso Eventi Touch → Programma
@@ -32,7 +38,7 @@ esp_err_t tasks_publish_program_button_action(uint8_t program_id, agn_id_t sende
         .to = {AGN_ID_FSM},           // ✅ TARGET: FSM task
         .action = ACTION_ID_PROGRAM_SELECTED,
         .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
-        .text = "NomeProgramma",      // ✅ Nome programma da config
+        .text = "NomeProgramma",      // ✅ Nome programma risolto dalla tabella programmi (programs.json)
         // ...altri dati...
     };
     
@@ -148,6 +154,15 @@ if (event_received &&
 
 ## 📡 Altri Eventi Digital I/O
 
+### Eventi OOS / ripristino runtime (gestione diretta FSM)
+
+| Evento | Source | Target | Messaggio | Note percorso |
+|--------|--------|--------|----------|---------------|
+| **Ingresso OUT_OF_SERVICE** | FSM task (`tasks_fsm_task`) | FSM core | `[M] ... OUT_OF_SERVICE ...` | `ACTION_ID_SYSTEM_ERROR` iniettato direttamente in `fsm_handle_input_event(...)` |
+| **Retry risolto OUT_OF_SERVICE** | FSM task (`tasks_fsm_task`) | FSM core | `[M] OUT_OF_SERVICE risolto ... ritorno in RUN` | `ACTION_ID_SYSTEM_RUN` iniettato direttamente in `fsm_handle_input_event(...)` |
+| **Riabilitazione gettoniera** | FSM task (`tasks_fsm_task`) | CCTALK task | `[M] Gettoniera CCTALK riabilitata ...` | Dopo uscita OOS viene pubblicato `ACTION_ID_CCTALK_START` |
+| **Riabilitazione scanner** | FSM task (`tasks_fsm_task`) | Scanner USB CDC | `[M] Scanner riabilitato ...` oppure warning | Dopo uscita OOS: `usb_cdc_scanner_send_setup_command()` + `usb_cdc_scanner_send_on_command()` |
+
 ### Eventi da Ingressi Digitali
 
 | Evento | Source | Target | Messaggio | Condizioni |
@@ -155,7 +170,7 @@ if (event_received &&
 | **Fronte Salita** | Digital I/O Task | FSM | `[M] IN%02u -> programma %u` | Ingresso mappato a programma |
 | **Snapshot Error** | Digital I/O Task | - | `[M] Snapshot digital_io attesa config (non critico)` | Config non pronto |
 | **Local IO Disabled** | Digital I/O Task | - | `[M] I/O locali disabilitati (non critico)` | I/O expander off |
-| **Modbus Disabled** | Digital I/O Task | - | `[M] Modbus disabilitato (non critico)` | Modbus non disponibile |
+| **Modbus Runtime Blocked** | Digital I/O Task | - | `[M] Modbus bloccato runtime (OOS/hard inhibit)` | Blocco operativo durante OOS/hard inhibit |
 
 ### Codici Errore Specifici Digital I/O
 

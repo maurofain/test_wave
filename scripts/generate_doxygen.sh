@@ -9,6 +9,7 @@ WORKDIR="$(cd "$(dirname "$0")/.." && pwd)"
 DOXYFILE="$WORKDIR/Doxyfile"
 OUTDIR="$WORKDIR/doxygen"
 MD_OUTDIR="$OUTDIR/markdown"
+REL_OUTDIR="${OUTDIR#${WORKDIR}/}"
 
 command -v doxygen >/dev/null 2>&1 || { echo "doxygen non trovato nel PATH. Installa doxygen e riprova." >&2; exit 1; }
 command -v dot >/dev/null 2>&1 || {
@@ -31,12 +32,31 @@ mkdir -p "$OUTDIR"
 echo "Eseguo: doxygen $DOXYFILE"
 doxygen "$DOXYFILE"
 
-# Copia tutti i file .md del progetto (docs/*.md, root README.md, ecc.) nella cartella di output
+# Copia solo i documenti approvati docs/**/a_*.md nella cartella markdown di output
 mkdir -p "$MD_OUTDIR"
-echo "Copio file .md in $MD_OUTDIR"
-# include docs/ markdown + top-level README + qualsiasi altro .md che può essere utile
-rsync -av --exclude="**/node_modules/**" --include='*/' --include='*.md' --exclude='*' \
-  "$WORKDIR/" "$MD_OUTDIR/" || true
+echo "Copio solo docs/**/a_*.md in $MD_OUTDIR"
+
+# Protezione anti-ricorsione: l'output e' sotto WORKDIR, quindi deve essere escluso esplicitamente.
+if [[ "$REL_OUTDIR" == "$OUTDIR" || -z "$REL_OUTDIR" ]]; then
+  echo "ERRORE: impossibile determinare REL_OUTDIR per escludere la directory di output" >&2
+  exit 1
+fi
+
+# include esclusivamente documenti approvati a_*.md dalla cartella docs
+rsync -av --prune-empty-dirs \
+  --exclude='doxygen/***' \
+  --exclude='docs/doxygen/***' \
+  --exclude='mh1001/***' \
+  --exclude='**/node_modules/**' \
+  --include='docs/' \
+  --include='docs/**/' \
+  --include='docs/a_*.md' \
+  --exclude='docs/Internal/***' \
+  --exclude='docs/Backup/***' \
+  --include='docs/**/a_*.md' \
+  --exclude='docs/***' \
+  --exclude='*' \
+  "$WORKDIR/" "$MD_OUTDIR/"
 
 # Mostra riepilogo dimensioni output e numero di file generati
 echo
@@ -50,9 +70,9 @@ else
 fi
 
 echo
-echo "Documentazione rigenerata. HTML in: $OUTDIR/html (se abilitato)
-File .md copiati in: $MD_OUTDIR"
+echo "Documentazione rigenerata. HTML in: $OUTDIR/html (se abilitato)"
+echo "File docs/a_*.md copiati in: $MD_OUTDIR"
 
-echo "Nota: se vuoi convertire l'output Doxygen in Markdown (file .md di output), usa strumenti come doxygen-to-markdown o pandoc su \">$OUTDIR/xml" (se abilitato GENERATE_XML)."
+echo "Nota: se vuoi convertire l'output Doxygen in Markdown (file .md di output), usa strumenti come doxygen-to-markdown o pandoc su \"$OUTDIR/xml\" (se abilitato GENERATE_XML)."
 
 exit 0

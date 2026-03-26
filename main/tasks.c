@@ -74,7 +74,8 @@ typedef struct {
 static tasks_oos_cause_t s_oos_requested = {0};
 static portMUX_TYPE s_oos_lock = portMUX_INITIALIZER_UNLOCKED;
 static volatile bool s_oos_runtime_active = false;
-static volatile bool s_oos_modbus_probe_window = false;
+static volatile bool s_modbus_hard_inhibit = false;
+static volatile bool s_oos_modbus_recovery_test_active = false;
 
 static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event);
 
@@ -88,9 +89,57 @@ static void tasks_set_out_of_service_runtime(bool active)
     s_oos_runtime_active = active;
 }
 
-static bool tasks_is_modbus_probe_allowed_in_oos(void)
+static bool tasks_is_modbus_hard_inhibited(void)
 {
-    return s_oos_modbus_probe_window;
+    bool inhibited = false;
+    portENTER_CRITICAL(&s_oos_lock);
+    inhibited = s_modbus_hard_inhibit;
+    portEXIT_CRITICAL(&s_oos_lock);
+    return inhibited;
+}
+
+static void tasks_set_modbus_hard_inhibit(bool inhibit)
+{
+    portENTER_CRITICAL(&s_oos_lock);
+    s_modbus_hard_inhibit = inhibit;
+    if (!inhibit) {
+        s_oos_modbus_recovery_test_active = false;
+    }
+    portEXIT_CRITICAL(&s_oos_lock);
+}
+
+static bool tasks_is_modbus_recovery_test_active(void)
+{
+    bool active = false;
+    portENTER_CRITICAL(&s_oos_lock);
+    active = s_oos_modbus_recovery_test_active;
+    portEXIT_CRITICAL(&s_oos_lock);
+    return active;
+}
+
+static void tasks_set_modbus_recovery_test_active(bool active)
+{
+    portENTER_CRITICAL(&s_oos_lock);
+    s_oos_modbus_recovery_test_active = active;
+    if (active) {
+        s_modbus_hard_inhibit = true;
+    }
+    portEXIT_CRITICAL(&s_oos_lock);
+}
+
+static bool tasks_is_modbus_runtime_blocked(void)
+{
+    return tasks_is_out_of_service_state() || tasks_is_modbus_hard_inhibited();
+}
+
+bool digital_io_modbus_runtime_allowed(void)
+{
+    return !tasks_is_modbus_runtime_blocked();
+}
+
+bool usb_cdc_scanner_runtime_allowed(void)
+{
+    return !tasks_is_out_of_service_state();
 }
 
 static const char *tasks_agent_name(agn_id_t agent)
@@ -140,12 +189,22 @@ static bool tasks_oos_take_requested(tasks_oos_cause_t *out)
     return has;
 }
 
+static void tasks_oos_clear_requested(void)
+{
+    portENTER_CRITICAL(&s_oos_lock);
+    memset(&s_oos_requested, 0, sizeof(s_oos_requested));
+    portEXIT_CRITICAL(&s_oos_lock);
+}
+
 void tasks_request_out_of_service(agn_id_t agent_id,
                                   const char *reason_key,
                                   const char *reason_fallback)
 {
     portENTER_CRITICAL(&s_oos_lock);
     tasks_oos_set(&s_oos_requested, agent_id, reason_key, reason_fallback);
+    if (agent_id == AGN_ID_RS485) {
+        s_modbus_hard_inhibit = true;
+    }
     portEXIT_CRITICAL(&s_oos_lock);
 }
 
@@ -183,12 +242,11 @@ static bool tasks_probe_modbus_bootstrap(const device_config_t *cfg)
         return true;
     }
 
-    bool prev_probe_window = s_oos_modbus_probe_window;
-    s_oos_modbus_probe_window = true;
+    bool probe_ok = false;
+    tasks_set_modbus_recovery_test_active(true);
 
     if (modbus_relay_init() != ESP_OK) {
-        s_oos_modbus_probe_window = prev_probe_window;
-        return false;
+        goto done;
     }
 
     uint8_t bits[MODBUS_RELAY_MAX_BYTES] = {0};
@@ -213,8 +271,7 @@ static bool tasks_probe_modbus_bootstrap(const device_config_t *cfg)
                                     relay_count,
                                     bits,
                                     sizeof(bits)) != ESP_OK) {
-            s_oos_modbus_probe_window = prev_probe_window;
-            return false;
+            goto done;
         }
         ESP_LOGI(TAG,
                  "[M] Health Modbus lettura relay OK (start=%u count=%u)",
@@ -228,8 +285,7 @@ static bool tasks_probe_modbus_bootstrap(const device_config_t *cfg)
                                               input_count,
                                               bits,
                                               sizeof(bits)) != ESP_OK) {
-            s_oos_modbus_probe_window = prev_probe_window;
-            return false;
+            goto done;
         }
         ESP_LOGI(TAG,
                  "[M] Health Modbus lettura input OK (start=%u count=%u)",
@@ -237,8 +293,16 @@ static bool tasks_probe_modbus_bootstrap(const device_config_t *cfg)
                  (unsigned)input_count);
     }
 
-    s_oos_modbus_probe_window = prev_probe_window;
-    return true;
+    probe_ok = true;
+
+done:
+    tasks_set_modbus_recovery_test_active(false);
+    if (probe_ok) {
+        tasks_set_modbus_hard_inhibit(false);
+    } else {
+        tasks_set_modbus_hard_inhibit(true);
+    }
+    return probe_ok;
 }
 
 static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_cause)
@@ -543,9 +607,28 @@ static esp_err_t tasks_execute_digital_io_action(action_id_t action,
                                                  bool *out_bool,
                                                  digital_io_snapshot_t *out_snapshot)
 {
-    esp_err_t init_err = digital_io_init();
-    if (init_err != ESP_OK) {
-        return init_err;
+    bool modbus_blocked = tasks_is_modbus_runtime_blocked();
+
+    if (modbus_blocked) {
+        uint8_t channel_id = (uint8_t)value_u32;
+        bool is_modbus_output = (channel_id >= DIGITAL_IO_FIRST_MODBUS_OUTPUT) &&
+                                (channel_id <= DIGITAL_IO_OUTPUT_COUNT);
+        bool is_modbus_input = (channel_id >= DIGITAL_IO_FIRST_MODBUS_INPUT) &&
+                               (channel_id <= DIGITAL_IO_INPUT_COUNT);
+
+        if ((action == ACTION_ID_DIGITAL_IO_SET_OUTPUT && is_modbus_output) ||
+            (action == ACTION_ID_DIGITAL_IO_GET_OUTPUT && is_modbus_output) ||
+            (action == ACTION_ID_DIGITAL_IO_GET_INPUT && is_modbus_input) ||
+            action == ACTION_ID_DIGITAL_IO_GET_SNAPSHOT) {
+            return DIGITAL_IO_ERR_MODBUS_DISABLED;
+        }
+    }
+
+    if (!modbus_blocked) {
+        esp_err_t init_err = digital_io_init();
+        if (init_err != ESP_OK) {
+            return init_err;
+        }
     }
 
     switch (action) {
@@ -967,6 +1050,11 @@ static void digital_io_task(void *arg)
 
     while (true) {
         vTaskDelayUntil(&last_wake, period_ticks);
+
+        if (tasks_is_modbus_runtime_blocked()) {
+            previous_valid = false;
+            continue;
+        }
 
         esp_err_t init_err = digital_io_init();
         if (init_err != ESP_OK) {
@@ -1601,7 +1689,22 @@ static void rs485_task(void *arg)
     bool bootstrap_probe_done = false;
 
     while (true) {
-        if (tasks_is_out_of_service_state() && !tasks_is_modbus_probe_allowed_in_oos()) {
+        bool modbus_hard_inhibit = tasks_is_modbus_hard_inhibited();
+        bool modbus_recovery_test_active = tasks_is_modbus_recovery_test_active();
+
+        if (modbus_hard_inhibit) {
+            if (!modbus_recovery_test_active && modbus_relay_is_running()) {
+                (void)modbus_relay_deinit();
+                ESP_LOGI(TAG, "[M] Modbus fermato: inibizione hard attiva");
+            }
+            last_init_err = ESP_OK;
+            last_poll_err = ESP_OK;
+            bootstrap_probe_done = false;
+            vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(200));
+            continue;
+        }
+
+        if (tasks_is_out_of_service_state()) {
             if (modbus_relay_is_running()) {
                 (void)modbus_relay_deinit();
                 ESP_LOGI(TAG, "[M] Modbus fermato: stato OUT_OF_SERVICE");
@@ -1869,10 +1972,54 @@ static void fsm_task(void *arg)
                              active_oos.reason_key);
                 } else {
                     ESP_LOGW(TAG,
-                             "[M] OUT_OF_SERVICE risolto (agent=%s): riavvio dispositivo",
+                             "[M] OUT_OF_SERVICE risolto (agent=%s): ritorno in RUN",
                              tasks_agent_name((agn_id_t)fsm.out_of_service_agent));
-                    vTaskDelay(pdMS_TO_TICKS(250));
-                    esp_restart();
+
+                    fsm_input_event_t run_event = {
+                        .from = AGN_ID_NONE,
+                        .to = {AGN_ID_FSM},
+                        .action = ACTION_ID_SYSTEM_RUN,
+                        .type = FSM_INPUT_EVENT_NONE,
+                        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(now_tick),
+                        .value_i32 = 0,
+                        .value_u32 = 0,
+                        .aux_u32 = 0,
+                        .data_ptr = NULL,
+                        .text = {0},
+                    };
+                    changed = fsm_handle_input_event(&fsm, &run_event) || changed;
+                    if (fsm.state != FSM_STATE_OUT_OF_SERVICE) {
+                        tasks_oos_clear_requested();
+                        tasks_set_out_of_service_runtime(false);
+
+                        if (cfg && cfg->sensors.cctalk_enabled) {
+                            if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_START)) {
+                                ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo uscita OUT_OF_SERVICE");
+                            } else {
+                                ESP_LOGW(TAG, "[M] Riabilitazione gettoniera CCTALK fallita dopo uscita OUT_OF_SERVICE");
+                            }
+                        }
+
+                        if (cfg && cfg->scanner.enabled) {
+                            esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
+                            esp_err_t on_err = usb_cdc_scanner_send_on_command();
+                            if (setup_err == ESP_OK && on_err == ESP_OK) {
+                                ESP_LOGI(TAG, "[M] Scanner riabilitato dopo uscita OUT_OF_SERVICE");
+                            } else {
+                                ESP_LOGW(TAG,
+                                         "[M] Riabilitazione scanner fallita dopo uscita OUT_OF_SERVICE (setup=%s on=%s)",
+                                         esp_err_to_name(setup_err),
+                                         esp_err_to_name(on_err));
+                            }
+                        }
+
+                        memset(&active_oos, 0, sizeof(active_oos));
+                        next_health_check = now_tick + pdMS_TO_TICKS(OOS_HEALTH_CHECK_MS);
+                        next_oos_retry = 0;
+                        ESP_LOGI(TAG, "[M] Uscita OUT_OF_SERVICE completata");
+                    } else {
+                        ESP_LOGW(TAG, "[M] Uscita OUT_OF_SERVICE fallita: stato ancora OOS dopo SYSTEM_RUN");
+                    }
                 }
             }
         } else if ((int32_t)(now_tick - next_health_check) >= 0) {
@@ -1998,8 +2145,15 @@ static void fsm_task(void *arg)
         if ((state_before != fsm.state) && cfg && cfg->display.enabled) {
             if (fsm.state == FSM_STATE_ADS) {
                 lvgl_panel_show_ads_page();
+            } else if (fsm.state == FSM_STATE_IDLE) {
+                if (cfg->display.ads_enabled) {
+                    lvgl_panel_show_ads_page();
+                } else {
+                    lvgl_panel_show_main_page();
+                }
             } else if (fsm.state == FSM_STATE_CREDIT &&
                        (state_before == FSM_STATE_ADS ||
+                        state_before == FSM_STATE_OUT_OF_SERVICE ||
                         state_before == FSM_STATE_RUNNING ||
                         state_before == FSM_STATE_PAUSED)) {
                 lvgl_panel_show_main_page();

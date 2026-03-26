@@ -54,6 +54,11 @@
 static const char *TAG = "USB_CDC_SCANNER";
 static usb_cdc_scanner_callback_t s_on_barcode = NULL;
 
+__attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
+{
+    return true;
+}
+
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
 static TaskHandle_t s_usb_open_task = NULL;
 static cdc_acm_dev_hdl_t s_cdc_dev = NULL;
@@ -339,7 +344,26 @@ static void usb_cdc_scanner_open_task(void *arg)
         .data_cb = cdc_data_cb
     };
 
+    bool runtime_block_logged = false;
+
     while (1) {
+        if (!usb_cdc_scanner_runtime_allowed()) {
+            if (!runtime_block_logged) {
+                ESP_LOGI(TAG, "Scanner runtime blocked: opening/enumeration paused");
+                runtime_block_logged = true;
+            }
+
+            if (s_cdc_dev != NULL) {
+                cdc_acm_host_close(s_cdc_dev);
+                s_cdc_dev = NULL;
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        runtime_block_logged = false;
+
         // Refresh runtime config each iteration to allow dynamic changes
         device_config_t *cur = device_config_get();
         if (cur) {

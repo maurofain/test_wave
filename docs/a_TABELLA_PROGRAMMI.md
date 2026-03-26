@@ -36,17 +36,42 @@ Ogni riga rappresenta un programma (es. 1..8 o 1..10):
 | Campo | Tipo | Obbligatorio | Descrizione |
 |---|---|---:|---|
 | program_id | int | Sì | Identificativo univoco programma |
-| name | string | Sì | Nome/etichetta visualizzata |
+| name_it | string | Sì | Nome programma in italiano |
+| name_en | string | Sì | Nome programma in inglese |
+| name_fr | string | Sì | Nome programma in francese |
+| name_de | string | Sì | Nome programma in tedesco |
+| name_es | string | Sì | Nome programma in spagnolo |
 | enabled | bool | Sì | Programma selezionabile |
 | price_units | int | Sì | Costo programma in unità credito (coin/token centesimi) |
 | duration_sec | int | Sì | Durata iniziale in secondi |
-| relay_mask / relay_list | string/array | Sì | Relay da attivare durante il programma |
-| prog_end_relay_sec | int | No | Durata impulso relay fine programma |
-| allow_pause | bool | No | Abilita pausa programma |
-| pause_timeout_sec | int | No | Timeout pausa (0 = no pausa) |
+| pause_max_suspend_sec | int | Sì | Timeout massimo pausa/sospensione |
+| relay_mask | int | Sì | Bitmask relay da attivare durante il programma |
+| name (runtime) | string | Derivato | Nome attivo per la lingua runtime (selezionato lato firmware/UI) |
+| prog_end_relay_sec | int | No | Durata impulso relay fine programma (eventuale estensione) |
+| allow_pause | bool | No | Abilita pausa programma (eventuale estensione) |
+| pause_timeout_sec | int | No | Timeout pausa (0 = no pausa, eventuale estensione) |
 | input_binding | string/array | No | Input fisici associati al programma |
 | output_binding | string/array | No | Output/logiche associate |
 | priority | int | No | Priorità in caso di conflitti |
+
+## Formato attualmente in uso (`programs.json`)
+
+Nel progetto corrente il formato persistito è:
+
+- runtime: `/spiffs/programs.json`
+- seed: `data/programs.json`
+
+Campi attivi per ciascun programma:
+
+- `program_id`
+- `name_it`, `name_en`, `name_fr`, `name_de`, `name_es`
+- `enabled`
+- `price_units`
+- `duration_sec`
+- `pause_max_suspend_sec`
+- `relay_mask`
+
+Nota: il nome mostrato in UI/FSM (`entry->name`) è derivato dai campi lingua e dalla lingua runtime utente/pannello.
 
 ## Tabella valori pagamento (separata ma collegata)
 
@@ -84,6 +109,11 @@ Ogni riga rappresenta un programma (es. 1..8 o 1..10):
 - Unità monetaria interna (`coin`, centesimi, secondi equivalenti).
 - Formula esatta del ricalcolo proporzionale nel cambio programma.
 - Mappatura finale input/output per ciascun modello impianto.
+
+## Aggiornamento stato corrente
+
+- Configurazione attuale caricata con `count=10` programmi.
+- La localizzazione dei nomi programma è gestita direttamente nella tabella programmi (`name_*`), non tramite placeholder `__i18n__`.
 
 ## Sintesi
 La “tabella programmi” deve coprire almeno: prezzo, durata, relay associati, abilitazione pulsanti e regole di esecuzione. Le fonti disponibili confermano che questi sono i parametri minimi necessari per coerenza tra UI, logica firmware e integrazione con PLC/server.
