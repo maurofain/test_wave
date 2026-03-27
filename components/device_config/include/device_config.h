@@ -305,8 +305,8 @@ char* device_config_to_json(const device_config_t *config);
 esp_err_t device_config_update_from_json(const char *json_str);
 
 /**
- * @brief Legge il JSON configurazione direttamente da EEPROM (senza fallback NVS)
- * @return Stringa JSON allocata (da liberare con free()) oppure NULL se EEPROM non valida/non disponibile
+ * @brief API legacy: legge il JSON configurazione persistito (backend corrente NVS)
+ * @return Stringa JSON allocata (da liberare con free()) oppure NULL se non disponibile
  */
 char* device_config_read_json_from_eeprom(void);
 

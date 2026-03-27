@@ -12,7 +12,6 @@ char *i18n_concat_from_psram(uint8_t scope_id, uint16_t key_id);
 #include "nvs.h"
 #include "cJSON.h"
 #include "esp_rom_crc.h"
-#include "eeprom_24lc16.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 #include <string.h>
@@ -26,6 +25,7 @@ static const char *TAG = "DEVICE_CFG";
 static const char *NVS_NAMESPACE = "device_config";
 static const char *UI_LANG_DEFAULT = "it";
 static const char *I18N_V2_FILE_PATH = "/spiffs/i18n_v2.json";
+static const char *SPIFFS_CONFIG_FILE_PATH = "/spiffs/config.jsn";
 #define DEVICE_CFG_MODBUS_MAX_POINTS 64
 #define DEVICE_CFG_SERIAL_BAUD_MIN 300
 #define DEVICE_CFG_SERIAL_BAUD_MAX 3000000
@@ -220,20 +220,6 @@ static void _parse_serial_cfg_json(cJSON *serial_obj,
                                                     defaults->tx_buf_size);
     }
 }
-
-#define EEPROM_MAGIC 0x57415645 // "WAVE"
-#define EEPROM_HEADER_ADDR 0
-
-typedef struct {
-    uint32_t magic;
-    uint32_t crc;
-    uint32_t length;
-    uint16_t modified;
-    uint16_t version;
-} eeprom_header_t;
-
-#define EEPROM_STORAGE_SIZE_BYTES 2048U
-#define EEPROM_JSON_MAX_LENGTH (EEPROM_STORAGE_SIZE_BYTES - sizeof(eeprom_header_t))
 
 static device_config_t s_config = {0};
 static bool s_initialized = false;
@@ -1119,118 +1105,6 @@ static uint32_t _calculate_crc(const char *json_str)
 }
 
 // -----------------------------------------------------------------------------
-// Helper EEProm
-// -----------------------------------------------------------------------------
-
-
-/**
- * @brief Scrive una stringa JSON in EEPROM.
- *
- * @param [in] json_str Puntatore alla stringa JSON da scrivere in EEPROM.
- * @param [in] modified Flag che indica se i dati sono stati modificati.
- * @return esp_err_t Codice di errore.
- */
-static esp_err_t _write_to_eeprom(const char *json_str, bool modified)
-{
-    if (!json_str) return ESP_ERR_INVALID_ARG;
-    if (!eeprom_24lc16_is_available()) {
-        ESP_LOGW(TAG, "[C] EEPROM non disponibile: salto persistenza config");
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    size_t json_len = strlen(json_str);
-    if (json_len == 0 || json_len > EEPROM_JSON_MAX_LENGTH) {
-        ESP_LOGE(TAG,
-                 "[C] JSON troppo grande per EEPROM (len=%lu, max=%lu)",
-                 (unsigned long)json_len,
-                 (unsigned long)EEPROM_JSON_MAX_LENGTH);
-        return ESP_ERR_INVALID_SIZE;
-    }
-
-    eeprom_header_t header;
-    header.magic = EEPROM_MAGIC;
-    header.length = (uint32_t)json_len;
-    header.crc = _calculate_crc(json_str);
-    header.modified = modified ? 1 : 0;
-    header.version = 1;
-
-    // Scrivi header
-    esp_err_t wr_err = eeprom_24lc16_write(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header));
-    if (wr_err != ESP_OK) {
-        ESP_LOGE(TAG,
-                 "[C] Scrittura header EEPROM fallita (len=%lu, err=%s)",
-                 (unsigned long)header.length,
-                 esp_err_to_name(wr_err));
-        return wr_err;
-    }
-
-    // Scrivi dati subito dopo l'header
-    wr_err = eeprom_24lc16_write(EEPROM_HEADER_ADDR + sizeof(header), (const uint8_t *)json_str, header.length);
-    if (wr_err != ESP_OK) {
-        ESP_LOGI(TAG,
-                 "[C] Scrittura JSON EEPROM fallita (len=%lu, err=%s)",
-                 (unsigned long)header.length,
-                 esp_err_to_name(wr_err));
-        return wr_err;
-    }
-
-    ESP_LOGI(TAG, "[C] Config salvata in EEPROM (len=%lu, crc=0x%08lX, modified=%d)", 
-             (unsigned long)header.length, (unsigned long)header.crc, header.modified);
-    return ESP_OK;
-}
-
-
-/** Legge i dati dalla EEPROM.
- * @param [out] out_modified Indica se i dati sono stati modificati.
- * @return Puntatore alla stringa letta dalla EEPROM, NULL in caso di errore.
- */
-static char* _read_from_eeprom(bool *out_modified)
-{
-    if (!eeprom_24lc16_is_available()) {
-        ESP_LOGI(TAG, "[C] EEPROM non disponibile o non inizializzata");
-        return NULL;
-    }
-
-    eeprom_header_t header;
-    if (eeprom_24lc16_read(EEPROM_HEADER_ADDR, (uint8_t *)&header, sizeof(header)) != ESP_OK) {
-        ESP_LOGW(TAG, "[C] Lettura header EEPROM fallita");
-        return NULL;
-    }
-
-    if (header.magic != EEPROM_MAGIC) {
-        ESP_LOGW(TAG, "[C] Magic EEPROM non valido (0x%08lX)", (unsigned long)header.magic);
-        return NULL;
-    }
-
-    if (header.length == 0 || header.length > EEPROM_JSON_MAX_LENGTH) {
-        ESP_LOGW(TAG, "[C] Lunghezza JSON EEPROM non valida (%lu)", (unsigned long)header.length);
-        return NULL;
-    }
-
-    char *json_str = malloc(header.length + 1);
-    if (!json_str) return NULL;
-
-    if (eeprom_24lc16_read(EEPROM_HEADER_ADDR + sizeof(header), (uint8_t *)json_str, header.length) != ESP_OK) {
-        ESP_LOGW(TAG, "[C] Lettura payload EEPROM fallita");
-        free(json_str);
-        return NULL;
-    }
-    json_str[header.length] = '\0';
-    ESP_LOGD(TAG, "[C] EEPROM JSON caricato: %s", json_str);
-
-    uint32_t c_crc = _calculate_crc(json_str);
-    if (c_crc != header.crc) {
-        ESP_LOGI(TAG, "[C] Errore CRC EEPROM: calc=0x%08lX, saved=0x%08lX", (unsigned long)c_crc, (unsigned long)header.crc);
-        free(json_str);
-        return NULL;
-    }
-
-    if (out_modified) *out_modified = (header.modified == 1);
-    ESP_LOGD(TAG, "[C] Config caricata da EEPROM (modified=%d)", header.modified);
-    return json_str;
-}
-
-// -----------------------------------------------------------------------------
 // Helper NVS
 // -----------------------------------------------------------------------------
 
@@ -1321,6 +1195,52 @@ static char* _read_from_nvs(void)
 
 
 /**
+ * @brief Legge la configurazione JSON da SPIFFS.
+ *
+ * @return char* Stringa allocata su heap con il contenuto JSON, oppure NULL se non disponibile/errore.
+ */
+static char* _read_from_spiffs(void)
+{
+    struct stat st = {0};
+    if (stat(SPIFFS_CONFIG_FILE_PATH, &st) != 0) {
+        ESP_LOGW(TAG, "[C] Config SPIFFS non trovata: %s", SPIFFS_CONFIG_FILE_PATH);
+        return NULL;
+    }
+
+    if (st.st_size <= 0) {
+        ESP_LOGW(TAG, "[C] Config SPIFFS vuota: %s", SPIFFS_CONFIG_FILE_PATH);
+        return NULL;
+    }
+
+    FILE *f = fopen(SPIFFS_CONFIG_FILE_PATH, "rb");
+    if (!f) {
+        ESP_LOGW(TAG, "[C] Apertura config SPIFFS fallita: %s (errno=%d)", SPIFFS_CONFIG_FILE_PATH, errno);
+        return NULL;
+    }
+
+    size_t size = (size_t)st.st_size;
+    char *json_str = malloc(size + 1);
+    if (!json_str) {
+        fclose(f);
+        return NULL;
+    }
+
+    size_t read_len = fread(json_str, 1, size, f);
+    fclose(f);
+
+    if (read_len != size) {
+        ESP_LOGW(TAG, "[C] Lettura config SPIFFS incompleta (%u/%u)", (unsigned int)read_len, (unsigned int)size);
+        free(json_str);
+        return NULL;
+    }
+
+    json_str[size] = '\0';
+    ESP_LOGI(TAG, "[C] Config caricata da SPIFFS: %s (%u bytes)", SPIFFS_CONFIG_FILE_PATH, (unsigned int)size);
+    return json_str;
+}
+
+
+/**
  * @brief Inizializza la configurazione del dispositivo.
  *
  * Questa funzione inizializza la configurazione del dispositivo, preparandola per l'uso successivo.
@@ -1366,53 +1286,29 @@ esp_err_t device_config_load(device_config_t *config)
 
     _set_defaults(config);
 
-    bool eeprom_available = eeprom_24lc16_is_available();
-    bool eeprom_modified = false;
-    char *json_str = eeprom_available ? _read_from_eeprom(&eeprom_modified) : NULL;
-    bool source_is_eeprom = false;
+    char *json_str = NULL;
     bool source_is_nvs = false;
+    bool source_is_spiffs = false;
 
+    ESP_LOGI(TAG, "[C] Caricamento configurazione da NVS...");
+    json_str = _read_from_nvs();
     if (json_str) {
-        // EEPROM valida
-        source_is_eeprom = true;
-        ESP_LOGI(TAG, "[C] Configurazione valida in EEPROM");
-        
-        if (eeprom_modified) {
-            ESP_LOGI(TAG, "[C] Flag 'modified' attivo: sincronizzo EEPROM -> NVS");
-            if (_write_to_nvs(json_str) == ESP_OK) {
-                // Riscrivi in EEPROM per azzerare il flag di modifica
-                esp_err_t clear_modified_err = _write_to_eeprom(json_str, false);
-                if (clear_modified_err != ESP_OK) {
-                    ESP_LOGW(TAG, "[C] Reset flag modified in EEPROM fallito: %s",
-                             esp_err_to_name(clear_modified_err));
-                }
-            }
-        }
+        ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
+        source_is_nvs = true;
     } else {
-        // EEPROM non disponibile/non valida, prova NVS
-        const char *eeprom_fallback_msg = eeprom_available
-                                              ? "[C] EEPROM non valida o non leggibile, provo NVS..."
-                                              : "[C] EEPROM non disponibile, provo NVS...";
-        ESP_LOGI(TAG, "%s", eeprom_fallback_msg);
-        json_str = _read_from_nvs();
+        ESP_LOGI(TAG, "[C] Config non presente in NVS, provo SPIFFS (%s)", SPIFFS_CONFIG_FILE_PATH);
+        json_str = _read_from_spiffs();
         if (json_str) {
-            ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
-            source_is_nvs = true;
+            source_is_spiffs = true;
+
+            if (_write_to_nvs(json_str) != ESP_OK) {
+                ESP_LOGW(TAG, "[C] Persistenza config SPIFFS in NVS fallita");
+            }
         } else {
-            // Niente né in EEPROM né in NVS: Defaults
-            ESP_LOGI(TAG, "[C] Nessun config trovato: inizializzo Defaults su NVS e EEPROM");
+            ESP_LOGI(TAG, "[C] Nessun config trovato: inizializzo Defaults su NVS");
             char *def_json = device_config_to_json(config);
             if (def_json) {
                 _write_to_nvs(def_json);
-                if (eeprom_available) {
-                    esp_err_t eeprom_wr_err = _write_to_eeprom(def_json, false);
-                    if (eeprom_wr_err != ESP_OK) {
-                        ESP_LOGW(TAG, "[C] Persistenza defaults in EEPROM fallita: %s",
-                                 esp_err_to_name(eeprom_wr_err));
-                    }
-                } else {
-                    ESP_LOGI(TAG, "[C] Defaults salvati solo in NVS: EEPROM assente");
-                }
                 free(def_json);
             }
             return ESP_OK; // Caricati i defaults in s_config via _set_defaults
@@ -1420,11 +1316,9 @@ esp_err_t device_config_load(device_config_t *config)
     }
 
     if (json_str) {
-        bool parse_ok = false;
         ESP_LOGI(TAG, "[CONFIG] Loading JSON config (%zu bytes): %s", strlen(json_str), json_str);
         cJSON *root = cJSON_Parse(json_str);
         if (root) {
-            parse_ok = true;
             // Nome dispositivo
             cJSON *name = cJSON_GetObjectItem(root, "device_name");
             if (name && name->valuestring) strncpy(config->device_name, name->valuestring, sizeof(config->device_name) - 1);
@@ -1986,22 +1880,10 @@ esp_err_t device_config_load(device_config_t *config)
                 }
 
             cJSON_Delete(root);
-            ESP_LOGD(TAG, "[C] Configurazione caricata correttamente da %s", source_is_eeprom ? "EEPROM" : "NVS");
+            const char *source_name = source_is_nvs ? "NVS" : (source_is_spiffs ? "SPIFFS" : "UNKNOWN");
+            ESP_LOGD(TAG, "[C] Configurazione caricata correttamente da %s", source_name);
         } else {
             ESP_LOGE(TAG, "[C] Errore parsing JSON!");
-        }
-
-        if (parse_ok && source_is_nvs && eeprom_24lc16_is_available()) {
-            /* Sincronizza NVS -> EEPROM usando JSON canonico ridotto,
-             * evitando payload legacy potenzialmente troppo grandi. */
-            char *canonical_json = device_config_to_json(config);
-            if (canonical_json) {
-                esp_err_t sync_err = _write_to_eeprom(canonical_json, true);
-                if (sync_err != ESP_OK) {
-                    ESP_LOGW(TAG, "[C] Sync NVS->EEPROM fallita: %s", esp_err_to_name(sync_err));
-                }
-                free(canonical_json);
-            }
         }
 
         free(json_str);
@@ -2242,15 +2124,15 @@ char* device_config_to_json(const device_config_t *config)
 
 
 /**
- * @brief Legge la configurazione del dispositivo in formato JSON dalla EEPROM.
+ * @brief API legacy: legge la configurazione JSON persistita (ora da NVS).
  *
  * @param [out] Nessun parametro di input.
  * @return char* Puntatore alla stringa JSON contenente la configurazione del dispositivo, o NULL in caso di errore.
  */
 char* device_config_read_json_from_eeprom(void)
 {
-    bool eeprom_modified = false;
-    return _read_from_eeprom(&eeprom_modified);
+    ESP_LOGW(TAG, "[C] API legacy device_config_read_json_from_eeprom: uso backend NVS");
+    return _read_from_nvs();
 }
 
 
@@ -2273,27 +2155,15 @@ esp_err_t device_config_save(const device_config_t *config)
     if (!json_str) return ESP_ERR_NO_MEM;
 
     ESP_LOGD(TAG, "[C] JSON da salvare: %s", json_str);
-    esp_err_t err = ESP_ERR_INVALID_STATE;
-    
-    if (eeprom_24lc16_is_available()) {
-        // Alla modifica (tasto save), salviamo in EEPROM con flag 'modified' (Specifica 3)
-        err = _write_to_eeprom(json_str, true);
-    }
-
+    esp_err_t err = _write_to_nvs(json_str);
     if (err != ESP_OK) {
-        // Se EEPROM non disponibile o salvataggio fallito, scriviamo direttamente in NVS (Specifica User)
-        _write_to_nvs(json_str);
-        if (err == ESP_ERR_INVALID_STATE) {
-            ESP_LOGW(TAG, "[C] EEPROM non disponibile, salvataggio diretto su NVS");
-        } else {
-            ESP_LOGE(TAG, "[C] Salvataggio EEPROM fallito (0x%x), ripiego su NVS", err);
-        }
+        ESP_LOGE(TAG, "[C] Salvataggio configurazione in NVS fallito: %s", esp_err_to_name(err));
     } else {
-        ESP_LOGI(TAG, "[C] Config salvato in EEPROM (flag modified settato)");
+        ESP_LOGI(TAG, "[C] Config salvata in NVS");
     }
     
     free(json_str);
-    return ESP_OK;
+    return err;
 }
 
 

@@ -803,37 +803,48 @@ static esp_err_t transfer_coredump_flash_to_sd(void)
  */
 static void nvs_list_entries(void)
 {
-  nvs_iterator_t it = NULL;
-  esp_err_t ret = nvs_entry_find(NULL, NULL, NVS_TYPE_ANY, &it);
+  const char *namespaces[] = {"device_config", BOOT_GUARD_NAMESPACE};
+  int total_count = 0;
 
-  if (ret == ESP_ERR_NVS_NOT_FOUND)
+  ESP_LOGI(TAG, "[M] === Elenco NVS Entries ===");
+
+  for (size_t ns_i = 0; ns_i < (sizeof(namespaces) / sizeof(namespaces[0])); ++ns_i)
   {
-    ESP_LOGI(TAG, "=== NVS vuota (no entries) ===");
-    return;
-  }
+    const char *ns = namespaces[ns_i];
+    nvs_iterator_t it = NULL;
+    esp_err_t ret = nvs_entry_find("nvs", ns, NVS_TYPE_ANY, &it);
 
-  if (ret != ESP_OK)
-  {
-    ESP_LOGW(TAG, "Avviso lettura NVS: %s (verranno usate le defaults)",
-             esp_err_to_name(ret));
-    return;
-  }
+    if (ret == ESP_ERR_NVS_NOT_FOUND)
+    {
+      ESP_LOGI(TAG, "[M] namespace '%s': nessuna entry", ns);
+      continue;
+    }
 
-  ESP_LOGI(TAG, "=== Elenco NVS Entries ===");
-  int count = 0;
-
-  while (it != NULL)
-  {
-    nvs_entry_info_t info;
-    nvs_entry_info(it, &info);
-    count++;
-    ESP_LOGI(TAG, "  [%d] chiave='%s', tipo=%d", count, info.key, info.type);
-    ret = nvs_entry_next(&it);
     if (ret != ESP_OK)
-      break;
+    {
+      ESP_LOGW(TAG, "[M] Avviso lettura NVS namespace '%s': %s", ns,
+               esp_err_to_name(ret));
+      continue;
+    }
+
+    int ns_count = 0;
+    while (it != NULL)
+    {
+      nvs_entry_info_t info;
+      nvs_entry_info(it, &info);
+      ns_count++;
+      total_count++;
+      ESP_LOGI(TAG, "[M]   [%s:%d] chiave='%s', tipo=%d", ns, ns_count,
+               info.key, info.type);
+      ret = nvs_entry_next(&it);
+      if (ret != ESP_OK)
+      {
+        break;
+      }
+    }
   }
 
-  ESP_LOGI(TAG, "=== Totale: %d voci ===", count);
+  ESP_LOGI(TAG, "[M] === Totale entries NVS note: %d ===", total_count);
 }
 
 /**

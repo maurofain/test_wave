@@ -44,7 +44,7 @@
 #endif
 
 #define BARCODE_BUF_SIZE 128
-#define USB_SCANNER_EXPERIMENTAL_DIAG 0
+#define USB_SCANNER_EXPERIMENTAL_DIAG 1
 
 /* Default scanner identifiers (auto-aligned / authoritative defaults) */
 #define SCANNER_DEFAULT_VID  0x1EAB  /* VID: 1EAB */
