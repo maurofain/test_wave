@@ -71,6 +71,7 @@ OUT : WHITE_LED, BLUE_LED,RELAY3,RELAY4,RELAY2,RELAY1,RED_LED,HEATHER1
 IN  : DIP1, DIP2, DIP3 , SERVICE_SWITCH, OPTO2, OPTO1, OPTO4, OPTO3
 Dobbiamo mappare tutti gli input nel device considerando gli input OPTOx come possibili tasti e gli altri come segnali da far processare al task io_process (per ora non agisce) , gli out considerando RELAYx come relay da pilotare e da usare nella lista programmi e i LED come segnali da utilizzare per eventi usando come consumer task il io_process (per ora non agisce), lo stato di HEATER va processato dal task io_process (per ora non agisce)
 
+[ ] creiamo un nuovo device audio per riprodurre dei suoni tramite l'interfaccia i2s dell scheda esp32P4. Aggiungiamo un azione PLAY_AUDIO con il nome del file da eseguire. I file audio saranno mp3 a 96kbit
 -----------------------
 ❯ in precedenza usavamo per la gestione delle pagine html e i relativi javascript il sistema che prevedeva che nel file wepages_embedded.c ci fossero i sorgenti html e js delle pagine stesse, che poi venivano estratti da uno script python. Poi abbiamo cambiato con una gestioen diretta di html e js ma il file
   webpages_embedde.c è rimansto. Fai un report sull'attuale impiego di questo file e verifica se possiamo toglierlo dal codice e dalla documentazione  
@@ -184,6 +185,8 @@ Cambiamento della lingua LVGL in base alla scelta utente usando la tabella in PS
 Cambiamento della lingua di backend in base alla richiesta utente web (manutentore) e rilettura del json con successiva invalidazione pagine .
 
 Per ora prepara un report della situazione e il programma per la correzzione che salverai in 260319_LANGUAGE_ISSUES.md
+
+
 ------------------
 
 ------------------

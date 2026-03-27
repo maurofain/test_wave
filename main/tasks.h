@@ -42,6 +42,7 @@ float tasks_get_temperature(void);
 float tasks_get_humidity(void);
 bool tasks_publish_key_event(void);
 bool tasks_publish_card_credit_event(int32_t vcd_amount_cents, const char *source_tag);
+esp_err_t tasks_publish_play_audio(const char *audio_path, agn_id_t sender);
 esp_err_t tasks_publish_program_button_action(uint8_t program_id, agn_id_t sender);
 esp_err_t tasks_digital_io_set_output_via_agent(uint8_t output_id, bool value, TickType_t timeout_ticks);
 esp_err_t tasks_digital_io_get_output_via_agent(uint8_t output_id, bool *out_value, TickType_t timeout_ticks);

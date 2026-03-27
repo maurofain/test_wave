@@ -86,6 +86,7 @@ typedef enum {
     AGN_ID_ERROR_LOG,         /* error/crash logger */
     AGN_ID_LVGL,              /* LVGL graphics engine */
     AGN_ID_WAVESHARE_LCD,     /* display driver */
+    AGN_ID_AUDIO,             /* audio playback task */
     /* add more agents as components are introduced */
 } agn_id_t;
 
@@ -187,6 +188,9 @@ typedef enum {
     ACTION_ID_SD_CARD_WRITE,
     ACTION_ID_SD_CARD_DELETE,
     ACTION_ID_SD_CARD_ERROR,
+
+    /* Audio playback operations */
+    ACTION_ID_PLAY_AUDIO,
 
     /* ... more actions ... */
 } action_id_t;

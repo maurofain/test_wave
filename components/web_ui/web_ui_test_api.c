@@ -37,6 +37,7 @@
 #include "sht40.h"
 #include "modbus_relay.h"
 #include "digital_io.h"
+#include "audio_player.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -72,6 +73,56 @@ static uint8_t clamp_u8_value(int value, uint8_t min, uint8_t max)
         return max;
     }
     return (uint8_t)value;
+}
+
+/**
+ * @brief Estrae il path audio dal body JSON della richiesta.
+ *
+ * Formato atteso: {"path":"nome_file.wav"} oppure path assoluto su SPIFFS.
+ *
+ * @param [in] req Richiesta HTTP con payload JSON.
+ * @param [out] out_path Buffer destinazione del path normalizzato.
+ * @param [in] out_path_len Dimensione buffer destinazione.
+ * @return esp_err_t ESP_OK su successo.
+ */
+static esp_err_t parse_audio_path_from_request(httpd_req_t *req, char *out_path, size_t out_path_len)
+{
+    if (!req || !out_path || out_path_len < 10U) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (req->content_len <= 0 || req->content_len >= 256) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    char buf[256] = {0};
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret <= 0) {
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    cJSON *path = cJSON_GetObjectItem(root, "path");
+    if (!path || !cJSON_IsString(path) || !path->valuestring || path->valuestring[0] == '\0') {
+        cJSON_Delete(root);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *raw = path->valuestring;
+    if (strncmp(raw, "/spiffs/", 8) == 0) {
+        snprintf(out_path, out_path_len, "%s", raw);
+    } else if (raw[0] == '/') {
+        snprintf(out_path, out_path_len, "/spiffs%s", raw);
+    } else {
+        snprintf(out_path, out_path_len, "/spiffs/%s", raw);
+    }
+
+    cJSON_Delete(root);
+    return (out_path[0] != '\0') ? ESP_OK : ESP_FAIL;
 }
 
 
@@ -281,6 +332,42 @@ esp_err_t api_test_handler(httpd_req_t *req)
     } else if (strcmp(test_name, "led_stop") == 0) {
         led_test_stop();
         snprintf(response, sizeof(response), "{\"message\":\"Test LED fermato\"}");
+    }
+
+    else if (strcmp(test_name, "audio_play") == 0) {
+        char audio_path[128] = {0};
+        esp_err_t parse_err = parse_audio_path_from_request(req, audio_path, sizeof(audio_path));
+        if (parse_err != ESP_OK) {
+            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"path audio non valido\"}");
+            httpd_resp_set_status(req, "400 Bad Request");
+        } else {
+            esp_err_t publish_err = tasks_publish_play_audio(audio_path, AGN_ID_WEB_UI);
+            if (publish_err == ESP_OK) {
+                snprintf(response,
+                         sizeof(response),
+                         "{\"status\":\"ok\",\"message\":\"PLAY_AUDIO pubblicato\",\"path\":\"%s\"}",
+                         audio_path);
+            } else {
+                snprintf(response,
+                         sizeof(response),
+                         "{\"status\":\"error\",\"error\":\"publish PLAY_AUDIO fallito\",\"err\":\"%s\"}",
+                         esp_err_to_name(publish_err));
+                httpd_resp_set_status(req, "500 Internal Server Error");
+            }
+        }
+    }
+
+    else if (strcmp(test_name, "audio_stop") == 0) {
+        esp_err_t stop_err = audio_player_stop();
+        if (stop_err == ESP_OK) {
+            snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Stop audio richiesto\"}");
+        } else {
+            snprintf(response,
+                     sizeof(response),
+                     "{\"status\":\"error\",\"error\":\"stop audio fallito\",\"err\":\"%s\"}",
+                     esp_err_to_name(stop_err));
+            httpd_resp_set_status(req, "500 Internal Server Error");
+        }
     }
 
     else if (strcmp(test_name, "scanner_setup") == 0) {

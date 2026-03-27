@@ -1023,6 +1023,8 @@ static void _set_defaults(device_config_t *config)
     config->display.enabled = true; // display abilitato di default
     config->display.lcd_brightness = 80;
     config->display.backlight = true; // backlight acceso di default
+    config->audio.enabled = true;
+    config->audio.volume = 75;
 
     // Default RS232
     config->rs232.baud_rate = 9600;
@@ -1765,6 +1767,20 @@ esp_err_t device_config_load(device_config_t *config)
                     if (ads_enabled) config->display.ads_enabled = cJSON_IsTrue(ads_enabled);
                 }
 
+                // Analisi config Audio
+                cJSON *audio_obj = cJSON_GetObjectItem(root, "audio");
+                if (audio_obj) {
+                    cJSON *enabled = cJSON_GetObjectItem(audio_obj, "en"); if (!enabled) enabled = cJSON_GetObjectItem(audio_obj, "enabled");
+                    if (enabled) config->audio.enabled = cJSON_IsTrue(enabled);
+                    cJSON *volume = cJSON_GetObjectItem(audio_obj, "vol"); if (!volume) volume = cJSON_GetObjectItem(audio_obj, "volume");
+                    if (volume && cJSON_IsNumber(volume)) {
+                        int val = volume->valueint;
+                        if (val < 0) val = 0;
+                        if (val > 100) val = 100;
+                        config->audio.volume = (uint8_t)val;
+                    }
+                }
+
                 // Analisi config Seriali (RS232, RS485, MDB)
                 cJSON *rs232_obj = cJSON_GetObjectItem(root, "rs232");
                 if (rs232_obj) {
@@ -2088,6 +2104,12 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddBoolToObject(disp_obj, "backlight", config->display.backlight);
     cJSON_AddBoolToObject(disp_obj, "ads_en", config->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", disp_obj);
+
+    // Audio
+    cJSON *audio_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(audio_obj, "en", config->audio.enabled);
+    cJSON_AddNumberToObject(audio_obj, "vol", config->audio.volume);
+    cJSON_AddItemToObject(root, "audio", audio_obj);
 
     // Seriale RS232
     cJSON *rs232_obj = cJSON_CreateObject();

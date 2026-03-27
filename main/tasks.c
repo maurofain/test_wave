@@ -6,6 +6,7 @@
 #include "led.h"
 #include "device_config.h"
 #include "digital_io.h"
+#include "audio_player.h"
 #include "sht40.h"
 #include "esp_lcd_touch.h"
 #include "web_ui.h"
@@ -149,6 +150,7 @@ static const char *tasks_agent_name(agn_id_t agent)
         case AGN_ID_HTTP_SERVICES: return "HTTP_SERVICES";
         case AGN_ID_CCTALK: return "CCTALK";
         case AGN_ID_USB_CDC_SCANNER: return "USB_SCANNER";
+        case AGN_ID_AUDIO: return "AUDIO";
         case AGN_ID_FSM: return "FSM";
         default: return "UNKNOWN";
     }
@@ -1322,6 +1324,53 @@ bool tasks_publish_card_credit_event(int32_t vcd_amount_cents, const char *sourc
 
     ESP_LOGI(TAG, "[M] Hook card: CARD_CREDIT pubblicato (%ld)", (long)vcd_amount_cents);
     return true;
+}
+
+esp_err_t tasks_publish_play_audio(const char *audio_path, agn_id_t sender)
+{
+    if (!audio_path || audio_path[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGW(TAG, "[M] PLAY_AUDIO non pubblicato: coda FSM non disponibile");
+        return TASKS_ERR_FSM_QUEUE_NOT_READY;
+    }
+
+    char normalized_path[FSM_EVENT_TEXT_MAX_LEN] = {0};
+    if (strncmp(audio_path, "/spiffs/", 8) == 0) {
+        snprintf(normalized_path, sizeof(normalized_path), "%s", audio_path);
+    } else if (audio_path[0] == '/') {
+        snprintf(normalized_path, sizeof(normalized_path), "/spiffs%s", audio_path);
+    } else {
+        snprintf(normalized_path, sizeof(normalized_path), "/spiffs/%s", audio_path);
+    }
+
+    if (normalized_path[0] == '\0' || strlen(normalized_path) >= sizeof(((fsm_input_event_t *)0)->text)) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    fsm_input_event_t event = {
+        .from = (sender != AGN_ID_NONE) ? sender : AGN_ID_WEB_UI,
+        .to = {AGN_ID_AUDIO},
+        .action = ACTION_ID_PLAY_AUDIO,
+        .type = FSM_INPUT_EVENT_NONE,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .data_ptr = NULL,
+        .text = {0},
+    };
+
+    strncpy(event.text, normalized_path, sizeof(event.text) - 1);
+    if (!fsm_event_publish(&event, pdMS_TO_TICKS(20))) {
+        ESP_LOGW(TAG, "[M] PLAY_AUDIO publish fallito: %s", normalized_path);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "[M] PLAY_AUDIO pubblicato: %s", normalized_path);
+    return ESP_OK;
 }
 
 /* Wrapper: crea il task allocando lo stack in DRAM interna o PSRAM
@@ -2849,6 +2898,64 @@ static void usb_scanner_task_wrapper(void *arg)
     usb_cdc_scanner_task(NULL);
 }
 
+/**
+ * @brief Task consumer per i messaggi audio in coda FSM.
+ *
+ * Consuma eventi indirizzati a AGN_ID_AUDIO e, quando riceve ACTION_ID_PLAY_AUDIO,
+ * riproduce il file audio presente su SPIFFS.
+ */
+static void audio_task(void *arg)
+{
+    task_param_t *param = (task_param_t *)arg;
+    TickType_t period_ticks = (param && param->period_ticks > 0)
+                                ? param->period_ticks
+                                : pdMS_TO_TICKS(100);
+
+    esp_err_t init_err = audio_player_init();
+    if (init_err != ESP_OK) {
+        ESP_LOGE(TAG, "[M] Audio init fallita: %s", esp_err_to_name(init_err));
+    } else {
+        ESP_LOGI(TAG, "[M] Audio task pronta");
+    }
+
+    while (true) {
+        fsm_input_event_t event = {0};
+        if (!fsm_event_receive(&event, AGN_ID_AUDIO, period_ticks)) {
+            continue;
+        }
+
+        if (event.action != ACTION_ID_PLAY_AUDIO) {
+            continue;
+        }
+
+        if (event.text[0] == '\0') {
+            ESP_LOGW(TAG, "[M] PLAY_AUDIO ignorato: path vuoto");
+            continue;
+        }
+
+        device_config_t *cfg = device_config_get();
+        if (cfg && !cfg->audio.enabled) {
+            ESP_LOGI(TAG, "[M] PLAY_AUDIO ignorato: audio disabilitato in config");
+            continue;
+        }
+
+        uint8_t volume = (cfg != NULL) ? cfg->audio.volume : 75U;
+        if (audio_player_set_volume(volume) != ESP_OK) {
+            ESP_LOGW(TAG, "[M] Impostazione volume audio fallita (%u)", (unsigned)volume);
+        }
+
+        esp_err_t play_err = audio_player_play_file(event.text);
+        if (play_err != ESP_OK) {
+            ESP_LOGW(TAG,
+                     "[M] PLAY_AUDIO fallito (%s): %s",
+                     event.text,
+                     esp_err_to_name(play_err));
+        } else {
+            ESP_LOGI(TAG, "[M] PLAY_AUDIO eseguito: %s", event.text);
+        }
+    }
+}
+
 /* Wrapper CCtalk: l'hardware UART è già inizializzato da init.c (cctalk_driver_init).
  * Questo wrapper entra direttamente nel loop di ricezione. */
 
@@ -3054,6 +3161,18 @@ static task_param_t s_tasks[] = {
         .period_ticks = pdMS_TO_TICKS(100),
         .task_fn = scanner_cooldown_task,
         .stack_words = 4096,                  /* RISC-V: 4KB; polling cooldown + comando ON scanner */
+        .stack_caps = MALLOC_CAP_SPIRAM,
+        .arg = NULL,
+        .handle = NULL,
+    },
+    {
+        .name = "audio",
+        .state = TASK_STATE_RUN,
+        .priority = 4,
+        .core_id = 0,
+        .period_ticks = pdMS_TO_TICKS(100),
+        .task_fn = audio_task,
+        .stack_words = 12288,                 /* RISC-V: 12KB; parsing WAV + streaming I2S */
         .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,

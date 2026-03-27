@@ -93,6 +93,14 @@ typedef struct {
 } device_display_config_t;
 
 /**
+ * @brief Struttura di configurazione Audio
+ */
+typedef struct {
+    bool enabled;              ///< Audio abilitato
+    uint8_t volume;            ///< Volume uscita speaker (0-100)
+} device_audio_config_t;
+
+/**
  * @brief Struttura di configurazione Scanner USB
  */
 typedef struct {
@@ -258,6 +266,7 @@ typedef struct {
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;
     device_display_config_t display;
+    device_audio_config_t audio;
     device_scanner_config_t scanner;    ///< Configurazione Scanner USB
     device_timeouts_config_t timeouts;  ///< Timeout applicativi
     device_serial_config_t rs232;       ///< Configurazione RS232

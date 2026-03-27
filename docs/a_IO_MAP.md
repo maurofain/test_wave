@@ -40,6 +40,13 @@
 | I15               | MODBUS01| I7           | `IN15` (discrete input `input_start+6`) |
 | I16               | MODBUS01| I8           | `IN16` (discrete input `input_start+7`) |
 
+
+## Utilizzo DIP SWITCH
+  
+- DIP 1 : 
+  - se a valore HIGH (OFF) abilita il display MIPI  con priorità sul file config.jsn,
+  - se LOW (ON) allora si prende lo stato definito in config.json
+
 ## Analisi estensione a ulteriori moduli Modbus I/O expander
 
 ### Stato attuale
