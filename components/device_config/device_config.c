@@ -1239,6 +1239,28 @@ static char* _read_from_spiffs(void)
     return json_str;
 }
 
+/**
+ * @brief Verifica se la stringa è un JSON valido con root object.
+ *
+ * @param json_str Stringa JSON da verificare.
+ * @return true se il payload è valido e con root object, false altrimenti.
+ */
+static bool _is_valid_json_object(const char *json_str)
+{
+    if (!json_str || json_str[0] == '\0') {
+        return false;
+    }
+
+    cJSON *root = cJSON_Parse(json_str);
+    if (!root) {
+        return false;
+    }
+
+    bool is_valid = cJSON_IsObject(root);
+    cJSON_Delete(root);
+    return is_valid;
+}
+
 
 /**
  * @brief Inizializza la configurazione del dispositivo.
@@ -1290,22 +1312,37 @@ esp_err_t device_config_load(device_config_t *config)
     bool source_is_nvs = false;
     bool source_is_spiffs = false;
 
-    ESP_LOGI(TAG, "[C] Caricamento configurazione da NVS...");
-    json_str = _read_from_nvs();
+    ESP_LOGI(TAG, "[C] Caricamento configurazione da SPIFFS...");
+    json_str = _read_from_spiffs();
     if (json_str) {
-        ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
-        source_is_nvs = true;
-    } else {
-        ESP_LOGI(TAG, "[C] Config non presente in NVS, provo SPIFFS (%s)", SPIFFS_CONFIG_FILE_PATH);
-        json_str = _read_from_spiffs();
-        if (json_str) {
+        if (_is_valid_json_object(json_str)) {
+            ESP_LOGI(TAG, "[C] Configurazione valida in SPIFFS");
             source_is_spiffs = true;
 
             if (_write_to_nvs(json_str) != ESP_OK) {
                 ESP_LOGW(TAG, "[C] Persistenza config SPIFFS in NVS fallita");
             }
         } else {
-            ESP_LOGI(TAG, "[C] Nessun config trovato: inizializzo Defaults su NVS");
+            ESP_LOGW(TAG, "[C] Config SPIFFS non valida: provo NVS");
+            free(json_str);
+            json_str = NULL;
+        }
+    }
+
+    if (!json_str) {
+        ESP_LOGI(TAG, "[C] Caricamento configurazione da NVS...");
+        json_str = _read_from_nvs();
+        if (json_str && _is_valid_json_object(json_str)) {
+            ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
+            source_is_nvs = true;
+        } else {
+            if (json_str) {
+                ESP_LOGW(TAG, "[C] Config NVS non valida: inizializzo defaults");
+                free(json_str);
+                json_str = NULL;
+            }
+
+            ESP_LOGI(TAG, "[C] Nessun config valido trovato: inizializzo Defaults su NVS");
             char *def_json = device_config_to_json(config);
             if (def_json) {
                 _write_to_nvs(def_json);

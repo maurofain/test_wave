@@ -50,6 +50,7 @@ cctalk_driver_init(void); /* forward decl - header in components/cctalk */
 #include "bsp/esp-bsp.h"
 #include "bsp/touch.h"
 #include "device_activity.h"
+#include "digital_io.h"
 #include "eeprom_24lc16.h"
 #include "error_log.h"
 #include "fsm.h" // needed for fsm_event_queue_init()
@@ -515,11 +516,27 @@ static esp_err_t try_send_pending_crash_record(void)
   }
 
   esp_http_client_set_header(client, "Content-Type", "application/json");
+  esp_http_client_set_header(client, "Connection", "close");
+  esp_http_client_set_header(client, "Accept-Encoding", "identity");
   esp_http_client_set_post_field(client, body, (int)strlen(body));
 
+  esp_log_level_t prev_http_client_level = esp_log_level_get("HTTP_CLIENT");
+  esp_log_level_t prev_esp_http_client_level = esp_log_level_get("esp_http_client");
+  esp_log_level_set("HTTP_CLIENT", ESP_LOG_NONE);
+  esp_log_level_set("esp_http_client", ESP_LOG_NONE);
   esp_err_t http_ret = esp_http_client_perform(client);
+  esp_log_level_set("HTTP_CLIENT", prev_http_client_level);
+  esp_log_level_set("esp_http_client", prev_esp_http_client_level);
   int status = esp_http_client_get_status_code(client);
   esp_http_client_cleanup(client);
+
+  if (http_ret != ESP_OK && status >= 200 && status < 300)
+  {
+    ESP_LOGW(TAG,
+             "[M] [C] preboot crash send: risposta 2xx con body parziale (%s), tratto come successo",
+             esp_err_to_name(http_ret));
+    http_ret = ESP_OK;
+  }
 
   if (http_ret == ESP_OK && status >= 200 && status < 300)
   {
@@ -990,6 +1007,79 @@ static inline void init_lvgl_status_log(const char *text)
     {
       lvgl_panel_set_init_status(text);
     }
+  }
+}
+
+/**
+ * @brief Restituisce testo "abilitata"/"disabilitata" per i flag booleani.
+ */
+static const char *enabled_text(bool enabled)
+{
+  return enabled ? "abilitata" : "disabilitata";
+}
+
+/**
+ * @brief Logga lo stato periferiche subito dopo il caricamento config.
+ */
+static void log_peripherals_from_config(const device_config_t *cfg)
+{
+  if (!cfg)
+  {
+    ESP_LOGW(TAG, "[M] Config non disponibile: impossibile loggare periferiche");
+    return;
+  }
+
+  ESP_LOGI(TAG, "[M] Stato periferiche da config caricata:");
+  ESP_LOGI(TAG, "[M]  - display: %s", enabled_text(cfg->display.enabled));
+  ESP_LOGI(TAG, "[M]  - ethernet: %s", enabled_text(cfg->eth.enabled));
+  ESP_LOGI(TAG, "[M]  - wifi_sta: %s", enabled_text(cfg->wifi.sta_enabled));
+  ESP_LOGI(TAG, "[M]  - scanner_usb: %s", enabled_text(cfg->scanner.enabled));
+  ESP_LOGI(TAG, "[M]  - io_expander: %s", enabled_text(cfg->sensors.io_expander_enabled));
+  ESP_LOGI(TAG, "[M]  - temperatura: %s", enabled_text(cfg->sensors.temperature_enabled));
+  ESP_LOGI(TAG, "[M]  - led_strip: %s", enabled_text(cfg->sensors.led_enabled));
+  ESP_LOGI(TAG, "[M]  - rs232: %s", enabled_text(cfg->sensors.rs232_enabled));
+  ESP_LOGI(TAG, "[M]  - rs485: %s", enabled_text(cfg->sensors.rs485_enabled));
+  ESP_LOGI(TAG, "[M]  - mdb: %s", enabled_text(cfg->sensors.mdb_enabled));
+  ESP_LOGI(TAG, "[M]  - cctalk: %s", enabled_text(cfg->sensors.cctalk_enabled));
+  ESP_LOGI(TAG, "[M]  - eeprom: %s", enabled_text(cfg->sensors.eeprom_enabled));
+  ESP_LOGI(TAG, "[M]  - sd_card: %s", enabled_text(cfg->sensors.sd_card_enabled));
+  ESP_LOGI(TAG, "[M]  - pwm1: %s", enabled_text(cfg->sensors.pwm1_enabled));
+  ESP_LOGI(TAG, "[M]  - pwm2: %s", enabled_text(cfg->sensors.pwm2_enabled));
+}
+
+/**
+ * @brief Applica override display in base allo stato DIP1.
+ *
+ * Regola richiesta:
+ * - DIP1 LOW (switch ON) => forza display disabilitato.
+ * - DIP1 HIGH (switch OFF) => nessun forcing (usa stato da config).
+ */
+static void apply_display_override_from_dip1(device_config_t *cfg)
+{
+  if (!cfg)
+  {
+    return;
+  }
+
+  esp_err_t io_ret = io_expander_init();
+  if (io_ret != ESP_OK)
+  {
+    ESP_LOGW(TAG,
+             "[M] DIP1 override non disponibile: IO expander non pronto (%s)",
+             esp_err_to_name(io_ret));
+    return;
+  }
+
+  bool dip1_high = io_get_pin((int)(DIGITAL_IO_INPUT_DIP1 - 1U));
+  if (!dip1_high)
+  {
+    cfg->display.enabled = false;
+    ESP_LOGW(TAG,
+             "[M] =========================================================");
+    ESP_LOGW(TAG,
+             "[M] MIPI DISPLAY FORCED DISALED (DIP1=ON)");
+    ESP_LOGW(TAG,
+             "[M] =========================================================");
   }
 }
 
@@ -1505,6 +1595,15 @@ static esp_err_t start_ethernet(void)
  */
 static esp_err_t init_display_lvgl_minimal(void)
 {
+  device_config_t *device_cfg = device_config_get();
+  if (!device_cfg || !device_cfg->display.enabled)
+  {
+    ESP_LOGI(TAG, "[M] Display disabilitato: skip init display/backlight/touch");
+    s_touch_handle = NULL;
+    tasks_set_touchscreen_handle(NULL);
+    return ESP_ERR_INVALID_STATE;
+  }
+
   ESP_LOGI(TAG, "Heap before display init:");
   ESP_LOGI(
       TAG, "  INTERNAL free: %u",
@@ -1562,7 +1661,6 @@ static esp_err_t init_display_lvgl_minimal(void)
   }
   else
   {
-    device_config_t *device_cfg = device_config_get();
     uint8_t brightness = device_cfg->display.lcd_brightness;
     if (brightness == 0)
     {
@@ -1783,13 +1881,15 @@ esp_err_t init_run_factory(void)
   generic_i2c_diagnostic_scan(bsp_i2c_get_handle(), "BSP I2C", 20);
 #endif
 
-  /* La EEPROM deve essere pronta prima del load config, altrimenti
-   * device_config ricade inutilmente su NVS/default e registra errori fuorvianti. */
+  /* Inizializzazione EEPROM separata dalla persistenza config,
+   * utile per diagnostica e API test dedicate. */
   init_eeprom_on_periph_i2c();
 
   // Inizializza configurazione device PRIMA degli altri moduli applicativi
   ESP_ERROR_CHECK(device_config_init());
   init_agent_status_set(AGN_ID_DEVICE_CONFIG, 1, INIT_AGENT_ERR_NONE);
+  apply_display_override_from_dip1(device_config_get());
+  log_peripherals_from_config(device_config_get());
 
   // Inizializza Remote Logging il prima possibile per catturare i log pre-rete
 #if !defined(DNA_REMOTE_LOGGING) || (DNA_REMOTE_LOGGING == 0)
@@ -1915,6 +2015,8 @@ esp_err_t init_run_factory(void)
   {
     ESP_LOGI(TAG, "[M] Display disabilitato da config: salto init LVGL/display "
                   "(modalità headless)");
+    s_touch_handle = NULL;
+    tasks_set_touchscreen_handle(NULL);
     init_agent_status_set(AGN_ID_LVGL, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
     init_agent_status_set(AGN_ID_WAVESHARE_LCD, 1,
                           INIT_AGENT_ERR_DISABLED_BY_CONFIG);
