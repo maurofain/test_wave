@@ -2231,7 +2231,7 @@ static void fsm_task(void *arg)
 
         if (changed) {
             ESP_LOGI(TAG, "****************************************");
-            ESP_LOGI(TAG, "[FSM] State=%s credit=%ldc", fsm_state_to_string(fsm.state), (long)fsm.credit_cents);
+            ESP_LOGI(TAG, "[FSM] State=%s credit=%ldcoin", fsm_state_to_string(fsm.state), (long)fsm.credit_cents);
             ESP_LOGI(TAG, "****************************************");
         }
 

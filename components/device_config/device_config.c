@@ -1140,6 +1140,36 @@ static esp_err_t _write_to_nvs(const char *json_str)
 
 
 /**
+ * @brief Scrive la configurazione JSON su SPIFFS.
+ * 
+ * @param json_str Stringa JSON da scrivere.
+ * @return esp_err_t ESP_OK se riuscita, altrimenti codice errore.
+ */
+static esp_err_t _write_config_to_spiffs(const char *json_str)
+{
+    if (!json_str) return ESP_ERR_INVALID_ARG;
+    
+    FILE *f = fopen(SPIFFS_CONFIG_FILE_PATH, "w");
+    if (!f) {
+        ESP_LOGE(TAG, "[C] Impossibile aprire %s per scrittura (errno=%d)", SPIFFS_CONFIG_FILE_PATH, errno);
+        return ESP_FAIL;
+    }
+    
+    size_t json_len = strlen(json_str);
+    size_t written = fwrite(json_str, 1, json_len, f);
+    fclose(f);
+    
+    if (written != json_len) {
+        ESP_LOGE(TAG, "[C] Scrittura SPIFFS incompleta: %u/%u bytes", (unsigned int)written, (unsigned int)json_len);
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGI(TAG, "[C] Config salvata su SPIFFS: %s (%u bytes)", SPIFFS_CONFIG_FILE_PATH, (unsigned int)json_len);
+    return ESP_OK;
+}
+
+
+/**
  * @brief Legge i dati da NVS (Non-Volatile Storage).
  *
  * @param [in] Non ci sono parametri di input per questa funzione.
@@ -2207,13 +2237,13 @@ esp_err_t device_config_save(const device_config_t *config)
 {
     if (!config) return ESP_ERR_INVALID_ARG;
 
-    ESP_LOGI(TAG, "[C] Salvataggio configurazione: LED count = %lu, LCD bright = %d", 
+    ESP_LOGI(TAG, "[C] Salvataggio configurazione in NVS: LED count = %lu, LCD bright = %d", 
              config->sensors.led_count, config->display.lcd_brightness);
 
     char *json_str = device_config_to_json(config);
     if (!json_str) return ESP_ERR_NO_MEM;
 
-    ESP_LOGD(TAG, "[C] JSON da salvare: %s", json_str);
+    ESP_LOGD(TAG, "[C] JSON da salvare in NVS: %s", json_str);
     esp_err_t err = _write_to_nvs(json_str);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "[C] Salvataggio configurazione in NVS fallito: %s", esp_err_to_name(err));
@@ -2221,6 +2251,27 @@ esp_err_t device_config_save(const device_config_t *config)
         ESP_LOGI(TAG, "[C] Config salvata in NVS");
     }
     
+    free(json_str);
+    return err;
+}
+
+
+/**
+ * @brief Scrive la configurazione in JSON su SPIFFS
+ * 
+ * @param config Puntatore alla struttura device_config_t da salvare.
+ * @return ESP_OK se riuscito, ESP_ERR_INVALID_ARG o ESP_FAIL altrimenti.
+ */
+esp_err_t device_config_write_to_spiffs(const device_config_t *config)
+{
+    if (!config) return ESP_ERR_INVALID_ARG;
+
+    ESP_LOGI(TAG, "[C] Salvataggio configurazione su SPIFFS");
+
+    char *json_str = device_config_to_json(config);
+    if (!json_str) return ESP_ERR_NO_MEM;
+
+    esp_err_t err = _write_config_to_spiffs(json_str);
     free(json_str);
     return err;
 }

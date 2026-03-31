@@ -99,6 +99,18 @@ const mdb_status_t* mdb_get_status(void);
 esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len);
 
 /**
+ * @brief Invia un singolo byte MDB con controllo esplicito del 9° bit.
+ *
+ * Utile nei test /api/test quando si vuole inviare un frame raw completo
+ * (checksum incluso) senza ricostruzione automatica del pacchetto.
+ *
+ * @param data Byte da inviare.
+ * @param mode_bit Valore del bit9 (true=1, false=0).
+ * @return ESP_OK se il byte è inviato correttamente.
+ */
+esp_err_t mdb_send_raw_byte(uint8_t data, bool mode_bit);
+
+/**
  * @brief Riceve una risposta MDB
  * 
  * @param out_data Buffer dove scrivere i dati ricevuti

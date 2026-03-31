@@ -75,6 +75,62 @@ static uint8_t clamp_u8_value(int value, uint8_t min, uint8_t max)
     return (uint8_t)value;
 }
 
+static esp_err_t parse_mdb_bxx_frame(const char *input,
+                                     uint8_t *out_bytes,
+                                     bool *out_bit9,
+                                     size_t max_items,
+                                     size_t *out_len)
+{
+    if (!input || !out_bytes || !out_bit9 || !out_len) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    size_t count = 0;
+    const char *p = input;
+    while (*p) {
+        while (*p && isspace((unsigned char)*p)) {
+            p++;
+        }
+        if (!*p) {
+            break;
+        }
+
+        char token[8] = {0};
+        size_t tlen = 0;
+        while (*p && !isspace((unsigned char)*p) && tlen < sizeof(token) - 1) {
+            token[tlen++] = *p++;
+        }
+        token[tlen] = '\0';
+
+        if (tlen != 3 || !isxdigit((unsigned char)token[0]) || !isxdigit((unsigned char)token[1]) || !isxdigit((unsigned char)token[2])) {
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        if (count >= max_items) {
+            return ESP_ERR_NO_MEM;
+        }
+
+        char b9s[2] = {token[0], '\0'};
+        char hexs[3] = {token[1], token[2], '\0'};
+        long b9 = strtol(b9s, NULL, 16);
+        long val = strtol(hexs, NULL, 16);
+        if ((b9 != 0 && b9 != 1) || val < 0 || val > 0xFF) {
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        out_bit9[count] = (b9 == 1);
+        out_bytes[count] = (uint8_t)val;
+        count++;
+    }
+
+    if (count == 0) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    *out_len = count;
+    return ESP_OK;
+}
+
 /**
  * @brief Estrae il path audio dal body JSON della richiesta.
  *
@@ -1555,16 +1611,48 @@ modbus_read_end:
 
             if (port_raw && strcmp(port_raw, "mdb") == 0) {
                 if (data_str) {
-                    uint8_t mdb_packet[32];
-                    int mdb_len = 0;
-                    char *p = (char*)data_str;
-                    while(*p && mdb_len < 32) {
-                        if(*p == ' ') { p++; continue; }
-                        mdb_packet[mdb_len++] = (uint8_t)strtol(p, &p, 16);
-                    }
-                    if (mdb_len > 0) {
-                        mdb_send_packet(mdb_packet[0], mdb_packet + 1, mdb_len - 1);
-                        snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Pacchetto MDB inviato (Addr: 0x%02X)\"}", mdb_packet[0]);
+                    uint8_t raw_bytes[48] = {0};
+                    bool raw_bit9[48] = {0};
+                    size_t raw_len = 0;
+
+                    esp_err_t raw_parse = parse_mdb_bxx_frame(data_str,
+                                                              raw_bytes,
+                                                              raw_bit9,
+                                                              sizeof(raw_bytes),
+                                                              &raw_len);
+                    if (raw_parse == ESP_OK) {
+                        esp_err_t send_err = ESP_OK;
+                        for (size_t i = 0; i < raw_len; i++) {
+                            send_err = mdb_send_raw_byte(raw_bytes[i], raw_bit9[i]);
+                            if (send_err != ESP_OK) {
+                                break;
+                            }
+                        }
+
+                        if (send_err == ESP_OK) {
+                            serial_test_push_monitor_entry("MDB_TX_RAW", raw_bytes, raw_len);
+                            snprintf(response,
+                                     sizeof(response),
+                                     "{\"status\":\"ok\",\"message\":\"Frame MDB RAW inviato (%u byte)\"}",
+                                     (unsigned)raw_len);
+                        } else {
+                            snprintf(response,
+                                     sizeof(response),
+                                     "{\"status\":\"error\",\"error\":\"Invio MDB RAW fallito\",\"err\":\"%s\"}",
+                                     esp_err_to_name(send_err));
+                        }
+                    } else {
+                        uint8_t mdb_packet[32];
+                        int mdb_len = 0;
+                        char *p = (char*)data_str;
+                        while(*p && mdb_len < 32) {
+                            if(*p == ' ') { p++; continue; }
+                            mdb_packet[mdb_len++] = (uint8_t)strtol(p, &p, 16);
+                        }
+                        if (mdb_len > 0) {
+                            mdb_send_packet(mdb_packet[0], mdb_packet + 1, mdb_len - 1);
+                            snprintf(response, sizeof(response), "{\"status\":\"ok\",\"message\":\"Pacchetto MDB inviato (Addr: 0x%02X)\"}", mdb_packet[0]);
+                        }
                     }
                 }
             } else if (port_raw && strcmp(port_raw, "cctalk") == 0) {

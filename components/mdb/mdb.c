@@ -286,6 +286,11 @@ static esp_err_t mdb_send_byte(uint8_t data, bool mode_bit)
     return ESP_OK;
 }
 
+esp_err_t mdb_send_raw_byte(uint8_t data, bool mode_bit)
+{
+    return mdb_send_byte(data, mode_bit);
+}
+
 
 /**
  * @brief Invia un pacchetto tramite la libreria MDB.
@@ -452,6 +457,12 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
     ESP_LOGI(TAG, "[C] [MOCK] mdb_send_packet: addr=0x%02X len=%zu ignorato", address, len);
     (void)data;
+    return ESP_OK;
+}
+
+esp_err_t mdb_send_raw_byte(uint8_t data, bool mode_bit)
+{
+    ESP_LOGI(TAG, "[C] [MOCK] mdb_send_raw_byte: data=0x%02X b9=%d ignorato", data, (int)mode_bit);
     return ESP_OK;
 }
 

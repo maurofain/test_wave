@@ -629,6 +629,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_QR_SCANNED:
+            // Segnala che creditò QR è in arrivo
             ctx->qr_credit_pending = true;
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
@@ -662,6 +663,11 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_QR_CREDIT:
             ctx->qr_credit_pending = false;
+            // Azzera il credito VCD precedente quando arriva il nuovo QR credit
+            ctx->vcd_coins = 0;
+            ctx->vcd_used = 0;
+            ctx->vcd_cents_residual = 0;
+            ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;  // Now vcd_coins=0, so credit = ecd only
             if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
                 ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");

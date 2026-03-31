@@ -230,7 +230,7 @@ esp_err_t keepalive_task_start(void)
     BaseType_t result = xTaskCreate(
         keepalive_task,
         "keepalive_task",
-        8192,  // Stack size
+        16384,  // Stack size (increased from 8192 to prevent stack overflow during logging)
         NULL,
         5,    // Priority (medium)
         &s_keepalive_task_handle

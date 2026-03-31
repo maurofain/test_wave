@@ -300,6 +300,13 @@ esp_err_t device_config_load(device_config_t *config);
 esp_err_t device_config_save(const device_config_t *config);
 
 /**
+ * @brief Scrive la configurazione in JSON su SPIFFS
+ * @param config Puntatore a struttura di configurazione
+ * @return ESP_OK se riuscito
+ */
+esp_err_t device_config_write_to_spiffs(const device_config_t *config);
+
+/**
  * @brief Converte la configurazione in JSON
  * @param config Puntatore alla configurazione
  * @return Stringa JSON allocata (da liberare con free())

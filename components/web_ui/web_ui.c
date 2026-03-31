@@ -1758,21 +1758,18 @@ esp_err_t api_config_backup(httpd_req_t *req)
     char *json = cJSON_Print(root);
 
     char response[256] = {0};
-    bool spiffs_ok = false;
+    bool nvs_ok = false;
     bool sd_attempted = false;
     bool sd_ok = false;
 
     if (json) {
-        FILE *f = fopen("/spiffs/config.jsn", "w");
-        if (f) {
-            if (fputs(json, f) >= 0) {
-                spiffs_ok = true;
-            }
-            fclose(f);
-        } else {
-            ESP_LOGE(TAG, "[C] Backup config: impossibile aprire /spiffs/config.jsn in scrittura");
+        // Salva in NVS tramite device_config_save
+        nvs_ok = (device_config_save(cfg) == ESP_OK);
+        if (!nvs_ok) {
+            ESP_LOGE(TAG, "[C] Backup config: salvataggio NVS fallito");
         }
 
+        // Salva su SD card se montata
         if (sd_card_is_mounted()) {
             sd_attempted = true;
             sd_ok = (sd_card_write_file("/sdcard/config.jsn", json) == ESP_OK);
@@ -1787,30 +1784,30 @@ esp_err_t api_config_backup(httpd_req_t *req)
     }
     cJSON_Delete(root);
 
-    if (!spiffs_ok) {
+    if (!nvs_ok) {
         httpd_resp_set_status(req, "500 Internal Server Error");
         if (sd_attempted && sd_ok) {
             snprintf(response,
                      sizeof(response),
-                     "{\"error\":\"Backup SPIFFS fallito; backup SD eseguito in /sdcard/config.jsn\"}");
+                     "{\"error\":\"Backup NVS fallito; config salvata su /sdcard/config.jsn\"}");
         } else {
             snprintf(response,
                      sizeof(response),
-                     "{\"error\":\"Backup SPIFFS fallito\"}");
+                     "{\"error\":\"Backup NVS fallito\"}");
         }
     } else {
         if (sd_attempted && sd_ok) {
             snprintf(response,
                      sizeof(response),
-                     "{\"status\":\"ok\",\"message\":\"Backup salvato in /spiffs/config.jsn e /sdcard/config.jsn\"}");
+                     "{\"status\":\"ok\",\"message\":\"Backup salvato in NVS e /sdcard/config.jsn\"}");
         } else if (sd_attempted && !sd_ok) {
             snprintf(response,
                      sizeof(response),
-                     "{\"status\":\"ok\",\"message\":\"Backup salvato in /spiffs/config.jsn; backup SD non riuscito\"}");
+                     "{\"status\":\"ok\",\"message\":\"Backup salvato in NVS; scrittura SD non riuscita\"}");
         } else {
             snprintf(response,
                      sizeof(response),
-                     "{\"status\":\"ok\",\"message\":\"Backup salvato in /spiffs/config.jsn (SD non montata)\"}");
+                     "{\"status\":\"ok\",\"message\":\"Backup salvato in NVS (SD non montata)\"}");
         }
     }
 
@@ -2449,7 +2446,13 @@ esp_err_t api_config_save(httpd_req_t *req)
         (strncmp(prev_server_password, cfg->server.password, sizeof(prev_server_password)) != 0);
     
     cfg->updated = true;
-    device_config_save(cfg);
+    
+    // Salva in SPIFFS (prioritario) - il salvataggio in NVS/backup avviene via /api/config/backup
+    esp_err_t spiffs_err = device_config_write_to_spiffs(cfg);
+    if (spiffs_err != ESP_OK) {
+        ESP_LOGE(TAG, "[C] Salvataggio SPIFFS fallito: %s", esp_err_to_name(spiffs_err));
+    }
+    
     if (server_cfg_changed) {
         esp_err_t hs_sync_err = http_services_sync_runtime_state(true);
         if (hs_sync_err != ESP_OK && cfg->server.enabled) {
@@ -2486,6 +2489,130 @@ esp_err_t api_config_save(httpd_req_t *req)
     const char *ok_resp = "{\"status\":\"ok\"}";
     httpd_resp_send(req, ok_resp, strlen(ok_resp));
     return ESP_OK;
+}
+
+
+
+
+// Handler API POST /api/config/load_from_sd
+
+/**
+ * @brief Carica la configurazione da SD Card e la applica in runtime.
+ * 
+ * Legge config.jsn da /sdcard/, lo parsa e aggiorna la struttura
+ * della configurazione corrente. Disponibile solo se SD è montata.
+ * 
+ * @param req Puntatore alla richiesta HTTP.
+ * @return esp_err_t Errore generato dalla funzione.
+ */
+esp_err_t api_config_load_from_sd(httpd_req_t *req)
+{
+    if (send_http_log) ESP_LOGI(TAG, "[C] POST /api/config/load_from_sd");
+
+    // Verifica che SD Card sia montata
+    if (!sd_card_is_mounted()) {
+        ESP_LOGW(TAG, "[C] Load from SD: SD Card non montata");
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"SD Card non montata\"}", -1);
+    }
+
+    // Leggi file da SD
+    size_t file_size = 0;
+    void *file_data = sd_card_read_file("/sdcard/config.jsn", &file_size);
+    if (!file_data || file_size == 0) {
+        ESP_LOGE(TAG, "[C] Load from SD: impossibile leggere /sdcard/config.jsn");
+        httpd_resp_set_status(req, "404 Not Found");
+        return httpd_resp_send(req, "{\"error\":\"File config.jsn non trovato su SD\"}", -1);
+    }
+
+    // Null-terminate la stringa
+    char *json_str = (char *)file_data;
+    *(json_str + file_size) = '\0';
+
+    ESP_LOGI(TAG, "[C] Config letta da SD: %zd bytes", file_size);
+
+    // Parsa il JSON e aggiorna la config
+    device_config_t *cfg = device_config_get();
+    cJSON *root = cJSON_Parse(json_str);
+    if (!root) {
+        ESP_LOGE(TAG, "[C] Load from SD: JSON parsing fallito");
+        free(json_str);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"JSON non valido\"}", -1);
+    }
+
+    // Applica il parsing dalla radice (riutilizza la logica di api_config_save)
+    cJSON *name_obj = cJSON_GetObjectItem(root, "dname");
+    if (!name_obj) name_obj = cJSON_GetObjectItem(root, "device_name");
+    if (name_obj && name_obj->valuestring) strncpy(cfg->device_name, name_obj->valuestring, sizeof(cfg->device_name)-1);
+
+    cJSON *loc_obj = cJSON_GetObjectItem(root, "loc");
+    if (!loc_obj) loc_obj = cJSON_GetObjectItem(root, "location_name");
+    if (loc_obj && loc_obj->valuestring) strncpy(cfg->location_name, loc_obj->valuestring, sizeof(cfg->location_name)-1);
+
+    cJSON *img_src_obj = cJSON_GetObjectItem(root, "image_source");
+    if (img_src_obj && img_src_obj->valuestring) {
+        cfg->image_source = (strcmp(img_src_obj->valuestring, "sdcard") == 0)
+            ? IMAGE_SOURCE_SDCARD : IMAGE_SOURCE_SPIFFS;
+    }
+
+    // Numero programmi
+    cJSON *num_prog_obj = cJSON_GetObjectItem(root, "n_prg");
+    if (!num_prog_obj) num_prog_obj = cJSON_GetObjectItem(root, "num_programs");
+    if (num_prog_obj && cJSON_IsNumber(num_prog_obj)) {
+        static const uint8_t s_valid_np[] = {1, 2, 3, 4, 5, 6, 8, 10};
+        uint8_t np = (uint8_t)num_prog_obj->valueint;
+        bool np_ok = false;
+        for (int _i = 0; _i < (int)(sizeof(s_valid_np)/sizeof(s_valid_np[0])); _i++) {
+            if (s_valid_np[_i] == np) { np_ok = true; break; }
+        }
+        cfg->num_programs = np_ok ? np : 10;
+    }
+
+    // Display settings
+    cJSON *display_obj = cJSON_GetObjectItem(root, "display");
+    if (display_obj) {
+        cJSON *enabled = cJSON_GetObjectItem(display_obj, "enabled");
+        if (enabled) {
+#if FORCE_VIDEO_DISABLED
+            cfg->display.enabled = false;
+#else
+            cfg->display.enabled = cJSON_IsTrue(enabled);
+#endif
+        }
+        cJSON *bright = cJSON_GetObjectItem(display_obj, "brt");
+        if (!bright) bright = cJSON_GetObjectItem(display_obj, "lcd_brightness");
+        if (bright) {
+            cfg->display.lcd_brightness = (uint8_t)bright->valueint;
+            if (cfg->display.enabled) {
+                bsp_display_brightness_set(cfg->display.lcd_brightness);
+            }
+        }
+    }
+
+    // Sensori - LED settings
+    cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
+    if (sensors_obj) {
+        cJSON *led = cJSON_GetObjectItem(sensors_obj, "led");
+        if (led) cfg->sensors.led_enabled = cJSON_IsTrue(led);
+
+        cJSON *led_count = cJSON_GetObjectItem(sensors_obj, "led_n");
+        if (!led_count) led_count = cJSON_GetObjectItem(sensors_obj, "led_count");
+        if (led_count) cfg->sensors.led_count = (uint32_t)led_count->valueint;
+    }
+
+    cfg->updated = true;
+    
+    // Salva la nuova config in SPIFFS e applica cambamenti
+    device_config_write_to_spiffs(cfg);
+    tasks_apply_n_run();
+
+    cJSON_Delete(root);
+    free(json_str);
+
+    httpd_resp_set_type(req, "application/json");
+    const char *ok_resp = "{\"status\":\"ok\",\"message\":\"Configurazione caricata da SD e applicata\"}";
+    return httpd_resp_send(req, ok_resp, strlen(ok_resp));
 }
 
 
@@ -3444,6 +3571,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 
     httpd_uri_t uri_api_backup = {.uri = "/api/config/backup", .method = HTTP_POST, .handler = api_config_backup};
     httpd_register_uri_handler(server, &uri_api_backup);
+
+    httpd_uri_t uri_api_load_from_sd = {.uri = "/api/config/load_from_sd", .method = HTTP_POST, .handler = api_config_load_from_sd};
+    httpd_register_uri_handler(server, &uri_api_load_from_sd);
     
     httpd_uri_t uri_api_reset = {.uri = "/api/config/reset", .method = HTTP_POST, .handler = api_config_reset};
     httpd_register_uri_handler(server, &uri_api_reset);
