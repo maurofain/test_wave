@@ -2011,6 +2011,16 @@ void lvgl_page_main_show(void)
 
     update_time(true);
 
+    /* [C] Resetta il cache delle etichette di credito al caricamento della pagina
+       per garantire che venga letto il valore corretto indipendentemente dal punto di ingresso */
+    s_last_credit_text[0] = '\0';
+    s_last_elapsed_text[0] = '\0';
+    s_last_pause_text[0] = '\0';
+    s_last_residual_credit_text[0] = '\0';
+    s_last_gauge_pct = -1;
+    invalidate_program_label_cache();
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: cache etichette resettato");
+
     fsm_ctx_t snap = {0};
     if (fsm_runtime_snapshot(&snap))
     {

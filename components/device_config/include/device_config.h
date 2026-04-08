@@ -122,6 +122,7 @@ typedef struct {
     uint32_t credit_reset_timeout_ms; ///< Timeout per reset crediti CVD/ECD (default 300000ms=5min)
     uint8_t  pre_fine_ciclo_percent; ///< Percentuale ciclo per passaggio a PreFineCiclo (default 70, range 0-99)
     uint32_t pause_max_suspend_sec;  ///< Massima sospensione programma in secondi (default 300s=5min)
+    bool allow_exit_programs_clears_vcd; ///< Abilita tasto ESCI in scelta programmi che azzera VCD (default false)
 } device_timeouts_config_t;
 
 /**
