@@ -2749,8 +2749,11 @@ static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_
         .value_u32 = 0,
         .aux_u32 = 0,
         .text = {0},
+        .customer_code = {0},
     };
     strncpy(pay_ev.text, service_code, sizeof(pay_ev.text) - 1);
+    snprintf(pay_ev.customer_code, sizeof(pay_ev.customer_code), "%s",
+             ctx->customer_code[0] ? ctx->customer_code : "0");
 
     if (!fsm_event_publish(&pay_ev, pdMS_TO_TICKS(50))) {
         ESP_LOGE(TAG, "[M] Publish PAYMENT_EVENT fallito (service=%s amount=%ld)",
@@ -2787,14 +2790,25 @@ static void http_services_task(void *arg)
         if (event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED && event.action == ACTION_ID_PROGRAM_SELECTED) {
             const char *service_code = (event.text[0] != '\0') ? event.text : "SER1";
             int32_t amount = (event.value_i32 > 0) ? event.value_i32 : 0;
-            const http_services_customer_t *customer = s_last_customer_available ? &s_last_customer : NULL;
+            
+            /* [C] Usa customer_code dall'evento FSM, altrimenti fallback su s_last_customer */
+            http_services_customer_t customer = {0};
+            const http_services_customer_t *customer_ptr = NULL;
+            
+            if (event.customer_code[0] != '\0') {
+                customer.valid = true;
+                snprintf(customer.code, sizeof(customer.code), "%s", event.customer_code);
+                customer_ptr = &customer;
+            } else if (s_last_customer_available) {
+                customer_ptr = &s_last_customer;
+            }
 
-            if (!s_last_customer_available) {
+            if (!customer_ptr) {
                 ESP_LOGW(TAG, "[M] payment: customer non disponibile, invio campi customer vuoti");
             }
 
             http_services_payment_response_t pay_resp;
-            esp_err_t pay_err = http_services_payment(customer, amount, service_code, &pay_resp);
+            esp_err_t pay_err = http_services_payment(customer_ptr, amount, service_code, &pay_resp);
             if (pay_err != ESP_OK || pay_resp.common.iserror) {
                 ESP_LOGE(TAG,
                          "[M] payment fallita service=%s amount=%ld err=%s code=%ld des=%s",

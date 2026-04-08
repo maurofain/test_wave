@@ -1,7 +1,6 @@
 #include "fsm.h"
 #include "tasks.h"
 #include "device_config.h"
-#include "http_services.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
@@ -240,26 +239,6 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
     if (!fsm_try_charge_program_cycle(ctx, ctx->running_price_units)) {
         return false;
     }
-
-    /* [C] Chiama api/payment quando il credito viene scalato per il rinnovo automatico */
-    if (ctx->running_price_units > 0) {
-        http_services_customer_t customer = {0};
-        customer.valid = true;
-        snprintf(customer.code, sizeof(customer.code), "%s",
-                 ctx->customer_code[0] ? ctx->customer_code : "0");
-        
-        http_services_payment_response_t resp = {0};
-        esp_err_t err = http_services_payment(&customer,
-                                              ctx->running_price_units,
-                                              "PRG",
-                                              &resp);
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG, "[C] api/payment POST OK (autorenew): paymentid=%ld", (long)resp.paymentid);
-        } else {
-            ESP_LOGW(TAG, "[C] api/payment POST error (autorenew): %s", esp_err_to_name(err));
-        }
-    }
-
     ctx->running_elapsed_ms = 0;
     ctx->pause_elapsed_ms = 0;
     ctx->pause_limit_reached = false;
@@ -825,25 +804,6 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                          prev_running_program_name);
                 fsm_append_message("Avvio programma fallito: credito ripristinato");
                 return false;
-            }
-
-            /* [C] Chiama api/payment quando il credito viene scalato per il programma */
-            if (charged && ctx->running_price_units > 0) {
-                http_services_customer_t customer = {0};
-                customer.valid = true;
-                snprintf(customer.code, sizeof(customer.code), "%s",
-                         ctx->customer_code[0] ? ctx->customer_code : "0");
-                
-                http_services_payment_response_t resp = {0};
-                esp_err_t err = http_services_payment(&customer,
-                                                      ctx->running_price_units,
-                                                      "PRG",
-                                                      &resp);
-                if (err == ESP_OK) {
-                    ESP_LOGI(TAG, "[C] api/payment POST OK: paymentid=%ld", (long)resp.paymentid);
-                } else {
-                    ESP_LOGW(TAG, "[C] api/payment POST error: %s", esp_err_to_name(err));
-                }
             }
 
             return true;

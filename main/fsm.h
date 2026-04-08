@@ -233,6 +233,7 @@ typedef struct {
     uint32_t aux_u32;
     void * data_ptr;
     char text[FSM_EVENT_TEXT_MAX_LEN];
+    char customer_code[FSM_EVENT_TEXT_MAX_LEN];  /* [C] codice cliente per api/payment */
 } fsm_input_event_t;
 
 typedef struct {

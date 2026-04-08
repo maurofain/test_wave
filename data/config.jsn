@@ -84,7 +84,7 @@
         "ad_rotation_ms": 30000
     },
     "display": {
-        "en": false,
+        "en": true,
         "brt": 80,
         "backlight": true,
         "ads_en": true
