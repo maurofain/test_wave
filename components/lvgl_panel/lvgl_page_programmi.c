@@ -99,6 +99,7 @@ static lv_obj_t *s_gauge = NULL;
 static lv_obj_t *s_gauge_time_lbl = NULL;
 static lv_obj_t *s_counter_fill = NULL;
 static lv_obj_t *s_stop_btn = NULL;  /* Flag image inside the button */
+static lv_obj_t *s_exit_btn = NULL;  /* pulsante ESCI opzionale che azzera VCD */
 static lv_obj_t *s_stop_lbl = NULL;  /* label inside stop button */
 static lv_obj_t *s_program_popup = NULL;
 static lv_obj_t *s_program_popup_lbl = NULL;
@@ -979,6 +980,21 @@ static void update_state(const fsm_ctx_t *snap)
         }
     }
 
+    /* [C] Gestione pulsante ESCI (opzionale, azzera VCD) */
+    if (s_exit_btn) {
+        const device_config_t *cfg = device_config_get();
+        bool exit_enabled = cfg && cfg->timeouts.allow_exit_programs_clears_vcd;
+        bool show_exit = exit_enabled && !running && !paused;
+
+        if (show_exit) {
+            lv_obj_clear_flag(s_exit_btn, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(s_exit_btn, LV_OBJ_FLAG_CLICKABLE);
+        } else {
+            lv_obj_add_flag(s_exit_btn, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(s_exit_btn, LV_OBJ_FLAG_CLICKABLE);
+        }
+    }
+
     /* Sync program button labels with running/paused state */
     if ((running || paused) && snap->running_program_name[0] != '\0') {
         const web_ui_program_table_t *tbl = web_ui_program_table_get();
@@ -1150,6 +1166,58 @@ static void on_prog_btn(lv_event_t *e)
             s_last_pause_text[0] = '\0';
         }
     }
+}
+
+/**
+ * @brief [C] Gestisce il click sul pulsante ESCI (azzera VCD e torna al menu).
+ *
+ * Questa funzione viene chiamata quando il pulsante ESCI viene premuto.
+ * Azzera i crediti VCD (vcd_coins, vcd_used, vcd_cents_residual)
+ * e ritorna a ADS se abilitato, altrimenti a IDLE.
+ *
+ * @param e Puntatore all'evento generato.
+ * @return Nessun valore di ritorno.
+ */
+static void on_exit_btn(lv_event_t *e)
+{
+    (void)e;
+    mark_user_interaction();
+    ESP_LOGI(TAG, "[C] Pulsante ESCI premuto - azzero VCD e torno al menu");
+
+    fsm_ctx_t snap = {0};
+    bool has_snap = fsm_runtime_snapshot(&snap);
+    
+    if (!has_snap) {
+        ESP_LOGW(TAG, "[C] on_exit_btn: non posso leggere FSM snapshot");
+        return;
+    }
+
+    // Verifico che siamo in stato appropriato (non running, non paused)
+    if (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED) {
+        ESP_LOGI(TAG, "[C] ESCI ignorato: programma è in corso");
+        return;
+    }
+
+    // Azzero i crediti VCD
+    fsm_input_event_t ev = {
+        .from = AGN_ID_LVGL,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_CREDIT_ENDED,  // Usa azione generica di fine credito
+        .type = FSM_INPUT_EVENT_CREDIT_ENDED,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,  // Impostammo il flag VCD clear nel data_ptr
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .data_ptr = NULL,  // Potremmo usare questo per un flag speciale se necessario
+        .text = {0},
+    };
+
+    // Pubblica l'evento per azzerare crediti e tornare a menu
+    if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
+        ESP_LOGW(TAG, "[C] publish CREDIT_ENDED from EXIT button failed");
+    }
+
+    ESP_LOGI(TAG, "[C] ESCI: evento CREDIT_ENDED pubblicato verso FSM");
 }
 
 /**
@@ -1520,6 +1588,29 @@ static void build_status(lv_obj_t *scr)
     lv_obj_clear_flag(s_stop_btn, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_color(s_stop_btn, lv_color_make(0x50, 0x20, 0x20), LV_PART_MAIN);
     lv_obj_set_style_opa(s_stop_btn, LV_OPA_COVER, LV_PART_MAIN);
+
+    /* [C] Pulsante ESCI opzionale (azzera VCD e torna a menu) */
+    s_exit_btn = lv_button_create(scr);
+    lv_obj_set_pos(s_exit_btn, PANEL_PAD_X, stop_y);
+    lv_obj_set_size(s_exit_btn, PANEL_FULL_W, PANEL_STOP_BTN_H);
+    lv_obj_set_style_bg_color(s_exit_btn, lv_color_make(0x27, 0xd7, 0xb2), LV_PART_MAIN);  /* Verde turchese */
+    lv_obj_set_style_bg_opa(s_exit_btn, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_exit_btn, 2, LV_PART_MAIN);
+    lv_obj_set_style_border_color(s_exit_btn, lv_color_make(0x80, 0xFF, 0x80), LV_PART_MAIN);
+    lv_obj_set_style_radius(s_exit_btn, 25, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s_exit_btn, 0, LV_PART_MAIN);
+    lv_obj_add_flag(s_exit_btn, LV_OBJ_FLAG_HIDDEN);  /* Nascondi inizialmente */
+
+    lv_obj_t *exit_lbl = lv_label_create(s_exit_btn);
+    char exit_text[64];
+    (void)lvgl_i18n_get_text("program_exit", "ESCI", exit_text, sizeof(exit_text));
+    lv_label_set_text(exit_lbl, exit_text);
+    lv_obj_set_style_text_color(exit_lbl, COL_BLACK, LV_PART_MAIN);
+    lv_obj_set_style_text_font(exit_lbl, FONT_PROG_BTN, LV_PART_MAIN);
+    lv_obj_center(exit_lbl);
+
+    lv_obj_add_event_cb(s_exit_btn, on_exit_btn, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_style_opa(s_exit_btn, LV_OPA_COVER, LV_PART_MAIN);
 }
 
 /**

@@ -1083,6 +1083,7 @@ static void _set_defaults(device_config_t *config)
     config->timeouts.credit_reset_timeout_ms = 300000; // Default 5min per reset crediti
     config->timeouts.pre_fine_ciclo_percent = 70;   // Default 70% per PreFineCiclo
     config->timeouts.pause_max_suspend_sec = 300;   // Default 5min (300s) per sospensione programma
+    config->timeouts.allow_exit_programs_clears_vcd = false; // Default: tasto ESCI disabilitato
     config->display.ads_enabled = true;
 
     // Default testi UI / lingua
@@ -1758,6 +1759,10 @@ esp_err_t device_config_load(device_config_t *config)
                             config->timeouts.pause_max_suspend_sec = val;
                         }
                     }
+                    cJSON *allow_exit = cJSON_GetObjectItem(timeouts_obj, "allow_exit_programs_clears_vcd");
+                    if (allow_exit) {
+                        config->timeouts.allow_exit_programs_clears_vcd = cJSON_IsTrue(allow_exit);
+                    }
                 }
                 if (config->timeouts.exit_programs_ms < 1000U)  config->timeouts.exit_programs_ms = 1000U;
                 if (config->timeouts.exit_programs_ms > 600000U) config->timeouts.exit_programs_ms = 600000U;
@@ -2124,6 +2129,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(timeouts_obj, "credit_reset_timeout_ms", config->timeouts.credit_reset_timeout_ms);
     cJSON_AddNumberToObject(timeouts_obj, "pre_fine_ciclo_percent", config->timeouts.pre_fine_ciclo_percent);
     cJSON_AddNumberToObject(timeouts_obj, "pause_max_suspend_sec", config->timeouts.pause_max_suspend_sec);
+    cJSON_AddBoolToObject(timeouts_obj, "allow_exit_programs_clears_vcd", config->timeouts.allow_exit_programs_clears_vcd);
     cJSON_AddItemToObject(root, "timeouts", timeouts_obj);
 
     // MDB

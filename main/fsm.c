@@ -53,11 +53,23 @@ static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source
 static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source);
 static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost);
 static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx);
+static const char *fsm_source_tag_to_display_name(const char *source_tag);
 static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
                                       int32_t amount_cents,
                                       bool is_ecd,
                                       const char *source_tag);
 static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms);
+
+/* Mappa source_tag a etichetta visualizzazione per il logging dei crediti ricevuti */
+static const char *fsm_source_tag_to_display_name(const char *source_tag)
+{
+    if (!source_tag) return "PAGAMENTO";
+    if (strcmp(source_tag, "coin") == 0) return "MONETE";
+    if (strcmp(source_tag, "token") == 0) return "MDB-GETTONE";
+    if (strcmp(source_tag, "qr_vcd") == 0) return "SCANNER-QR";
+    if (strcmp(source_tag, "card_vcd") == 0) return "TESSERA/CARD";
+    return "PAGAMENTO";
+}
 
 static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms)
 {
@@ -124,6 +136,21 @@ static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
              (long)ctx->ecd_coins,
              (long)ctx->vcd_coins,
              (long)ctx->credit_cents);
+
+    /* Log box-style con info ricezione crediti (44 char tra i ║) */
+    const char *display_name = fsm_source_tag_to_display_name(source_tag);
+    char line1[50], line2[50], line3[50], line4[50];
+    snprintf(line1, sizeof(line1), " CREDITI RICEVUTI - %s", display_name);
+    snprintf(line2, sizeof(line2), " Importo: %ld cent", (long)amount_cents);
+    snprintf(line3, sizeof(line3), " ECD dopo: %ld | VCD dopo: %ld", (long)ctx->ecd_coins, (long)ctx->vcd_coins);
+    snprintf(line4, sizeof(line4), " Credito totale: %ld cent", (long)ctx->credit_cents);
+    ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════╗");
+    ESP_LOGI(TAG, "[M] ║%-44s║", line1);
+    ESP_LOGI(TAG, "[M] ║%-44s║", line2);
+    ESP_LOGI(TAG, "[M] ║%-44s║", line3);
+    ESP_LOGI(TAG, "[M] ║%-44s║", line4);
+    ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════╝");
+
 }
 
 static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
