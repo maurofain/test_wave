@@ -1,6 +1,7 @@
 #include "fsm.h"
 #include "tasks.h"
 #include "device_config.h"
+#include "http_services.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
@@ -239,6 +240,26 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
     if (!fsm_try_charge_program_cycle(ctx, ctx->running_price_units)) {
         return false;
     }
+
+    /* [C] Chiama api/payment quando il credito viene scalato per il rinnovo automatico */
+    if (ctx->running_price_units > 0) {
+        http_services_customer_t customer = {0};
+        customer.valid = true;
+        snprintf(customer.code, sizeof(customer.code), "%s",
+                 ctx->customer_code[0] ? ctx->customer_code : "0");
+        
+        http_services_payment_response_t resp = {0};
+        esp_err_t err = http_services_payment(&customer,
+                                              ctx->running_price_units,
+                                              "PRG",
+                                              &resp);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "[C] api/payment POST OK (autorenew): paymentid=%ld", (long)resp.paymentid);
+        } else {
+            ESP_LOGW(TAG, "[C] api/payment POST error (autorenew): %s", esp_err_to_name(err));
+        }
+    }
+
     ctx->running_elapsed_ms = 0;
     ctx->pause_elapsed_ms = 0;
     ctx->pause_limit_reached = false;
@@ -422,6 +443,7 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->pre_fine_ciclo_active = false;
     ctx->out_of_service_agent = (int32_t)AGN_ID_NONE;
     memset(ctx->out_of_service_reason, 0, sizeof(ctx->out_of_service_reason));
+    memset(ctx->customer_code, 0, sizeof(ctx->customer_code));
 }
 
 
@@ -666,6 +688,8 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
+            /* [C] Codice cliente "0" per pagamento monete */
+            snprintf(ctx->customer_code, sizeof(ctx->customer_code), "0");
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
@@ -680,6 +704,8 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
+            /* [C] Codice cliente "0" per pagamento token */
+            snprintf(ctx->customer_code, sizeof(ctx->customer_code), "0");
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
@@ -701,6 +727,9 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_QR);
+            /* [C] Memorizza il codice cliente da QR per successiva api/payment */
+            snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s",
+                     (event->text[0] != '\0') ? event->text : "0");
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
@@ -717,6 +746,9 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_CARD);
+            /* [C] Memorizza il codice cliente da Card per successiva api/payment */
+            snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s",
+                     (event->text[0] != '\0') ? event->text : "0");
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
@@ -793,6 +825,25 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                          prev_running_program_name);
                 fsm_append_message("Avvio programma fallito: credito ripristinato");
                 return false;
+            }
+
+            /* [C] Chiama api/payment quando il credito viene scalato per il programma */
+            if (charged && ctx->running_price_units > 0) {
+                http_services_customer_t customer = {0};
+                customer.valid = true;
+                snprintf(customer.code, sizeof(customer.code), "%s",
+                         ctx->customer_code[0] ? ctx->customer_code : "0");
+                
+                http_services_payment_response_t resp = {0};
+                esp_err_t err = http_services_payment(&customer,
+                                                      ctx->running_price_units,
+                                                      "PRG",
+                                                      &resp);
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "[C] api/payment POST OK: paymentid=%ld", (long)resp.paymentid);
+                } else {
+                    ESP_LOGW(TAG, "[C] api/payment POST error: %s", esp_err_to_name(err));
+                }
             }
 
             return true;

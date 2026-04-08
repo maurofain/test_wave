@@ -265,6 +265,7 @@ typedef struct {
     bool pre_fine_ciclo_active;  /* true quando la soglia PreFineCiclo è stata raggiunta */
     int32_t out_of_service_agent; /* AGN_ID_* che ha causato lo stato OOS */
     char out_of_service_reason[FSM_EVENT_TEXT_MAX_LEN]; /* chiave motivo OOS */
+    char customer_code[FSM_EVENT_TEXT_MAX_LEN]; /* [C] codice cliente per api/payment (QR, Card, o "0" per monete) */
 } fsm_ctx_t;
 
 void fsm_init(fsm_ctx_t *ctx);
