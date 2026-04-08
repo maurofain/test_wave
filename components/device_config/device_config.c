@@ -65,7 +65,6 @@ static const device_serial_config_t s_serial_default_mdb = {
     .tx_buf_size = 1024,
 };
 
-
 /**
  * @brief Legge un intero da un oggetto JSON con chiave primaria e legacy.
  *
@@ -78,23 +77,25 @@ static const device_serial_config_t s_serial_default_mdb = {
  */
 static bool _json_read_int(cJSON *obj, const char *primary_key, const char *legacy_key, int *out_value)
 {
-    if (!obj || !primary_key || !out_value) {
+    if (!obj || !primary_key || !out_value)
+    {
         return false;
     }
 
     cJSON *item = cJSON_GetObjectItem(obj, primary_key);
-    if ((!item || !cJSON_IsNumber(item)) && legacy_key) {
+    if ((!item || !cJSON_IsNumber(item)) && legacy_key)
+    {
         item = cJSON_GetObjectItem(obj, legacy_key);
     }
 
-    if (!item || !cJSON_IsNumber(item)) {
+    if (!item || !cJSON_IsNumber(item))
+    {
         return false;
     }
 
     *out_value = item->valueint;
     return true;
 }
-
 
 /**
  * @brief Legge un booleano da JSON accettando formati bool/numero/stringa.
@@ -113,40 +114,47 @@ static bool _json_read_bool(cJSON *obj,
                             const char *legacy_key,
                             bool current_value)
 {
-    if (!obj || !primary_key) {
+    if (!obj || !primary_key)
+    {
         return current_value;
     }
 
     cJSON *item = cJSON_GetObjectItem(obj, primary_key);
-    if (!item && legacy_key) {
+    if (!item && legacy_key)
+    {
         item = cJSON_GetObjectItem(obj, legacy_key);
     }
-    if (!item) {
+    if (!item)
+    {
         return current_value;
     }
 
-    if (cJSON_IsBool(item)) {
+    if (cJSON_IsBool(item))
+    {
         return cJSON_IsTrue(item);
     }
-    if (cJSON_IsNumber(item)) {
+    if (cJSON_IsNumber(item))
+    {
         return item->valuedouble != 0.0;
     }
-    if (cJSON_IsString(item) && item->valuestring) {
+    if (cJSON_IsString(item) && item->valuestring)
+    {
         if ((strcmp(item->valuestring, "true") == 0) ||
             (strcmp(item->valuestring, "TRUE") == 0) ||
-            (strcmp(item->valuestring, "1") == 0)) {
+            (strcmp(item->valuestring, "1") == 0))
+        {
             return true;
         }
         if ((strcmp(item->valuestring, "false") == 0) ||
             (strcmp(item->valuestring, "FALSE") == 0) ||
-            (strcmp(item->valuestring, "0") == 0)) {
+            (strcmp(item->valuestring, "0") == 0))
+        {
             return false;
         }
     }
 
     return current_value;
 }
-
 
 /**
  * @brief Restituisce il valore se nel range, altrimenti il default.
@@ -159,12 +167,12 @@ static bool _json_read_bool(cJSON *obj,
  */
 static int _clamp_int_or_default(int value, int min_value, int max_value, int default_value)
 {
-    if (value < min_value || value > max_value) {
+    if (value < min_value || value > max_value)
+    {
         return default_value;
     }
     return value;
 }
-
 
 /**
  * @brief Esegue parsing sicuro della configurazione seriale da JSON.
@@ -177,43 +185,50 @@ static void _parse_serial_cfg_json(cJSON *serial_obj,
                                    device_serial_config_t *target,
                                    const device_serial_config_t *defaults)
 {
-    if (!serial_obj || !target || !defaults) {
+    if (!serial_obj || !target || !defaults)
+    {
         return;
     }
 
     int value = 0;
 
-    if (_json_read_int(serial_obj, "baud", "baud_rate", &value)) {
+    if (_json_read_int(serial_obj, "baud", "baud_rate", &value))
+    {
         target->baud_rate = _clamp_int_or_default(value,
                                                   DEVICE_CFG_SERIAL_BAUD_MIN,
                                                   DEVICE_CFG_SERIAL_BAUD_MAX,
                                                   defaults->baud_rate);
     }
-    if (_json_read_int(serial_obj, "data", "data_bits", &value)) {
+    if (_json_read_int(serial_obj, "data", "data_bits", &value))
+    {
         target->data_bits = _clamp_int_or_default(value,
                                                   DEVICE_CFG_SERIAL_DATA_BITS_MIN,
                                                   DEVICE_CFG_SERIAL_DATA_BITS_MAX,
                                                   defaults->data_bits);
     }
-    if (_json_read_int(serial_obj, "par", "parity", &value)) {
+    if (_json_read_int(serial_obj, "par", "parity", &value))
+    {
         target->parity = _clamp_int_or_default(value,
                                                DEVICE_CFG_SERIAL_PARITY_MIN,
                                                DEVICE_CFG_SERIAL_PARITY_MAX,
                                                defaults->parity);
     }
-    if (_json_read_int(serial_obj, "stop", "stop_bits", &value)) {
+    if (_json_read_int(serial_obj, "stop", "stop_bits", &value))
+    {
         target->stop_bits = _clamp_int_or_default(value,
                                                   DEVICE_CFG_SERIAL_STOP_BITS_MIN,
                                                   DEVICE_CFG_SERIAL_STOP_BITS_MAX,
                                                   defaults->stop_bits);
     }
-    if (_json_read_int(serial_obj, "rx_buf", "rx_buf_size", &value)) {
+    if (_json_read_int(serial_obj, "rx_buf", "rx_buf_size", &value))
+    {
         target->rx_buf_size = _clamp_int_or_default(value,
                                                     DEVICE_CFG_SERIAL_RX_BUF_MIN,
                                                     DEVICE_CFG_SERIAL_BUF_MAX,
                                                     defaults->rx_buf_size);
     }
-    if (_json_read_int(serial_obj, "tx_buf", "tx_buf_size", &value)) {
+    if (_json_read_int(serial_obj, "tx_buf", "tx_buf_size", &value))
+    {
         target->tx_buf_size = _clamp_int_or_default(value,
                                                     0,
                                                     DEVICE_CFG_SERIAL_BUF_MAX,
@@ -234,25 +249,22 @@ static void _i18n_v2_clear_cache(void);
 static cJSON *s_i18n_lookup_cache = NULL;
 static char s_i18n_lookup_lang[8] = {0};
 
-
-
 /**
  * @brief Cancella la cache di ricerca internazionale.
  */
 static void _i18n_lookup_cache_clear(void)
 {
-    if (s_i18n_lookup_cache) {
+    if (s_i18n_lookup_cache)
+    {
         cJSON_Delete(s_i18n_lookup_cache);
         s_i18n_lookup_cache = NULL;
     }
     s_i18n_lookup_lang[0] = '\0';
 }
 
-
-
 /**
  * @brief Aggiunge un testo JSON all'oggetto cJSON.
- * 
+ *
  * @param object Puntatore all'oggetto cJSON a cui aggiungere il testo.
  * @param key Chiave del campo JSON da aggiungere.
  * @param text Testo da aggiungere.
@@ -261,25 +273,29 @@ static void _i18n_lookup_cache_clear(void)
  */
 static bool _append_json_text(cJSON *object, const char *key, const char *text)
 {
-    if (!object || !key || key[0] == '\0') {
+    if (!object || !key || key[0] == '\0')
+    {
         return false;
     }
 
     const char *chunk = text ? text : "";
     cJSON *existing = cJSON_GetObjectItemCaseSensitive(object, key);
-    if (!existing) {
+    if (!existing)
+    {
         cJSON_AddStringToObject(object, key, chunk);
         return true;
     }
 
-    if (!cJSON_IsString(existing) || !existing->valuestring) {
+    if (!cJSON_IsString(existing) || !existing->valuestring)
+    {
         return false;
     }
 
     size_t old_len = strlen(existing->valuestring);
     size_t add_len = strlen(chunk);
     char *merged = malloc(old_len + add_len + 1);
-    if (!merged) {
+    if (!merged)
+    {
         return false;
     }
 
@@ -289,7 +305,8 @@ static bool _append_json_text(cJSON *object, const char *key, const char *text)
 
     cJSON *new_item = cJSON_CreateString(merged);
     free(merged);
-    if (!new_item) {
+    if (!new_item)
+    {
         return false;
     }
 
@@ -297,10 +314,9 @@ static bool _append_json_text(cJSON *object, const char *key, const char *text)
     return true;
 }
 
-
 /**
  * @brief Aggiunge una mappatura di ricerca se non esiste già.
- * 
+ *
  * @param [in] table Puntatore alla tabella JSON in cui aggiungere la mappatura.
  * @param [in] key Chiave della mappatura da aggiungere.
  * @param [in] value Valore della mappatura da aggiungere.
@@ -308,14 +324,15 @@ static bool _append_json_text(cJSON *object, const char *key, const char *text)
  */
 static void _add_lookup_mapping_if_missing(cJSON *table, const char *key, const char *value)
 {
-    if (!table || !key || !value || key[0] == '\0') {
+    if (!table || !key || !value || key[0] == '\0')
+    {
         return;
     }
-    if (!cJSON_GetObjectItemCaseSensitive(table, key)) {
+    if (!cJSON_GetObjectItemCaseSensitive(table, key))
+    {
         cJSON_AddStringToObject(table, key, value);
     }
 }
-
 
 /**
  * @brief Costruisce il cache per la traduzione per un determinato linguaggio.
@@ -326,7 +343,8 @@ static void _add_lookup_mapping_if_missing(cJSON *table, const char *key, const 
 static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
 {
     const char *lang = _effective_lang(language);
-    if (s_i18n_lookup_cache && strcmp(s_i18n_lookup_lang, lang) == 0) {
+    if (s_i18n_lookup_cache && strcmp(s_i18n_lookup_lang, lang) == 0)
+    {
         return ESP_OK;
     }
 
@@ -334,10 +352,12 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
 
     const char *lang_or_default = (lang && lang[0]) ? lang : UI_LANG_DEFAULT;
     cJSON *records = _i18n_v2_build_records_for_language(lang_or_default);
-    if (!records && strcmp(lang_or_default, UI_LANG_DEFAULT) != 0) {
+    if (!records && strcmp(lang_or_default, UI_LANG_DEFAULT) != 0)
+    {
         records = _i18n_v2_build_records_for_language(UI_LANG_DEFAULT);
     }
-    if (!records) {
+    if (!records)
+    {
         return ESP_FAIL;
     }
 
@@ -345,43 +365,52 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
     cJSON *aggregated = cJSON_CreateObject();
     cJSON *aggregated_scope = cJSON_CreateObject();
     cJSON *aggregated_key = cJSON_CreateObject();
-    if (!table || !aggregated || !aggregated_scope || !aggregated_key) {
-        if (table) {
+    if (!table || !aggregated || !aggregated_scope || !aggregated_key)
+    {
+        if (table)
+        {
             cJSON_Delete(table);
         }
-        if (aggregated) {
+        if (aggregated)
+        {
             cJSON_Delete(aggregated);
         }
-        if (aggregated_scope) {
+        if (aggregated_scope)
+        {
             cJSON_Delete(aggregated_scope);
         }
-        if (aggregated_key) {
+        if (aggregated_key)
+        {
             cJSON_Delete(aggregated_key);
         }
         cJSON_Delete(records);
         return ESP_ERR_NO_MEM;
     }
 
-
     cJSON *item = NULL;
-    cJSON_ArrayForEach(item, records) {
-        if (!cJSON_IsObject(item)) {
+    cJSON_ArrayForEach(item, records)
+    {
+        if (!cJSON_IsObject(item))
+        {
             continue;
         }
 
         cJSON *text = cJSON_GetObjectItemCaseSensitive(item, "text");
-        if (!cJSON_IsString(text) || !text->valuestring) {
+        if (!cJSON_IsString(text) || !text->valuestring)
+        {
             continue;
         }
 
         cJSON *scope = cJSON_GetObjectItemCaseSensitive(item, "scope");
         cJSON *key = cJSON_GetObjectItemCaseSensitive(item, "key");
-        
+
         // Gestione sistema vecchio (chiavi numeriche)
-        if (cJSON_IsNumber(scope) && cJSON_IsNumber(key)) {
+        if (cJSON_IsNumber(scope) && cJSON_IsNumber(key))
+        {
             int scope_id = scope->valueint;
             int key_id = key->valueint;
-            if (scope_id <= 0 || key_id <= 0) {
+            if (scope_id <= 0 || key_id <= 0)
+            {
                 continue;
             }
 
@@ -390,41 +419,48 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
             _append_json_text(aggregated, scoped_key, text->valuestring);
 
             const char *scope_text = i18n_scope_name(scope_id);
-            const char *key_text   = i18n_key_name(key_id);
-            if (scope_text && !cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key)) {
+            const char *key_text = i18n_key_name(key_id);
+            if (scope_text && !cJSON_GetObjectItemCaseSensitive(aggregated_scope, scoped_key))
+            {
                 cJSON_AddStringToObject(aggregated_scope, scoped_key, scope_text);
             }
-            if (key_text && !cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key)) {
+            if (key_text && !cJSON_GetObjectItemCaseSensitive(aggregated_key, scoped_key))
+            {
                 cJSON_AddStringToObject(aggregated_key, scoped_key, key_text);
             }
         }
         // Gestione nuovo sistema (chiavi testuali)
-        else if (cJSON_IsNumber(scope) && cJSON_IsString(key)) {
+        else if (cJSON_IsNumber(scope) && cJSON_IsString(key))
+        {
             int scope_id = scope->valueint;
             const char *key_text = key->valuestring;
-            if (scope_id <= 0 || !key_text) {
+            if (scope_id <= 0 || !key_text)
+            {
                 continue;
             }
 
             const char *scope_text = i18n_scope_name(scope_id);
-            if (scope_text) {
+            if (scope_text)
+            {
                 // Aggiungi chiave scoped: scope_text.key_text
                 char scoped_key[96] = {0};
                 snprintf(scoped_key, sizeof(scoped_key), "%s.%s", scope_text, key_text);
                 _append_json_text(aggregated, scoped_key, text->valuestring);
-                
+
                 // Aggiungi anche chiave non scoped per fallback
                 _append_json_text(aggregated, key_text, text->valuestring);
-                
-                ESP_LOGD(TAG, "[C] Cache aggiunta: '%s' -> '%s' e '%s' -> '%s'", 
+
+                ESP_LOGD(TAG, "[C] Cache aggiunta: '%s' -> '%s' e '%s' -> '%s'",
                          scoped_key, text->valuestring, key_text, text->valuestring);
             }
         }
     }
 
     cJSON *entry = NULL;
-    cJSON_ArrayForEach(entry, aggregated) {
-        if (!cJSON_IsString(entry) || !entry->string || !entry->valuestring) {
+    cJSON_ArrayForEach(entry, aggregated)
+    {
+        if (!cJSON_IsString(entry) || !entry->string || !entry->valuestring)
+        {
             continue;
         }
 
@@ -433,7 +469,8 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
         _add_lookup_mapping_if_missing(table, scoped_key, value);
 
         const char *dot = strchr(scoped_key, '.');
-        if (dot && dot[1] != '\0') {
+        if (dot && dot[1] != '\0')
+        {
             _add_lookup_mapping_if_missing(table, dot + 1, value);
         }
     }
@@ -446,7 +483,6 @@ static esp_err_t _i18n_lookup_cache_build_for_lang(const char *language)
     s_i18n_lookup_lang[sizeof(s_i18n_lookup_lang) - 1] = '\0';
     return ESP_OK;
 }
-
 
 /**
  * @brief Controlla se la lingua specificata è un ISO 639-1 codice di due lettere.
@@ -461,18 +497,20 @@ static bool _is_iso2_lang(const char *language)
 
 static const char *_effective_lang(const char *language)
 {
-    if (_is_iso2_lang(language)) {
+    if (_is_iso2_lang(language))
+    {
         return language;
     }
-    if (_is_iso2_lang(s_config.ui.user_language)) {
+    if (_is_iso2_lang(s_config.ui.user_language))
+    {
         return s_config.ui.user_language;
     }
-    if (_is_iso2_lang(s_config.ui.backend_language)) {
+    if (_is_iso2_lang(s_config.ui.backend_language))
+    {
         return s_config.ui.backend_language;
     }
     return UI_LANG_DEFAULT;
 }
-
 
 /**
  * @brief Costruisce il percorso del file di traduzione per un determinato linguaggio.
@@ -485,63 +523,73 @@ static const char *_effective_lang(const char *language)
  */
 static char *_read_text_file(const char *path, size_t *out_len)
 {
-    if (out_len) {
+    if (out_len)
+    {
         *out_len = 0;
     }
-    if (!path) {
+    if (!path)
+    {
         return NULL;
     }
 
     FILE *file = fopen(path, "r");
-    if (!file) {
+    if (!file)
+    {
         return NULL;
     }
 
     fseek(file, 0, SEEK_END);
     long sz = ftell(file);
     fseek(file, 0, SEEK_SET);
-    if (sz <= 0) {
+    if (sz <= 0)
+    {
         fclose(file);
         return NULL;
     }
 
     char *buffer = malloc((size_t)sz + 1);
-    if (!buffer) {
+    if (!buffer)
+    {
         fclose(file);
         return NULL;
     }
 
     size_t read = fread(buffer, 1, (size_t)sz, file);
     fclose(file);
-    
-    if (read != (size_t)sz) {
+
+    if (read != (size_t)sz)
+    {
         free(buffer);
         return NULL;
     }
-    
+
     buffer[read] = '\0';
-    if (out_len) {
+    if (out_len)
+    {
         *out_len = read;
     }
-    
+
     return buffer;
 }
 
 static esp_err_t _write_text_file(const char *path, const char *content)
 {
-    if (!path || !content) {
+    if (!path || !content)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
     char tmp_path[256] = {0};
     int n = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
-    if (n <= 0 || (size_t)n >= sizeof(tmp_path)) {
+    if (n <= 0 || (size_t)n >= sizeof(tmp_path))
+    {
         ESP_LOGE(TAG, "[C] Path temporaneo non valido per %s", path);
         return ESP_ERR_INVALID_SIZE;
     }
 
     FILE *file = fopen(tmp_path, "w");
-    if (!file) {
+    if (!file)
+    {
         ESP_LOGE(TAG,
                  "[C] Impossibile aprire il file temporaneo %s in scrittura (errno=%d)",
                  tmp_path,
@@ -554,7 +602,8 @@ static esp_err_t _write_text_file(const char *path, const char *content)
     int fflush_rc = fflush(file);
     int fclose_rc = fclose(file);
 
-    if (written != len || fflush_rc != 0 || fclose_rc != 0) {
+    if (written != len || fflush_rc != 0 || fclose_rc != 0)
+    {
         ESP_LOGE(TAG,
                  "[C] Scrittura incompleta su %s: %zu/%zu byte (fflush=%d fclose=%d errno=%d)",
                  tmp_path,
@@ -567,7 +616,8 @@ static esp_err_t _write_text_file(const char *path, const char *content)
         return ESP_FAIL;
     }
 
-    if (rename(tmp_path, path) != 0) {
+    if (rename(tmp_path, path) != 0)
+    {
         ESP_LOGE(TAG,
                  "[C] Rename atomico fallito %s -> %s (errno=%d)",
                  tmp_path,
@@ -583,7 +633,7 @@ static esp_err_t _write_text_file(const char *path, const char *content)
 
 /**
  * @brief Aggiorna il testo di un programma in i18n_v2.json
- * 
+ *
  * @param program_key Chiave del programma (es. "program_name_01")
  * @param language Codice lingua (es. "it", "en")
  * @param new_text Nuovo testo per il programma
@@ -591,55 +641,66 @@ static esp_err_t _write_text_file(const char *path, const char *content)
  */
 esp_err_t device_config_update_program_text_i18n(const char *program_key, const char *language, const char *new_text)
 {
-    if (!program_key || !language || !new_text) {
+    if (!program_key || !language || !new_text)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
     // Carica i18n_v2.json
     size_t sz = 0;
     char *json_content = _read_text_file(I18N_V2_FILE_PATH, &sz);
-    if (!json_content || sz == 0) {
+    if (!json_content || sz == 0)
+    {
         ESP_LOGE(TAG, "[C] Impossibile leggere i18n_v2.json");
-        if (json_content) free(json_content);
+        if (json_content)
+            free(json_content);
         return ESP_FAIL;
     }
 
     // Parse JSON
     cJSON *root = cJSON_Parse(json_content);
     free(json_content);
-    if (!root) {
+    if (!root)
+    {
         ESP_LOGE(TAG, "[C] Errore parsing i18n_v2.json");
         return ESP_FAIL;
     }
 
     // Naviga fino a lvgl -> program_key -> text -> language
     cJSON *lvgl_section = cJSON_GetObjectItem(root, "lvgl");
-    if (!lvgl_section) {
+    if (!lvgl_section)
+    {
         ESP_LOGE(TAG, "[C] Sezione 'lvgl' non trovata in i18n_v2.json");
         cJSON_Delete(root);
         return ESP_FAIL;
     }
 
     cJSON *program_entry = cJSON_GetObjectItem(lvgl_section, program_key);
-    if (!program_entry) {
+    if (!program_entry)
+    {
         ESP_LOGE(TAG, "[C] Programma '%s' non trovato in i18n_v2.json", program_key);
         cJSON_Delete(root);
         return ESP_FAIL;
     }
 
     cJSON *text_section = cJSON_GetObjectItem(program_entry, "text");
-    if (!text_section) {
+    if (!text_section)
+    {
         ESP_LOGE(TAG, "[C] Sezione 'text' non trovata per programma '%s'", program_key);
         cJSON_Delete(root);
         return ESP_FAIL;
     }
 
     // Aggiorna il testo per la lingua specificata
-    if (!cJSON_IsString(text_section) && cJSON_IsObject(text_section)) {
+    if (!cJSON_IsString(text_section) && cJSON_IsObject(text_section))
+    {
         cJSON *lang_entry = cJSON_GetObjectItem(text_section, language);
-        if (lang_entry) {
+        if (lang_entry)
+        {
             cJSON_ReplaceItemInObject(text_section, language, cJSON_CreateString(new_text));
-        } else {
+        }
+        else
+        {
             cJSON_AddStringToObject(text_section, language, new_text);
         }
     }
@@ -647,8 +708,9 @@ esp_err_t device_config_update_program_text_i18n(const char *program_key, const 
     // Converti JSON aggiornato in stringa
     char *updated_json = cJSON_Print(root);
     cJSON_Delete(root);
-    
-    if (!updated_json) {
+
+    if (!updated_json)
+    {
         ESP_LOGE(TAG, "[C] Errore generazione JSON aggiornato");
         return ESP_FAIL;
     }
@@ -657,7 +719,8 @@ esp_err_t device_config_update_program_text_i18n(const char *program_key, const 
     esp_err_t err = _write_text_file(I18N_V2_FILE_PATH, updated_json);
     free(updated_json);
 
-    if (err == ESP_OK) {
+    if (err == ESP_OK)
+    {
         ESP_LOGI(TAG, "[C] Aggiornato testo programma '%s' per lingua '%s': '%s'", program_key, language, new_text);
 
         // Invalida le cache i18n locali prima delle prossime letture.
@@ -674,14 +737,17 @@ esp_err_t device_config_update_program_text_i18n(const char *program_key, const 
 
 static cJSON *_i18n_v2_root_get(void)
 {
-    if (s_i18n_v2_root) {
+    if (s_i18n_v2_root)
+    {
         return s_i18n_v2_root;
     }
 
     size_t sz = 0;
     char *json = _read_text_file(I18N_V2_FILE_PATH, &sz);
-    if (!json || sz == 0) {
-        if (json) {
+    if (!json || sz == 0)
+    {
+        if (json)
+        {
             free(json);
         }
         return NULL;
@@ -690,35 +756,39 @@ static cJSON *_i18n_v2_root_get(void)
     cJSON *root = cJSON_Parse(json);
     free(json);
 
-    if (!root || !cJSON_IsObject(root)) {
-        if (root) {
+    if (!root || !cJSON_IsObject(root))
+    {
+        if (root)
+        {
             cJSON_Delete(root);
         }
         return NULL;
     }
 
     s_i18n_v2_root = root;
-    
+
     const char *lang = device_config_get_ui_backend_language();
-    if (!lang) lang = "it";
+    if (!lang)
+        lang = "it";
     _i18n_lookup_cache_build_for_lang(lang);
-    
+
     return s_i18n_v2_root;
 }
 
 /**
  * @brief Ottiene il root JSON i18n v2 (funzione pubblica)
- * 
+ *
  * @return Puntatore al root JSON o NULL se non disponibile
  */
-cJSON* device_config_get_i18n_v2_root(void)
+cJSON *device_config_get_i18n_v2_root(void)
 {
     return _i18n_v2_root_get();
 }
 
 static void _i18n_v2_clear_cache(void)
 {
-    if (s_i18n_v2_root) {
+    if (s_i18n_v2_root)
+    {
         cJSON_Delete(s_i18n_v2_root);
         s_i18n_v2_root = NULL;
     }
@@ -726,16 +796,19 @@ static void _i18n_v2_clear_cache(void)
 
 static bool _legacy_id_parse(const char *legacy_id, int *out_scope, int *out_key)
 {
-    if (!legacy_id || !out_scope || !out_key) {
+    if (!legacy_id || !out_scope || !out_key)
+    {
         return false;
     }
 
     int scope = 0;
     int key = 0;
-    if (sscanf(legacy_id, "%d.%d", &scope, &key) != 2) {
+    if (sscanf(legacy_id, "%d.%d", &scope, &key) != 2)
+    {
         return false;
     }
-    if (scope <= 0 || key <= 0) {
+    if (scope <= 0 || key <= 0)
+    {
         return false;
     }
 
@@ -746,12 +819,14 @@ static bool _legacy_id_parse(const char *legacy_id, int *out_scope, int *out_key
 
 static cJSON *_build_record_object(int scope_id, int key_id, const char *text)
 {
-    if (scope_id <= 0 || key_id <= 0 || !text) {
+    if (scope_id <= 0 || key_id <= 0 || !text)
+    {
         return NULL;
     }
 
     cJSON *obj = cJSON_CreateObject();
-    if (!obj) {
+    if (!obj)
+    {
         return NULL;
     }
 
@@ -764,14 +839,17 @@ static cJSON *_build_record_object(int scope_id, int key_id, const char *text)
 
 static void _records_append_or_free(cJSON *array, cJSON *obj)
 {
-    if (!array || !obj) {
-        if (obj) {
+    if (!array || !obj)
+    {
+        if (obj)
+        {
             cJSON_Delete(obj);
         }
         return;
     }
 
-    if (!cJSON_IsArray(array)) {
+    if (!cJSON_IsArray(array))
+    {
         cJSON_Delete(obj);
         return;
     }
@@ -781,27 +859,32 @@ static void _records_append_or_free(cJSON *array, cJSON *obj)
 
 static const char *_i18n_v2_entry_pick_text(cJSON *entry, const char *lang)
 {
-    if (!entry || !cJSON_IsObject(entry)) {
+    if (!entry || !cJSON_IsObject(entry))
+    {
         return NULL;
     }
 
     cJSON *legacy = cJSON_GetObjectItemCaseSensitive(entry, "legacyId");
-    if (!cJSON_IsString(legacy) || !legacy->valuestring) {
+    if (!cJSON_IsString(legacy) || !legacy->valuestring)
+    {
         return NULL;
     }
 
     cJSON *text_obj = cJSON_GetObjectItemCaseSensitive(entry, "text");
-    if (!cJSON_IsObject(text_obj)) {
+    if (!cJSON_IsObject(text_obj))
+    {
         return NULL;
     }
 
     cJSON *lang_item = cJSON_GetObjectItemCaseSensitive(text_obj, lang);
-    if (cJSON_IsString(lang_item) && lang_item->valuestring && lang_item->valuestring[0]) {
+    if (cJSON_IsString(lang_item) && lang_item->valuestring && lang_item->valuestring[0])
+    {
         return lang_item->valuestring;
     }
 
     cJSON *fallback_it = cJSON_GetObjectItemCaseSensitive(text_obj, UI_LANG_DEFAULT);
-    if (cJSON_IsString(fallback_it) && fallback_it->valuestring) {
+    if (cJSON_IsString(fallback_it) && fallback_it->valuestring)
+    {
         return fallback_it->valuestring;
     }
     return NULL;
@@ -809,42 +892,52 @@ static const char *_i18n_v2_entry_pick_text(cJSON *entry, const char *lang)
 
 static void _i18n_v2_append_entry(cJSON *array, cJSON *entry, const char *lang)
 {
-    if (!array) {
+    if (!array)
+    {
         return;
     }
-    if (!entry || !cJSON_IsObject(entry)) {
+    if (!entry || !cJSON_IsObject(entry))
+    {
         return;
     }
 
     const char *text = _i18n_v2_entry_pick_text(entry, lang);
-    if (!text) {
+    if (!text)
+    {
         return;
     }
 
     // Prima prova con legacyId (sistema vecchio)
     cJSON *legacy = cJSON_GetObjectItemCaseSensitive(entry, "legacyId");
-    if (cJSON_IsString(legacy) && legacy->valuestring) {
+    if (cJSON_IsString(legacy) && legacy->valuestring)
+    {
         int scope_id = 0;
         int key_id = 0;
-        if (_legacy_id_parse(legacy->valuestring, &scope_id, &key_id)) {
+        if (_legacy_id_parse(legacy->valuestring, &scope_id, &key_id))
+        {
             cJSON *record = _build_record_object(scope_id, key_id, text);
             _records_append_or_free(array, record);
             return;
         }
     }
-    
+
     // Se legacyId non è valido, usa il nome della chiave direttamente (nuovo sistema)
     // Itera sull'array per trovare il nome della chiave corrispondente a questa entry
     cJSON *root = _i18n_v2_root_get();
-    if (root) {
+    if (root)
+    {
         cJSON *lvgl_section = cJSON_GetObjectItem(root, "lvgl");
-        if (cJSON_IsObject(lvgl_section)) {
+        if (cJSON_IsObject(lvgl_section))
+        {
             cJSON *key_entry = NULL;
-            cJSON_ArrayForEach(key_entry, lvgl_section) {
-                if (key_entry == entry) {
+            cJSON_ArrayForEach(key_entry, lvgl_section)
+            {
+                if (key_entry == entry)
+                {
                     // Trovato! Usa il nome della chiave come testo diretto
                     cJSON *record = cJSON_CreateObject();
-                    if (record) {
+                    if (record)
+                    {
                         cJSON_AddStringToObject(record, "key", key_entry->string);
                         cJSON_AddStringToObject(record, "text", text);
                         cJSON_AddNumberToObject(record, "scope_id", 2); // lvgl scope
@@ -862,37 +955,46 @@ static cJSON *_i18n_v2_build_records_for_language(const char *language)
 {
     const char *lang = _effective_lang(language);
     cJSON *root = _i18n_v2_root_get();
-    if (!root || !lang) {
+    if (!root || !lang)
+    {
         return NULL;
     }
 
     cJSON *web = cJSON_GetObjectItemCaseSensitive(root, "web");
     cJSON *lvgl = cJSON_GetObjectItemCaseSensitive(root, "lvgl");
-    if (!cJSON_IsObject(web) && !cJSON_IsObject(lvgl)) {
+    if (!cJSON_IsObject(web) && !cJSON_IsObject(lvgl))
+    {
         return NULL;
     }
 
     cJSON *array = cJSON_CreateArray();
-    if (!array) {
+    if (!array)
+    {
         return NULL;
     }
 
-    if (cJSON_IsObject(web)) {
+    if (cJSON_IsObject(web))
+    {
         cJSON *page = NULL;
-        cJSON_ArrayForEach(page, web) {
-            if (!cJSON_IsObject(page)) {
+        cJSON_ArrayForEach(page, web)
+        {
+            if (!cJSON_IsObject(page))
+            {
                 continue;
             }
             cJSON *entry = NULL;
-            cJSON_ArrayForEach(entry, page) {
+            cJSON_ArrayForEach(entry, page)
+            {
                 _i18n_v2_append_entry(array, entry, lang);
             }
         }
     }
 
-    if (cJSON_IsObject(lvgl)) {
+    if (cJSON_IsObject(lvgl))
+    {
         cJSON *entry = NULL;
-        cJSON_ArrayForEach(entry, lvgl) {
+        cJSON_ArrayForEach(entry, lvgl)
+        {
             _i18n_v2_append_entry(array, entry, lang);
         }
     }
@@ -919,7 +1021,7 @@ static void _set_defaults(device_config_t *config)
     config->image_source = IMAGE_SOURCE_SPIFFS;
 
     // Numero pulsanti programma e coordinate geografiche
-    config->num_programs = 10;   /* default: 10 programmi (2 colonne x 5 righe) */
+    config->num_programs = 10; /* default: 10 programmi (2 colonne x 5 righe) */
     static const uint8_t s_default_touch_inputs[DEVICE_TOUCH_BUTTON_MAX] = {
         DEVICE_TOUCH_INPUT_OPTO1,
         DEVICE_TOUCH_INPUT_OPTO2,
@@ -932,15 +1034,17 @@ static void _set_defaults(device_config_t *config)
         DEVICE_TOUCH_BUTTON_UNASSIGNED,
         DEVICE_TOUCH_BUTTON_UNASSIGNED,
     };
-    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
+    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index)
+    {
         uint8_t default_input = s_default_touch_inputs[button_index];
-        if (default_input < DEVICE_TOUCH_INPUT_MIN || default_input > DEVICE_TOUCH_INPUT_MAX) {
+        if (default_input < DEVICE_TOUCH_INPUT_MIN || default_input > DEVICE_TOUCH_INPUT_MAX)
+        {
             default_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
         }
         config->touch_button_map.button_to_input[button_index] = default_input;
     }
-    config->latitude     = 0.0;
-    config->longitude    = 0.0;
+    config->latitude = 0.0;
+    config->longitude = 0.0;
 
     // Default Ethernet
     config->eth.enabled = true;
@@ -966,7 +1070,7 @@ static void _set_defaults(device_config_t *config)
     // Default NTP
     strncpy(config->ntp.server1, "time.google.com", sizeof(config->ntp.server1) - 1);
     strncpy(config->ntp.server2, "pool.ntp.org", sizeof(config->ntp.server2) - 1);
-    config->ntp.timezone_offset = 1;  // Default to CET (Central European Time)
+    config->ntp.timezone_offset = 1; // Default to CET (Central European Time)
 
     // Default Server/Cloud settings
     config->server.enabled = false; // not enabled by default
@@ -983,9 +1087,9 @@ static void _set_defaults(device_config_t *config)
     config->ftp.path[0] = '\0';
 
     // Default Remote Logging (broadcast disabled by default)
-    config->remote_log.server_port = 9514;  // Default port for broadcast
+    config->remote_log.server_port = 9514;    // Default port for broadcast
     config->remote_log.use_broadcast = false; // No broadcast by default
-    config->remote_log.write_to_sd = false; // Salvataggio su SD disabilitato di default
+    config->remote_log.write_to_sd = false;   // Salvataggio su SD disabilitato di default
 
     // Default Sensori (tutti abilitati per impostazione predefinita)
     config->sensors.io_expander_enabled = true;
@@ -1078,19 +1182,23 @@ static void _set_defaults(device_config_t *config)
     // Default timeout applicativi
     config->timeouts.exit_programs_ms = 60000;
     config->timeouts.exit_language_ms = 60000;
-    config->timeouts.idle_before_ads_ms = 60000;    // Default 60s prima di mostrare ads
-    config->timeouts.ad_rotation_ms = 30000;         // Default 30s per rotazione slide (tempo cambio slide)
+    config->timeouts.idle_before_ads_ms = 60000;       // Default 60s prima di mostrare ads
+    config->timeouts.ad_rotation_ms = 30000;           // Default 30s per rotazione slide (tempo cambio slide)
     config->timeouts.credit_reset_timeout_ms = 300000; // Default 5min per reset crediti
-    config->timeouts.pre_fine_ciclo_percent = 70;   // Default 70% per PreFineCiclo
-    config->timeouts.pause_max_suspend_sec = 300;   // Default 5min (300s) per sospensione programma
+    config->timeouts.pre_fine_ciclo_percent = 70;      // Default 70% per PreFineCiclo
+    config->timeouts.pause_max_suspend_sec = 300;      // Default 5min (300s) per sospensione programma
     config->display.ads_enabled = true;
 
     // Default testi UI / lingua
     strncpy(config->ui.user_language, UI_LANG_DEFAULT, sizeof(config->ui.user_language) - 1);
     config->ui.program_end_message_sec = 3;
     config->ui.texts_json[0] = '\0';
-}
 
+    // Default logging configuration
+    config->logging.http_services = true;
+    config->logging.lvgl = true;
+    config->logging.io_expander = true;
+}
 
 /**
  * @brief Calcola il CRC32 di una stringa JSON.
@@ -1102,14 +1210,14 @@ static void _set_defaults(device_config_t *config)
  */
 static uint32_t _calculate_crc(const char *json_str)
 {
-    if (!json_str) return 0;
+    if (!json_str)
+        return 0;
     return esp_rom_crc32_le(0, (const uint8_t *)json_str, strlen(json_str));
 }
 
 // -----------------------------------------------------------------------------
 // Helper NVS
 // -----------------------------------------------------------------------------
-
 
 /**
  * @brief Scrive una stringa JSON in NVS (Non-Volatile Storage).
@@ -1121,53 +1229,55 @@ static esp_err_t _write_to_nvs(const char *json_str)
 {
     nvs_handle_t handle;
     ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle), TAG, "Apertura NVS fallita");
-    
+
     esp_err_t ret = nvs_set_str(handle, "config_json", json_str);
-    if (ret == ESP_OK) {
+    if (ret == ESP_OK)
+    {
         // Salviamo il CRC in un JSON separato per evitare la dipendenza circolare (Specifica User)
         uint32_t crc_val = _calculate_crc(json_str);
         char meta_str[64];
         snprintf(meta_str, sizeof(meta_str), "{\"crc\":%lu,\"len\":%u}", (unsigned long)crc_val, (unsigned int)strlen(json_str));
         nvs_set_str(handle, "config_meta", meta_str);
-        
+
         nvs_commit(handle);
         ESP_LOGI(TAG, "[C] Backup NVS completato con meta: %s", meta_str);
     }
-    
+
     nvs_close(handle);
     return ret;
 }
 
-
 /**
  * @brief Scrive la configurazione JSON su SPIFFS.
- * 
+ *
  * @param json_str Stringa JSON da scrivere.
  * @return esp_err_t ESP_OK se riuscita, altrimenti codice errore.
  */
 static esp_err_t _write_config_to_spiffs(const char *json_str)
 {
-    if (!json_str) return ESP_ERR_INVALID_ARG;
-    
+    if (!json_str)
+        return ESP_ERR_INVALID_ARG;
+
     FILE *f = fopen(SPIFFS_CONFIG_FILE_PATH, "w");
-    if (!f) {
+    if (!f)
+    {
         ESP_LOGE(TAG, "[C] Impossibile aprire %s per scrittura (errno=%d)", SPIFFS_CONFIG_FILE_PATH, errno);
         return ESP_FAIL;
     }
-    
+
     size_t json_len = strlen(json_str);
     size_t written = fwrite(json_str, 1, json_len, f);
     fclose(f);
-    
-    if (written != json_len) {
+
+    if (written != json_len)
+    {
         ESP_LOGE(TAG, "[C] Scrittura SPIFFS incompleta: %u/%u bytes", (unsigned int)written, (unsigned int)json_len);
         return ESP_FAIL;
     }
-    
+
     ESP_LOGI(TAG, "[C] Config salvata su SPIFFS: %s (%u bytes)", SPIFFS_CONFIG_FILE_PATH, (unsigned int)json_len);
     return ESP_OK;
 }
-
 
 /**
  * @brief Legge i dati da NVS (Non-Volatile Storage).
@@ -1176,34 +1286,43 @@ static esp_err_t _write_config_to_spiffs(const char *json_str)
  *
  * @return char* Un puntatore alla stringa contenente i dati letti, o NULL in caso di errore.
  */
-static char* _read_from_nvs(void)
+static char *_read_from_nvs(void)
 {
     nvs_handle_t handle;
-    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return NULL;
-    
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK)
+        return NULL;
+
     size_t size = 0;
     char *json_str = NULL;
     char meta_str[64];
     size_t meta_size = sizeof(meta_str);
-    
+
     bool valid = false;
-    
+
     // Leggiamo il meta per verificare il CRC
-    if (nvs_get_str(handle, "config_meta", meta_str, &meta_size) == ESP_OK) {
+    if (nvs_get_str(handle, "config_meta", meta_str, &meta_size) == ESP_OK)
+    {
         ESP_LOGI(TAG, "[C] NVS Meta caricato: %s", meta_str);
         cJSON *meta_root = cJSON_Parse(meta_str);
-        if (meta_root) {
+        if (meta_root)
+        {
             uint32_t expected_crc = (uint32_t)cJSON_GetNumberValue(cJSON_GetObjectItem(meta_root, "crc"));
-            
-            if (nvs_get_str(handle, "config_json", NULL, &size) == ESP_OK && size > 1) {
+
+            if (nvs_get_str(handle, "config_json", NULL, &size) == ESP_OK && size > 1)
+            {
                 json_str = malloc(size);
-                if (json_str) {
-                    if (nvs_get_str(handle, "config_json", json_str, &size) == ESP_OK) {
+                if (json_str)
+                {
+                    if (nvs_get_str(handle, "config_json", json_str, &size) == ESP_OK)
+                    {
                         ESP_LOGI(TAG, "[C] NVS JSON caricato: %s", json_str);
                         uint32_t actual_crc = _calculate_crc(json_str);
-                        if (actual_crc == expected_crc) {
+                        if (actual_crc == expected_crc)
+                        {
                             valid = true;
-                        } else {
+                        }
+                        else
+                        {
                             ESP_LOGE(TAG, "[C] Errore CRC backup NVS! (Exp: %lx, Got: %lx)", (unsigned long)expected_crc, (unsigned long)actual_crc);
                         }
                     }
@@ -1211,48 +1330,54 @@ static char* _read_from_nvs(void)
             }
             cJSON_Delete(meta_root);
         }
-    } else {
+    }
+    else
+    {
         ESP_LOGW(TAG, "[C] Nessun dato Meta trovato in NVS");
     }
-    
+
     nvs_close(handle);
-    
-    if (!valid && json_str) {
+
+    if (!valid && json_str)
+    {
         free(json_str);
         return NULL;
     }
-    
+
     return json_str;
 }
-
 
 /**
  * @brief Legge la configurazione JSON da SPIFFS.
  *
  * @return char* Stringa allocata su heap con il contenuto JSON, oppure NULL se non disponibile/errore.
  */
-static char* _read_from_spiffs(void)
+static char *_read_from_spiffs(void)
 {
     struct stat st = {0};
-    if (stat(SPIFFS_CONFIG_FILE_PATH, &st) != 0) {
+    if (stat(SPIFFS_CONFIG_FILE_PATH, &st) != 0)
+    {
         ESP_LOGW(TAG, "[C] Config SPIFFS non trovata: %s", SPIFFS_CONFIG_FILE_PATH);
         return NULL;
     }
 
-    if (st.st_size <= 0) {
+    if (st.st_size <= 0)
+    {
         ESP_LOGW(TAG, "[C] Config SPIFFS vuota: %s", SPIFFS_CONFIG_FILE_PATH);
         return NULL;
     }
 
     FILE *f = fopen(SPIFFS_CONFIG_FILE_PATH, "rb");
-    if (!f) {
+    if (!f)
+    {
         ESP_LOGW(TAG, "[C] Apertura config SPIFFS fallita: %s (errno=%d)", SPIFFS_CONFIG_FILE_PATH, errno);
         return NULL;
     }
 
     size_t size = (size_t)st.st_size;
     char *json_str = malloc(size + 1);
-    if (!json_str) {
+    if (!json_str)
+    {
         fclose(f);
         return NULL;
     }
@@ -1260,7 +1385,8 @@ static char* _read_from_spiffs(void)
     size_t read_len = fread(json_str, 1, size, f);
     fclose(f);
 
-    if (read_len != size) {
+    if (read_len != size)
+    {
         ESP_LOGW(TAG, "[C] Lettura config SPIFFS incompleta (%u/%u)", (unsigned int)read_len, (unsigned int)size);
         free(json_str);
         return NULL;
@@ -1279,12 +1405,14 @@ static char* _read_from_spiffs(void)
  */
 static bool _is_valid_json_object(const char *json_str)
 {
-    if (!json_str || json_str[0] == '\0') {
+    if (!json_str || json_str[0] == '\0')
+    {
         return false;
     }
 
     cJSON *root = cJSON_Parse(json_str);
-    if (!root) {
+    if (!root)
+    {
         return false;
     }
 
@@ -1292,7 +1420,6 @@ static bool _is_valid_json_object(const char *json_str)
     cJSON_Delete(root);
     return is_valid;
 }
-
 
 /**
  * @brief Inizializza la configurazione del dispositivo.
@@ -1309,17 +1436,18 @@ esp_err_t device_config_init(void)
     _set_defaults(&s_config);
     s_initialized = true;
     esp_err_t err = device_config_load(&s_config);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         return err;
     }
 
-    if (_i18n_lookup_cache_build_for_lang(s_config.ui.backend_language) == ESP_OK) {
+    if (_i18n_lookup_cache_build_for_lang(s_config.ui.backend_language) == ESP_OK)
+    {
         ESP_LOGI(TAG, "[I18N] Cache lookup lingua backend '%s' precaricata", _effective_lang(s_config.ui.backend_language));
     }
 
     return ESP_OK;
 }
-
 
 /**
  * @brief Carica la configurazione del dispositivo.
@@ -1336,7 +1464,8 @@ esp_err_t device_config_init(void)
  */
 esp_err_t device_config_load(device_config_t *config)
 {
-    if (!config) return ESP_ERR_INVALID_ARG;
+    if (!config)
+        return ESP_ERR_INVALID_ARG;
 
     _set_defaults(config);
 
@@ -1344,39 +1473,58 @@ esp_err_t device_config_load(device_config_t *config)
     bool source_is_nvs = false;
     bool source_is_spiffs = false;
 
-    ESP_LOGI(TAG, "[C] Caricamento configurazione da SPIFFS...");
+    ESP_LOGI(TAG, "[C] Ricerca config.jsn su SPIFFS (%s)...", SPIFFS_CONFIG_FILE_PATH);
     json_str = _read_from_spiffs();
-    if (json_str) {
-        if (_is_valid_json_object(json_str)) {
-            ESP_LOGI(TAG, "[C] Configurazione valida in SPIFFS");
+    if (json_str)
+    {
+        if (_is_valid_json_object(json_str))
+        {
+            ESP_LOGI(TAG, "[C] ✓ File trovato su SPIFFS e JSON valido");
             source_is_spiffs = true;
 
-            if (_write_to_nvs(json_str) != ESP_OK) {
+            if (_write_to_nvs(json_str) != ESP_OK)
+            {
                 ESP_LOGW(TAG, "[C] Persistenza config SPIFFS in NVS fallita");
             }
-        } else {
-            ESP_LOGW(TAG, "[C] Config SPIFFS non valida: provo NVS");
+        }
+        else
+        {
+            ESP_LOGW(TAG, "[C] ✗ File trovato su SPIFFS ma JSON non valido");
             free(json_str);
             json_str = NULL;
         }
     }
+    else
+    {
+        ESP_LOGI(TAG, "[C] ✗ File non trovato su SPIFFS");
+    }
 
-    if (!json_str) {
-        ESP_LOGI(TAG, "[C] Caricamento configurazione da NVS...");
+    if (!json_str)
+    {
+        ESP_LOGI(TAG, "[C] Fallback su NVS (namespace: %s)...", NVS_NAMESPACE);
         json_str = _read_from_nvs();
-        if (json_str && _is_valid_json_object(json_str)) {
-            ESP_LOGI(TAG, "[C] Configurazione valida in NVS");
+        if (json_str && _is_valid_json_object(json_str))
+        {
+            ESP_LOGI(TAG, "[C] ✓ Config valida trovata in NVS");
             source_is_nvs = true;
-        } else {
-            if (json_str) {
-                ESP_LOGW(TAG, "[C] Config NVS non valida: inizializzo defaults");
+        }
+        else
+        {
+            if (json_str)
+            {
+                ESP_LOGW(TAG, "[C] ✗ Config NVS non valida");
                 free(json_str);
                 json_str = NULL;
             }
+            else
+            {
+                ESP_LOGI(TAG, "[C] ✗ Config non trovata in NVS");
+            }
 
-            ESP_LOGI(TAG, "[C] Nessun config valido trovato: inizializzo Defaults su NVS");
+            ESP_LOGI(TAG, "[C] Inizializzo configurazione con Defaults");
             char *def_json = device_config_to_json(config);
-            if (def_json) {
+            if (def_json)
+            {
                 _write_to_nvs(def_json);
                 free(def_json);
             }
@@ -1384,603 +1532,882 @@ esp_err_t device_config_load(device_config_t *config)
         }
     }
 
-    if (json_str) {
-        ESP_LOGI(TAG, "[CONFIG] Loading JSON config (%zu bytes): %s", strlen(json_str), json_str);
+    if (json_str)
+    {
+        const char *source_label = source_is_spiffs ? "SPIFFS" : (source_is_nvs ? "NVS" : "UNKNOWN");
+        ESP_LOGI(TAG, "---------\n[C] *** CONFIG CARICATA DA %s *** (%zu bytes)\n---------", source_label, strlen(json_str));
+        ESP_LOGD(TAG, "[C] JSON caricato: %s", json_str);
         cJSON *root = cJSON_Parse(json_str);
-        if (root) {
+        if (root)
+        {
             // Nome dispositivo
             cJSON *name = cJSON_GetObjectItem(root, "device_name");
-            if (name && name->valuestring) strncpy(config->device_name, name->valuestring, sizeof(config->device_name) - 1);
+            if (name && name->valuestring)
+                strncpy(config->device_name, name->valuestring, sizeof(config->device_name) - 1);
             cJSON *loc = cJSON_GetObjectItem(root, "location_name");
-            if (loc && loc->valuestring) strncpy(config->location_name, loc->valuestring, sizeof(config->location_name) - 1);
+            if (loc && loc->valuestring)
+                strncpy(config->location_name, loc->valuestring, sizeof(config->location_name) - 1);
             cJSON *img_src = cJSON_GetObjectItem(root, "image_source");
-            if (img_src && img_src->valuestring) {
+            if (img_src && img_src->valuestring)
+            {
                 config->image_source = (strcmp(img_src->valuestring, "sdcard") == 0)
-                    ? IMAGE_SOURCE_SDCARD : IMAGE_SOURCE_SPIFFS;
+                                           ? IMAGE_SOURCE_SDCARD
+                                           : IMAGE_SOURCE_SPIFFS;
             }
 
-                // Numero pulsanti programma (valori ammessi: 1,2,3,4,5,6,8,10)
-                cJSON *num_prog_j = cJSON_GetObjectItem(root, "n_prg");
-                if (!num_prog_j) num_prog_j = cJSON_GetObjectItem(root, "num_programs"); /* compat */
-                if (num_prog_j && cJSON_IsNumber(num_prog_j)) {
-                    static const uint8_t valid_np[] = {1, 2, 3, 4, 5, 6, 8, 10};
-                    uint8_t np = (uint8_t)num_prog_j->valueint;
-                    bool ok = false;
-                    for (int _i = 0; _i < (int)(sizeof(valid_np)/sizeof(valid_np[0])); _i++) {
-                        if (valid_np[_i] == np) { ok = true; break; }
+            // Numero pulsanti programma (valori ammessi: 1,2,3,4,5,6,8,10)
+            cJSON *num_prog_j = cJSON_GetObjectItem(root, "n_prg");
+            if (!num_prog_j)
+                num_prog_j = cJSON_GetObjectItem(root, "num_programs"); /* compat */
+            if (num_prog_j && cJSON_IsNumber(num_prog_j))
+            {
+                static const uint8_t valid_np[] = {1, 2, 3, 4, 5, 6, 8, 10};
+                uint8_t np = (uint8_t)num_prog_j->valueint;
+                bool ok = false;
+                for (int _i = 0; _i < (int)(sizeof(valid_np) / sizeof(valid_np[0])); _i++)
+                {
+                    if (valid_np[_i] == np)
+                    {
+                        ok = true;
+                        break;
                     }
-                    config->num_programs = ok ? np : 10;
                 }
+                config->num_programs = ok ? np : 10;
+            }
 
-                // Coordinate geografiche impianto
-                cJSON *lat_j = cJSON_GetObjectItem(root, "lat");
-                if (!lat_j) lat_j = cJSON_GetObjectItem(root, "latitude"); /* compat */
-                if (lat_j && cJSON_IsNumber(lat_j)) config->latitude  = lat_j->valuedouble;
-                cJSON *lon_j = cJSON_GetObjectItem(root, "lon");
-                if (!lon_j) lon_j = cJSON_GetObjectItem(root, "longitude"); /* compat */
-                if (lon_j && cJSON_IsNumber(lon_j)) config->longitude = lon_j->valuedouble;
+            // Coordinate geografiche impianto
+            cJSON *lat_j = cJSON_GetObjectItem(root, "lat");
+            if (!lat_j)
+                lat_j = cJSON_GetObjectItem(root, "latitude"); /* compat */
+            if (lat_j && cJSON_IsNumber(lat_j))
+                config->latitude = lat_j->valuedouble;
+            cJSON *lon_j = cJSON_GetObjectItem(root, "lon");
+            if (!lon_j)
+                lon_j = cJSON_GetObjectItem(root, "longitude"); /* compat */
+            if (lon_j && cJSON_IsNumber(lon_j))
+                config->longitude = lon_j->valuedouble;
 
-                cJSON *touch_map_obj = cJSON_GetObjectItem(root, "touch_map");
-                if (!touch_map_obj) {
-                    touch_map_obj = cJSON_GetObjectItem(root, "touch_button_map"); /* compat */
-                }
-                if (touch_map_obj && cJSON_IsObject(touch_map_obj)) {
-                    cJSON *buttons = cJSON_GetObjectItem(touch_map_obj, "buttons");
-                    if (buttons && cJSON_IsArray(buttons)) {
-                        int button_count = cJSON_GetArraySize(buttons);
-                        for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
-                            uint8_t mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
-                            if ((int)button_index < button_count) {
-                                cJSON *item = cJSON_GetArrayItem(buttons, (int)button_index);
-                                if (cJSON_IsNumber(item)) {
-                                    mapped_input = (uint8_t)item->valueint;
-                                } else if (cJSON_IsString(item) && item->valuestring) {
-                                    mapped_input = (uint8_t)strtoul(item->valuestring, NULL, 10);
-                                }
+            cJSON *touch_map_obj = cJSON_GetObjectItem(root, "touch_map");
+            if (!touch_map_obj)
+            {
+                touch_map_obj = cJSON_GetObjectItem(root, "touch_button_map"); /* compat */
+            }
+            if (touch_map_obj && cJSON_IsObject(touch_map_obj))
+            {
+                cJSON *buttons = cJSON_GetObjectItem(touch_map_obj, "buttons");
+                if (buttons && cJSON_IsArray(buttons))
+                {
+                    int button_count = cJSON_GetArraySize(buttons);
+                    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index)
+                    {
+                        uint8_t mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
+                        if ((int)button_index < button_count)
+                        {
+                            cJSON *item = cJSON_GetArrayItem(buttons, (int)button_index);
+                            if (cJSON_IsNumber(item))
+                            {
+                                mapped_input = (uint8_t)item->valueint;
                             }
-
-                            if (mapped_input < DEVICE_TOUCH_INPUT_MIN || mapped_input > DEVICE_TOUCH_INPUT_MAX) {
-                                mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
+                            else if (cJSON_IsString(item) && item->valuestring)
+                            {
+                                mapped_input = (uint8_t)strtoul(item->valuestring, NULL, 10);
                             }
-                            config->touch_button_map.button_to_input[button_index] = mapped_input;
                         }
-                    }
-                }
 
-                // Analisi config Ethernet
-                cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
-                if (eth_obj) {
-                    cJSON *_eth_en = cJSON_GetObjectItem(eth_obj, "en"); if (!_eth_en) _eth_en = cJSON_GetObjectItem(eth_obj, "enabled");
-                    config->eth.enabled = cJSON_IsTrue(_eth_en);
-                    cJSON *_eth_dhcp = cJSON_GetObjectItem(eth_obj, "dhcp"); if (!_eth_dhcp) _eth_dhcp = cJSON_GetObjectItem(eth_obj, "dhcp_enabled");
-                    config->eth.dhcp_enabled = cJSON_IsTrue(_eth_dhcp);
-                    cJSON *ip = cJSON_GetObjectItem(eth_obj, "ip");
-                    if (ip && ip->valuestring) strncpy(config->eth.ip, ip->valuestring, sizeof(config->eth.ip) - 1);
-                    cJSON *subnet = cJSON_GetObjectItem(eth_obj, "sub"); if (!subnet) subnet = cJSON_GetObjectItem(eth_obj, "subnet");
-                    if (subnet && subnet->valuestring) strncpy(config->eth.subnet, subnet->valuestring, sizeof(config->eth.subnet) - 1);
-                    cJSON *gateway = cJSON_GetObjectItem(eth_obj, "gw"); if (!gateway) gateway = cJSON_GetObjectItem(eth_obj, "gateway");
-                    if (gateway && gateway->valuestring) strncpy(config->eth.gateway, gateway->valuestring, sizeof(config->eth.gateway) - 1);
-                    cJSON *dns1 = cJSON_GetObjectItem(eth_obj, "dns1");
-                    if (dns1 && dns1->valuestring) strncpy(config->eth.dns1, dns1->valuestring, sizeof(config->eth.dns1) - 1);
-                    cJSON *dns2 = cJSON_GetObjectItem(eth_obj, "dns2");
-                    if (dns2 && dns2->valuestring) strncpy(config->eth.dns2, dns2->valuestring, sizeof(config->eth.dns2) - 1);
-                }
-
-                // Analisi config WiFi
-                cJSON *wifi_obj = cJSON_GetObjectItem(root, "wifi");
-                if (wifi_obj) {
-                    cJSON *_w_sta = cJSON_GetObjectItem(wifi_obj, "sta"); if (!_w_sta) _w_sta = cJSON_GetObjectItem(wifi_obj, "sta_enabled");
-                    config->wifi.sta_enabled = cJSON_IsTrue(_w_sta);
-                    cJSON *_w_dhcp = cJSON_GetObjectItem(wifi_obj, "dhcp"); if (!_w_dhcp) _w_dhcp = cJSON_GetObjectItem(wifi_obj, "dhcp_enabled");
-                    config->wifi.dhcp_enabled = cJSON_IsTrue(_w_dhcp);
-                    cJSON *ssid = cJSON_GetObjectItem(wifi_obj, "ssid");
-                    if (ssid && ssid->valuestring) strncpy(config->wifi.ssid, ssid->valuestring, sizeof(config->wifi.ssid) - 1);
-                    cJSON *password = cJSON_GetObjectItem(wifi_obj, "pwd"); if (!password) password = cJSON_GetObjectItem(wifi_obj, "password");
-                    if (password && password->valuestring) strncpy(config->wifi.password, password->valuestring, sizeof(config->wifi.password) - 1);
-                    cJSON *ip = cJSON_GetObjectItem(wifi_obj, "ip");
-                    if (ip && ip->valuestring) strncpy(config->wifi.ip, ip->valuestring, sizeof(config->wifi.ip) - 1);
-                    cJSON *subnet = cJSON_GetObjectItem(wifi_obj, "sub"); if (!subnet) subnet = cJSON_GetObjectItem(wifi_obj, "subnet");
-                    if (subnet && subnet->valuestring) strncpy(config->wifi.subnet, subnet->valuestring, sizeof(config->wifi.subnet) - 1);
-                    cJSON *gateway = cJSON_GetObjectItem(wifi_obj, "gw"); if (!gateway) gateway = cJSON_GetObjectItem(wifi_obj, "gateway");
-                    if (gateway && gateway->valuestring) strncpy(config->wifi.gateway, gateway->valuestring, sizeof(config->wifi.gateway) - 1);
-                }
-
-                // NTP enabled
-                cJSON *_ntp_en = cJSON_GetObjectItem(root, "ntp_en"); if (!_ntp_en) _ntp_en = cJSON_GetObjectItem(root, "ntp_enabled");
-                config->ntp_enabled = cJSON_IsTrue(_ntp_en);
-
-                // Analisi config NTP
-                cJSON *ntp_obj = cJSON_GetObjectItem(root, "ntp");
-                if (ntp_obj) {
-                    cJSON *server1 = cJSON_GetObjectItem(ntp_obj, "s1"); if (!server1) server1 = cJSON_GetObjectItem(ntp_obj, "server1");
-                    if (server1 && server1->valuestring) strncpy(config->ntp.server1, server1->valuestring, sizeof(config->ntp.server1) - 1);
-                    cJSON *server2 = cJSON_GetObjectItem(ntp_obj, "s2"); if (!server2) server2 = cJSON_GetObjectItem(ntp_obj, "server2");
-                    if (server2 && server2->valuestring) strncpy(config->ntp.server2, server2->valuestring, sizeof(config->ntp.server2) - 1);
-                    cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "tz"); if (!tz_offset) tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset");
-                    if (tz_offset && cJSON_IsNumber(tz_offset)) config->ntp.timezone_offset = tz_offset->valueint;
-                }
-
-                // Analisi config Server/Cloud
-                cJSON *server_obj = cJSON_GetObjectItem(root, "server");
-                if (server_obj) {
-                    cJSON *_srv_en = cJSON_GetObjectItem(server_obj, "en"); if (!_srv_en) _srv_en = cJSON_GetObjectItem(server_obj, "enabled");
-                    config->server.enabled = cJSON_IsTrue(_srv_en);
-                    cJSON *url = cJSON_GetObjectItem(server_obj, "url");
-                    if (url && url->valuestring) strncpy(config->server.url, url->valuestring, sizeof(config->server.url) - 1);
-                    cJSON *serial = cJSON_GetObjectItem(server_obj, "ser"); if (!serial) serial = cJSON_GetObjectItem(server_obj, "serial");
-                    if (serial && serial->valuestring) strncpy(config->server.serial, serial->valuestring, sizeof(config->server.serial) - 1);
-                    cJSON *password = cJSON_GetObjectItem(server_obj, "pwd"); if (!password) password = cJSON_GetObjectItem(server_obj, "password");
-                    if (password && password->valuestring) strncpy(config->server.password, password->valuestring, sizeof(config->server.password) - 1);
-                }
-
-                // Analisi config agente FTP
-                cJSON *ftp_obj = cJSON_GetObjectItem(root, "ftp");
-                if (ftp_obj) {
-                    cJSON *_ftp_en = cJSON_GetObjectItem(ftp_obj, "en"); if (!_ftp_en) _ftp_en = cJSON_GetObjectItem(ftp_obj, "enabled");
-                    config->ftp.enabled = cJSON_IsTrue(_ftp_en);
-                    cJSON *ftp_server = cJSON_GetObjectItem(ftp_obj, "server");
-                    if (ftp_server && ftp_server->valuestring) strncpy(config->ftp.server, ftp_server->valuestring, sizeof(config->ftp.server) - 1);
-                    cJSON *ftp_user = cJSON_GetObjectItem(ftp_obj, "user");
-                    if (ftp_user && ftp_user->valuestring) strncpy(config->ftp.user, ftp_user->valuestring, sizeof(config->ftp.user) - 1);
-                    cJSON *ftp_password = cJSON_GetObjectItem(ftp_obj, "password");
-                    if (ftp_password && ftp_password->valuestring) strncpy(config->ftp.password, ftp_password->valuestring, sizeof(config->ftp.password) - 1);
-                    cJSON *ftp_path = cJSON_GetObjectItem(ftp_obj, "path");
-                    if (ftp_path && ftp_path->valuestring) strncpy(config->ftp.path, ftp_path->valuestring, sizeof(config->ftp.path) - 1);
-                }
-
-                // Analisi config Remote Logging
-                cJSON *remote_log_obj = cJSON_GetObjectItem(root, "rlog");
-                if (!remote_log_obj) remote_log_obj = cJSON_GetObjectItem(root, "remote_log"); /* compat */
-                if (remote_log_obj) {
-                    cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "port"); if (!server_port) server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
-                    if (server_port) config->remote_log.server_port = (uint16_t)server_port->valueint;
-                    cJSON *_bcast = cJSON_GetObjectItem(remote_log_obj, "bcast"); if (!_bcast) _bcast = cJSON_GetObjectItem(remote_log_obj, "use_broadcast");
-                    config->remote_log.use_broadcast = cJSON_IsTrue(_bcast);
-                    cJSON *_to_sd = cJSON_GetObjectItem(remote_log_obj, "to_sd"); if (!_to_sd) _to_sd = cJSON_GetObjectItem(remote_log_obj, "write_to_sd");
-                    config->remote_log.write_to_sd = cJSON_IsTrue(_to_sd);
-                }
-
-                // Analisi config Sensori
-                cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
-                if (sensors_obj) {
-                    config->sensors.io_expander_enabled = _json_read_bool(
-                        sensors_obj,
-                        "io_exp",
-                        "io_expander_enabled",
-                        config->sensors.io_expander_enabled);
-
-                    config->sensors.temperature_enabled = _json_read_bool(
-                        sensors_obj,
-                        "temp",
-                        "temperature_enabled",
-                        config->sensors.temperature_enabled);
-
-                    config->sensors.led_enabled = _json_read_bool(
-                        sensors_obj,
-                        "led",
-                        "led_enabled",
-                        config->sensors.led_enabled);
-
-                    cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_n"); if (!lc) lc = cJSON_GetObjectItem(sensors_obj, "led_count");
-                    if (lc) config->sensors.led_count = (uint32_t)lc->valueint;
-
-                    cJSON *led_run_r = cJSON_GetObjectItem(sensors_obj, "lrr"); if (!led_run_r) led_run_r = cJSON_GetObjectItem(sensors_obj, "led_run_r");
-                    if (led_run_r && cJSON_IsNumber(led_run_r)) {
-                        int val = led_run_r->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_run_r = (uint8_t)val;
-                    }
-                    cJSON *led_run_g = cJSON_GetObjectItem(sensors_obj, "lrg"); if (!led_run_g) led_run_g = cJSON_GetObjectItem(sensors_obj, "led_run_g");
-                    if (led_run_g && cJSON_IsNumber(led_run_g)) {
-                        int val = led_run_g->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_run_g = (uint8_t)val;
-                    }
-                    cJSON *led_run_b = cJSON_GetObjectItem(sensors_obj, "lrb"); if (!led_run_b) led_run_b = cJSON_GetObjectItem(sensors_obj, "led_run_b");
-                    if (led_run_b && cJSON_IsNumber(led_run_b)) {
-                        int val = led_run_b->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_run_b = (uint8_t)val;
-                    }
-
-                    cJSON *led_prefine_r = cJSON_GetObjectItem(sensors_obj, "lpr"); if (!led_prefine_r) led_prefine_r = cJSON_GetObjectItem(sensors_obj, "led_prefine_r");
-                    if (led_prefine_r && cJSON_IsNumber(led_prefine_r)) {
-                        int val = led_prefine_r->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_prefine_r = (uint8_t)val;
-                    }
-                    cJSON *led_prefine_g = cJSON_GetObjectItem(sensors_obj, "lpg"); if (!led_prefine_g) led_prefine_g = cJSON_GetObjectItem(sensors_obj, "led_prefine_g");
-                    if (led_prefine_g && cJSON_IsNumber(led_prefine_g)) {
-                        int val = led_prefine_g->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_prefine_g = (uint8_t)val;
-                    }
-                    cJSON *led_prefine_b = cJSON_GetObjectItem(sensors_obj, "lpb"); if (!led_prefine_b) led_prefine_b = cJSON_GetObjectItem(sensors_obj, "led_prefine_b");
-                    if (led_prefine_b && cJSON_IsNumber(led_prefine_b)) {
-                        int val = led_prefine_b->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_prefine_b = (uint8_t)val;
-                    }
-
-                    cJSON *led_standby_r = cJSON_GetObjectItem(sensors_obj, "lsr"); if (!led_standby_r) led_standby_r = cJSON_GetObjectItem(sensors_obj, "led_standby_r");
-                    if (led_standby_r && cJSON_IsNumber(led_standby_r)) {
-                        int val = led_standby_r->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_standby_r = (uint8_t)val;
-                    }
-                    cJSON *led_standby_g = cJSON_GetObjectItem(sensors_obj, "lsg"); if (!led_standby_g) led_standby_g = cJSON_GetObjectItem(sensors_obj, "led_standby_g");
-                    if (led_standby_g && cJSON_IsNumber(led_standby_g)) {
-                        int val = led_standby_g->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_standby_g = (uint8_t)val;
-                    }
-                    cJSON *led_standby_b = cJSON_GetObjectItem(sensors_obj, "lsb"); if (!led_standby_b) led_standby_b = cJSON_GetObjectItem(sensors_obj, "led_standby_b");
-                    if (led_standby_b && cJSON_IsNumber(led_standby_b)) {
-                        int val = led_standby_b->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_standby_b = (uint8_t)val;
-                    }
-
-                    cJSON *led_flash_r = cJSON_GetObjectItem(sensors_obj, "lfr"); if (!led_flash_r) led_flash_r = cJSON_GetObjectItem(sensors_obj, "led_flash_r");
-                    if (led_flash_r && cJSON_IsNumber(led_flash_r)) {
-                        int val = led_flash_r->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_flash_r = (uint8_t)val;
-                    }
-                    cJSON *led_flash_g = cJSON_GetObjectItem(sensors_obj, "lfg"); if (!led_flash_g) led_flash_g = cJSON_GetObjectItem(sensors_obj, "led_flash_g");
-                    if (led_flash_g && cJSON_IsNumber(led_flash_g)) {
-                        int val = led_flash_g->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_flash_g = (uint8_t)val;
-                    }
-                    cJSON *led_flash_b = cJSON_GetObjectItem(sensors_obj, "lfb"); if (!led_flash_b) led_flash_b = cJSON_GetObjectItem(sensors_obj, "led_flash_b");
-                    if (led_flash_b && cJSON_IsNumber(led_flash_b)) {
-                        int val = led_flash_b->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 255) val = 255;
-                        config->sensors.led_flash_b = (uint8_t)val;
-                    }
-
-                    cJSON *led_flash_count = cJSON_GetObjectItem(sensors_obj, "lfc"); if (!led_flash_count) led_flash_count = cJSON_GetObjectItem(sensors_obj, "led_flash_count");
-                    if (led_flash_count && cJSON_IsNumber(led_flash_count)) {
-                        int val = led_flash_count->valueint;
-                        if (val < 1) val = 1;
-                        if (val > 20) val = 20;
-                        config->sensors.led_flash_count = (uint8_t)val;
-                    }
-
-                    config->sensors.rs232_enabled = _json_read_bool(
-                        sensors_obj,
-                        "rs232",
-                        "rs232_enabled",
-                        config->sensors.rs232_enabled);
-
-                    config->sensors.rs485_enabled = _json_read_bool(
-                        sensors_obj,
-                        "rs485",
-                        "rs485_enabled",
-                        config->sensors.rs485_enabled);
-
-                    config->sensors.mdb_enabled = _json_read_bool(
-                        sensors_obj,
-                        "mdb",
-                        "mdb_enabled",
-                        config->sensors.mdb_enabled);
-
-                    config->sensors.cctalk_enabled = _json_read_bool(
-                        sensors_obj,
-                        "cctalk",
-                        "cctalk_enabled",
-                        config->sensors.cctalk_enabled);
-
-                    config->sensors.eeprom_enabled = _json_read_bool(
-                        sensors_obj,
-                        "eeprom",
-                        "eeprom_enabled",
-                        config->sensors.eeprom_enabled);
-
-                    config->sensors.pwm1_enabled = _json_read_bool(
-                        sensors_obj,
-                        "pwm1",
-                        "pwm1_enabled",
-                        config->sensors.pwm1_enabled);
-
-                    config->sensors.pwm2_enabled = _json_read_bool(
-                        sensors_obj,
-                        "pwm2",
-                        "pwm2_enabled",
-                        config->sensors.pwm2_enabled);
-
-                    config->sensors.sd_card_enabled = _json_read_bool(
-                        sensors_obj,
-                        "sd",
-                        "sd_card_enabled",
-                        config->sensors.sd_card_enabled);
-                }
-
-                // Analisi config Scanner USB
-                cJSON *scanner_obj = cJSON_GetObjectItem(root, "scanner");
-                if (scanner_obj) {
-                    config->scanner.enabled = _json_read_bool(
-                        scanner_obj,
-                        "en",
-                        "enabled",
-                        config->scanner.enabled);
-                    cJSON *vid = cJSON_GetObjectItem(scanner_obj, "vid");
-                    cJSON *pid = cJSON_GetObjectItem(scanner_obj, "pid");
-                    cJSON *dual = cJSON_GetObjectItem(scanner_obj, "dpid"); if (!dual) dual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
-                    cJSON *cooldown = cJSON_GetObjectItem(scanner_obj, "cool"); if (!cooldown) cooldown = cJSON_GetObjectItem(scanner_obj, "cooldown_ms");
-                    if (vid && cJSON_IsNumber(vid)) config->scanner.vid = (uint16_t)vid->valueint;
-                    if (pid && cJSON_IsNumber(pid)) config->scanner.pid = (uint16_t)pid->valueint;
-                    if (dual && cJSON_IsNumber(dual)) config->scanner.dual_pid = (uint16_t)dual->valueint;
-                    if (cooldown && cJSON_IsNumber(cooldown) && cooldown->valueint > 0) {
-                        config->scanner.cooldown_ms = (uint32_t)cooldown->valueint;
-                    }
-                } else {
-                    ESP_LOGI(TAG, "[CONFIG] scanner section not found in JSON");
-                }
-
-                // Analisi timeout applicativi
-                cJSON *timeouts_obj = cJSON_GetObjectItem(root, "timeouts");
-                if (timeouts_obj) {
-                    cJSON *t_prg = cJSON_GetObjectItem(timeouts_obj, "t_prg");
-                    /* compat: accetta anche il vecchio nome */
-                    if (!t_prg) t_prg = cJSON_GetObjectItem(timeouts_obj, "language_return_ms");
-                    if (t_prg && cJSON_IsNumber(t_prg) && t_prg->valueint > 0) {
-                        config->timeouts.exit_programs_ms = (uint32_t)t_prg->valueint;
-                    }
-                    cJSON *t_lang = cJSON_GetObjectItem(timeouts_obj, "t_lang");
-                    if (t_lang && cJSON_IsNumber(t_lang) && t_lang->valueint > 0) {
-                        config->timeouts.exit_language_ms = (uint32_t)t_lang->valueint;
-                    }
-                    cJSON *pre_fine = cJSON_GetObjectItem(timeouts_obj, "pre_fine_ciclo_percent");
-                    if (pre_fine && cJSON_IsNumber(pre_fine)) {
-                        uint8_t val = (uint8_t)pre_fine->valueint;
-                        if (val <= 99) {
-                            config->timeouts.pre_fine_ciclo_percent = val;
+                        if (mapped_input < DEVICE_TOUCH_INPUT_MIN || mapped_input > DEVICE_TOUCH_INPUT_MAX)
+                        {
+                            mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
                         }
-                    }
-                    cJSON *pause_suspend = cJSON_GetObjectItem(timeouts_obj, "pause_max_suspend_sec");
-                    if (pause_suspend && cJSON_IsNumber(pause_suspend)) {
-                        uint32_t val = (uint32_t)pause_suspend->valuedouble;
-                        if (val <= 65535) {
-                            config->timeouts.pause_max_suspend_sec = val;
-                        }
+                        config->touch_button_map.button_to_input[button_index] = mapped_input;
                     }
                 }
-                if (config->timeouts.exit_programs_ms < 1000U)  config->timeouts.exit_programs_ms = 1000U;
-                if (config->timeouts.exit_programs_ms > 600000U) config->timeouts.exit_programs_ms = 600000U;
-                if (config->timeouts.exit_language_ms < 1000U)  config->timeouts.exit_language_ms = 1000U;
-                if (config->timeouts.exit_language_ms > 600000U) config->timeouts.exit_language_ms = 600000U;
+            }
 
-                // Analisi config MDB
-                cJSON *mdb_obj = cJSON_GetObjectItem(root, "mdb");
-                if (mdb_obj) {
-                    config->mdb.coin_acceptor_en = _json_read_bool(
-                        mdb_obj,
-                        "coin_en",
-                        "coin_acceptor_en",
-                        config->mdb.coin_acceptor_en);
-                    config->mdb.bill_validator_en = _json_read_bool(
-                        mdb_obj,
-                        "bill_en",
-                        "bill_validator_en",
-                        config->mdb.bill_validator_en);
-                    config->mdb.cashless_en = _json_read_bool(
-                        mdb_obj,
-                        "cashless_en",
-                        NULL,
-                        config->mdb.cashless_en);
+            // Analisi config Ethernet
+            cJSON *eth_obj = cJSON_GetObjectItem(root, "eth");
+            if (eth_obj)
+            {
+                cJSON *_eth_en = cJSON_GetObjectItem(eth_obj, "en");
+                if (!_eth_en)
+                    _eth_en = cJSON_GetObjectItem(eth_obj, "enabled");
+                config->eth.enabled = cJSON_IsTrue(_eth_en);
+                cJSON *_eth_dhcp = cJSON_GetObjectItem(eth_obj, "dhcp");
+                if (!_eth_dhcp)
+                    _eth_dhcp = cJSON_GetObjectItem(eth_obj, "dhcp_enabled");
+                config->eth.dhcp_enabled = cJSON_IsTrue(_eth_dhcp);
+                cJSON *ip = cJSON_GetObjectItem(eth_obj, "ip");
+                if (ip && ip->valuestring)
+                    strncpy(config->eth.ip, ip->valuestring, sizeof(config->eth.ip) - 1);
+                cJSON *subnet = cJSON_GetObjectItem(eth_obj, "sub");
+                if (!subnet)
+                    subnet = cJSON_GetObjectItem(eth_obj, "subnet");
+                if (subnet && subnet->valuestring)
+                    strncpy(config->eth.subnet, subnet->valuestring, sizeof(config->eth.subnet) - 1);
+                cJSON *gateway = cJSON_GetObjectItem(eth_obj, "gw");
+                if (!gateway)
+                    gateway = cJSON_GetObjectItem(eth_obj, "gateway");
+                if (gateway && gateway->valuestring)
+                    strncpy(config->eth.gateway, gateway->valuestring, sizeof(config->eth.gateway) - 1);
+                cJSON *dns1 = cJSON_GetObjectItem(eth_obj, "dns1");
+                if (dns1 && dns1->valuestring)
+                    strncpy(config->eth.dns1, dns1->valuestring, sizeof(config->eth.dns1) - 1);
+                cJSON *dns2 = cJSON_GetObjectItem(eth_obj, "dns2");
+                if (dns2 && dns2->valuestring)
+                    strncpy(config->eth.dns2, dns2->valuestring, sizeof(config->eth.dns2) - 1);
+            }
+
+            // Analisi config WiFi
+            cJSON *wifi_obj = cJSON_GetObjectItem(root, "wifi");
+            if (wifi_obj)
+            {
+                cJSON *_w_sta = cJSON_GetObjectItem(wifi_obj, "sta");
+                if (!_w_sta)
+                    _w_sta = cJSON_GetObjectItem(wifi_obj, "sta_enabled");
+                config->wifi.sta_enabled = cJSON_IsTrue(_w_sta);
+                cJSON *_w_dhcp = cJSON_GetObjectItem(wifi_obj, "dhcp");
+                if (!_w_dhcp)
+                    _w_dhcp = cJSON_GetObjectItem(wifi_obj, "dhcp_enabled");
+                config->wifi.dhcp_enabled = cJSON_IsTrue(_w_dhcp);
+                cJSON *ssid = cJSON_GetObjectItem(wifi_obj, "ssid");
+                if (ssid && ssid->valuestring)
+                    strncpy(config->wifi.ssid, ssid->valuestring, sizeof(config->wifi.ssid) - 1);
+                cJSON *password = cJSON_GetObjectItem(wifi_obj, "pwd");
+                if (!password)
+                    password = cJSON_GetObjectItem(wifi_obj, "password");
+                if (password && password->valuestring)
+                    strncpy(config->wifi.password, password->valuestring, sizeof(config->wifi.password) - 1);
+                cJSON *ip = cJSON_GetObjectItem(wifi_obj, "ip");
+                if (ip && ip->valuestring)
+                    strncpy(config->wifi.ip, ip->valuestring, sizeof(config->wifi.ip) - 1);
+                cJSON *subnet = cJSON_GetObjectItem(wifi_obj, "sub");
+                if (!subnet)
+                    subnet = cJSON_GetObjectItem(wifi_obj, "subnet");
+                if (subnet && subnet->valuestring)
+                    strncpy(config->wifi.subnet, subnet->valuestring, sizeof(config->wifi.subnet) - 1);
+                cJSON *gateway = cJSON_GetObjectItem(wifi_obj, "gw");
+                if (!gateway)
+                    gateway = cJSON_GetObjectItem(wifi_obj, "gateway");
+                if (gateway && gateway->valuestring)
+                    strncpy(config->wifi.gateway, gateway->valuestring, sizeof(config->wifi.gateway) - 1);
+            }
+
+            // NTP enabled
+            cJSON *_ntp_en = cJSON_GetObjectItem(root, "ntp_en");
+            if (!_ntp_en)
+                _ntp_en = cJSON_GetObjectItem(root, "ntp_enabled");
+            config->ntp_enabled = cJSON_IsTrue(_ntp_en);
+
+            // Analisi config NTP
+            cJSON *ntp_obj = cJSON_GetObjectItem(root, "ntp");
+            if (ntp_obj)
+            {
+                cJSON *server1 = cJSON_GetObjectItem(ntp_obj, "s1");
+                if (!server1)
+                    server1 = cJSON_GetObjectItem(ntp_obj, "server1");
+                if (server1 && server1->valuestring)
+                    strncpy(config->ntp.server1, server1->valuestring, sizeof(config->ntp.server1) - 1);
+                cJSON *server2 = cJSON_GetObjectItem(ntp_obj, "s2");
+                if (!server2)
+                    server2 = cJSON_GetObjectItem(ntp_obj, "server2");
+                if (server2 && server2->valuestring)
+                    strncpy(config->ntp.server2, server2->valuestring, sizeof(config->ntp.server2) - 1);
+                cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "tz");
+                if (!tz_offset)
+                    tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset");
+                if (tz_offset && cJSON_IsNumber(tz_offset))
+                    config->ntp.timezone_offset = tz_offset->valueint;
+            }
+
+            // Analisi config Server/Cloud
+            cJSON *server_obj = cJSON_GetObjectItem(root, "server");
+            if (server_obj)
+            {
+                cJSON *_srv_en = cJSON_GetObjectItem(server_obj, "en");
+                if (!_srv_en)
+                    _srv_en = cJSON_GetObjectItem(server_obj, "enabled");
+                config->server.enabled = cJSON_IsTrue(_srv_en);
+                cJSON *url = cJSON_GetObjectItem(server_obj, "url");
+                if (url && url->valuestring)
+                    strncpy(config->server.url, url->valuestring, sizeof(config->server.url) - 1);
+                cJSON *serial = cJSON_GetObjectItem(server_obj, "ser");
+                if (!serial)
+                    serial = cJSON_GetObjectItem(server_obj, "serial");
+                if (serial && serial->valuestring)
+                    strncpy(config->server.serial, serial->valuestring, sizeof(config->server.serial) - 1);
+                cJSON *password = cJSON_GetObjectItem(server_obj, "pwd");
+                if (!password)
+                    password = cJSON_GetObjectItem(server_obj, "password");
+                if (password && password->valuestring)
+                    strncpy(config->server.password, password->valuestring, sizeof(config->server.password) - 1);
+            }
+
+            // Analisi config agente FTP
+            cJSON *ftp_obj = cJSON_GetObjectItem(root, "ftp");
+            if (ftp_obj)
+            {
+                cJSON *_ftp_en = cJSON_GetObjectItem(ftp_obj, "en");
+                if (!_ftp_en)
+                    _ftp_en = cJSON_GetObjectItem(ftp_obj, "enabled");
+                config->ftp.enabled = cJSON_IsTrue(_ftp_en);
+                cJSON *ftp_server = cJSON_GetObjectItem(ftp_obj, "server");
+                if (ftp_server && ftp_server->valuestring)
+                    strncpy(config->ftp.server, ftp_server->valuestring, sizeof(config->ftp.server) - 1);
+                cJSON *ftp_user = cJSON_GetObjectItem(ftp_obj, "user");
+                if (ftp_user && ftp_user->valuestring)
+                    strncpy(config->ftp.user, ftp_user->valuestring, sizeof(config->ftp.user) - 1);
+                cJSON *ftp_password = cJSON_GetObjectItem(ftp_obj, "password");
+                if (ftp_password && ftp_password->valuestring)
+                    strncpy(config->ftp.password, ftp_password->valuestring, sizeof(config->ftp.password) - 1);
+                cJSON *ftp_path = cJSON_GetObjectItem(ftp_obj, "path");
+                if (ftp_path && ftp_path->valuestring)
+                    strncpy(config->ftp.path, ftp_path->valuestring, sizeof(config->ftp.path) - 1);
+            }
+
+            // Analisi config Remote Logging
+            cJSON *remote_log_obj = cJSON_GetObjectItem(root, "rlog");
+            if (!remote_log_obj)
+                remote_log_obj = cJSON_GetObjectItem(root, "remote_log"); /* compat */
+            if (remote_log_obj)
+            {
+                cJSON *server_port = cJSON_GetObjectItem(remote_log_obj, "port");
+                if (!server_port)
+                    server_port = cJSON_GetObjectItem(remote_log_obj, "server_port");
+                if (server_port)
+                    config->remote_log.server_port = (uint16_t)server_port->valueint;
+                cJSON *_bcast = cJSON_GetObjectItem(remote_log_obj, "bcast");
+                if (!_bcast)
+                    _bcast = cJSON_GetObjectItem(remote_log_obj, "use_broadcast");
+                config->remote_log.use_broadcast = cJSON_IsTrue(_bcast);
+                cJSON *_to_sd = cJSON_GetObjectItem(remote_log_obj, "to_sd");
+                if (!_to_sd)
+                    _to_sd = cJSON_GetObjectItem(remote_log_obj, "write_to_sd");
+                config->remote_log.write_to_sd = cJSON_IsTrue(_to_sd);
+            }
+
+            // Analisi config Sensori
+            cJSON *sensors_obj = cJSON_GetObjectItem(root, "sensors");
+            if (sensors_obj)
+            {
+                config->sensors.io_expander_enabled = _json_read_bool(
+                    sensors_obj,
+                    "io_exp",
+                    "io_expander_enabled",
+                    config->sensors.io_expander_enabled);
+
+                config->sensors.temperature_enabled = _json_read_bool(
+                    sensors_obj,
+                    "temp",
+                    "temperature_enabled",
+                    config->sensors.temperature_enabled);
+
+                config->sensors.led_enabled = _json_read_bool(
+                    sensors_obj,
+                    "led",
+                    "led_enabled",
+                    config->sensors.led_enabled);
+
+                cJSON *lc = cJSON_GetObjectItem(sensors_obj, "led_n");
+                if (!lc)
+                    lc = cJSON_GetObjectItem(sensors_obj, "led_count");
+                if (lc)
+                    config->sensors.led_count = (uint32_t)lc->valueint;
+
+                cJSON *led_run_r = cJSON_GetObjectItem(sensors_obj, "lrr");
+                if (!led_run_r)
+                    led_run_r = cJSON_GetObjectItem(sensors_obj, "led_run_r");
+                if (led_run_r && cJSON_IsNumber(led_run_r))
+                {
+                    int val = led_run_r->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_run_r = (uint8_t)val;
+                }
+                cJSON *led_run_g = cJSON_GetObjectItem(sensors_obj, "lrg");
+                if (!led_run_g)
+                    led_run_g = cJSON_GetObjectItem(sensors_obj, "led_run_g");
+                if (led_run_g && cJSON_IsNumber(led_run_g))
+                {
+                    int val = led_run_g->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_run_g = (uint8_t)val;
+                }
+                cJSON *led_run_b = cJSON_GetObjectItem(sensors_obj, "lrb");
+                if (!led_run_b)
+                    led_run_b = cJSON_GetObjectItem(sensors_obj, "led_run_b");
+                if (led_run_b && cJSON_IsNumber(led_run_b))
+                {
+                    int val = led_run_b->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_run_b = (uint8_t)val;
                 }
 
-                // Analisi config Display
-                cJSON *disp_obj = cJSON_GetObjectItem(root, "display");
-                if (disp_obj) {
-                    cJSON *enabled = cJSON_GetObjectItem(disp_obj, "en"); if (!enabled) enabled = cJSON_GetObjectItem(disp_obj, "enabled");
-                    if (enabled) config->display.enabled = cJSON_IsTrue(enabled);
-                    cJSON *bright = cJSON_GetObjectItem(disp_obj, "brt"); if (!bright) bright = cJSON_GetObjectItem(disp_obj, "lcd_brightness");
-                    if (bright) config->display.lcd_brightness = (uint8_t)bright->valueint;
-                    cJSON *backlight = cJSON_GetObjectItem(disp_obj, "backlight");
-                    if (backlight) config->display.backlight = cJSON_IsTrue(backlight);
-                    cJSON *ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_en"); if (!ads_enabled) ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_enabled");
-                    if (ads_enabled) config->display.ads_enabled = cJSON_IsTrue(ads_enabled);
+                cJSON *led_prefine_r = cJSON_GetObjectItem(sensors_obj, "lpr");
+                if (!led_prefine_r)
+                    led_prefine_r = cJSON_GetObjectItem(sensors_obj, "led_prefine_r");
+                if (led_prefine_r && cJSON_IsNumber(led_prefine_r))
+                {
+                    int val = led_prefine_r->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_prefine_r = (uint8_t)val;
+                }
+                cJSON *led_prefine_g = cJSON_GetObjectItem(sensors_obj, "lpg");
+                if (!led_prefine_g)
+                    led_prefine_g = cJSON_GetObjectItem(sensors_obj, "led_prefine_g");
+                if (led_prefine_g && cJSON_IsNumber(led_prefine_g))
+                {
+                    int val = led_prefine_g->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_prefine_g = (uint8_t)val;
+                }
+                cJSON *led_prefine_b = cJSON_GetObjectItem(sensors_obj, "lpb");
+                if (!led_prefine_b)
+                    led_prefine_b = cJSON_GetObjectItem(sensors_obj, "led_prefine_b");
+                if (led_prefine_b && cJSON_IsNumber(led_prefine_b))
+                {
+                    int val = led_prefine_b->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_prefine_b = (uint8_t)val;
                 }
 
-                // Analisi config Audio
-                cJSON *audio_obj = cJSON_GetObjectItem(root, "audio");
-                if (audio_obj) {
-                    cJSON *enabled = cJSON_GetObjectItem(audio_obj, "en"); if (!enabled) enabled = cJSON_GetObjectItem(audio_obj, "enabled");
-                    if (enabled) config->audio.enabled = cJSON_IsTrue(enabled);
-                    cJSON *volume = cJSON_GetObjectItem(audio_obj, "vol"); if (!volume) volume = cJSON_GetObjectItem(audio_obj, "volume");
-                    if (volume && cJSON_IsNumber(volume)) {
-                        int val = volume->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 100) val = 100;
-                        config->audio.volume = (uint8_t)val;
-                    }
+                cJSON *led_standby_r = cJSON_GetObjectItem(sensors_obj, "lsr");
+                if (!led_standby_r)
+                    led_standby_r = cJSON_GetObjectItem(sensors_obj, "led_standby_r");
+                if (led_standby_r && cJSON_IsNumber(led_standby_r))
+                {
+                    int val = led_standby_r->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_standby_r = (uint8_t)val;
+                }
+                cJSON *led_standby_g = cJSON_GetObjectItem(sensors_obj, "lsg");
+                if (!led_standby_g)
+                    led_standby_g = cJSON_GetObjectItem(sensors_obj, "led_standby_g");
+                if (led_standby_g && cJSON_IsNumber(led_standby_g))
+                {
+                    int val = led_standby_g->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_standby_g = (uint8_t)val;
+                }
+                cJSON *led_standby_b = cJSON_GetObjectItem(sensors_obj, "lsb");
+                if (!led_standby_b)
+                    led_standby_b = cJSON_GetObjectItem(sensors_obj, "led_standby_b");
+                if (led_standby_b && cJSON_IsNumber(led_standby_b))
+                {
+                    int val = led_standby_b->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_standby_b = (uint8_t)val;
                 }
 
-                // Analisi config Seriali (RS232, RS485, MDB)
-                cJSON *rs232_obj = cJSON_GetObjectItem(root, "rs232");
-                if (rs232_obj) {
-                    _parse_serial_cfg_json(rs232_obj, &config->rs232, &s_serial_default_rs232);
+                cJSON *led_flash_r = cJSON_GetObjectItem(sensors_obj, "lfr");
+                if (!led_flash_r)
+                    led_flash_r = cJSON_GetObjectItem(sensors_obj, "led_flash_r");
+                if (led_flash_r && cJSON_IsNumber(led_flash_r))
+                {
+                    int val = led_flash_r->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_flash_r = (uint8_t)val;
                 }
-                cJSON *rs485_obj = cJSON_GetObjectItem(root, "rs485");
-                if (rs485_obj) {
-                    _parse_serial_cfg_json(rs485_obj, &config->rs485, &s_serial_default_rs485);
+                cJSON *led_flash_g = cJSON_GetObjectItem(sensors_obj, "lfg");
+                if (!led_flash_g)
+                    led_flash_g = cJSON_GetObjectItem(sensors_obj, "led_flash_g");
+                if (led_flash_g && cJSON_IsNumber(led_flash_g))
+                {
+                    int val = led_flash_g->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_flash_g = (uint8_t)val;
                 }
-                cJSON *modbus_obj = cJSON_GetObjectItem(root, "modbus");
-                if (modbus_obj) {
-                    cJSON *enabled = cJSON_GetObjectItem(modbus_obj, "enabled");
-                    if (enabled) {
-                        config->modbus.enabled = cJSON_IsTrue(enabled);
-                    }
-
-                    cJSON *slave_id = cJSON_GetObjectItem(modbus_obj, "slave_id");
-                    if (slave_id && cJSON_IsNumber(slave_id)) {
-                        int val = slave_id->valueint;
-                        if (val < 1) val = 1;
-                        if (val > 255) val = 255;
-                        config->modbus.slave_id = (uint8_t)val;
-                    }
-
-                    cJSON *poll_ms = cJSON_GetObjectItem(modbus_obj, "poll_ms");
-                    if (poll_ms && cJSON_IsNumber(poll_ms)) {
-                        int val = poll_ms->valueint;
-                        if (val < 20) val = 20;
-                        if (val > 5000) val = 5000;
-                        config->modbus.poll_ms = (uint16_t)val;
-                    }
-
-                    cJSON *timeout_ms = cJSON_GetObjectItem(modbus_obj, "timeout_ms");
-                    if (timeout_ms && cJSON_IsNumber(timeout_ms)) {
-                        int val = timeout_ms->valueint;
-                        if (val < 50) val = 50;
-                        if (val > 2000) val = 2000;
-                        config->modbus.timeout_ms = (uint16_t)val;
-                    }
-
-                    cJSON *retries = cJSON_GetObjectItem(modbus_obj, "retries");
-                    if (retries && cJSON_IsNumber(retries)) {
-                        int val = retries->valueint;
-                        if (val < 0) val = 0;
-                        if (val > 5) val = 5;
-                        config->modbus.retries = (uint8_t)val;
-                    }
-
-                    cJSON *relay_start = cJSON_GetObjectItem(modbus_obj, "relay_start");
-                    if (relay_start && cJSON_IsNumber(relay_start)) {
-                        int val = relay_start->valueint;
-                        if (val < 0) val = 0;
-                        config->modbus.relay_start = (uint16_t)val;
-                    }
-
-                    cJSON *relay_count = cJSON_GetObjectItem(modbus_obj, "relay_count");
-                    if (relay_count && cJSON_IsNumber(relay_count)) {
-                        int val = relay_count->valueint;
-                        if (val < 1) val = 1;
-                        if (val > DEVICE_CFG_MODBUS_MAX_POINTS) val = DEVICE_CFG_MODBUS_MAX_POINTS;
-                        config->modbus.relay_count = (uint16_t)val;
-                    }
-
-                    cJSON *input_start = cJSON_GetObjectItem(modbus_obj, "input_start");
-                    if (input_start && cJSON_IsNumber(input_start)) {
-                        int val = input_start->valueint;
-                        if (val < 0) val = 0;
-                        config->modbus.input_start = (uint16_t)val;
-                    }
-
-                    cJSON *input_count = cJSON_GetObjectItem(modbus_obj, "input_count");
-                    if (input_count && cJSON_IsNumber(input_count)) {
-                        int val = input_count->valueint;
-                        if (val < 1) val = 1;
-                        if (val > DEVICE_CFG_MODBUS_MAX_POINTS) val = DEVICE_CFG_MODBUS_MAX_POINTS;
-                        config->modbus.input_count = (uint16_t)val;
-                    }
+                cJSON *led_flash_b = cJSON_GetObjectItem(sensors_obj, "lfb");
+                if (!led_flash_b)
+                    led_flash_b = cJSON_GetObjectItem(sensors_obj, "led_flash_b");
+                if (led_flash_b && cJSON_IsNumber(led_flash_b))
+                {
+                    int val = led_flash_b->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 255)
+                        val = 255;
+                    config->sensors.led_flash_b = (uint8_t)val;
                 }
 
-                cJSON *cctalk_obj = cJSON_GetObjectItem(root, "cctalk");
-                if (cctalk_obj) {
-                    cJSON *addr = cJSON_GetObjectItem(cctalk_obj, "address");
-                    if (addr && cJSON_IsNumber(addr)) {
-                        int val = addr->valueint;
-                        if (val < 1) val = 1;
-                        if (val > 255) val = 255;
-                        config->cctalk.address = (uint8_t)val;
-                    }
+                cJSON *led_flash_count = cJSON_GetObjectItem(sensors_obj, "lfc");
+                if (!led_flash_count)
+                    led_flash_count = cJSON_GetObjectItem(sensors_obj, "led_flash_count");
+                if (led_flash_count && cJSON_IsNumber(led_flash_count))
+                {
+                    int val = led_flash_count->valueint;
+                    if (val < 1)
+                        val = 1;
+                    if (val > 20)
+                        val = 20;
+                    config->sensors.led_flash_count = (uint8_t)val;
                 }
 
-                cJSON *cctalk_serial_obj = cJSON_GetObjectItem(root, "cctalk_serial");
-                if (cctalk_serial_obj) {
-                    cJSON *addr = cJSON_GetObjectItem(cctalk_serial_obj, "addr");
-                    if (addr && cJSON_IsNumber(addr)) {
-                        int val = addr->valueint;
-                        if (val < 1) val = 1;
-                        if (val > 255) val = 255;
-                        config->cctalk.address = (uint8_t)val;
+                config->sensors.rs232_enabled = _json_read_bool(
+                    sensors_obj,
+                    "rs232",
+                    "rs232_enabled",
+                    config->sensors.rs232_enabled);
+
+                config->sensors.rs485_enabled = _json_read_bool(
+                    sensors_obj,
+                    "rs485",
+                    "rs485_enabled",
+                    config->sensors.rs485_enabled);
+
+                config->sensors.mdb_enabled = _json_read_bool(
+                    sensors_obj,
+                    "mdb",
+                    "mdb_enabled",
+                    config->sensors.mdb_enabled);
+
+                config->sensors.cctalk_enabled = _json_read_bool(
+                    sensors_obj,
+                    "cctalk",
+                    "cctalk_enabled",
+                    config->sensors.cctalk_enabled);
+
+                config->sensors.eeprom_enabled = _json_read_bool(
+                    sensors_obj,
+                    "eeprom",
+                    "eeprom_enabled",
+                    config->sensors.eeprom_enabled);
+
+                config->sensors.pwm1_enabled = _json_read_bool(
+                    sensors_obj,
+                    "pwm1",
+                    "pwm1_enabled",
+                    config->sensors.pwm1_enabled);
+
+                config->sensors.pwm2_enabled = _json_read_bool(
+                    sensors_obj,
+                    "pwm2",
+                    "pwm2_enabled",
+                    config->sensors.pwm2_enabled);
+
+                config->sensors.sd_card_enabled = _json_read_bool(
+                    sensors_obj,
+                    "sd",
+                    "sd_card_enabled",
+                    config->sensors.sd_card_enabled);
+            }
+
+            // Analisi config Scanner USB
+            cJSON *scanner_obj = cJSON_GetObjectItem(root, "scanner");
+            if (scanner_obj)
+            {
+                config->scanner.enabled = _json_read_bool(
+                    scanner_obj,
+                    "en",
+                    "enabled",
+                    config->scanner.enabled);
+                cJSON *vid = cJSON_GetObjectItem(scanner_obj, "vid");
+                cJSON *pid = cJSON_GetObjectItem(scanner_obj, "pid");
+                cJSON *dual = cJSON_GetObjectItem(scanner_obj, "dpid");
+                if (!dual)
+                    dual = cJSON_GetObjectItem(scanner_obj, "dual_pid");
+                cJSON *cooldown = cJSON_GetObjectItem(scanner_obj, "cool");
+                if (!cooldown)
+                    cooldown = cJSON_GetObjectItem(scanner_obj, "cooldown_ms");
+                if (vid && cJSON_IsNumber(vid))
+                    config->scanner.vid = (uint16_t)vid->valueint;
+                if (pid && cJSON_IsNumber(pid))
+                    config->scanner.pid = (uint16_t)pid->valueint;
+                if (dual && cJSON_IsNumber(dual))
+                    config->scanner.dual_pid = (uint16_t)dual->valueint;
+                if (cooldown && cJSON_IsNumber(cooldown) && cooldown->valueint > 0)
+                {
+                    config->scanner.cooldown_ms = (uint32_t)cooldown->valueint;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "[CONFIG] scanner section not found in JSON");
+            }
+
+            // Analisi timeout applicativi
+            cJSON *timeouts_obj = cJSON_GetObjectItem(root, "timeouts");
+            if (timeouts_obj)
+            {
+                cJSON *t_prg = cJSON_GetObjectItem(timeouts_obj, "t_prg");
+                /* compat: accetta anche il vecchio nome */
+                if (!t_prg)
+                    t_prg = cJSON_GetObjectItem(timeouts_obj, "language_return_ms");
+                if (t_prg && cJSON_IsNumber(t_prg) && t_prg->valueint > 0)
+                {
+                    config->timeouts.exit_programs_ms = (uint32_t)t_prg->valueint;
+                }
+                cJSON *t_lang = cJSON_GetObjectItem(timeouts_obj, "t_lang");
+                if (t_lang && cJSON_IsNumber(t_lang) && t_lang->valueint > 0)
+                {
+                    config->timeouts.exit_language_ms = (uint32_t)t_lang->valueint;
+                }
+                cJSON *pre_fine = cJSON_GetObjectItem(timeouts_obj, "pre_fine_ciclo_percent");
+                if (pre_fine && cJSON_IsNumber(pre_fine))
+                {
+                    uint8_t val = (uint8_t)pre_fine->valueint;
+                    if (val <= 99)
+                    {
+                        config->timeouts.pre_fine_ciclo_percent = val;
                     }
                 }
-
-                cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_ser");
-                if (!mdb_s_obj) mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial"); /* compat */
-                if (mdb_s_obj) {
-                    _parse_serial_cfg_json(mdb_s_obj, &config->mdb_serial, &s_serial_default_mdb);
-                }
-
-                // Analisi GPIOs configurabili
-                cJSON *gpios_obj = cJSON_GetObjectItem(root, "gpios");
-                if (gpios_obj) {
-                    cJSON *g33 = cJSON_GetObjectItem(gpios_obj, "gpio33");
-                    if (g33) {
-                        cJSON *_mode = cJSON_GetObjectItem(g33, "m"); if (!_mode) _mode = cJSON_GetObjectItem(g33, "mode");
-                        config->gpios.gpio33.mode = (device_gpio_cfg_mode_t)cJSON_GetNumberValue(_mode);
-                        cJSON *_st = cJSON_GetObjectItem(g33, "st"); if (!_st) _st = cJSON_GetObjectItem(g33, "state");
-                        config->gpios.gpio33.initial_state = cJSON_IsTrue(_st);
+                cJSON *pause_suspend = cJSON_GetObjectItem(timeouts_obj, "pause_max_suspend_sec");
+                if (pause_suspend && cJSON_IsNumber(pause_suspend))
+                {
+                    uint32_t val = (uint32_t)pause_suspend->valuedouble;
+                    if (val <= 65535)
+                    {
+                        config->timeouts.pause_max_suspend_sec = val;
                     }
                 }
+            }
+            if (config->timeouts.exit_programs_ms < 1000U)
+                config->timeouts.exit_programs_ms = 1000U;
+            if (config->timeouts.exit_programs_ms > 600000U)
+                config->timeouts.exit_programs_ms = 600000U;
+            if (config->timeouts.exit_language_ms < 1000U)
+                config->timeouts.exit_language_ms = 1000U;
+            if (config->timeouts.exit_language_ms > 600000U)
+                config->timeouts.exit_language_ms = 600000U;
 
-                // Analisi tabella UI (lingue: pannello utente e backend)
-                cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
-                if (ui_obj) {
-                    cJSON *user_lang = cJSON_GetObjectItem(ui_obj, "ulang");
-                    if (!user_lang) user_lang = cJSON_GetObjectItem(ui_obj, "user_language"); /* compat */
-                    if (!user_lang) user_lang = cJSON_GetObjectItem(ui_obj, "language"); /* compat */
-                    if (user_lang && cJSON_IsString(user_lang) && user_lang->valuestring) {
-                        strncpy(config->ui.user_language, user_lang->valuestring, sizeof(config->ui.user_language) - 1);
-                    }
+            // Analisi config MDB
+            cJSON *mdb_obj = cJSON_GetObjectItem(root, "mdb");
+            if (mdb_obj)
+            {
+                config->mdb.coin_acceptor_en = _json_read_bool(
+                    mdb_obj,
+                    "coin_en",
+                    "coin_acceptor_en",
+                    config->mdb.coin_acceptor_en);
+                config->mdb.bill_validator_en = _json_read_bool(
+                    mdb_obj,
+                    "bill_en",
+                    "bill_validator_en",
+                    config->mdb.bill_validator_en);
+                config->mdb.cashless_en = _json_read_bool(
+                    mdb_obj,
+                    "cashless_en",
+                    NULL,
+                    config->mdb.cashless_en);
+            }
 
-                    cJSON *backend_lang = cJSON_GetObjectItem(ui_obj, "blang");
-                    if (!backend_lang) backend_lang = cJSON_GetObjectItem(ui_obj, "backend_language"); /* compat */
-                    if (backend_lang && cJSON_IsString(backend_lang) && backend_lang->valuestring) {
-                        strncpy(config->ui.backend_language, backend_lang->valuestring, sizeof(config->ui.backend_language) - 1);
-                    }
+            // Analisi config Display
+            cJSON *disp_obj = cJSON_GetObjectItem(root, "display");
+            if (disp_obj)
+            {
+                cJSON *enabled = cJSON_GetObjectItem(disp_obj, "en");
+                if (!enabled)
+                    enabled = cJSON_GetObjectItem(disp_obj, "enabled");
+                if (enabled)
+                    config->display.enabled = cJSON_IsTrue(enabled);
+                cJSON *bright = cJSON_GetObjectItem(disp_obj, "brt");
+                if (!bright)
+                    bright = cJSON_GetObjectItem(disp_obj, "lcd_brightness");
+                if (bright)
+                    config->display.lcd_brightness = (uint8_t)bright->valueint;
+                cJSON *backlight = cJSON_GetObjectItem(disp_obj, "backlight");
+                if (backlight)
+                    config->display.backlight = cJSON_IsTrue(backlight);
+                cJSON *ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_en");
+                if (!ads_enabled)
+                    ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_enabled");
+                if (ads_enabled)
+                    config->display.ads_enabled = cJSON_IsTrue(ads_enabled);
+            }
 
-                    cJSON *program_end_sec = cJSON_GetObjectItem(ui_obj, "pem");
-                    if (!program_end_sec) program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_message_sec");
-                    if (!program_end_sec) program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_sec"); /* compat */
-                    if (program_end_sec && cJSON_IsNumber(program_end_sec)) {
-                        int sec = program_end_sec->valueint;
-                        if (sec < 0) sec = 0;
-                        if (sec > 10) sec = 10;
-                        config->ui.program_end_message_sec = (uint8_t)sec;
-                    }
+            // Analisi config Audio
+            cJSON *audio_obj = cJSON_GetObjectItem(root, "audio");
+            if (audio_obj)
+            {
+                cJSON *enabled = cJSON_GetObjectItem(audio_obj, "en");
+                if (!enabled)
+                    enabled = cJSON_GetObjectItem(audio_obj, "enabled");
+                if (enabled)
+                    config->audio.enabled = cJSON_IsTrue(enabled);
+                cJSON *volume = cJSON_GetObjectItem(audio_obj, "vol");
+                if (!volume)
+                    volume = cJSON_GetObjectItem(audio_obj, "volume");
+                if (volume && cJSON_IsNumber(volume))
+                {
+                    int val = volume->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 100)
+                        val = 100;
+                    config->audio.volume = (uint8_t)val;
+                }
+            }
+
+            // Analisi config Seriali (RS232, RS485, MDB)
+            cJSON *rs232_obj = cJSON_GetObjectItem(root, "rs232");
+            if (rs232_obj)
+            {
+                _parse_serial_cfg_json(rs232_obj, &config->rs232, &s_serial_default_rs232);
+            }
+            cJSON *rs485_obj = cJSON_GetObjectItem(root, "rs485");
+            if (rs485_obj)
+            {
+                _parse_serial_cfg_json(rs485_obj, &config->rs485, &s_serial_default_rs485);
+            }
+            cJSON *modbus_obj = cJSON_GetObjectItem(root, "modbus");
+            if (modbus_obj)
+            {
+                cJSON *enabled = cJSON_GetObjectItem(modbus_obj, "enabled");
+                if (enabled)
+                {
+                    config->modbus.enabled = cJSON_IsTrue(enabled);
                 }
 
-                cJSON *ui_lang_flat = cJSON_GetObjectItem(root, "ui_language");
-                if (ui_lang_flat && cJSON_IsString(ui_lang_flat) && ui_lang_flat->valuestring) {
-                    strncpy(config->ui.user_language, ui_lang_flat->valuestring, sizeof(config->ui.user_language) - 1);
+                cJSON *slave_id = cJSON_GetObjectItem(modbus_obj, "slave_id");
+                if (slave_id && cJSON_IsNumber(slave_id))
+                {
+                    int val = slave_id->valueint;
+                    if (val < 1)
+                        val = 1;
+                    if (val > 255)
+                        val = 255;
+                    config->modbus.slave_id = (uint8_t)val;
                 }
+
+                cJSON *poll_ms = cJSON_GetObjectItem(modbus_obj, "poll_ms");
+                if (poll_ms && cJSON_IsNumber(poll_ms))
+                {
+                    int val = poll_ms->valueint;
+                    if (val < 20)
+                        val = 20;
+                    if (val > 5000)
+                        val = 5000;
+                    config->modbus.poll_ms = (uint16_t)val;
+                }
+
+                cJSON *timeout_ms = cJSON_GetObjectItem(modbus_obj, "timeout_ms");
+                if (timeout_ms && cJSON_IsNumber(timeout_ms))
+                {
+                    int val = timeout_ms->valueint;
+                    if (val < 50)
+                        val = 50;
+                    if (val > 2000)
+                        val = 2000;
+                    config->modbus.timeout_ms = (uint16_t)val;
+                }
+
+                cJSON *retries = cJSON_GetObjectItem(modbus_obj, "retries");
+                if (retries && cJSON_IsNumber(retries))
+                {
+                    int val = retries->valueint;
+                    if (val < 0)
+                        val = 0;
+                    if (val > 5)
+                        val = 5;
+                    config->modbus.retries = (uint8_t)val;
+                }
+
+                cJSON *relay_start = cJSON_GetObjectItem(modbus_obj, "relay_start");
+                if (relay_start && cJSON_IsNumber(relay_start))
+                {
+                    int val = relay_start->valueint;
+                    if (val < 0)
+                        val = 0;
+                    config->modbus.relay_start = (uint16_t)val;
+                }
+
+                cJSON *relay_count = cJSON_GetObjectItem(modbus_obj, "relay_count");
+                if (relay_count && cJSON_IsNumber(relay_count))
+                {
+                    int val = relay_count->valueint;
+                    if (val < 1)
+                        val = 1;
+                    if (val > DEVICE_CFG_MODBUS_MAX_POINTS)
+                        val = DEVICE_CFG_MODBUS_MAX_POINTS;
+                    config->modbus.relay_count = (uint16_t)val;
+                }
+
+                cJSON *input_start = cJSON_GetObjectItem(modbus_obj, "input_start");
+                if (input_start && cJSON_IsNumber(input_start))
+                {
+                    int val = input_start->valueint;
+                    if (val < 0)
+                        val = 0;
+                    config->modbus.input_start = (uint16_t)val;
+                }
+
+                cJSON *input_count = cJSON_GetObjectItem(modbus_obj, "input_count");
+                if (input_count && cJSON_IsNumber(input_count))
+                {
+                    int val = input_count->valueint;
+                    if (val < 1)
+                        val = 1;
+                    if (val > DEVICE_CFG_MODBUS_MAX_POINTS)
+                        val = DEVICE_CFG_MODBUS_MAX_POINTS;
+                    config->modbus.input_count = (uint16_t)val;
+                }
+            }
+
+            cJSON *cctalk_obj = cJSON_GetObjectItem(root, "cctalk");
+            if (cctalk_obj)
+            {
+                cJSON *addr = cJSON_GetObjectItem(cctalk_obj, "address");
+                if (addr && cJSON_IsNumber(addr))
+                {
+                    int val = addr->valueint;
+                    if (val < 1)
+                        val = 1;
+                    if (val > 255)
+                        val = 255;
+                    config->cctalk.address = (uint8_t)val;
+                }
+            }
+
+            cJSON *cctalk_serial_obj = cJSON_GetObjectItem(root, "cctalk_serial");
+            if (cctalk_serial_obj)
+            {
+                cJSON *addr = cJSON_GetObjectItem(cctalk_serial_obj, "addr");
+                if (addr && cJSON_IsNumber(addr))
+                {
+                    int val = addr->valueint;
+                    if (val < 1)
+                        val = 1;
+                    if (val > 255)
+                        val = 255;
+                    config->cctalk.address = (uint8_t)val;
+                }
+            }
+
+            cJSON *mdb_s_obj = cJSON_GetObjectItem(root, "mdb_ser");
+            if (!mdb_s_obj)
+                mdb_s_obj = cJSON_GetObjectItem(root, "mdb_serial"); /* compat */
+            if (mdb_s_obj)
+            {
+                _parse_serial_cfg_json(mdb_s_obj, &config->mdb_serial, &s_serial_default_mdb);
+            }
+
+            // Analisi GPIOs configurabili
+            cJSON *gpios_obj = cJSON_GetObjectItem(root, "gpios");
+            if (gpios_obj)
+            {
+                cJSON *g33 = cJSON_GetObjectItem(gpios_obj, "gpio33");
+                if (g33)
+                {
+                    cJSON *_mode = cJSON_GetObjectItem(g33, "m");
+                    if (!_mode)
+                        _mode = cJSON_GetObjectItem(g33, "mode");
+                    config->gpios.gpio33.mode = (device_gpio_cfg_mode_t)cJSON_GetNumberValue(_mode);
+                    cJSON *_st = cJSON_GetObjectItem(g33, "st");
+                    if (!_st)
+                        _st = cJSON_GetObjectItem(g33, "state");
+                    config->gpios.gpio33.initial_state = cJSON_IsTrue(_st);
+                }
+            }
+
+            // Analisi tabella UI (lingue: pannello utente e backend)
+            cJSON *ui_obj = cJSON_GetObjectItem(root, "ui");
+            if (ui_obj)
+            {
+                cJSON *user_lang = cJSON_GetObjectItem(ui_obj, "ulang");
+                if (!user_lang)
+                    user_lang = cJSON_GetObjectItem(ui_obj, "user_language"); /* compat */
+                if (!user_lang)
+                    user_lang = cJSON_GetObjectItem(ui_obj, "language"); /* compat */
+                if (user_lang && cJSON_IsString(user_lang) && user_lang->valuestring)
+                {
+                    strncpy(config->ui.user_language, user_lang->valuestring, sizeof(config->ui.user_language) - 1);
+                }
+
+                cJSON *backend_lang = cJSON_GetObjectItem(ui_obj, "blang");
+                if (!backend_lang)
+                    backend_lang = cJSON_GetObjectItem(ui_obj, "backend_language"); /* compat */
+                if (backend_lang && cJSON_IsString(backend_lang) && backend_lang->valuestring)
+                {
+                    strncpy(config->ui.backend_language, backend_lang->valuestring, sizeof(config->ui.backend_language) - 1);
+                }
+
+                cJSON *program_end_sec = cJSON_GetObjectItem(ui_obj, "pem");
+                if (!program_end_sec)
+                    program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_message_sec");
+                if (!program_end_sec)
+                    program_end_sec = cJSON_GetObjectItem(ui_obj, "program_end_sec"); /* compat */
+                if (program_end_sec && cJSON_IsNumber(program_end_sec))
+                {
+                    int sec = program_end_sec->valueint;
+                    if (sec < 0)
+                        sec = 0;
+                    if (sec > 10)
+                        sec = 10;
+                    config->ui.program_end_message_sec = (uint8_t)sec;
+                }
+            }
+
+            cJSON *ui_lang_flat = cJSON_GetObjectItem(root, "ui_language");
+            if (ui_lang_flat && cJSON_IsString(ui_lang_flat) && ui_lang_flat->valuestring)
+            {
+                strncpy(config->ui.user_language, ui_lang_flat->valuestring, sizeof(config->ui.user_language) - 1);
+            }
+
+            // Analisi config Logging
+            cJSON *logging_obj = cJSON_GetObjectItem(root, "logging");
+            if (logging_obj)
+            {
+                cJSON *http_services = cJSON_GetObjectItem(logging_obj, "http_services");
+                config->logging.http_services = cJSON_IsTrue(http_services);
+                cJSON *lvgl = cJSON_GetObjectItem(logging_obj, "lvgl");
+                config->logging.lvgl = cJSON_IsTrue(lvgl);
+                cJSON *io_expander = cJSON_GetObjectItem(logging_obj, "io_expander");
+                config->logging.io_expander = cJSON_IsTrue(io_expander);
+            }
 
             cJSON_Delete(root);
             const char *source_name = source_is_nvs ? "NVS" : (source_is_spiffs ? "SPIFFS" : "UNKNOWN");
             ESP_LOGD(TAG, "[C] Configurazione caricata correttamente da %s", source_name);
-            
+
             /* [C] Log evidenziato della sorgente di caricamento */
             ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════════════╗");
             ESP_LOGI(TAG, "[M] ║ CONFIG.JSON CARICATO DA: %-27s ║", source_name);
             ESP_LOGI(TAG, "[M] ║ Dispositivo: %-40s ║", config->device_name);
             ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════════════╝");
-        } else {
+        }
+        else
+        {
             ESP_LOGE(TAG, "[C] Errore parsing JSON!");
         }
 
         free(json_str);
     }
-
+    else
+    {
+        ESP_LOGI(TAG, "[C] *** CONFIG NON TROVATA IN SPIFFS o NVS: Usato i valori di default");
+    }
     return ESP_OK;
 }
-
 
 /**
  * @brief Converte una configurazione di dispositivo in un formato JSON.
@@ -1988,9 +2415,10 @@ esp_err_t device_config_load(device_config_t *config)
  * @param [in] config Puntatore alla struttura di configurazione del dispositivo.
  * @return char* Puntatore alla stringa JSON rappresentante la configurazione del dispositivo.
  */
-char* device_config_to_json(const device_config_t *config)
+char *device_config_to_json(const device_config_t *config)
 {
-    if (!config) return NULL;
+    if (!config)
+        return NULL;
 
     cJSON *root = cJSON_CreateObject();
 
@@ -2007,9 +2435,11 @@ char* device_config_to_json(const device_config_t *config)
 
     cJSON *touch_map_obj = cJSON_CreateObject();
     cJSON *touch_buttons = cJSON_CreateArray();
-    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
+    for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index)
+    {
         uint8_t mapped_input = config->touch_button_map.button_to_input[button_index];
-        if (mapped_input < DEVICE_TOUCH_INPUT_MIN || mapped_input > DEVICE_TOUCH_INPUT_MAX) {
+        if (mapped_input < DEVICE_TOUCH_INPUT_MIN || mapped_input > DEVICE_TOUCH_INPUT_MAX)
+        {
             mapped_input = DEVICE_TOUCH_BUTTON_UNASSIGNED;
         }
         cJSON_AddItemToArray(touch_buttons, cJSON_CreateNumber(mapped_input));
@@ -2141,6 +2571,13 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddBoolToObject(disp_obj, "ads_en", config->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", disp_obj);
 
+    // Logging
+    cJSON *logging_obj = cJSON_CreateObject();
+    cJSON_AddBoolToObject(logging_obj, "http_services", config->logging.http_services);
+    cJSON_AddBoolToObject(logging_obj, "lvgl", config->logging.lvgl);
+    cJSON_AddBoolToObject(logging_obj, "io_expander", config->logging.io_expander);
+    cJSON_AddItemToObject(root, "logging", logging_obj);
+
     // Audio
     cJSON *audio_obj = cJSON_CreateObject();
     cJSON_AddBoolToObject(audio_obj, "en", config->audio.enabled);
@@ -2217,19 +2654,17 @@ char* device_config_to_json(const device_config_t *config)
     return json_str;
 }
 
-
 /**
  * @brief API legacy: legge la configurazione JSON persistita (ora da NVS).
  *
  * @param [out] Nessun parametro di input.
  * @return char* Puntatore alla stringa JSON contenente la configurazione del dispositivo, o NULL in caso di errore.
  */
-char* device_config_read_json_from_eeprom(void)
+char *device_config_read_json_from_eeprom(void)
 {
     ESP_LOGW(TAG, "[C] API legacy device_config_read_json_from_eeprom: uso backend NVS");
     return _read_from_nvs();
 }
-
 
 /**
  * @brief Salva la configurazione del dispositivo.
@@ -2241,54 +2676,59 @@ char* device_config_read_json_from_eeprom(void)
  */
 esp_err_t device_config_save(const device_config_t *config)
 {
-    if (!config) return ESP_ERR_INVALID_ARG;
+    if (!config)
+        return ESP_ERR_INVALID_ARG;
 
-    ESP_LOGI(TAG, "[C] Salvataggio configurazione in NVS: LED count = %lu, LCD bright = %d", 
+    ESP_LOGI(TAG, "[C] Salvataggio configurazione in NVS: LED count = %lu, LCD bright = %d",
              config->sensors.led_count, config->display.lcd_brightness);
 
     char *json_str = device_config_to_json(config);
-    if (!json_str) return ESP_ERR_NO_MEM;
+    if (!json_str)
+        return ESP_ERR_NO_MEM;
 
     ESP_LOGD(TAG, "[C] JSON da salvare in NVS: %s", json_str);
     esp_err_t err = _write_to_nvs(json_str);
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "[C] Salvataggio configurazione in NVS fallito: %s", esp_err_to_name(err));
-    } else {
+    }
+    else
+    {
         ESP_LOGI(TAG, "[C] Config salvata in NVS");
     }
-    
+
     free(json_str);
     return err;
 }
 
-
 /**
  * @brief Scrive la configurazione in JSON su SPIFFS
- * 
+ *
  * @param config Puntatore alla struttura device_config_t da salvare.
  * @return ESP_OK se riuscito, ESP_ERR_INVALID_ARG o ESP_FAIL altrimenti.
  */
 esp_err_t device_config_write_to_spiffs(const device_config_t *config)
 {
-    if (!config) return ESP_ERR_INVALID_ARG;
+    if (!config)
+        return ESP_ERR_INVALID_ARG;
 
     ESP_LOGI(TAG, "[C] Salvataggio configurazione su SPIFFS");
 
     char *json_str = device_config_to_json(config);
-    if (!json_str) return ESP_ERR_NO_MEM;
+    if (!json_str)
+        return ESP_ERR_NO_MEM;
 
     esp_err_t err = _write_config_to_spiffs(json_str);
     free(json_str);
     return err;
 }
 
-
 /**
  * @brief Ottiene un puntatore alla configurazione del dispositivo.
  *
  * @return device_config_t* Puntatore alla configurazione del dispositivo.
  */
-device_config_t* device_config_get(void)
+device_config_t *device_config_get(void)
 {
     return &s_config;
 }
@@ -2301,12 +2741,12 @@ device_config_t* device_config_get(void)
 uint32_t device_config_get_crc(void)
 {
     char *json = device_config_to_json(&s_config);
-    if (!json) return 0;
+    if (!json)
+        return 0;
     uint32_t crc = _calculate_crc(json);
     free(json);
     return crc;
 }
-
 
 /**
  * @brief Controlla se la configurazione del dispositivo è stata aggiornata.
@@ -2336,7 +2776,6 @@ esp_err_t device_config_reset_defaults(void)
     return device_config_save(&s_config);
 }
 
-
 /**
  * @brief Riavvia il dispositivo alla configurazione di fabbrica.
  *
@@ -2349,18 +2788,21 @@ void device_config_reboot_factory(void)
 {
     const esp_partition_t *factory = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, NULL);
     _i18n_v2_clear_cache();
-    if (factory) {
+    if (factory)
+    {
         ESP_LOGI(TAG, "Impostazione partizione di boot: FACTORY");
         esp_err_t err = esp_ota_set_boot_partition(factory);
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             ESP_LOGE(TAG, "Errore set boot partition FACTORY: %s", esp_err_to_name(err));
         }
         esp_restart();
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "Partizione Factory non trovata!");
     }
 }
-
 
 /**
  * @brief Riavvia l'applicazione del dispositivo.
@@ -2374,7 +2816,6 @@ void device_config_reboot_app(void)
     device_config_reboot_app_last();
 }
 
-
 /**
  * @brief Riavvia il dispositivo utilizzando l'immagine OTA0.
  *
@@ -2387,18 +2828,21 @@ void device_config_reboot_app(void)
 void device_config_reboot_ota0(void)
 {
     const esp_partition_t *ota0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
-    if (ota0) {
+    if (ota0)
+    {
         ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_0");
         esp_err_t err = esp_ota_set_boot_partition(ota0);
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             ESP_LOGE(TAG, "Errore set boot partition OTA_0: %s", esp_err_to_name(err));
         }
         esp_restart();
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "Partizione OTA_0 non trovata!");
     }
 }
-
 
 /**
  * @brief Riavvia il dispositivo utilizzando l'aggiornamento OTA1.
@@ -2410,18 +2854,21 @@ void device_config_reboot_ota0(void)
 void device_config_reboot_ota1(void)
 {
     const esp_partition_t *ota1 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, NULL);
-    if (ota1) {
+    if (ota1)
+    {
         ESP_LOGI(TAG, "Impostazione partizione di boot: OTA_1");
         esp_err_t err = esp_ota_set_boot_partition(ota1);
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             ESP_LOGE(TAG, "Errore set boot partition OTA_1: %s", esp_err_to_name(err));
         }
         esp_restart();
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "Partizione OTA_1 non trovata!");
     }
 }
-
 
 /**
  * @brief Riavvia l'applicazione con la configurazione dell'ultimo dispositivo.
@@ -2437,59 +2884,72 @@ void device_config_reboot_app_last(void)
     const esp_partition_t *boot = esp_ota_get_boot_partition();
     const esp_partition_t *target = NULL;
 
-    if (boot && (boot->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 || boot->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1)) {
+    if (boot && (boot->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 || boot->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1))
+    {
         target = boot;
-    } else {
+    }
+    else
+    {
         const esp_partition_t *running = esp_ota_get_running_partition();
-        if (running && (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 || running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1)) {
+        if (running && (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0 || running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1))
+        {
             target = running;
         }
     }
 
-    if (!target) {
+    if (!target)
+    {
         target = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, NULL);
     }
 
-    if (target) {
+    if (target)
+    {
         ESP_LOGI(TAG, "Impostazione partizione di boot: APP LAST (%s)", target->label);
         esp_err_t err = esp_ota_set_boot_partition(target);
-        if (err != ESP_OK) {
+        if (err != ESP_OK)
+        {
             ESP_LOGE(TAG, "Errore set boot partition APP LAST (%s): %s", target->label, esp_err_to_name(err));
         }
         esp_restart();
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "Partizione APP LAST non trovata (OTA_0/OTA_1 assenti)!");
     }
 }
 
-const char* device_config_get_running_app_name(void)
+const char *device_config_get_running_app_name(void)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
-    if (running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY) {
+    if (running->subtype == ESP_PARTITION_SUBTYPE_APP_FACTORY)
+    {
         return "MAINTENANCE";
-    } else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0) {
+    }
+    else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0)
+    {
         return "OTA0";
-    } else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1) {
+    }
+    else if (running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1)
+    {
         return "OTA1";
     }
     return "UNKNOWN";
 }
 
-const char* device_config_get_ui_language(void)
+const char *device_config_get_ui_language(void)
 {
     return s_config.ui.user_language;
 }
 
-const char* device_config_get_ui_user_language(void)
+const char *device_config_get_ui_user_language(void)
 {
     return s_config.ui.user_language;
 }
 
-const char* device_config_get_ui_backend_language(void)
+const char *device_config_get_ui_backend_language(void)
 {
     return s_config.ui.backend_language;
 }
-
 
 /**
  * @brief Ottiene i record di testo dell'interfaccia utente in formato JSON per un determinato linguaggio.
@@ -2497,17 +2957,17 @@ const char* device_config_get_ui_backend_language(void)
  * @param [in] language Il codice del linguaggio per cui si desidera ottenere i record di testo dell'interfaccia utente.
  * @return char* Un puntatore a una stringa JSON contenente i record di testo dell'interfaccia utente, oppure NULL in caso di errore.
  */
-char* device_config_get_ui_texts_records_json(const char *language)
+char *device_config_get_ui_texts_records_json(const char *language)
 {
     cJSON *records = _i18n_v2_build_records_for_language(language);
-    if (!records) {
+    if (!records)
+    {
         return NULL;
     }
     char *json = cJSON_PrintUnformatted(records);
     cJSON_Delete(records);
     return json;
 }
-
 
 /**
  * @brief Imposta i testi UI per i record JSON in base alla lingua specificata.
@@ -2524,10 +2984,9 @@ esp_err_t device_config_set_ui_texts_records_json(const char *language, const ch
     return ESP_ERR_NOT_SUPPORTED;
 }
 
-
 /**
  * @brief Ottiene il testo dell'interfaccia utente per un determinato ambito e chiave.
- * 
+ *
  * @param [in] scope L'ambito per cui si desidera ottenere il testo dell'interfaccia utente.
  * @param [in] key La chiave per cui si desidera ottenere il testo dell'interfaccia utente.
  * @param [in] fallback Il testo di fallback da utilizzare se non viene trovato il testo dell'interfaccia utente.
@@ -2537,7 +2996,8 @@ esp_err_t device_config_set_ui_texts_records_json(const char *language, const ch
  */
 esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, const char *fallback, char *out, size_t out_len)
 {
-    if (!scope || !key || !out || out_len == 0) {
+    if (!scope || !key || !out || out_len == 0)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -2545,11 +3005,13 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
 
     /* Prefer numeric lookup via PSRAM when the dictionary is loaded. */
     {
-        uint8_t  scope_id = (uint8_t)i18n_scope_id(scope);
-        uint16_t key_id   = (uint16_t)i18n_key_id(key);
-        if (scope_id != 0 && key_id != 0) {
+        uint8_t scope_id = (uint8_t)i18n_scope_id(scope);
+        uint16_t key_id = (uint16_t)i18n_key_id(key);
+        if (scope_id != 0 && key_id != 0)
+        {
             char *concat = i18n_concat_from_psram(scope_id, key_id);
-            if (concat) {
+            if (concat)
+            {
                 strncpy(out, concat, out_len - 1);
                 out[out_len - 1] = '\0';
                 ESP_LOGD("DEVICE_CFG", "[C] i18n PSRAM hit: '%s' -> '%s'", key, out);
@@ -2560,12 +3022,16 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
     }
 
     ESP_LOGD("DEVICE_CFG", "[C] i18n PSRAM miss, trying cache build");
-    if (_i18n_lookup_cache_build_for_lang(NULL) != ESP_OK || !s_i18n_lookup_cache) {
+    if (_i18n_lookup_cache_build_for_lang(NULL) != ESP_OK || !s_i18n_lookup_cache)
+    {
         ESP_LOGW("DEVICE_CFG", "[C] i18n cache build failed, using fallback");
-        if (fallback) {
+        if (fallback)
+        {
             strncpy(out, fallback, out_len - 1);
             out[out_len - 1] = '\0';
-        } else {
+        }
+        else
+        {
             out[0] = '\0';
         }
         return ESP_ERR_INVALID_STATE;
@@ -2577,24 +3043,32 @@ esp_err_t device_config_get_ui_text_scoped(const char *scope, const char *key, c
 
     esp_err_t ret = ESP_ERR_NOT_FOUND;
     cJSON *val = cJSON_GetObjectItemCaseSensitive(s_i18n_lookup_cache, scoped_key);
-    if (!cJSON_IsString(val) || !val->valuestring) {
+    if (!cJSON_IsString(val) || !val->valuestring)
+    {
         val = cJSON_GetObjectItemCaseSensitive(s_i18n_lookup_cache, key);
         ESP_LOGD(TAG, "[C] Secondo tentativo con chiave '%s': %s", key, val ? "trovato" : "non trovato");
-    } else {
+    }
+    else
+    {
         ESP_LOGD(TAG, "[C] Trovato con chiave scoped '%s': '%s'", scoped_key, val->valuestring);
     }
 
-    if (cJSON_IsString(val) && val->valuestring) {
+    if (cJSON_IsString(val) && val->valuestring)
+    {
         strncpy(out, val->valuestring, out_len - 1);
         out[out_len - 1] = '\0';
         ret = ESP_OK;
     }
 
-    if (ret != ESP_OK) {
-        if (fallback) {
+    if (ret != ESP_OK)
+    {
+        if (fallback)
+        {
             strncpy(out, fallback, out_len - 1);
             out[out_len - 1] = '\0';
-        } else {
+        }
+        else
+        {
             out[0] = '\0';
         }
     }

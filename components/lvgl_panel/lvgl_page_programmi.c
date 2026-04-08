@@ -2019,11 +2019,11 @@ void lvgl_page_main_show(void)
     }
 
     /* Log finale con riepilogo dei pulsanti creati */
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: BUTTONS SUMMARY - s_num_programs=%u", (unsigned)s_num_programs);
-    for (int i = 0; i < PROG_COUNT && i < (int)s_num_programs; i++) {
-        ESP_LOGI(TAG, "[C] lvgl_page_main_show: s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
-                 i, (void*)s_prog_btns[i], i, (void*)s_prog_lbls[i]);
-    }
+     ESP_LOGI(TAG, "[C] lvgl_page_main_show: BUTTONS SUMMARY - s_num_programs=%u", (unsigned)s_num_programs);
+     for (int i = 0; i < PROG_COUNT && i < (int)s_num_programs; i++) {
+         ESP_LOGI(TAG, "[C] lvgl_page_main_show: s_prog_btns[%d]=%p, s_prog_lbls[%d]=%p", 
+                  i, (void*)s_prog_btns[i], i, (void*)s_prog_lbls[i]);
+     }
     
     ESP_LOGI(TAG, "[C] ===== lvgl_page_main_show END =====");
 

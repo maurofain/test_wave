@@ -640,10 +640,19 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (event->value_i32 > 0) {
+                ESP_LOGI(TAG, "[M] *** CREDITI RICEVUTI *** Fonte: MONETE | Importo: %ld cent | ECD prima: %ld | VCD prima: %ld",
+                         (long)event->value_i32, (long)ctx->ecd_coins, (long)ctx->vcd_coins);
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           true,
                                           (event->text[0] != '\0') ? event->text : "coin");
+                // Log evidenziato con valori posteriori
+                ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════╗");
+                ESP_LOGI(TAG, "[M] ║ CREDITI RICEVUTI - MONETE                  ║");
+                ESP_LOGI(TAG, "[M] ║ Importo: %ld cent                          ║", (long)event->value_i32);
+                ESP_LOGI(TAG, "[M] ║ ECD dopo: %ld | VCD dopo: %ld            ║", (long)ctx->ecd_coins, (long)ctx->vcd_coins);
+                ESP_LOGI(TAG, "[M] ║ Credito totale: %ld cent                   ║", (long)ctx->credit_cents);
+                ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════╝");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -654,10 +663,19 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             if (event->value_i32 > 0) {
+                ESP_LOGI(TAG, "[M] *** CREDITI RICEVUTI *** Fonte: MDB-GETTONE | Importo: %ld cent | ECD prima: %ld | VCD prima: %ld",
+                         (long)event->value_i32, (long)ctx->ecd_coins, (long)ctx->vcd_coins);
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           true,
                                           (event->text[0] != '\0') ? event->text : "token");
+                // Log evidenziato con valori posteriori
+                ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════╗");
+                ESP_LOGI(TAG, "[M] ║ CREDITI RICEVUTI - MDB-GETTONE             ║");
+                ESP_LOGI(TAG, "[M] ║ Importo: %ld cent                          ║", (long)event->value_i32);
+                ESP_LOGI(TAG, "[M] ║ ECD dopo: %ld | VCD dopo: %ld            ║", (long)ctx->ecd_coins, (long)ctx->vcd_coins);
+                ESP_LOGI(TAG, "[M] ║ Credito totale: %ld cent                   ║", (long)ctx->credit_cents);
+                ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════╝");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -675,10 +693,19 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_QR);
             if (event->value_i32 > 0) {
+                ESP_LOGI(TAG, "[M] *** CREDITI RICEVUTI *** Fonte: SCANNER-QR | Importo: %ld cent | ECD corrente: %ld | VCD prima: 0 (reset)",
+                         (long)event->value_i32, (long)ctx->ecd_coins);
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           false,
                                           (event->text[0] != '\0') ? event->text : "qr_vcd");
+                // Log evidenziato con valori posteriori
+                ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════╗");
+                ESP_LOGI(TAG, "[M] ║ CREDITI RICEVUTI - SCANNER-QR              ║");
+                ESP_LOGI(TAG, "[M] ║ Importo: %ld cent                          ║", (long)event->value_i32);
+                ESP_LOGI(TAG, "[M] ║ ECD dopo: %ld | VCD dopo: %ld (reset)    ║", (long)ctx->ecd_coins, (long)ctx->vcd_coins);
+                ESP_LOGI(TAG, "[M] ║ Credito totale: %ld cent                   ║", (long)ctx->credit_cents);
+                ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════╝");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -691,10 +718,19 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_CARD);
             if (event->value_i32 > 0) {
+                ESP_LOGI(TAG, "[M] *** CREDITI RICEVUTI *** Fonte: TESSERA/CARD | Importo: %ld cent | ECD corrente: %ld | VCD prima: %ld",
+                         (long)event->value_i32, (long)ctx->ecd_coins, (long)ctx->vcd_coins);
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           false,
                                           (event->text[0] != '\0') ? event->text : "card_vcd");
+                // Log evidenziato con valori posteriori
+                ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════╗");
+                ESP_LOGI(TAG, "[M] ║ CREDITI RICEVUTI - TESSERA/CARD            ║");
+                ESP_LOGI(TAG, "[M] ║ Importo: %ld cent                          ║", (long)event->value_i32);
+                ESP_LOGI(TAG, "[M] ║ ECD dopo: %ld | VCD dopo: %ld            ║", (long)ctx->ecd_coins, (long)ctx->vcd_coins);
+                ESP_LOGI(TAG, "[M] ║ Credito totale: %ld cent                   ║", (long)ctx->credit_cents);
+                ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════╝");
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
         }
@@ -887,6 +923,23 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
 
     if (ctx->state == FSM_STATE_RUNNING) {
         ctx->running_elapsed_ms += elapsed_ms;
+        
+        // Calcola il progresso percentuale per logging
+        uint32_t progress_pct = 0;
+        if (ctx->running_target_ms > 0) {
+            progress_pct = (ctx->running_elapsed_ms * 100U) / ctx->running_target_ms;
+            if (progress_pct > 100U) progress_pct = 100U;
+        }
+        
+        // Loggia ogni 10% di progresso
+        static uint32_t last_logged_pct = 0;
+        if ((progress_pct / 10) > (last_logged_pct / 10)) {
+            last_logged_pct = progress_pct;
+            ESP_LOGI(TAG, "[M] Progresso ciclo: %u%% (%lu ms / %lu ms)", 
+                     progress_pct, 
+                     (unsigned long)ctx->running_elapsed_ms,
+                     (unsigned long)ctx->running_target_ms);
+        }
         
         // Logica PreFineCiclo: attiva la segnalazione quando si raggiunge la percentuale configurata
         if (!ctx->pre_fine_ciclo_active && ctx->running_target_ms > 0) {

@@ -166,8 +166,9 @@ esp_err_t eeprom_24lc16_init(void) {
         ESP_LOGI("INIT", "[M] EEPROM init: 24LC16BT trovata e pronta");
         
         // Test EEPROM: leggi, modifica, verifica, ripristina byte alla locazione 400
-        uint8_t original_value = 0;
-        esp_err_t read_ret = eeprom_24lc16_read_byte(400, &original_value);
+        // uint8_t original_value = 0;
+        // esp_err_t read_ret = eeprom_24lc16_read_byte(400, &original_value);
+        /*
         if (read_ret == ESP_OK) {
             ESP_LOGI("INIT", "[M] EEPROM TEST: Lettura locazione 400 -> valore originale: 0x%02X (%d)", original_value, original_value);
             
@@ -205,7 +206,7 @@ esp_err_t eeprom_24lc16_init(void) {
             }
         } else {
             ESP_LOGE("INIT", "[M] EEPROM TEST: ❌ Errore lettura iniziale: %s", esp_err_to_name(read_ret));
-        }
+        }*/
     } else {
         s_eeprom_available = false;
         ESP_LOGW("INIT",
@@ -214,6 +215,7 @@ esp_err_t eeprom_24lc16_init(void) {
                  esp_err_to_name(ret));
         cleanup_dev_handles();
     }
+       
     return ESP_OK; 
 }
 

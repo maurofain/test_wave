@@ -1,8 +1,9 @@
 #include "keepalive_task.h"
 #include "http_services.h"
 #include "digital_io.h"
-#include "sht40.h"
 #include "fsm.h"
+#include "tasks.h"
+#include "sht40.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -73,13 +74,14 @@ static esp_err_t keepalive_send_message(void)
                                outputstates,
                                sizeof(outputstates));
 
+    /* [C] Lettura diretta da SHT40 per test (temporal revert) */
     esp_err_t sht_err = sht40_read(&temp_float, &hum_float);
     if (sht_err != ESP_OK) {
-        ESP_LOGW(TAG, "[C] Lettura SHT40 fallita per keepalive: %s",
-                 esp_err_to_name(sht_err));
+        ESP_LOGW(TAG, "[C] SHT40 read fallito: %s", esp_err_to_name(sht_err));
         temp_float = 0.0f;
         hum_float = 0.0f;
     }
+    ESP_LOGD(TAG, "[C] Temp/Hum read: T=%.2f°C, H=%.2f%%", temp_float, hum_float);
 
     int32_t temp_hundredths = (int32_t)(temp_float * 100.0f);
     int32_t hum_hundredths = (int32_t)(hum_float * 100.0f);

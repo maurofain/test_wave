@@ -447,4 +447,18 @@ uint8_t io_get(void)
     return io_input_state;
 }
 
+/**
+ * @brief [C] Ritorna uno snapshot atomico dello stato degli I/O expander
+ * @note Thread-safe, legge solo i valori cached senza accesso I2C
+ * @return Snapshot contenente gli stati di output e input
+ */
+io_expander_snapshot_t io_expander_get_snapshot(void)
+{
+    io_expander_snapshot_t snapshot = {
+        .output_state = io_output_state,
+        .input_state = io_input_state,
+    };
+    return snapshot;
+}
+
 #endif /* DNA_IO_EXPANDER */

@@ -47,7 +47,7 @@ static const char *TAG = "HTTP_SERVICES";
 // Global variable to store the token
 char g_auth_token[HTTP_SERVICES_AUTH_TOKEN_MAX_LEN] = {0};
 static bool s_remote_online = false;
-static bool s_http_services_initial_token_done = false;
+static bool __attribute__((unused)) s_http_services_initial_token_done = false;
 static bool s_http_buffering_enabled = false;
 static bool s_http_buffer_flushed = false;
 static char *s_http_pending_json = NULL;
@@ -607,7 +607,7 @@ static void http_services_buffer_append(const char *json_payload)
     s_http_pending_json[s_http_pending_len] = '\0';
 }
 
-static esp_err_t http_services_buffer_flush(void)
+static esp_err_t __attribute__((unused)) http_services_buffer_flush(void)
 {
     if (!s_http_pending_json || s_http_pending_len == 0) {
         s_http_buffer_flushed = true;
@@ -1111,7 +1111,7 @@ static void log_httpd_request(httpd_req_t *req, const char *body)
     }
 }
 
-static esp_err_t remote_post_pending(const char *remote_path, const char *body)
+static esp_err_t __attribute__((unused)) remote_post_pending(const char *remote_path, const char *body)
 {
     (void)remote_path;
     if (!body) {
@@ -1204,7 +1204,7 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 
     esp_http_client_config_t cfg_http = {
         .url = url,
-        .timeout_ms = 15000,
+        .timeout_ms = 5000,  /* [C] Ridotto da 15s a 5s per riconoscimento veloce disconnessioni */
         .skip_cert_common_name_check = true,
         /* increase internal buffers so large response headers (or many headers) fit */
         .buffer_size = 8192,

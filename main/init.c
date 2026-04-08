@@ -58,6 +58,7 @@ cctalk_driver_init(void); /* forward decl - header in components/cctalk */
 #include "io_expander.h"
 #include "lvgl.h"
 #include "lvgl_panel.h"
+#include "lvgl_page_chrome.h"  /* [M] Per aggiornare indicatori periferiche */
 #include "periph_i2c.h"
 #include "pwm.h"
 #include "remote_logging.h"
@@ -176,6 +177,49 @@ void init_agent_status_reset_defaults(void)
   s_agent_status_table[0].error_code = INIT_AGENT_ERR_NONE;
 }
 
+/* [M] Aggiorna gli indicatori di stato periferiche (puntini sopra bandiera) */
+static void update_periph_status_indicator(int32_t agn_value, init_agent_error_code_t error_code)
+{
+  /* Mappa: 0=Network, 1=Scanner USB, 2=CCTALK, 3=MDB */
+  int indicator_index = -1;
+  const char *periph_name = "";
+  
+  switch (agn_value) {
+    case AGN_ID_HTTP_SERVICES:
+      indicator_index = 0;  /* Network connection */
+      periph_name = "Network";
+      break;
+    case AGN_ID_USB_CDC_SCANNER:
+      indicator_index = 1;  /* USB Scanner */
+      periph_name = "USB Scanner";
+      break;
+    case AGN_ID_CCTALK:
+      indicator_index = 2;  /* CCTALK */
+      periph_name = "CCTALK";
+      break;
+    case AGN_ID_MDB:
+      indicator_index = 3;  /* MDB */
+      periph_name = "MDB";
+      break;
+    default:
+      return;  /* Non è una periferica da monitorare */
+  }
+  
+  if (indicator_index < 0) {
+    return;
+  }
+  
+  /* Aggiorna solo se il display è pronto e LVGL è attivo */
+  if (s_display_ready) {
+    bool is_ok = (error_code == INIT_AGENT_ERR_NONE);
+    lvgl_page_chrome_update_status_indicator(indicator_index, is_ok);
+    /* [M] Log evidenziato dell'aggiornamento indicatore */
+    ESP_LOGI(TAG, "[M] 🔵 Indicatore #%d (%s): %s → %s", indicator_index, periph_name,
+             is_ok ? "BIANCO ✓" : "ROSSO ✗",
+             init_agent_error_code_text(error_code));
+  }
+}
+
 /**
  * @brief Inizializza lo stato dell'agente.
  *
@@ -196,6 +240,8 @@ void init_agent_status_set(int32_t agn_value, int32_t state,
       s_agent_status_table[i].state = state;
       s_agent_status_table[i].error_code = (int32_t)error_code;
       init_agent_status_update_error_counter();
+      /* [M] Aggiorna anche gli indicatori visivi se disponibili */
+      update_periph_status_indicator(agn_value, error_code);
       return;
     }
   }
@@ -1011,6 +1057,14 @@ static inline void init_lvgl_status_log(const char *text)
 }
 
 /**
+ * @brief Restituisce marcatore emoji ✅/❌ per i flag booleani.
+ */
+static const char *enabled_marker(bool enabled)
+{
+  return enabled ? "✅" : "❌";
+}
+
+/**
  * @brief Restituisce testo "abilitata"/"disabilitata" per i flag booleani.
  */
 static const char *enabled_text(bool enabled)
@@ -1035,40 +1089,40 @@ static void log_peripherals_from_config(const device_config_t *cfg)
   
   /* Rete e comunicazione */
   ESP_LOGI(TAG, "[M] │ RETE E COMUNICAZIONE │");
-  ESP_LOGI(TAG, "[M]  - ethernet:        %s", enabled_text(cfg->eth.enabled));
-  ESP_LOGI(TAG, "[M]  - wifi_sta:        %s", enabled_text(cfg->wifi.sta_enabled));
-  ESP_LOGI(TAG, "[M]  - ntp:             %s", enabled_text(cfg->ntp_enabled));
-  ESP_LOGI(TAG, "[M]  - server remoto:   %s", enabled_text(cfg->server.enabled));
-  ESP_LOGI(TAG, "[M]  - ftp:             %s", enabled_text(cfg->ftp.enabled));
-  ESP_LOGI(TAG, "[M]  - log remoto:      %s", enabled_text(cfg->remote_log.use_broadcast));
-  ESP_LOGI(TAG, "[M]  - log su SD:       %s", enabled_text(cfg->remote_log.write_to_sd));
+  ESP_LOGI(TAG, "[M]  %s ethernet:        %s", enabled_marker(cfg->eth.enabled), enabled_text(cfg->eth.enabled));
+  ESP_LOGI(TAG, "[M]  %s wifi_sta:        %s", enabled_marker(cfg->wifi.sta_enabled), enabled_text(cfg->wifi.sta_enabled));
+  ESP_LOGI(TAG, "[M]  %s ntp:             %s", enabled_marker(cfg->ntp_enabled), enabled_text(cfg->ntp_enabled));
+  ESP_LOGI(TAG, "[M]  %s server remoto:   %s", enabled_marker(cfg->server.enabled), enabled_text(cfg->server.enabled));
+  ESP_LOGI(TAG, "[M]  %s ftp:             %s", enabled_marker(cfg->ftp.enabled), enabled_text(cfg->ftp.enabled));
+  ESP_LOGI(TAG, "[M]  %s log remoto:      %s", enabled_marker(cfg->remote_log.use_broadcast), enabled_text(cfg->remote_log.use_broadcast));
+  ESP_LOGI(TAG, "[M]  %s log su SD:       %s", enabled_marker(cfg->remote_log.write_to_sd), enabled_text(cfg->remote_log.write_to_sd));
   
   /* Display e interfaccia utente */
   ESP_LOGI(TAG, "[M] │ DISPLAY E INTERFACCIA UTENTE │");
-  ESP_LOGI(TAG, "[M]  - display:        %s", enabled_text(cfg->display.enabled));
-  ESP_LOGI(TAG, "[M]  - ads:            %s", enabled_text(cfg->display.ads_enabled));
-  ESP_LOGI(TAG, "[M]  - audio:          %s", enabled_text(cfg->audio.enabled));
+  ESP_LOGI(TAG, "[M]  %s display:        %s", enabled_marker(cfg->display.enabled), enabled_text(cfg->display.enabled));
+  ESP_LOGI(TAG, "[M]  %s ads:            %s", enabled_marker(cfg->display.ads_enabled), enabled_text(cfg->display.ads_enabled));
+  ESP_LOGI(TAG, "[M]  %s audio:          %s", enabled_marker(cfg->audio.enabled), enabled_text(cfg->audio.enabled));
   
   /* Periferiche di input/output */
   ESP_LOGI(TAG, "[M] │ PERIFERICHE I/O │");
-  ESP_LOGI(TAG, "[M]  - scanner_usb:    %s", enabled_text(cfg->scanner.enabled));
-  ESP_LOGI(TAG, "[M]  - io_expander:    %s", enabled_text(cfg->sensors.io_expander_enabled));
-  ESP_LOGI(TAG, "[M]  - rs232:          %s", enabled_text(cfg->sensors.rs232_enabled));
-  ESP_LOGI(TAG, "[M]  - rs485:          %s", enabled_text(cfg->sensors.rs485_enabled));
-  ESP_LOGI(TAG, "[M]  - mdb:            %s", enabled_text(cfg->sensors.mdb_enabled));
-  ESP_LOGI(TAG, "[M]  - cctalk:         %s", enabled_text(cfg->sensors.cctalk_enabled));
+  ESP_LOGI(TAG, "[M]  %s scanner_usb:    %s", enabled_marker(cfg->scanner.enabled), enabled_text(cfg->scanner.enabled));
+  ESP_LOGI(TAG, "[M]  %s io_expander:    %s", enabled_marker(cfg->sensors.io_expander_enabled), enabled_text(cfg->sensors.io_expander_enabled));
+  ESP_LOGI(TAG, "[M]  %s rs232:          %s", enabled_marker(cfg->sensors.rs232_enabled), enabled_text(cfg->sensors.rs232_enabled));
+  ESP_LOGI(TAG, "[M]  %s rs485:          %s", enabled_marker(cfg->sensors.rs485_enabled), enabled_text(cfg->sensors.rs485_enabled));
+  ESP_LOGI(TAG, "[M]  %s mdb:            %s", enabled_marker(cfg->sensors.mdb_enabled), enabled_text(cfg->sensors.mdb_enabled));
+  ESP_LOGI(TAG, "[M]  %s cctalk:         %s", enabled_marker(cfg->sensors.cctalk_enabled), enabled_text(cfg->sensors.cctalk_enabled));
   
   /* Sensori e attuatori */
   ESP_LOGI(TAG, "[M] │ SENSORI E ATTUATORI │");
-  ESP_LOGI(TAG, "[M]  - temperatura:    %s", enabled_text(cfg->sensors.temperature_enabled));
-  ESP_LOGI(TAG, "[M]  - led_strip:      %s", enabled_text(cfg->sensors.led_enabled));
-  ESP_LOGI(TAG, "[M]  - pwm1:           %s", enabled_text(cfg->sensors.pwm1_enabled));
-  ESP_LOGI(TAG, "[M]  - pwm2:           %s", enabled_text(cfg->sensors.pwm2_enabled));
+  ESP_LOGI(TAG, "[M]  %s temperatura:    %s", enabled_marker(cfg->sensors.temperature_enabled), enabled_text(cfg->sensors.temperature_enabled));
+  ESP_LOGI(TAG, "[M]  %s led_strip:      %s", enabled_marker(cfg->sensors.led_enabled), enabled_text(cfg->sensors.led_enabled));
+  ESP_LOGI(TAG, "[M]  %s pwm1:           %s", enabled_marker(cfg->sensors.pwm1_enabled), enabled_text(cfg->sensors.pwm1_enabled));
+  ESP_LOGI(TAG, "[M]  %s pwm2:           %s", enabled_marker(cfg->sensors.pwm2_enabled), enabled_text(cfg->sensors.pwm2_enabled));
   
   /* Storage e memoria */
   ESP_LOGI(TAG, "[M] │ STORAGE │");
-  ESP_LOGI(TAG, "[M]  - sd_card:        %s", enabled_text(cfg->sensors.sd_card_enabled));
-  ESP_LOGI(TAG, "[M]  - eeprom:         %s", enabled_text(cfg->sensors.eeprom_enabled));
+  ESP_LOGI(TAG, "[M]  %s sd_card:        %s", enabled_marker(cfg->sensors.sd_card_enabled), enabled_text(cfg->sensors.sd_card_enabled));
+  ESP_LOGI(TAG, "[M]  %s eeprom:         %s", enabled_marker(cfg->sensors.eeprom_enabled), enabled_text(cfg->sensors.eeprom_enabled));
   
   ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════════════════════════╝");
 }
@@ -1296,8 +1350,16 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
        * handler */
       if (device_config_get()->ntp_enabled)
       {
-        ESP_LOGI(TAG, "[M] [NTP] Avvio SNTP (IP disponibile)");
-        init_sntp();
+        if (s_sntp_initialized)
+        {
+          ESP_LOGD(TAG, "[NTP] SNTP già inizializzato, skip reinit (Ethernet "
+                        "riconnesso)");
+        }
+        else
+        {
+          ESP_LOGI(TAG, "[M] [NTP] Avvio SNTP (IP disponibile)");
+          init_sntp();
+        }
       }
       else
       {
@@ -1367,6 +1429,14 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
   break;
   case ETHERNET_EVENT_DISCONNECTED:
     ESP_LOGW(TAG, "[M] Collegamento Ethernet inattivo");
+    /* Ferma il servizio SNTP quando Ethernet si disconnette per evitare
+       asserts quando si ricollega e prova a reinizializzare */
+    if (s_sntp_initialized)
+    {
+      ESP_LOGD(TAG, "[NTP] Fermare SNTP prima della disconnessione Ethernet");
+      esp_sntp_stop();
+      s_sntp_initialized = false;
+    }
     break;
   case ETHERNET_EVENT_START:
     ESP_LOGI(TAG, "[M] Driver Ethernet avviato");

@@ -3691,6 +3691,31 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_register_uri_handler(server, &uri_api_logs_options);
     ESP_LOGI(TAG, "Registered OPTIONS /api/logs/* handler");
 
+    // Register component logging endpoints
+    httpd_uri_t uri_api_logs_comp_http_status = {.uri = "/api/logs/component/HTTP_SERVICES/status", .method = HTTP_GET, .handler = api_logs_component_status_get};
+    httpd_register_uri_handler(server, &uri_api_logs_comp_http_status);
+    ESP_LOGI(TAG, "Registered GET /api/logs/component/HTTP_SERVICES/status");
+
+    httpd_uri_t uri_api_logs_comp_http_post = {.uri = "/api/logs/component/HTTP_SERVICES", .method = HTTP_POST, .handler = api_logs_component_post};
+    httpd_register_uri_handler(server, &uri_api_logs_comp_http_post);
+    ESP_LOGI(TAG, "Registered POST /api/logs/component/HTTP_SERVICES");
+
+    httpd_uri_t uri_api_logs_comp_lvgl_status = {.uri = "/api/logs/component/lvgl/status", .method = HTTP_GET, .handler = api_logs_component_status_get};
+    httpd_register_uri_handler(server, &uri_api_logs_comp_lvgl_status);
+    ESP_LOGI(TAG, "Registered GET /api/logs/component/lvgl/status");
+
+    httpd_uri_t uri_api_logs_comp_lvgl_post = {.uri = "/api/logs/component/lvgl", .method = HTTP_POST, .handler = api_logs_component_post};
+    httpd_register_uri_handler(server, &uri_api_logs_comp_lvgl_post);
+    ESP_LOGI(TAG, "Registered POST /api/logs/component/lvgl");
+
+    httpd_uri_t uri_api_logs_comp_io_exp_status = {.uri = "/api/logs/component/io_expander/status", .method = HTTP_GET, .handler = api_logs_component_status_get};
+    httpd_register_uri_handler(server, &uri_api_logs_comp_io_exp_status);
+    ESP_LOGI(TAG, "Registered GET /api/logs/component/io_expander/status");
+
+    httpd_uri_t uri_api_logs_comp_io_exp_post = {.uri = "/api/logs/component/io_expander", .method = HTTP_POST, .handler = api_logs_component_post};
+    httpd_register_uri_handler(server, &uri_api_logs_comp_io_exp_post);
+    ESP_LOGI(TAG, "Registered POST /api/logs/component/io_expander");
+
     // Register debug USB enumeration endpoint
     httpd_uri_t uri_api_debug_usb = {.uri = "/api/debug/usb/enumerate", .method = HTTP_GET, .handler = api_debug_usb_enumerate};
     httpd_register_uri_handler(server, &uri_api_debug_usb);

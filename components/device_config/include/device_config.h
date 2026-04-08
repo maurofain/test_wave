@@ -238,6 +238,15 @@ typedef struct {
 } device_ui_texts_config_t;
 
 /**
+ * @brief Configurazione log selettivi per componenti
+ */
+typedef struct {
+    bool http_services;         ///< Log HTTP_SERVICES abilitato
+    bool lvgl;                  ///< Log LVGL abilitato
+    bool io_expander;           ///< Log I/O Expander abilitato
+} device_logging_config_t;
+
+/**
  * @brief Seleziona la sorgente immagini pubblicitarie (SPIFFS o SD Card).
  */
 typedef enum {
@@ -263,6 +272,7 @@ typedef struct {
     device_server_config_t server;          ///< Configurazione Server/Cloud (base URL + abilitazione)
     device_ftp_config_t ftp;                ///< Configurazione agente FTP
     device_remote_log_config_t remote_log;  ///< Configurazione logging remoto
+    device_logging_config_t logging;        ///< Configurazione log selettivi componenti
     device_sensors_config_t sensors;
     device_mdb_config_t mdb;
     device_display_config_t display;

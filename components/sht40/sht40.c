@@ -186,11 +186,13 @@ esp_err_t sht40_read(float *temp, float *hum) {
         return ret;
     }
 
-    // Attesa per la misura (High precision richiede max 10ms)
-    vTaskDelay(pdMS_TO_TICKS(20));
+    /* [C] Attesa per la misura: aumentato da 20ms a 30ms per affidabilità
+       (High precision spec dice max 10ms, ma sensori reali spesso hanno glitch) */
+    vTaskDelay(pdMS_TO_TICKS(30));
 
-    // Legge i 6 byte (Temp MSB, Temp LSB, Temp CRC, Hum MSB, Hum LSB, Hum CRC)
-    ret = i2c_master_receive(sht_dev, data, 6, pdMS_TO_TICKS(100));
+    /* Legge i 6 byte (Temp MSB, Temp LSB, Temp CRC, Hum MSB, Hum LSB, Hum CRC)
+       [C] Timeout aumentato da 100ms a 150ms per maggiore robustezza */
+    ret = i2c_master_receive(sht_dev, data, 6, pdMS_TO_TICKS(150));
     if (ret == ESP_ERR_INVALID_STATE) {
         ESP_LOGW(TAG, "[C] SHT40 receive in invalid state, provo re-init");
         sht40_drop_device();
@@ -198,8 +200,8 @@ esp_err_t sht40_read(float *temp, float *hum) {
         if (init_ret == ESP_OK) {
             ret = i2c_master_transmit(sht_dev, &cmd, 1, pdMS_TO_TICKS(100));
             if (ret == ESP_OK) {
-                vTaskDelay(pdMS_TO_TICKS(20));
-                ret = i2c_master_receive(sht_dev, data, 6, pdMS_TO_TICKS(100));
+                vTaskDelay(pdMS_TO_TICKS(30));  /* [C] Aumentato a 30ms */
+                ret = i2c_master_receive(sht_dev, data, 6, pdMS_TO_TICKS(150));  /* [C] Aumentato timeout a 150ms */
             }
         } else {
             ret = init_ret;

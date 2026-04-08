@@ -64,6 +64,37 @@ esp_err_t status_get_handler(httpd_req_t *req)
     bool remote_online = http_services_is_remote_online();
     bool remote_token = http_services_has_auth_token();
 
+    /* [C] Estrai stato dei 4 agenti principali (Network, USB Scanner, CCTALK, MDB) */
+    bool http_services_online = false, usb_scanner_online = false;
+    bool cctalk_online = false, mdb_online_agent = false;
+    {
+        size_t agent_count = 0;
+        const init_agent_status_t *table = init_agent_status_get_table(&agent_count);
+        if (table && agent_count > 0) {
+            /* Cicla nella tabella per trovare i 4 agenti (salta primo elemento che è AGN_ID_NONE) */
+            for (size_t i = 1; i < agent_count; i++) {
+                /* state=1 significa OK (non-zero), state=0 significa KO */
+                int is_ok = (table[i].state != 0) ? 1 : 0;
+                switch (table[i].agn_value) {
+                    case AGN_ID_HTTP_SERVICES:
+                        http_services_online = !!is_ok;
+                        break;
+                    case AGN_ID_USB_CDC_SCANNER:
+                        usb_scanner_online = !!is_ok;
+                        break;
+                    case AGN_ID_CCTALK:
+                        cctalk_online = !!is_ok;
+                        break;
+                    case AGN_ID_MDB:
+                        mdb_online_agent = !!is_ok;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
     const size_t resp_cap = 5120;
     char *resp = malloc(resp_cap);
     if (!resp) {
@@ -84,6 +115,9 @@ esp_err_t status_get_handler(httpd_req_t *req)
                "\"temperature\":%d,\"cctalk\":%d,\"sd_card\":%d,\"eeprom\":%d,"
                "\"pwm1\":%d,\"pwm2\":%d,\"remote_logging\":%d"
              "},"
+             "\"agents\":{"
+               "\"http_services\":%s,\"usb_scanner\":%s,\"cctalk\":%s,\"mdb\":%s"
+             "},"
              "\"config\":%s}",
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,
              web_ui_is_running() ? "true" : "false",
@@ -98,6 +132,10 @@ esp_err_t status_get_handler(httpd_req_t *req)
              cfg->sensors.io_expander_enabled, cfg->sensors.led_enabled, cfg->sensors.rs232_enabled, cfg->sensors.rs485_enabled, cfg->sensors.mdb_enabled,
              cfg->sensors.temperature_enabled, cfg->sensors.cctalk_enabled, cfg->sensors.sd_card_enabled, cfg->sensors.eeprom_enabled,
              cfg->sensors.pwm1_enabled, cfg->sensors.pwm2_enabled, cfg->remote_log.use_broadcast,
+             http_services_online ? "true" : "false",
+             usb_scanner_online ? "true" : "false",
+             cctalk_online ? "true" : "false",
+             mdb_online_agent ? "true" : "false",
              config_json ? config_json : "{}");
 
     if (config_json) free(config_json);

@@ -7,6 +7,14 @@ extern uint8_t io_output_state;
 extern uint8_t io_input_state;
 
 /**
+ * @brief Snapshot atomico dello stato degli I/O expander
+ */
+typedef struct {
+    uint8_t output_state;  /* Stato dell'ultima scrittura sui pin di uscita (0-7) */
+    uint8_t input_state;   /* Stato dell'ultima lettura dai pin di ingresso (0-7) */
+} io_expander_snapshot_t;
+
+/**
  * @brief Inizializza gli I/O Expander (FXL6408)
  * @return ESP_OK in caso di successo
  */
@@ -43,3 +51,10 @@ bool io_get_pin(int pin);
  * @return Valore a 8 bit della porta di ingresso
  */
 uint8_t io_get(void);
+
+/**
+ * @brief [C] Ritorna uno snapshot atomico dello stato degli I/O expander
+ * @note Questa funzione è thread-safe e non richiede I2C; legge i valori cached
+ * @return Snapshot contenente gli stati di output e input
+ */
+io_expander_snapshot_t io_expander_get_snapshot(void);

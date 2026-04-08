@@ -1835,11 +1835,11 @@
       "045": {
         "label": "config.text.045",
         "text": {
-          "it": "📊 Logging Remoto",
-          "en": "📊 Remote Logging",
-          "fr": "📊 Enregistrement à distance",
-          "de": "📊 Fernprotokollierung",
-          "es": "📊 Registro remoto"
+          "it": "Logging",
+          "en": "Logging",
+          "fr": "Enregistrement",
+          "de": "Protokollierung",
+          "es": "Registro"
         }
       },
       "046": {
@@ -7045,11 +7045,11 @@
       "065": {
         "label": "test.text.065",
         "text": {
-          "it": "📡 Logging Remoto",
-          "en": "📡 Logging Remoto",
-          "fr": "📡 Logging Remoto",
-          "de": "📡 Logging Remoto",
-          "es": "📡 Logging Remoto"
+          "it": "Logging",
+          "en": "Logging",
+          "fr": "Enregistrement",
+          "de": "Protokollierung",
+          "es": "Registro"
         }
       },
       "066": {
@@ -7904,6 +7904,39 @@
         "fr": "Sélectionner la langue",
         "de": "Sprache auswählen",
         "es": "Seleccionar idioma"
+      }
+    },
+    "log_http_services_toggle": {
+      "legacyId": "",
+      "label": "config.logging.http_services",
+      "text": {
+        "it": "Log HTTP_SERVICES",
+        "en": "Log HTTP_SERVICES",
+        "fr": "Log HTTP_SERVICES",
+        "de": "Log HTTP_SERVICES",
+        "es": "Log HTTP_SERVICES"
+      }
+    },
+    "log_lvgl_toggle": {
+      "legacyId": "",
+      "label": "config.logging.lvgl",
+      "text": {
+        "it": "Log LVGL",
+        "en": "Log LVGL",
+        "fr": "Log LVGL",
+        "de": "Log LVGL",
+        "es": "Log LVGL"
+      }
+    },
+    "log_io_exp_toggle": {
+      "legacyId": "",
+      "label": "config.logging.io_expander",
+      "text": {
+        "it": "Log I/O Expander",
+        "en": "Log I/O Expander",
+        "fr": "Log I/O Expander",
+        "de": "Log I/O Expander",
+        "es": "Log I/O Expander"
       }
     }
   }

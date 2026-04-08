@@ -13,7 +13,24 @@
 4. ✅ Modifiche a fine ciclo
    - ✅ al termine dell'ultimo ciclo di programma va mostrato subito il messaggio di ringraziamento, ora appare solo dopo una successiva apertura di un'altra pagine (ad es. scelta lingua)
    - ✅ Il messaggio va mostrato solo all'ultimo ciclo, non al rinnovo automatico
-5. Piano test endpoint e funzioni 
+5. ✅ Utilizzo puntini sopra la bandieria di scelta lingua
+   - ✅ i 4 puntini sopra la bandieria di scelta lingua indicano rispettivamente:
+     1. ✅ connessione di rete : il puntino deve essere bianco se è stabilita la connessione di rete ed è attiva la connessione con il server remoto, o rosso se assente 
+     2. ✅ Scanner USB Attivo : bianco se OK, rosso se KO
+     3. ✅ Gettoniera cctalk  : bianco se OK, rosso se KO
+     4. ✅ MDB :  : bianco se OK, rosso se KO
+   - ✅ All'avvio mostrare i 4 punti tutti rossi e modificare il colore dopo ogni completamento del setup della periferica associata
+   - ✅ Puntini sono pieni (non solo bordi) e si aggiornano in tempo reale quando lo stato cambia
+6. ✅ Verificare se in caso di errore di rete il sistema è in grado di riconnersi e se aggiorna i puntino sopra alla bandierina di scelta lingua
+   - ✅ Documento di verifica creato: [VERIFICATION_POINT_6.md](VERIFICATION_POINT_6.md)
+   - ✅ Fix SNTP crash on network reconnection: `esp_sntp_stop()` + `s_sntp_initialized` reset su `ETHERNET_EVENT_DISCONNECTED`
+   - ✅ Aggiunto stato dello Scanner USB in "Stato Servizi" (web UI e endpoint `/status`)
+   - ✅ Puntini ora rispecchiano gli stati dal field `agents` in risposta `/status`
+   - ✅ Ridotto timeout HTTP da 15s a 5s per riconoscimento veloce disconnessioni di rete
+   - ⏳ Test Case 1-5 da eseguire su device hardware per validare
+   - Note: Rete ora riconosciuta come offline entro 5-10s (non 15-25s), puntini updateranno più velocemente, Scanner USB visibile nel "Stato Servizi"
+7. 
+8. Piano test endpoint e funzioni 
    -	Strutturare i test in 4 livelli: 
    - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
    - **Contract**: campi obbligatori e tipi minimi della risposta
@@ -34,30 +51,30 @@
    - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
    - 3 flow critici: SD, seriale unificato, backup config su SD
    - Report `junit.xml` + riepilogo markdown
-6. Protocollo moduli 8 I/O RS485 esterni
+9. Protocollo moduli 8 I/O RS485 esterni
    - Driver RS485 presente ma nessun protocollo per slave 8-I/O esterni (uno o due moduli)
    - Definire il protocollo di comunicazione (Modbus RTU o proprietario)
    - Implementare lettura ingressi e scrittura uscite ciclica
    - Aggiungere in /config: numero schede I/O esterne (0, 1, 2)
 
-7. PLC esterno
+10. PLC esterno
    - Definire protocollo di collegamento (seriale RS485 o input digitale diretto)
    - Implementare ricezione impulsi/segnali da PLC (es. segnale avanzamento ciclo)
    - Aggiungere in /config: abilitazione PLC, input/output associati, protocollo
 
-8. Config: assegnazione programmi a I/O e relay
+11. Config: assegnazione programmi a I/O e relay
    - I programmi sono configurabili (tempo, pausa) ma non mappati a uscite fisiche
    - Aggiungere in /config per ogni programma: maschera relay/output attivati durante l'erogazione
 
-9. Config: valore per metodo di pagamento
+12. Config: valore per metodo di pagamento
    - Aggiungere in /config i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
 
-10. Ricezione config da server (`api/getconfig`)
+13. Ricezione config da server (`api/getconfig`)
    - L'API server `POST /api/getconfig` è definita ma il device non applica la configurazione ricevuta
    - Implementare il parsing della risposta e aggiornamento della config locale
 
-11. Slideshow immagini idle in standby
+14. Slideshow immagini idle in standby
    - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
    - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
    - Uscita dallo slideshow al primo evento (credito, touch, tasto)

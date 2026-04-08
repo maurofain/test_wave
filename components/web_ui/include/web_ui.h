@@ -31,3 +31,15 @@ httpd_handle_t web_ui_get_server_handle(void);
  * @param message Messaggio del log
  */
 void web_ui_add_log(const char *level, const char *tag, const char *message);
+
+/**
+ * @brief GET /api/logs/component/{COMPONENT}/status
+ * Returns: {"enabled": true/false}
+ */
+esp_err_t api_logs_component_status_get(httpd_req_t *req);
+
+/**
+ * @brief POST /api/logs/component/{COMPONENT}
+ * Expects: {"enabled": true/false}
+ */
+esp_err_t api_logs_component_post(httpd_req_t *req);

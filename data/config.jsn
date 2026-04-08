@@ -1,143 +1,181 @@
 {
-    "dname": "TestWave-Device",
-    "loc": "",
-    "n_prg": 10,
-    "lat": 0,
-    "lon": 0,
-    "ui": {
-        "ulang": "it",
-        "blang": "it",
-        "program_end_message_sec": 3
-    },
-    "eth": {
-        "en": true,
-        "dhcp": false,
-        "ip": "192.168.2.153",
-        "subnet": "255.255.255.0",
-        "gateway": "192.168.2.209",
-        "dns1": "",
-        "dns2": ""
-    },
-    "wifi": {
-        "sta": false,
-        "dhcp": true,
-        "ssid": "",
-        "pwd": "",
-        "ip": "",
-        "sub": "",
-        "gw": ""
-    },
-    "ntp_en": true,
-    "ntp": {
-        "s1": "time.google.com",
-        "s2": "pool.ntp.org",
-        "tz": 1
-    },
-    "server": {
-        "en": true,
-        "url": "http://195.231.69.227:5556/",
-        "ser": "AD-34-DFG-333",
-        "pwd": "c1ef6429c5e0f753ff24a114de6ee7d4"
-    },
-    "rlog": {
-        "port": 9514,
-        "bcast": false,
-        "to_sd": false
-    },
-    "sensors": {
-        "io_exp": true,
-        "temp": true,
-        "led": true,
-        "led_n": 8,
-        "rs232": true,
-        "rs485": true,
-        "mdb": true,
-        "cctalk": true,
-        "eeprom": true,
-        "sd": true,
-        "pwm1": true,
-        "pwm2": true,
-        "led_run_r": 0,
-        "led_run_g": 100,
-        "led_run_b": 0,
-        "led_prefine_r": 64,
-        "led_prefine_g": 0,
-        "led_prefine_b": 64,
-        "led_standby_r": 0,
-        "led_standby_g": 0,
-        "led_standby_b": 48,
-        "led_flash_r": 255,
-        "led_flash_g": 255,
-        "led_flash_b": 255,
-        "led_flash_count": 5
-    },
-    "scanner": {
-        "en": true,
-        "vid": "0x1EAB",
-        "pid": "0x0006",
-        "dpid": "0x0006",
-        "cool": 10000
-    },
-    "timeouts": {
-        "t_prg": 60000,
-        "t_lang": 60000,
-        "ad_rotation_ms": 30000
-    },
-    "display": {
-        "en": false,
-        "brt": 80,
-        "backlight": true,
-        "ads_en": true
-    },
-    "rs232": {
-        "baud": 9600,
-        "data": 8,
-        "par": 0,
-        "stop": 1,
-        "rx_buf": 2048,
-        "tx_buf": 0
-    },
-    "rs485": {
-        "baud": 9600,
-        "data": 8,
-        "par": 0,
-        "stop": 1,
-        "rx_buf": 2048,
-        "tx_buf": 0
-    },
-    "mdb_ser": {
-        "baud": 9600,
-        "data": 8,
-        "par": 0,
-        "stop": 1,
-        "rx_buf": 1024,
-        "tx_buf": 1024
-    },
-    "cctalk": {
-        "address": 2
-    },
-    "gpios": {
-        "gpio33": {
-            "mode": 1,
-            "state": false
-        }
-    },
-    "modbus": {
-        "enabled": false,
-        "slave_id": 1,
-        "poll_ms": 100,
-        "timeout_ms": 200,
-        "retries": 2,
-        "relay_start": 0,
-        "relay_count": 8,
-        "input_start": 0,
-        "input_count": 8
-    },
-    "ftp": {
-        "en": false,
-        "server": "",
-        "user": "",
-        "password": "",
-        "path": ""
+  "updated": true,
+  "dname": "TestWave-Device",
+  "loc": "",
+  "image_source": "spiffs",
+  "n_prg": 10,
+  "touch_map": {
+    "buttons": [
+      6,
+      5,
+      8,
+      7,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "max_buttons": 10,
+    "input_min": 1,
+    "input_max": 16
+  },
+  "lat": 0,
+  "lon": 0,
+  "eth": {
+    "en": true,
+    "dhcp": false,
+    "ip": "192.168.2.153",
+    "sub": "255.255.255.0",
+    "gw": "192.168.2.209",
+    "dns1": "",
+    "dns2": ""
+  },
+  "wifi": {
+    "sta": false,
+    "dhcp": true,
+    "ssid": "",
+    "pwd": "",
+    "ip": "",
+    "sub": "",
+    "gw": ""
+  },
+  "ntp_en": false,
+  "ntp": {
+    "s1": "time.google.com",
+    "s2": "pool.ntp.org",
+    "tz": 1
+  },
+  "server": {
+    "en": true,
+    "url": "http://195.231.69.227:5556/",
+    "ser": "AD-34-DFG-333",
+    "pwd": "c1ef6429c5e0f753ff24a114de6ee7d4"
+  },
+  "ftp": {
+    "en": false,
+    "server": "",
+    "user": "",
+    "password": "",
+    "path": ""
+  },
+  "rlog": {
+    "port": 9514,
+    "bcast": false,
+    "to_sd": false
+  },
+  "sensors": {
+    "io_expander_enabled": true,
+    "temperature_enabled": true,
+    "led_enabled": true,
+    "led_count": 8,
+    "led_run_r": 0,
+    "led_run_g": 100,
+    "led_run_b": 0,
+    "led_prefine_r": 64,
+    "led_prefine_g": 0,
+    "led_prefine_b": 64,
+    "led_standby_r": 0,
+    "led_standby_g": 0,
+    "led_standby_b": 48,
+    "led_flash_r": 255,
+    "led_flash_g": 255,
+    "led_flash_b": 255,
+    "led_flash_count": 5,
+    "rs232_enabled": true,
+    "rs485_enabled": true,
+    "mdb_enabled": true,
+    "cctalk_enabled": true,
+    "eeprom_enabled": true,
+    "pwm1_enabled": true,
+    "pwm2_enabled": true,
+    "sd_card_enabled": false
+  },
+  "scanner": {
+    "en": true,
+    "vid": 7851,
+    "pid": 6,
+    "dpid": 0,
+    "cool": 10000
+  },
+  "timeouts": {
+    "t_prg": 60000,
+    "t_lang": 60000,
+    "idle_before_ads_ms": 60000,
+    "ad_rotation_ms": 30000,
+    "credit_reset_timeout_ms": 300000,
+    "pre_fine_ciclo_percent": 70,
+    "pause_max_suspend_sec": 300
+  },
+  "mdb": {
+    "coin_en": true,
+    "bill_en": false,
+    "cashless_en": false
+  },
+  "display": {
+    "en": true,
+    "brt": 91,
+    "backlight": true,
+    "ads_en": true
+  },
+  "logging": {
+    "http_services": true,
+    "lvgl": true,
+    "io_expander": true
+  },
+  "audio": {
+    "en": true,
+    "vol": 75
+  },
+  "rs232": {
+    "baud": 9600,
+    "data": 8,
+    "par": 0,
+    "stop": 1,
+    "rx_buf": 2048,
+    "tx_buf": 0
+  },
+  "rs485": {
+    "baud": 9600,
+    "data": 8,
+    "par": 0,
+    "stop": 1,
+    "rx_buf": 2048,
+    "tx_buf": 0
+  },
+  "modbus": {
+    "enabled": true,
+    "slave_id": 1,
+    "poll_ms": 100,
+    "timeout_ms": 200,
+    "retries": 2,
+    "relay_start": 0,
+    "relay_count": 8,
+    "input_start": 0,
+    "input_count": 8
+  },
+  "cctalk": {
+    "address": 2
+  },
+  "mdb_ser": {
+    "baud": 9600,
+    "data": 8,
+    "par": 0,
+    "stop": 1,
+    "rx_buf": 1024,
+    "tx_buf": 1024
+  },
+  "gpios": {
+    "gpio33": {
+      "m": 1,
+      "st": false
     }
+  },
+  "ui": {
+    "ulang": "it",
+    "blang": "it",
+    "program_end_message_sec": 3
+  },
+  "ui_language": "it"
 }
