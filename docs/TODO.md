@@ -132,6 +132,12 @@
 44. Scanner USB integrato nella coda messaggi; lettura QR → login automatico + `api_payment_post` via `http_services`
 45. Chiamate server remoto: header `Date` runtime, relogin automatico su 401/403, HTTPS con validazione certificato, coda offline persistente con retry/backoff, task periodico keepalive, metriche esposte via API/UI
 46. Sequenza di inizializzazione CCTalk: verificazione abilitazione interfaccia, invio 4 comandi di configurazione al boot (dopo ethernet) e prima di ogni caricamento pagina programmi; logging dettagliato di ogni comando (v1.5.3)
+47. ✅ Tasto ESCI in pagina programmi:
+    - ✅ Pulsante verde opzionale in basso (sopra lo STOP) che azzera VCD e torna a menu/ADS
+    - ✅ Toggle abilitazione in `/config` > Timeouts: "Tasto ESCI azzera VCD"
+    - ✅ Visibilità controllata da `allow_exit_programs_clears_vcd` e stato FSM (non visible quando RUNNING/PAUSED)
+    - ✅ Pubblicazione evento `FSM_INPUT_EVENT_CREDIT_ENDED` verso FSM per transizione menu/ADS
+    - ✅ Fix critico: reset cache etichette credito al caricamento pagina programmi per garantire display corretto da qualsiasi entry point (fix cache stale)
 
 ---
 
