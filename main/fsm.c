@@ -924,17 +924,14 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
             }
 
             /* Quando il credito ECD+VCD è finito, interrompi il ciclo automatico
-             * e torna in IDLE. */
+             * e torna in CREDIT (così il popup di ringraziamento viene mostrato dall'UI). */
             if ((ctx->ecd_coins + ctx->vcd_coins) <= 0) {
                 fsm_append_message("Credito esaurito: stop auto-riavvio programma");
-                ESP_LOGI(TAG, "[M] Credito ECD+VCD azzerato: stop auto-riavvio e ritorno a IDLE");
+                ESP_LOGI(TAG, "[M] Credito ECD+VCD azzerato: stop auto-riavvio e ritorno a CREDIT per mostrare popup ringraziamento");
 
                 ctx->credit_cents = 0;
                 fsm_reset_runtime_locked(ctx);
-                ctx->session_mode = FSM_SESSION_MODE_NONE;
-                ctx->session_source = FSM_SESSION_SOURCE_NONE;
-                ctx->allow_additional_payments = false;
-                ctx->state = FSM_STATE_IDLE;
+                ctx->state = FSM_STATE_CREDIT;  /* [M] CREDIT (non IDLE) per mostrare il popup di ringraziamento */
                 ctx->inactivity_ms = 0;
                 return true;
             }

@@ -1965,6 +1965,12 @@ esp_err_t device_config_load(device_config_t *config)
             cJSON_Delete(root);
             const char *source_name = source_is_nvs ? "NVS" : (source_is_spiffs ? "SPIFFS" : "UNKNOWN");
             ESP_LOGD(TAG, "[C] Configurazione caricata correttamente da %s", source_name);
+            
+            /* [C] Log evidenziato della sorgente di caricamento */
+            ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════════════╗");
+            ESP_LOGI(TAG, "[M] ║ CONFIG.JSON CARICATO DA: %-27s ║", source_name);
+            ESP_LOGI(TAG, "[M] ║ Dispositivo: %-40s ║", config->device_name);
+            ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════════════╝");
         } else {
             ESP_LOGE(TAG, "[C] Errore parsing JSON!");
         }

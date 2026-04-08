@@ -1226,7 +1226,7 @@ static void on_stop_btn(lv_event_t *e)
             ESP_LOGI(TAG, "[C] Conferma annullamento attiva con programma già in pausa");
         }
     } else {
-        /* Second press: conferma stop automatico a fine ciclo, senza interrompere subito */
+        /* Second press: conferma stop IMMEDIATO e mostra popup ringraziamento */
         s_stop_confirm = false;
         if (s_stop_lbl) {
             char stop_text[64];
@@ -1235,6 +1235,9 @@ static void on_stop_btn(lv_event_t *e)
         }
 
         s_stop_pressed = true;
+        
+        /* [M] Invia STOP IMMEDIATO (aux_u32=0 per stop immediato, non a fine ciclo) */
+        /* [M] Il popup di ringraziamento verrà mostrato dal ciclo UI quando vede la transizione RUNNING->CREDIT */
         fsm_input_event_t ev = {
             .from = AGN_ID_LVGL,
             .to = {AGN_ID_FSM},
@@ -1243,7 +1246,7 @@ static void on_stop_btn(lv_event_t *e)
             .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
             .value_i32 = (int32_t)pid,
             .value_u32 = 0,
-            .aux_u32 = 1U,
+            .aux_u32 = 0U,  /* [M] 0 = stop immediato (non 1 = stop a fine ciclo) */
             .data_ptr = NULL,
             .text = {0},
         };
@@ -1252,12 +1255,11 @@ static void on_stop_btn(lv_event_t *e)
             if (entry) strncpy(ev.text, entry->name, sizeof(ev.text) - 1);
         }
         if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
-            ESP_LOGW(TAG, "[C] publish stop-at-end failed for pid=%u", (unsigned)pid);
+            ESP_LOGW(TAG, "[C] publish stop immediately failed for pid=%u", (unsigned)pid);
         } else {
             ESP_LOGI(TAG,
-                     "[C] Stop a fine ciclo richiesto pid=%u (paused=%d)",
-                     (unsigned)pid,
-                     (int)paused);
+                     "[C] Stop immediato confermato pid=%u",
+                     (unsigned)pid);
         }
     }
 }
@@ -1855,6 +1857,11 @@ static void panel_timer_cb(lv_timer_t *t)
 
         if (was_running && is_now_idle) {
             show_program_end_effect(panel_effective_credit_cents(&snap));
+            
+            /* [M] Forza il refresh del credito resettando il cache quando il programma termina */
+            s_last_credit_text[0] = '\0';
+            s_last_residual_credit_text[0] = '\0';
+            ESP_LOGI(TAG, "[C] Cache credito resettato per forza refresh dopo fine programma");
         }
 
         bool end_effect_active = (s_program_end_effect_until_ms > 0U) &&

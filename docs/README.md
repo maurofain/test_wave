@@ -52,6 +52,10 @@ Esempi rapidi:
 | POST | `/api/test/serial/monitor` | `{}` | `{"rs232":"...","rs485":"...","mdb":"...","cctalk":"..."}` |
 | POST | `/api/test/serial/clear` | `{"port":"rs232"}` | `{"status":"ok"}` |
 
+### USB connessioen a scanner
+Per la connessioen dello scanner va usata la porta connessa direttamente al P4 bypassando l'hub interno . Il Jumper va messo si 'Device' e va usata la porta in basso a sx (guardando le porte USB frontalmente)
+
+
 ### Modbus RTU su RS485 (ESP-IDF `freemodbus`)
 
 Endpoint di test disponibili:

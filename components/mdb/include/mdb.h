@@ -39,6 +39,68 @@ typedef enum {
 } mdb_device_state_t;
 
 /**
+ * @brief Stato di una transazione di vendita Cashless
+ */
+typedef enum {
+    MDB_VEND_IDLE = 0,      // Inattivo
+    MDB_VEND_PENDING = 1,   // In attesa
+    MDB_VEND_WORKING = 2,   // In elaborazione
+    MDB_VEND_APPROVED = 3,  // Approvato
+    MDB_VEND_DENIED = 4     // Negato
+} MDB_VEND_STATUS;
+
+/**
+ * @brief Stato della rivalutazione del credito Cashless
+ */
+typedef enum {
+    MDB_REVALUE_IDLE = 0,           // Inattivo
+    MDB_REVALUE_REQUEST_PENDING = 1, // Richiesta in sospeso
+    MDB_REVALUE_IN_PROGRESS = 2,    // In corso
+    MDB_REVALUE_APPROVED = 3,       // Approvato
+    MDB_REVALUE_DENIED = 4          // Negato
+} MDB_REVALUE_STATUS;
+
+/**
+ * @brief Struttura dati del lettore Cashless MDB
+ */
+typedef struct {
+    int Address;                    // Indirizzo dispositivo
+    int EnabledStatus;              // Stato abilitazione dal sistema
+    int Enable;                     // Flag di abilitazione
+    int SessionOpen;                // Sessione aperta
+    bool ConfigRead;                // Configurazione letta
+    int Present;                    // Dispositivo presente
+    int Errors;                     // Numero errori
+    int Credit;                     // Credito in centesimi
+    int RequestPrice;               // Prezzo richiesto
+    int ApprovedPrice;              // Prezzo approvato
+    int RevaluePrice;               // Prezzo della rivalutazione
+    int ApprovedRevalue;            // Rivalutazione approvata
+    int RevalueLimit;               // Limite rivalutazione
+    MDB_VEND_STATUS VendStatus;     // Stato transazione (0=Idle 1=Pending 2=Working 3=Approved 4=Denied)
+    MDB_REVALUE_STATUS RevalueStatus; // Stato rivalutazione
+    char CashLessManufCode[4];      // Codice produttore (3 byte)
+    char CashLessModelNumber[13];   // Numero modello (12 byte)
+    int CashLessManufVer;           // Versione dispositivo Cashless
+    uint64_t StartTick;             // Tick inizio operazione
+    unsigned long KeyNum;           // Numero chiave
+    int KeyType;                    // Tipo chiave
+    int KeyPriceGroup;              // Gruppo di prezzo della chiave
+    int DeviceType;                 // Tipo dispositivo
+    char TotalErgVer[6];            // Versione applicativo TotalErg
+    char IngCB2Ver[6];              // Versione applicativo Ingenico
+    int TypePosPresent;             // Tipo POS presente
+    int TimerSessionBegin;          // Timer inizio sessione
+    int FeatureLevel;               // Livello funzionalità
+    int WaitingReset;               // In attesa di reset
+    bool CashSaleSupport;           // Supporto Cash Sale
+    bool VendFailure;               // Fallimento vendita
+    bool VendAbort;                 // Vendita abortita
+    int VendSold;                   // Articoli venduti
+    bool ExpansionRead;             // Expansione letta
+} ST_MDB_CASHLESS;
+
+/**
  * @brief Struttura globale per lo stato del bus MDB
  */
 typedef struct {
