@@ -225,7 +225,67 @@ Device legge config al boot:
 
 ---
 
+## 🔍 Verifica API QR Credit Request
+
+### **Analisi - Richiesta HTTP Corretta ✅**
+
+**Flow di Richiesta:**
+
+1. **Scanner USB → Barcode Event** (`main/tasks.c:2822`)
+   - Scanner legge QR code: `<barcode_value>`
+   - Normalizazione barcode
+   - Trigger HTTP lookup
+
+2. **HTTP Request → Server** (`components/http_services/http_services.c:1898`)
+   ```
+   POST /api/getcustomers
+   Content-Type: application/json
+   
+   {
+     "Code": "<barcode_scanned>",
+     "Telephone": ""
+   }
+   ```
+
+3. **Device Response Parsing** (`components/http_services/http_services.c:1975`)
+   - Parse customers array
+   - Iterate su risultati
+   - Cerca match esatto su `code == barcode`
+   - Fallback: primo cliente valido
+   - Pubblica evento credito con `selected->amount`
+
+**Conclusione:** 
+✅ La **richiesta del device è corretta** e ben formattata  
+✅ Il device implementa **smart fallback** in caso di risposta non filtrata
+
+### **Problema Identificato - Risposta Server Errata ❌**
+
+**Endpoint:** `/api/getcustomers`  
+**Problema:** Non filtra per parametro `Code`  
+**Effetto:** Ritorna **100+ clienti completi** (~18KB) invece di uno specifico
+
+**Impatto:**
+- 🔴 Spreco 18x bandwidth per ogni lookup QR
+- 🟡 Latenza aumentata
+- 🟡 Carico server non necessario
+- ✅ Funzionamento: comunque operativo grazie a fallback device
+
+**Soluzione Richiesta:**
+Contattare backend team per implementare **filtro lato server**:
+```javascript
+// Expected: single customer or empty array
+GET /api/getcustomers?code=<QR_CODE>
+Response: { customers: [{...}], iserror: false }
+```
+
+**Verification Location:**
+- Device code: [main/tasks.c#L2829-2830](../../main/tasks.c#L2829-L2830)
+- HTTP handler: [components/http_services/http_services.c#L1898-1906](../../components/http_services/http_services.c#L1898-L1906)
+- Response parser: [components/http_services/http_services.c#L1975-2000](../../components/http_services/http_services.c#L1975-L2000)
+
+---
+
 **Session Date:** 8 Aprile 2026  
 **Build Status:** ✅ Success  
-**Binary Size:** 0x24b500 bytes (2406144 bytes)  
-**Free Space:** 0xb4b00 bytes (745216 bytes, 24%)
+**Binary Size:** 0x24b930 bytes (2386224 bytes)  
+**Free Space:** 0xb46d0 bytes (745168 bytes, 23%)

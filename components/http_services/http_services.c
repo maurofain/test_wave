@@ -1896,7 +1896,7 @@ esp_err_t http_services_getcustomers(const char *code, const char *telephone,
     cJSON *req_json = cJSON_CreateObject();
     if (!req_json) return ESP_ERR_NO_MEM;
     cJSON_AddStringToObject(req_json, "Code", code);
-    cJSON_AddStringToObject(req_json, "Telephone", telephone ? telephone : "");
+    // cJSON_AddStringToObject(req_json, "Telephone", telephone ? telephone : "");
     char *body = cJSON_PrintUnformatted(req_json);
     cJSON_Delete(req_json);
     if (!body) return ESP_ERR_NO_MEM;
