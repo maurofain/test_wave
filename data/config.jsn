@@ -78,11 +78,16 @@
         "dpid": "0x0006",
         "cool": 10000
     },
-    "timeouts": {
-        "t_prg": 60000,
-        "t_lang": 60000,
-        "ad_rotation_ms": 30000
-    },
+  "timeouts": {
+    "t_prg": 60000,
+    "t_lang": 60000,
+    "idle_before_ads_ms": 60000,
+    "ad_rotation_ms": 30000,
+    "credit_reset_timeout_ms": 120000,
+    "pre_fine_ciclo_percent": 70,
+    "pause_max_suspend_sec": 120,
+    "allow_exit_programs_clears_vcd": true
+  },
     "display": {
         "en": true,
         "brt": 80,

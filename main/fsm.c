@@ -831,13 +831,20 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             break;
 
         case FSM_INPUT_EVENT_CREDIT_ENDED:
-            ctx->credit_cents = 0;
-            ctx->ecd_coins = 0;
-            ctx->vcd_coins = 0;
-            ctx->ecd_used  = 0;
-            ctx->vcd_used  = 0;
-            ctx->ecd_cents_residual = 0;
-            ctx->vcd_cents_residual = 0;
+            if (event->aux_u32 == 1U) {
+                ctx->vcd_coins = 0;
+                ctx->vcd_used = 0;
+                ctx->vcd_cents_residual = 0;
+                ctx->credit_cents = ctx->ecd_coins;
+            } else {
+                ctx->credit_cents = 0;
+                ctx->ecd_coins = 0;
+                ctx->vcd_coins = 0;
+                ctx->ecd_used  = 0;
+                ctx->vcd_used  = 0;
+                ctx->ecd_cents_residual = 0;
+                ctx->vcd_cents_residual = 0;
+            }
             return fsm_handle_event(ctx, FSM_EVENT_CREDIT_ENDED);
 
         case FSM_INPUT_EVENT_PROGRAM_SWITCH: {

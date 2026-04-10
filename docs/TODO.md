@@ -7,12 +7,7 @@
 1. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
 2. file da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
-3. ✅ Modifiche alla sequenza di STOP
-   - ✅ in fase di RUN se si preme il tasto STOP viene richiesta la conferma, ottenuta la conferma dell'annullamento il programma deve fermarsi immediatamente ed interrompere il'autoripetizione
-   - ✅ poi deve mostrare il popup di ringraziamento
-4. ✅ Modifiche a fine ciclo
-   - ✅ al termine dell'ultimo ciclo di programma va mostrato subito il messaggio di ringraziamento, ora appare solo dopo una successiva apertura di un'altra pagine (ad es. scelta lingua)
-   - ✅ Il messaggio va mostrato solo all'ultimo ciclo, non al rinnovo automatico
+
 5. Piano test endpoint e funzioni 
    -	Strutturare i test in 4 livelli: 
    - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
@@ -138,7 +133,12 @@
     - ✅ Visibilità controllata da `allow_exit_programs_clears_vcd` e stato FSM (non visible quando RUNNING/PAUSED)
     - ✅ Pubblicazione evento `FSM_INPUT_EVENT_CREDIT_ENDED` verso FSM per transizione menu/ADS
     - ✅ Fix critico: reset cache etichette credito al caricamento pagina programmi per garantire display corretto da qualsiasi entry point (fix cache stale)
-
+48. ✅ Modifiche alla sequenza di STOP
+   - ✅ in fase di RUN se si preme il tasto STOP viene richiesta la conferma, ottenuta la conferma dell'annullamento il programma deve fermarsi immediatamente ed interrompere il'autoripetizione
+   - ✅ poi deve mostrare il popup di ringraziamento
+49. ✅ Modifiche a fine ciclo
+   - ✅ al termine dell'ultimo ciclo di programma va mostrato subito il messaggio di ringraziamento, ora appare solo dopo una successiva apertura di un'altra pagine (ad es. scelta lingua)
+   - ✅ Il messaggio va mostrato solo all'ultimo ciclo, non al rinnovo automatico/
 ---
 
 ## 🖥️ TESTATI

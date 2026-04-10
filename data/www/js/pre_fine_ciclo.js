@@ -102,29 +102,38 @@ async function addPreFineCicloField() {
         return; // Già aggiunto
     }
     
-    // Trova il campo slideshow_speed_ms (Velocità Slideshow) per inserire dopo di esso
-    const slideshowField = document.getElementById('slideshow_speed_ms');
+    const slideshowField = document.getElementById('slideshow_speed_s');
     if (!slideshowField) {
-        console.warn('Campo slideshow_speed_ms non trovato');
+        console.warn('Campo slideshow_speed_s non trovato');
         return;
     }
-    
-    // Trova il contenitore della riga (sw-row o form-row)
-    let targetRow = slideshowField.closest('.sw-row') || slideshowField.closest('.form-row') || slideshowField.parentElement;
+
+    const exitField = document.getElementById('timeout_language_exit_s');
+    const exitGroup = exitField ? exitField.closest('.form-group') : null;
+    const targetRow = (exitGroup && exitGroup.parentElement && exitGroup.parentElement.classList.contains('form-row'))
+        ? exitGroup.parentElement
+        : slideshowField.closest('.form-row') || slideshowField.closest('.sw-row') || slideshowField.parentElement;
     
     // Crea il nuovo campo PreFineCiclo
     const preFineLabel = await resolveLabelByLegacyId(PREFINE_CICLO_LEGACY_ID, PREFINE_CICLO_LABEL_FALLBACK);
 
     const fieldHtml = `
-        <span style="margin-left:20px;">${escapeHtml(preFineLabel)}:</span>
-        <input type="number" id="pre_fine_ciclo_percent" min="0" max="99" value="70"
-               style="width:60px;padding:4px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box">
-        <span>%</span>
-        <button onclick="savePreFineCiclo()" style="padding:4px 10px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Salva</button>
+        <div class="form-group">
+            <label>${escapeHtml(preFineLabel)}</label>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <input type="number" id="pre_fine_ciclo_percent" min="0" max="99" value="70"
+                       style="width:80px;padding:8px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box">
+                <span>%</span>
+                <button type="button" onclick="savePreFineCiclo()" style="padding:6px 10px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;">Salva</button>
+            </div>
+        </div>
     `;
     
-    // Inserisce nella stessa riga dopo il campo slideshow
-    targetRow.insertAdjacentHTML('beforeend', fieldHtml);
+    if (exitGroup && exitGroup.parentElement && exitGroup.parentElement.classList.contains('form-row')) {
+        exitGroup.insertAdjacentHTML('afterend', fieldHtml);
+    } else {
+        targetRow.insertAdjacentHTML('beforeend', fieldHtml);
+    }
     
     // Carica il valore corrente dalla configurazione
     loadPreFineCicloValue();

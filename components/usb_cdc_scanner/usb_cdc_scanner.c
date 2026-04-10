@@ -44,7 +44,10 @@
 #endif
 
 #define BARCODE_BUF_SIZE 128
-#define USB_SCANNER_EXPERIMENTAL_DIAG 1
+/* Experimental diagnostics may allocate additional USB handles/endpoints and
+ * increase host resource pressure. Disable by default for production stability.
+ * Enable only when actively debugging USB enumeration or device descriptors. */
+#define USB_SCANNER_EXPERIMENTAL_DIAG 0
 
 /* Default scanner identifiers (auto-aligned / authoritative defaults) */
 #define SCANNER_DEFAULT_VID  0x1EAB  /* VID: 1EAB */
@@ -59,9 +62,15 @@ __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
     return true;
 }
 
+static bool s_usb_host_initialized = false;
+static bool s_usb_bsp_started = false;
+
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
 static TaskHandle_t s_usb_open_task = NULL;
 static cdc_acm_dev_hdl_t s_cdc_dev = NULL;
+static QueueHandle_t s_cdc_data_queue = NULL;
+static bool s_cdc_acm_installed = false;
+#define USB_CDC_SCANNER_RX_QUEUE_LEN 1024
 static const char *SCN_CMD_SETUP = "0000#SCNMOD3;RRDENA1;CIDENA1;SCNENA0;RRDDUR3000;";
 static const char *SCN_CMD_STATE = "0000#SCNENA*;";
 static const char *SCN_CMD_ON = "0000#SCNENA1;";
@@ -81,19 +90,15 @@ static const char *SCN_CMD_OFF = "0000#SCNENA0;";
  */
 static bool cdc_data_cb(const uint8_t *data, size_t data_len, void *arg)
 {
-    static char buf[BARCODE_BUF_SIZE];
-    static size_t idx = 0;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     for (size_t i = 0; i < data_len; ++i) {
-        char c = (char)data[i];
-        if (c == '\r' || c == '\n') {
-            if (idx > 0) {
-                buf[idx] = '\0';
-                if (s_on_barcode) s_on_barcode(buf);
-                idx = 0;
-            }
-        } else if (idx < BARCODE_BUF_SIZE - 1) {
-            buf[idx++] = c;
+        uint8_t byte = data[i];
+        if (s_cdc_data_queue != NULL) {
+            xQueueSendFromISR(s_cdc_data_queue, &byte, &xHigherPriorityTaskWoken);
         }
+    }
+    if (xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
     return true;
 }
@@ -206,6 +211,7 @@ static void usb_host_event_cb(const usb_host_client_event_msg_t *event_msg, void
 }
 #endif
 
+#if USB_SCANNER_EXPERIMENTAL_DIAG
 /* Sperimentali: task che monitora periodicamente la lista dispositivi e notifica cambiamenti */
 static TaskHandle_t s_usb_monitor_task = NULL;
 
@@ -251,7 +257,7 @@ static void usb_host_monitor_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
-
+#endif
 
 /**
  * @brief Verifica se due coppie di VID (Vendor ID) e PID (Product ID) sono uguali.
@@ -407,6 +413,10 @@ static void usb_cdc_scanner_open_task(void *arg)
                 vTaskDelay(pdMS_TO_TICKS(500));
             }
             cdc_dev = NULL;
+        } else if (err == ESP_ERR_NO_MEM) {
+            ESP_LOGW(TAG, "CDC open failed due to low USB host resources: %s; retrying in 5s", esp_err_to_name(err));
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            continue;
         } else {
             ESP_LOGI(TAG, "CDC device not found (err=%s), enumerating connected devices...", esp_err_to_name(err));
 
@@ -528,16 +538,39 @@ static void usb_cdc_scanner_open_task(void *arg)
 
 void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
     s_on_barcode = config ? config->on_barcode : NULL;
+    if (s_cdc_data_queue == NULL) {
+        s_cdc_data_queue = xQueueCreate(USB_CDC_SCANNER_RX_QUEUE_LEN, sizeof(uint8_t));
+        if (s_cdc_data_queue == NULL) {
+            ESP_LOGE(TAG, "Failed to create USB CDC scanner RX queue");
+        }
+    }
+
+    if (s_usb_host_initialized) {
+        ESP_LOGI(TAG, "USB CDC scanner already initialized, skipping repeated init");
+        return;
+    }
+    s_usb_host_initialized = true;
+
 #if CONFIG_USB_OTG_SUPPORTED
     // Start USB Host using the board BSP which will also enable VBUS/power mgmt if needed
-    ESP_LOGI(TAG, "Starting USB Host via BSP");
-    ESP_ERROR_CHECK(bsp_usb_host_start(BSP_USB_HOST_POWER_MODE_USB_DEV, true));
-    ESP_LOGI(TAG, "USB Host started via BSP");
+    if (!s_usb_bsp_started) {
+        ESP_LOGI(TAG, "Starting USB Host via BSP");
+        ESP_ERROR_CHECK(bsp_usb_host_start(BSP_USB_HOST_POWER_MODE_USB_DEV, true));
+        s_usb_bsp_started = true;
+        ESP_LOGI(TAG, "USB Host started via BSP");
+    } else {
+        ESP_LOGI(TAG, "USB Host BSP already started");
+    }
 
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
     // Install CDC-ACM host driver (if available as component)
-    ESP_LOGI(TAG, "CDC-ACM host enabled by config: installing CDC-ACM host component (if available)");
-    ESP_ERROR_CHECK(cdc_acm_host_install(NULL));
+    if (!s_cdc_acm_installed) {
+        ESP_LOGI(TAG, "CDC-ACM host enabled by config: installing CDC-ACM host component (if available)");
+        ESP_ERROR_CHECK(cdc_acm_host_install(NULL));
+        s_cdc_acm_installed = true;
+    } else {
+        ESP_LOGI(TAG, "CDC-ACM host already installed");
+    }
 
     /* Register new-device callback to get notified on connect and log descriptors for diagnostics */
     if (cdc_acm_host_register_new_dev_callback(cdc_new_device_cb) != ESP_OK) {
@@ -584,8 +617,13 @@ void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
 #endif
 
     // Create background task to try opening the configured device
-    if (xTaskCreate(usb_cdc_scanner_open_task, "usb_cdc_open", 4096, NULL, 18, &s_usb_open_task) != pdTRUE) {
-        ESP_LOGW(TAG, "Failed to create usb_cdc_open task");
+    if (s_usb_open_task == NULL) {
+        if (xTaskCreate(usb_cdc_scanner_open_task, "usb_cdc_open", 4096, NULL, 18, &s_usb_open_task) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to create usb_cdc_open task");
+            s_usb_open_task = NULL;
+        }
+    } else {
+        ESP_LOGI(TAG, "usb_cdc_open task already running");
     }
 
 #else
@@ -608,9 +646,30 @@ void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
  */
 void usb_cdc_scanner_task(void *param) {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
-    // If using real CDC-ACM host, the data callback handles incoming bytes.
-    // This task can sleep indefinitely.
-    while (1) vTaskDelay(pdMS_TO_TICKS(1000));
+    char barcode[BARCODE_BUF_SIZE];
+    int idx = 0;
+    if (s_cdc_data_queue == NULL) {
+        s_cdc_data_queue = xQueueCreate(USB_CDC_SCANNER_RX_QUEUE_LEN, sizeof(uint8_t));
+        if (s_cdc_data_queue == NULL) {
+            ESP_LOGE(TAG, "Failed to create USB CDC scanner RX queue");
+        }
+    }
+
+    while (1) {
+        uint8_t byte = 0;
+        if (s_cdc_data_queue != NULL && xQueueReceive(s_cdc_data_queue, &byte, pdMS_TO_TICKS(500)) == pdTRUE) {
+            char c = (char)byte;
+            if (c == '\r' || c == '\n') {
+                if (idx > 0) {
+                    barcode[idx] = '\0';
+                    if (s_on_barcode) s_on_barcode(barcode);
+                    idx = 0;
+                }
+            } else if (idx < BARCODE_BUF_SIZE - 1) {
+                barcode[idx++] = c;
+            }
+        }
+    }
 #else
     char barcode[BARCODE_BUF_SIZE];
     int idx = 0;

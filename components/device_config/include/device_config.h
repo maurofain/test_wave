@@ -206,6 +206,7 @@ typedef struct {
     char server1[64];       ///< Server NTP primario
     char server2[64];       ///< Server NTP secondario
     int timezone_offset;    ///< Offset timezone in ore (-12 a +12)
+    bool use_dst;           ///< Abilita ora legale automatica (regole europee)
 } device_ntp_config_t;
 
 /**

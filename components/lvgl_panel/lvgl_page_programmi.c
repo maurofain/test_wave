@@ -10,6 +10,7 @@
 #include "main.h"
 #include "tasks.h"
 #include "usb_cdc_scanner.h"
+#include "mdb.h"
 #include "web_ui_programs.h"
 
 #include "lvgl.h"
@@ -216,6 +217,8 @@ static void mark_user_interaction(void)
     s_last_user_interaction_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
 }
 
+static void reinit_payment_devices_if_reactivated(void);
+
 /**
  * @brief Callback touch su area generica pagina programmi.
  *
@@ -225,6 +228,7 @@ static void mark_user_interaction(void)
 static void on_main_page_touch(lv_event_t *e)
 {
     (void)e;
+    reinit_payment_devices_if_reactivated();
     mark_user_interaction();
 }
 
@@ -234,6 +238,7 @@ static void on_main_page_touch(lv_event_t *e)
 static void on_credit_box_touch(lv_event_t *e)
 {
     (void)e;
+    reinit_payment_devices_if_reactivated();
     mark_user_interaction();
     s_ecd_warning_dismissed = true;
     hide_program_end_effect();
@@ -382,6 +387,8 @@ static const web_ui_program_entry_t *find_program_entry(uint8_t pid)
     return NULL;
 }
 
+#define PROGRAMS_PAYMENT_REINIT_IDLE_MS 300000U
+
 static void invalidate_program_label_cache(void)
 {
     s_prog_label_cache_valid = false;
@@ -402,6 +409,13 @@ static void panel_enable_payment_devices_on_programs_open(void)
     cfg->scanner.enabled = true;
     cfg->mdb.coin_acceptor_en = true;
 
+    if (cfg->sensors.mdb_enabled) {
+        esp_err_t mdb_err = mdb_init();
+        if (mdb_err != ESP_OK) {
+            ESP_LOGW(TAG, "[C] Inizializzazione MDB in apertura programmi fallita: %s", esp_err_to_name(mdb_err));
+        }
+    }
+
     tasks_apply_n_run();
 
     esp_err_t on_err = usb_cdc_scanner_send_on_command();
@@ -420,12 +434,33 @@ static void panel_enable_payment_devices_on_programs_open(void)
         }
     }
 
+    if (cfg->sensors.cctalk_enabled) {
+        main_cctalk_send_initialization_sequence_async();
+    }
+
     ESP_LOGI(TAG,
              "[C] Apertura programmi: scanner=%d->%d gettoniera=%d->%d",
              scanner_was_enabled ? 1 : 0,
              cfg->scanner.enabled ? 1 : 0,
              coin_was_enabled ? 1 : 0,
              cfg->mdb.coin_acceptor_en ? 1 : 0);
+}
+
+static void reinit_payment_devices_if_reactivated(void)
+{
+    uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+    if (s_last_user_interaction_ms == 0) {
+        return;
+    }
+
+    if ((now_ms - s_last_user_interaction_ms) < PROGRAMS_PAYMENT_REINIT_IDLE_MS) {
+        return;
+    }
+
+    ESP_LOGI(TAG,
+             "[C] Utente riattiva dopo inattività > %lu ms: riavvio dispositivi pagamento",
+             (unsigned long)PROGRAMS_PAYMENT_REINIT_IDLE_MS);
+    panel_enable_payment_devices_on_programs_open();
 }
 
 static void rebuild_program_label_cache_if_needed(void)
@@ -984,7 +1019,8 @@ static void update_state(const fsm_ctx_t *snap)
     if (s_exit_btn) {
         const device_config_t *cfg = device_config_get();
         bool exit_enabled = cfg && cfg->timeouts.allow_exit_programs_clears_vcd;
-        bool show_exit = exit_enabled && !running && !paused;
+        bool vcd_present = (snap->vcd_coins > 0 || snap->vcd_cents_residual > 0);
+        bool show_exit = exit_enabled && !running && !paused && vcd_present && (snap->state == FSM_STATE_CREDIT);
 
         if (show_exit) {
             lv_obj_clear_flag(s_exit_btn, LV_OBJ_FLAG_HIDDEN);
@@ -1205,10 +1241,10 @@ static void on_exit_btn(lv_event_t *e)
         .action = ACTION_ID_CREDIT_ENDED,  // Usa azione generica di fine credito
         .type = FSM_INPUT_EVENT_CREDIT_ENDED,
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-        .value_i32 = 0,  // Impostammo il flag VCD clear nel data_ptr
+        .value_i32 = 0,
         .value_u32 = 0,
-        .aux_u32 = 0,
-        .data_ptr = NULL,  // Potremmo usare questo per un flag speciale se necessario
+        .aux_u32 = 1,  /* Richiede azzeramento VCD nel FSM */
+        .data_ptr = NULL,
         .text = {0},
     };
 
@@ -2042,9 +2078,6 @@ void lvgl_page_main_show(void)
         ESP_LOGW(TAG, "[C] Init digital_io per mappa pulsanti fallita: %s", esp_err_to_name(dio_err));
     }
     
-    /* Invia sequenza init CCTalk prima di ogni caricamento della pagina programmi */
-    main_cctalk_send_initialization_sequence_async();
-
     lv_obj_t *scr = lv_scr_act();
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: scr=%p", (void*)scr);
 

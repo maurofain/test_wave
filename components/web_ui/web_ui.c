@@ -1505,6 +1505,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(timeouts, "idle_before_ads_ms", cfg->timeouts.idle_before_ads_ms);
     cJSON_AddNumberToObject(timeouts, "ad_rotation_ms", cfg->timeouts.ad_rotation_ms);
     cJSON_AddNumberToObject(timeouts, "credit_reset_timeout_ms", cfg->timeouts.credit_reset_timeout_ms);
+    cJSON_AddBoolToObject(timeouts, "allow_exit_programs_clears_vcd", cfg->timeouts.allow_exit_programs_clears_vcd);
     cJSON_AddNumberToObject(timeouts, "pre_fine_ciclo_percent", cfg->timeouts.pre_fine_ciclo_percent);
     cJSON_AddNumberToObject(timeouts, "pause_max_suspend_sec", cfg->timeouts.pause_max_suspend_sec);
     cJSON_AddItemToObject(root, "timeouts", timeouts);
@@ -2361,6 +2362,10 @@ esp_err_t api_config_save(httpd_req_t *req)
                 cfg->timeouts.exit_language_ms = (uint32_t)strtoul(t_lang->valuestring, NULL, 0);
             }
         }
+        cJSON *allow_exit = cJSON_GetObjectItem(timeouts_obj, "allow_exit_programs_clears_vcd");
+        if (allow_exit) {
+            cfg->timeouts.allow_exit_programs_clears_vcd = cJSON_IsTrue(allow_exit);
+        }
         cJSON *pause_suspend = cJSON_GetObjectItem(timeouts_obj, "pause_max_suspend_sec");
         if (pause_suspend) {
             if (cJSON_IsNumber(pause_suspend)) {
@@ -2864,6 +2869,7 @@ esp_err_t api_config_timeouts_get(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "idle_before_ads_ms", cfg->timeouts.idle_before_ads_ms);
     cJSON_AddNumberToObject(root, "ad_rotation_ms", cfg->timeouts.ad_rotation_ms);
     cJSON_AddNumberToObject(root, "credit_reset_timeout_ms", cfg->timeouts.credit_reset_timeout_ms);
+    cJSON_AddBoolToObject(root, "allow_exit_programs_clears_vcd", cfg->timeouts.allow_exit_programs_clears_vcd);
     
     char *json_str = cJSON_Print(root);
     cJSON_Delete(root);
@@ -2928,6 +2934,9 @@ esp_err_t api_config_timeouts_post(httpd_req_t *req)
     }
     if ((item = cJSON_GetObjectItem(json, "credit_reset_timeout_ms")) != NULL && item->type == cJSON_Number) {
         cfg->timeouts.credit_reset_timeout_ms = (uint32_t)item->valueint;
+    }
+    if ((item = cJSON_GetObjectItem(json, "allow_exit_programs_clears_vcd")) != NULL) {
+        cfg->timeouts.allow_exit_programs_clears_vcd = cJSON_IsTrue(item);
     }
     
     cJSON_Delete(json);

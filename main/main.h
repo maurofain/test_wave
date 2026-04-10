@@ -12,3 +12,4 @@
  */
 void main_cctalk_send_initialization_sequence(void);
 void main_cctalk_send_initialization_sequence_async(void);
+void main_cctalk_start_acceptor_async(void);

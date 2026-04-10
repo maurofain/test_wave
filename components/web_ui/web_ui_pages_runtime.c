@@ -9,6 +9,7 @@
 #include "tasks.h"
 #include "app_version.h"
 #include "http_services.h"
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -64,6 +65,12 @@ esp_err_t status_get_handler(httpd_req_t *req)
     bool remote_online = http_services_is_remote_online();
     bool remote_token = http_services_has_auth_token();
 
+    time_t board_time_val = time(NULL);
+    struct tm board_tm;
+    localtime_r(&board_time_val, &board_tm);
+    char board_time_str[32];
+    strftime(board_time_str, sizeof(board_time_str), "%Y-%m-%d %H:%M:%S", &board_tm);
+
     const size_t resp_cap = 5120;
     char *resp = malloc(resp_cap);
     if (!resp) {
@@ -84,6 +91,7 @@ esp_err_t status_get_handler(httpd_req_t *req)
                "\"temperature\":%d,\"cctalk\":%d,\"sd_card\":%d,\"eeprom\":%d,"
                "\"pwm1\":%d,\"pwm2\":%d,\"remote_logging\":%d"
              "},"
+             "\"board_time\":\"%s\","
              "\"config\":%s}",
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,
              web_ui_is_running() ? "true" : "false",
@@ -98,7 +106,9 @@ esp_err_t status_get_handler(httpd_req_t *req)
              cfg->sensors.io_expander_enabled, cfg->sensors.led_enabled, cfg->sensors.rs232_enabled, cfg->sensors.rs485_enabled, cfg->sensors.mdb_enabled,
              cfg->sensors.temperature_enabled, cfg->sensors.cctalk_enabled, cfg->sensors.sd_card_enabled, cfg->sensors.eeprom_enabled,
              cfg->sensors.pwm1_enabled, cfg->sensors.pwm2_enabled, cfg->remote_log.use_broadcast,
-             config_json ? config_json : "{}");
+             board_time_str,
+             config_json ? config_json : "{}"
+             );
 
     if (config_json) free(config_json);
 

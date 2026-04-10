@@ -1499,6 +1499,9 @@ esp_err_t device_config_load(device_config_t *config)
                     if (server2 && server2->valuestring) strncpy(config->ntp.server2, server2->valuestring, sizeof(config->ntp.server2) - 1);
                     cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "tz"); if (!tz_offset) tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset");
                     if (tz_offset && cJSON_IsNumber(tz_offset)) config->ntp.timezone_offset = tz_offset->valueint;
+                    cJSON *dst_enabled = cJSON_GetObjectItem(ntp_obj, "use_dst"); if (!dst_enabled) dst_enabled = cJSON_GetObjectItem(ntp_obj, "dst_enabled");
+                    if (!dst_enabled) dst_enabled = cJSON_GetObjectItem(ntp_obj, "dst");
+                    if (dst_enabled) config->ntp.use_dst = cJSON_IsTrue(dst_enabled);
                 }
 
                 // Analisi config Server/Cloud
@@ -2056,6 +2059,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddStringToObject(ntp_obj, "s1", config->ntp.server1);
     cJSON_AddStringToObject(ntp_obj, "s2", config->ntp.server2);
     cJSON_AddNumberToObject(ntp_obj, "tz", config->ntp.timezone_offset);
+    cJSON_AddBoolToObject(ntp_obj, "use_dst", config->ntp.use_dst);
     cJSON_AddItemToObject(root, "ntp", ntp_obj);
 
     // Server/Cloud

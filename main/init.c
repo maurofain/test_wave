@@ -38,14 +38,13 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "tasks.h"
+#include "cctalk.h"
 #include <dirent.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
-extern esp_err_t
-cctalk_driver_init(void); /* forward decl - header in components/cctalk */
 #include "bsp/display.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/touch.h"
@@ -89,6 +88,97 @@ static const char *TAG = "INIT";
  * Impostare a 0 per comportamento normale basato su cfg->display.enabled.
  */
 #define FORCE_VIDEO_DISABLED 0
+
+void main_cctalk_send_initialization_sequence(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] Sequenza init CCTalk skip (disabilitato da config)");
+        return;
+    }
+
+    const uint8_t dest_addr = 0x02;
+    const uint32_t timeout_ms = 1000;
+
+    ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Inizio sequenza di inizializzazione CCTalk...");
+
+    if (cctalk_address_poll(dest_addr, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd1 - Address Poll: OK");
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd1 - Address Poll: FAIL");
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    if (cctalk_modify_inhibit_status(dest_addr, 0xFF, 0xFF, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd2 - Modify Inhibit Status (all channels): OK");
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd2 - Modify Inhibit Status: FAIL");
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    if (cctalk_modify_master_inhibit_std(dest_addr, true, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd3 - Modify Master Inhibit (accept enabled): OK");
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd3 - Modify Master Inhibit: FAIL");
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    uint8_t mask_low = 0, mask_high = 0;
+    if (cctalk_request_inhibit_status(dest_addr, &mask_low, &mask_high, timeout_ms)) {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd4 - Request Inhibit Status: OK (mask=0x%02X%02X)", mask_high, mask_low);
+    } else {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd4 - Request Inhibit Status: FAIL");
+    }
+
+    ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Sequenza CCTalk completata");
+}
+
+static void main_cctalk_init_task(void *pv)
+{
+    (void)pv;
+    main_cctalk_send_initialization_sequence();
+    vTaskDelete(NULL);
+}
+
+void main_cctalk_send_initialization_sequence_async(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] Sequenza init CCTalk async skip (disabilitato da config)");
+        return;
+    }
+
+    BaseType_t r = xTaskCreate(main_cctalk_init_task, "cctalk_init", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
+    if (r != pdPASS) {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Creazione task sequenza CCTalk fallita");
+    }
+}
+
+static void main_cctalk_start_acceptor_task(void *pv)
+{
+    (void)pv;
+    esp_err_t start_err = cctalk_driver_start_acceptor();
+    if (start_err != ESP_OK) {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " cctalk_driver_start_acceptor failed: %s", esp_err_to_name(start_err));
+    } else {
+        ESP_LOGI(TAG, LOG_CTX_PREFIX " cctalk_driver_start_acceptor OK");
+    }
+    vTaskDelete(NULL);
+}
+
+void main_cctalk_start_acceptor_async(void)
+{
+    device_config_t *cfg = device_config_get();
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] start acceptor async skip (disabilitato da config)");
+        return;
+    }
+
+    BaseType_t r = xTaskCreate(main_cctalk_start_acceptor_task, "cctalk_start", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
+    if (r != pdPASS) {
+        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Creazione task start acceptor CCTalk fallita");
+    }
+}
 
 static esp_netif_t *s_netif_ap;
 static esp_netif_t *s_netif_sta;
@@ -1109,18 +1199,86 @@ static void apply_display_override_from_dip1(device_config_t *cfg)
   }
 }
 
+static bool is_leap_year(int year)
+{
+  return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
+}
+
+static int day_of_week(int year, int month, int day)
+{
+  static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+  if (month < 3) year -= 1;
+  return (year + year/4 - year/100 + year/400 + t[month - 1] + day) % 7;
+}
+
+static int last_sunday_of_month(int year, int month)
+{
+  int days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (month == 2 && is_leap_year(year)) {
+    days_in_month[1] = 29;
+  }
+  int last_day = days_in_month[month - 1];
+  int dow = day_of_week(year, month, last_day);
+  return last_day - dow;
+}
+
+static bool is_europe_dst(int year, int month, int day, int hour)
+{
+  if (month < 3 || month > 10) {
+    return false;
+  }
+  if (month > 3 && month < 10) {
+    return true;
+  }
+  if (month == 3) {
+    int last_sunday = last_sunday_of_month(year, month);
+    if (day < last_sunday) {
+      return false;
+    }
+    if (day > last_sunday) {
+      return true;
+    }
+    return hour >= 2;
+  }
+  if (month == 10) {
+    int last_sunday = last_sunday_of_month(year, month);
+    if (day < last_sunday) {
+      return true;
+    }
+    if (day > last_sunday) {
+      return false;
+    }
+    return hour < 3;
+  }
+  return false;
+}
+
 static void ntp_sync_callback(struct timeval *tv)
 {
   device_config_t *cfg = device_config_get();
+  int total_offset_hours = cfg->ntp.timezone_offset;
+  int dst_offset = 0;
 
-  // Applica l'offset del fuso orario
-  if (cfg->ntp.timezone_offset != 0)
-  {
-    // Regola l'ora aggiungendo l'offset (in secondi)
-    tv->tv_sec += (cfg->ntp.timezone_offset * 3600);
+  if (cfg->ntp.use_dst) {
+    time_t utc_time = tv->tv_sec;
+    time_t local_time = utc_time + (time_t)cfg->ntp.timezone_offset * 3600;
+    struct tm local_tm;
+    gmtime_r(&local_time, &local_tm);
+    if (is_europe_dst(local_tm.tm_year + 1900, local_tm.tm_mon + 1, local_tm.tm_mday, local_tm.tm_hour)) {
+      dst_offset = 1;
+    }
+  }
+
+  if (cfg->ntp.timezone_offset != 0 || dst_offset != 0) {
+    total_offset_hours += dst_offset;
+    tv->tv_sec += (total_offset_hours * 3600);
     settimeofday(tv, NULL);
-    ESP_LOGI(TAG, "[NTP] Offset del fuso orario applicato: %+d ore",
-             cfg->ntp.timezone_offset);
+    ESP_LOGI(TAG, "[NTP] Offset del fuso orario applicato: %+d ore%s",
+             total_offset_hours,
+             dst_offset ? " (ora legale attiva)" : "");
+  } else {
+    settimeofday(tv, NULL);
+    ESP_LOGI(TAG, "[NTP] Offset del fuso orario applicato: %d ore", total_offset_hours);
   }
 
   time_t now = time(NULL);
@@ -1130,7 +1288,7 @@ static void ntp_sync_callback(struct timeval *tv)
            "[NTP] Time synchronized: %04d-%02d-%02d %02d:%02d:%02d (UTC%+d)",
            timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
-           cfg->ntp.timezone_offset);
+           total_offset_hours);
 
   // Quando la sincronizzazione NTP ha successo, aumenta l'intervallo a 1 ora
   // (3600000 ms) Evita tentativi continui quando l'ora è già corretta

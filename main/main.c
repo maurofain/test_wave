@@ -5,6 +5,7 @@
 #include "esp_heap_caps.h"
 #include "init.h"
 #include "tasks.h"
+#include "main.h"
 #include "lvgl_panel.h"
 #include "lvgl_panel_pages.h"
 #include "cctalk.h"
@@ -158,93 +159,6 @@ static void maybe_force_crash_at_boot(void)
  * 
  * @return void Non restituisce alcun valore.
  */
-void main_cctalk_send_initialization_sequence(void)
-{
-    device_config_t *cfg = device_config_get();
-    if (!cfg || !cfg->sensors.cctalk_enabled) {
-        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] Sequenza init CCTalk skip (disabilitato da config)");
-        return;
-    }
-
-    const uint8_t dest_addr = 0x02;
-    const uint32_t timeout_ms = 1000;
-    
-    ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Inizio sequenza di inizializzazione CCTalk...");
-    
-    // Comando 1: Address Poll (header 254 / 0xFE)
-    // Verifica che la gettoniera sia presente e risponda
-    if (cctalk_address_poll(dest_addr, timeout_ms)) {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd1 - Address Poll: OK");
-    } else {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd1 - Address Poll: FAIL");
-    }
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    // Comando 2: Modify Inhibit Status (header 231 / 0xE7)
-    // Abilita tutti i 16 canali (mask 0xFF 0xFF)
-    if (cctalk_modify_inhibit_status(dest_addr, 0xFF, 0xFF, timeout_ms)) {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd2 - Modify Inhibit Status (all channels): OK");
-    } else {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd2 - Modify Inhibit Status: FAIL");
-    }
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    // Comando 3: Modify Master Inhibit std (header 228 / 0xE4)
-    // Abilita accettazione globale delle monete
-    if (cctalk_modify_master_inhibit_std(dest_addr, true, timeout_ms)) {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd3 - Modify Master Inhibit (accept enabled): OK");
-    } else {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd3 - Modify Master Inhibit: FAIL");
-    }
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    // Comando 4: Request Inhibit Status (header 230 / 0xE6)
-    // Legge e verifica lo stato corrente delle inibizioni
-    uint8_t mask_low = 0, mask_high = 0;
-    if (cctalk_request_inhibit_status(dest_addr, &mask_low, &mask_high, timeout_ms)) {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Cmd4 - Request Inhibit Status: OK (mask=0x%02X%02X)", mask_high, mask_low);
-    } else {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Cmd4 - Request Inhibit Status: FAIL");
-    }
-
-    ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] Sequenza CCTalk completata");
-}
-
-/* Background task used to perform the blocking initialization sequence so
- * UI code can continue without waiting for the CCTalk timeouts. */
-static void main_cctalk_init_task(void *pv)
-{
-    (void)pv;
-    main_cctalk_send_initialization_sequence();
-    vTaskDelete(NULL);
-}
-
-void main_cctalk_send_initialization_sequence_async(void)
-{
-    device_config_t *cfg = device_config_get();
-    if (!cfg || !cfg->sensors.cctalk_enabled) {
-        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] Sequenza init CCTalk async skip (disabilitato da config)");
-        return;
-    }
-
-    BaseType_t r = xTaskCreate(main_cctalk_init_task, "cctalk_init", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
-    if (r != pdPASS) {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Creazione task sequenza CCTalk fallita");
-    }
-}
-
-/* Background task used to start the CCTalk acceptor without blocking UI */
-static void main_cctalk_start_acceptor_task(void *pv)
-{
-    (void)pv;
-    esp_err_t start_err = cctalk_driver_start_acceptor();
-    if (start_err != ESP_OK) {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " cctalk_driver_start_acceptor failed: %s", esp_err_to_name(start_err));
-    } else {
-        ESP_LOGI(TAG, LOG_CTX_PREFIX " cctalk_driver_start_acceptor OK");
-    }
-    vTaskDelete(NULL);
-}
 
 /**
  * @brief Esegue un probe Modbus al boot: init + lettura porte configurate.
@@ -309,21 +223,6 @@ static esp_err_t main_boot_probe_modbus(const device_config_t *cfg)
              (unsigned)relay_count,
              (unsigned)input_count);
     return ESP_OK;
-}
-
-/* Asynchronous wrapper to start cctalk acceptor after boot UI is ready */
-void main_cctalk_start_acceptor_async(void)
-{
-    device_config_t *cfg = device_config_get();
-    if (!cfg || !cfg->sensors.cctalk_enabled) {
-        ESP_LOGD(TAG, LOG_CTX_PREFIX " [M] start acceptor async skip (disabilitato da config)");
-        return;
-    }
-
-    BaseType_t r = xTaskCreate(main_cctalk_start_acceptor_task, "cctalk_start", 4096, NULL, tskIDLE_PRIORITY + 1, NULL);
-    if (r != pdPASS) {
-        ESP_LOGW(TAG, LOG_CTX_PREFIX " [M] Creazione task start acceptor CCTalk fallita");
-    }
 }
 
 
