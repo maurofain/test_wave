@@ -2028,6 +2028,10 @@ static void panel_timer_cb(lv_timer_t *t)
         s_last_fsm_state = snap.state;
         last_snap = snap;
 
+        const mdb_status_t *mdb_status = mdb_get_status();
+        bool mdb_online = mdb_status && mdb_status->coin.is_online;
+        lvgl_page_chrome_set_status_icon_state(1, mdb_online); /* indice 1 = MDB / CreditCard */
+
         update_state(&snap);
         refresh_prog_buttons(&snap);
     }
@@ -2131,7 +2135,12 @@ void lvgl_page_main_show(void)
 
     lvgl_page_chrome_set_flag_callback(on_lang_btn, NULL);
     lvgl_page_chrome_add(scr);
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added");
+
+    const mdb_status_t *mdb_status = mdb_get_status();
+    bool mdb_online = mdb_status && mdb_status->coin.is_online;
+    lvgl_page_chrome_set_status_icon_state(1, mdb_online); /* indice 1 = MDB / CreditCard */
+
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added (MDB %s)", mdb_online ? "ONLINE" : "OFFLINE");
 
     update_time(true);
 

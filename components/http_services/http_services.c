@@ -2080,8 +2080,10 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
 
     char datetime_iso[40] = {0};
     format_full_datetime(datetime_iso, sizeof(datetime_iso));
+    int32_t request_amount = amount * 100;
+
     cJSON_AddStringToObject(req, "datetime", datetime_iso);
-    cJSON_AddNumberToObject(req, "amount", amount);
+    cJSON_AddNumberToObject(req, "amount", request_amount);
     cJSON_AddStringToObject(req, "paymenttype", "CASH");
     cJSON_AddStringToObject(req, "paymentdata", "");
 
@@ -2093,13 +2095,13 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
         cJSON_Delete(req);
         return ESP_ERR_NO_MEM;
     }
-    if (amount > 0) {
+    if (request_amount > 0) {
         cJSON *ce = cJSON_CreateObject();
         if (!ce) {
             cJSON_Delete(req);
             return ESP_ERR_NO_MEM;
         }
-        cJSON_AddNumberToObject(ce, "value", amount);
+        cJSON_AddNumberToObject(ce, "value", request_amount);
         cJSON_AddNumberToObject(ce, "quantity", 1);
         cJSON_AddNumberToObject(ce, "position", 99);
         cJSON_AddItemToArray(cashentered, ce);
@@ -2117,7 +2119,7 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
         return ESP_ERR_NO_MEM;
     }
     cJSON_AddStringToObject(srv, "code", service);
-    cJSON_AddNumberToObject(srv, "amount", amount);
+    cJSON_AddNumberToObject(srv, "amount", request_amount);
     cJSON_AddNumberToObject(srv, "quantity", 1);
     cJSON_AddBoolToObject(srv, "used", true);
     cJSON_AddBoolToObject(srv, "recharge", false);
