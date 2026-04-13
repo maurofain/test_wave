@@ -3,72 +3,66 @@
 ---
 
 ## 📋 DA FARE
-
-
+## 📋 DA FARE
 
 1. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
-2. file da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
-3. Verifica su gestione del credito: Il credito viene gestito in 2 modi: per l'esecuzione dei programmi usai9mo il concetto di COIN ovvero il costo base del ciclo di lavaggio. Per la gestione dell'ammontare in denaro usiamo il cenetesimo di valuta (normalemente l'EURO). 
-   -  Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenedo in memoria gli eventuali frazionari (ad es. 50cent)
-   -  Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile , a prima ECD e poi VCD
-   -  Le chiamate verso il server comunicano sempre il valore in valuta espressa in centesimi
-4. Modifiche all'uso dei puntini sopra la bandiera lingue: 
-   1. I puntini vanno cambiati con le icone presenti in /data/icons
-   2. l'icona cloudKo.png e CloudOk.pgn vanno visualizzate al posto del primo punto a sx e rappresentano lo stato della connessione con i servizi https (KO e OK  rispettivamente)
-   3. l'icona CreditCardKo.png e CreditCardOk.pgn vanno visualizzate al posto del secondo punto da sx e rappresentano lo stato della connessione con i device MDB (Ok e KO  rispettivamente)
-5. Verifica la gestione generale delle dei components : tutti i component che gestiscono hardware devono avere queste funzioni e genera un report sullo stato attuale:
-      1. init
-      2. activate
-      3. deactivate
-      4. setup
-      5. status : indica se è disattivato , attivato , offline (attivato ma non operativo) o online (attivato e operativo)
-   5. l'icona MoneteKo.png e MoneteOk.pgn vanno visualizzate al posto del terzo punto da sx e rappresentano lo stato della connessione con i device CCTalk (Ok e KO  rispettivamente)
-   6. l'icona QrKo.png e QrOk.pgn vanno visualizzate al posto del punto più a dx e rappresentano lo stato della connessione con lo scanner QRCode (Ok e KO  rispettivamente)
-6. Piano test endpoint e funzioni 
-   -	Strutturare i test in 4 livelli: 
-   - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
-   - **Contract**: campi obbligatori e tipi minimi della risposta
-   - **Flow**: sequenze operative (es. `sd_init → sd_list`, `serial_send → monitor → clear`, `config/save → config/get`)
-   - **Hardware-aware**: aspettative diverse in base a periferica abilitata/disabilitata
-
-   Organizzazione:
-   - `tests/smoke`, `tests/contract`, `tests/flow`, `tests/hw`
-   - `tests/endpoints.yaml` con `method`, `path`, `payload`, `expected_status`, `required_keys`
-   - `conftest.py`: `base_url`, timeout, retry, helper JSON
-
-   Regole pratiche:
-   - Per endpoint mutativi: sempre rollback/ripristino stato
-   - Separare test rapidi da test hardware (`pytest -m hw` o `-m slow`)
-   - Loggare richiesta/risposta/tempo per diagnosi
-
-   Primo MVP:
-   - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
-   - 3 flow critici: SD, seriale unificato, backup config su SD
-   - Report `junit.xml` + riepilogo markdown
+2. File da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
+3. Verifica su gestione del credito
+   - Il credito viene gestito in 2 modi: per l'esecuzione dei programmi usiamo il concetto di COIN (costo base del ciclo). Per la gestione dell'ammontare in denaro usiamo il centesimo di valuta (normalmente EURO).
+   - Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenendo in memoria gli eventuali frazionari (es. 50 cent).
+   - Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile: prima ECD e poi VCD.
+   - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
+4. Modifiche all'uso dei puntini sopra la bandiera lingue
+   1. I puntini vanno cambiati con le icone presenti in `/docs/icone/normalized` (icona embedded nel firmware o servita da SD/SPIFFS a seconda della scelta).
+   2. L'icona `CloudKo.png` e `CloudOk.png` vanno visualizzate al posto del primo punto a sinistra e rappresentano lo stato della connessione con i servizi HTTPS (KO e OK rispettivamente).
+   3. L'icona `CreditCardKo.png` e `CreditCardOk.png` vanno visualizzate al posto del secondo punto da sinistra e rappresentano lo stato della connessione con i device MDB (OK e KO rispettivamente).
+   4. L'icona `MoneteKo.png` e `MoneteOk.png` vanno visualizzate al posto del terzo punto da sinistra e rappresentano lo stato della connessione con i device CCTalk (OK e KO rispettivamente).
+   5. L'icona `QrKo.png` e `QrOk.png` vanno visualizzate al posto del punto più a destra e rappresentano lo stato della connessione con lo scanner QRCode (OK e KO rispettivamente).
+5. Verifica la gestione generale dei componenti hardware
+   - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:
+     1. `init`
+     2. `activate`
+     3. `deactivate`
+     4. `setup`
+     5. `status` : indica se è `disattivato`, `attivato`, `offline` (attivato ma non operativo) o `online` (attivato e operativo).
+6. Piano test endpoint e funzioni
+   - Strutturare i test in 4 livelli:
+     - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
+     - **Contract**: campi obbligatori e tipi minimi della risposta
+     - **Flow**: sequenze operative (es. `sd_init → sd_list`, `serial_send → monitor → clear`, `config/save → config/get`)
+     - **Hardware-aware**: aspettative diverse in base a periferica abilitata/disabilitata
+   - Organizzazione:
+     - `tests/smoke`, `tests/contract`, `tests/flow`, `tests/hw`
+     - `tests/endpoints.yaml` con `method`, `path`, `payload`, `expected_status`, `required_keys`
+     - `conftest.py`: `base_url`, timeout, retry, helper JSON
+   - Regole pratiche:
+     - Per endpoint mutativi: sempre rollback/ripristino stato
+     - Separare test rapidi da test hardware (`pytest -m hw` o `-m slow`)
+     - Loggare richiesta/risposta/tempo per diagnosi
+   - Primo MVP:
+     - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
+     - 3 flow critici: SD, seriale unificato, backup config su SD
+     - Report `junit.xml` + riepilogo markdown
 7. Protocollo moduli 8 I/O RS485 esterni
    - Driver RS485 presente ma nessun protocollo per slave 8-I/O esterni (uno o due moduli)
    - Definire il protocollo di comunicazione (Modbus RTU o proprietario)
    - Implementare lettura ingressi e scrittura uscite ciclica
-   - Aggiungere in /config: numero schede I/O esterne (0, 1, 2)
+   - Aggiungere in `/config`: numero schede I/O esterne (0, 1, 2)
 8. PLC esterno
    - Definire protocollo di collegamento (seriale RS485 o input digitale diretto)
    - Implementare ricezione impulsi/segnali da PLC (es. segnale avanzamento ciclo)
-   - Aggiungere in /config: abilitazione PLC, input/output associati, protocollo
-
+   - Aggiungere in `/config`: abilitazione PLC, input/output associati, protocollo
 9. Config: assegnazione programmi a I/O e relay
    - I programmi sono configurabili (tempo, pausa) ma non mappati a uscite fisiche
-   - Aggiungere in /config per ogni programma: maschera relay/output attivati durante l'erogazione
-
-10.  Config: valore per metodo di pagamento
-   - Aggiungere in /config i valori configurabili per: gettone MDB, moneta, QR code, tessera
+   - Aggiungere in `/config` per ogni programma: maschera relay/output attivati durante l'erogazione
+10. Config: valore per metodo di pagamento
+   - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
-
 11. Ricezione config da server (`api/getconfig`)
    - L'API server `POST /api/getconfig` è definita ma il device non applica la configurazione ricevuta
    - Implementare il parsing della risposta e aggiornamento della config locale
-
-12.  Slideshow immagini idle in standby
+12. Slideshow immagini idle in standby
    - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
    - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
    - Uscita dallo slideshow al primo evento (credito, touch, tasto)

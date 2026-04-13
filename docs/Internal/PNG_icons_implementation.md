@@ -9,10 +9,10 @@ Il codice è stato definito in `components/lvgl_panel/lvgl_page_chrome.c`.
 ## Comportamento
 
 - Vengono creati due array di percorsi per otto icone PNG nello SPIFFS:
-  - `S:/spiffs/icons/CloudOk.png` / `S:/spiffs/icons/CloudKo.png`
-  - `S:/spiffs/icons/CreditCardOk.png` / `S:/spiffs/icons/CreditCardKo.png`
-  - `S:/spiffs/icons/MoneteOk3.png` / `S:/spiffs/icons/MoneteKo.png`
-  - `S:/spiffs/icons/QrOk.png` / `S:/spiffs/icons/QrKo.png`
+    - `docs/icone/normalized/CloudOk.png` / `docs/icone/normalized/CloudKo.png`
+    - `docs/icone/normalized/CreditCardOk.png` / `docs/icone/normalized/CreditCardKo.png`
+    - `docs/icone/normalized/MoneteOk3.png` / `docs/icone/normalized/MoneteKo.png`
+    - `docs/icone/normalized/QrOk.png` / `docs/icone/normalized/QrKo.png`
 - Le icone OK/KO vengono preloadate in PSRAM all'avvio tramite `lvgl_page_chrome_preload_status_icons()`.
 - Queste icone vengono visualizzate nella parte superiore destra della pagina LVGL.
 - Viene mantenuto un timer per aggiornare solo l'orologio, evitando di ricaricare le immagini dal filesystem ogni secondo.
@@ -39,10 +39,10 @@ static lv_event_cb_t  s_flag_cb              = NULL;
 static void          *s_flag_ud              = NULL;
 
 static const char *s_chrome_status_icon_paths[4] = {
-    "S:/spiffs/icons/CloudOk.png",
-    "S:/spiffs/icons/CreditCardOk.png",
-    "S:/spiffs/icons/MoneteOk.png",
-    "S:/spiffs/icons/QrOk.png",
+    "docs/icone/normalized/CloudOk.png",
+    "docs/icone/normalized/CreditCardOk.png",
+    "docs/icone/normalized/MoneteOk.png",
+    "docs/icone/normalized/QrOk.png",
 };
 
 static void chrome_update_time_label(void)

@@ -5,7 +5,7 @@
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ICONS_DIR="$ROOT/data/icons"
+ICONS_DIR="$ROOT/docs/icone/normalized"
 OUT_SRC="$ROOT/components/lvgl_panel/src/embedded_icons.c"
 OUT_HEADER="$ROOT/components/lvgl_panel/include/embedded_icons_images.h"
 

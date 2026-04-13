@@ -17,19 +17,11 @@ static bool           s_chrome_status_ok[4] = {true, true, true, true};
 static lv_event_cb_t  s_flag_cb            = NULL;  /* callback per click bandiera */
 static void          *s_flag_ud            = NULL;
 
-static const char *s_chrome_status_icon_ok_paths[4] = {
-    "S:/spiffs/icons/CloudOk.png",
-    "S:/spiffs/icons/CreditCardOk.png",
-    "S:/spiffs/icons/MoneteOk3.png",
-    "S:/spiffs/icons/QrOk.png",
-};
+/* SPIFFS fallback removed — icons are embedded or stored in docs/icone/normalized
+   Keep NULL entries to avoid fopen attempts on SPIFFS when embedded resources exist. */
+static const char *s_chrome_status_icon_ok_paths[4] = { NULL, NULL, NULL, NULL };
 
-static const char *s_chrome_status_icon_ko_paths[4] = {
-    "S:/spiffs/icons/CloudKo.png",
-    "S:/spiffs/icons/CreditCardKo.png",
-    "S:/spiffs/icons/MoneteKo.png",
-    "S:/spiffs/icons/QrKo.png",
-};
+static const char *s_chrome_status_icon_ko_paths[4] = { NULL, NULL, NULL, NULL };
 
 static const char *chrome_get_status_icon_path(int index)
 {
