@@ -57,6 +57,7 @@
 #include "io_expander.h"
 #include "lvgl.h"
 #include "lvgl_panel.h"
+#include "lvgl_page_chrome.h"
 #include "periph_i2c.h"
 #include "pwm.h"
 #include "remote_logging.h"
@@ -1312,6 +1313,12 @@ static bool s_sntp_initialized = false; /* [C] Flag: init_sntp() già chiamato *
  */
 static void init_sntp(void)
 {
+  if (s_sntp_initialized)
+  {
+    ESP_LOGI(TAG, "[NTP] SNTP già inizializzato, skip init");
+    return;
+  }
+
   device_config_t *cfg = device_config_get();
 
   ESP_LOGI(TAG, "[NTP] Initializing SNTP with servers: %s, %s",
@@ -1450,16 +1457,25 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGW(TAG, "[M] Post-ARP: s_netif_eth NULL");
       }
 
-      /* init_sntp() usa solo esp_sntp_* non-bloccanti: sicuro nell'event
+      /* init_sync_ntp() usa solo esp_sntp_* non-bloccanti: sicuro nell'event
        * handler */
       if (device_config_get()->ntp_enabled)
       {
         ESP_LOGI(TAG, "[M] [NTP] Avvio SNTP (IP disponibile)");
-        init_sntp();
+        if (init_sync_ntp() != ESP_OK)
+        {
+          ESP_LOGW(TAG, "[M] [NTP] init_sync_ntp() fallito");
+        }
       }
       else
       {
         ESP_LOGI(TAG, "[M] [NTP] NTP disabilitato da config");
+      }
+
+      if (bsp_display_lock(0))
+      {
+        lvgl_page_chrome_set_status_icon_state(0, true); /* Cloud = rete online */
+        bsp_display_unlock();
       }
     }
 
@@ -1525,6 +1541,11 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
   break;
   case ETHERNET_EVENT_DISCONNECTED:
     ESP_LOGW(TAG, "[M] Collegamento Ethernet inattivo");
+    if (bsp_display_lock(0))
+    {
+      lvgl_page_chrome_set_status_icon_state(0, false); /* Cloud = rete offline */
+      bsp_display_unlock();
+    }
     break;
   case ETHERNET_EVENT_START:
     ESP_LOGI(TAG, "[M] Driver Ethernet avviato");

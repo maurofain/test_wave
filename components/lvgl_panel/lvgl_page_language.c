@@ -210,8 +210,17 @@ void lvgl_page_language_show(void)
 
         lv_obj_t *img = NULL;
         if (opt->code) {
+#if (defined(LV_USE_LODEPNG) && (LV_USE_LODEPNG != 0)) || \
+    (defined(LV_USE_PNG) && (LV_USE_PNG != 0))
+            const void *flag_src = (const void *)get_flag_bitmap_for_language(opt->code);
+            if (!flag_src) {
+                flag_src = get_flag_src_for_language(opt->code);
+            }
+#else
+            const void *flag_src = get_flag_src_for_language(opt->code);
+#endif
             img = lv_image_create(btn);
-            lv_image_set_src(img, get_flag_src_for_language(opt->code));
+            lv_image_set_src(img, flag_src);
             lv_image_set_scale(img, flag_scale);
             lv_obj_align(img, LV_ALIGN_LEFT_MID, flag_x, 0);
         }

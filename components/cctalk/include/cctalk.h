@@ -82,6 +82,7 @@ esp_err_t cctalk_driver_init(void);
 esp_err_t cctalk_driver_start_acceptor(void);
 esp_err_t cctalk_driver_stop_acceptor(void);
 bool cctalk_driver_is_acceptor_enabled(void);
+bool cctalk_driver_is_acceptor_online(void);
 
 // Entry point del task di ricezione CCtalk. Da chiamare dopo cctalk_driver_init().
 void cctalk_task_run(void *arg);

@@ -27,6 +27,7 @@ extern bool dump_cctalk_log;
 static SemaphoreHandle_t s_cctalk_state_lock = NULL;
 static bool s_driver_initialized = false;
 static bool s_acceptor_enabled = false;
+static bool s_acceptor_online = false;
 static bool s_event_counter_valid = false;
 static uint8_t s_last_event_counter = 0;
 static uint32_t s_poll_error_streak = 0;
@@ -542,10 +543,26 @@ static void cctalk_poll_once(void)
         if (s_poll_error_streak == 1U || (s_poll_error_streak % 20U) == 0U) {
             serial_test_push_monitor_action("CCTALK", "POLL buffered credit timeout/errore");
         }
+        if (s_poll_error_streak >= 20U) {
+            if (cctalk_state_take(20)) {
+                if (s_acceptor_online) {
+                    s_acceptor_online = false;
+                    serial_test_push_monitor_action("CCTALK", "GETTONIERA offline (errore poll ripetuto)");
+                }
+                cctalk_state_give();
+            }
+        }
         return;
     }
 
-    s_poll_error_streak = 0U;
+    if (cctalk_state_take(20)) {
+        if (!s_acceptor_online) {
+            s_acceptor_online = true;
+            serial_test_push_monitor_action("CCTALK", "GETTONIERA tornata online");
+        }
+        s_poll_error_streak = 0U;
+        cctalk_state_give();
+    }
     cctalk_handle_buffered_credit(&buffer);
 }
 
@@ -746,6 +763,7 @@ esp_err_t cctalk_driver_start_acceptor(void)
     cctalk_clear_coin_id_cache();
     if (cctalk_state_take(20)) {
         s_acceptor_enabled = true;
+        s_acceptor_online = true;
         s_event_counter_valid = false;
         s_last_event_counter = 0;
         s_poll_error_streak = 0;
@@ -777,6 +795,7 @@ esp_err_t cctalk_driver_stop_acceptor(void)
 
     if (cctalk_state_take(20)) {
         s_acceptor_enabled = false;
+        s_acceptor_online = false;
         s_event_counter_valid = false;
         s_last_event_counter = 0;
         s_poll_error_streak = 0;
@@ -809,6 +828,16 @@ bool cctalk_driver_is_acceptor_enabled(void)
         cctalk_state_give();
     }
     return enabled;
+}
+
+bool cctalk_driver_is_acceptor_online(void)
+{
+    bool online = false;
+    if (cctalk_state_take(5)) {
+        online = s_acceptor_online;
+        cctalk_state_give();
+    }
+    return online;
 }
 
 #endif /* DNA_CCTALK == 0 */

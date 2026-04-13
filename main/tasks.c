@@ -62,7 +62,7 @@ static bool s_last_customer_available = false;
 
 #define OOS_REASON_KEY_LEN 64
 #define OOS_REASON_FALLBACK_LEN 128
-#define OOS_HEALTH_CHECK_MS 5000U
+#define OOS_HEALTH_CHECK_MS 1000U
 #define OOS_RETRY_MS 30000U
 
 typedef struct {
@@ -328,7 +328,7 @@ static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_caus
     }
 
     if ((focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_CCTALK || focus_agent == AGN_ID_USB_CDC_SCANNER)) {
-        bool cctalk_ok = cfg->sensors.cctalk_enabled && cctalk_driver_is_acceptor_enabled();
+        bool cctalk_ok = cfg->sensors.cctalk_enabled && cctalk_driver_is_acceptor_enabled() && cctalk_driver_is_acceptor_online();
         bool scanner_ok = cfg->scanner.enabled;
         if (!cctalk_ok && !scanner_ok) {
             init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
@@ -2223,9 +2223,12 @@ static void fsm_task(void *arg)
         }
 
         if (event_received &&
-            event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED &&
-            state_before == FSM_STATE_CREDIT &&
-            fsm.state == FSM_STATE_RUNNING) {
+            ((event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED &&
+              state_before == FSM_STATE_CREDIT &&
+              fsm.state == FSM_STATE_RUNNING) ||
+             (event.type == FSM_INPUT_EVENT_PROGRAM_SWITCH &&
+              (state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) &&
+              fsm.state == FSM_STATE_RUNNING))) {
             publish_program_payment_event(&fsm, &event);
         }
 

@@ -235,6 +235,7 @@ void lvgl_panel_show(void)
     }
     
     ESP_LOGI(TAG, "[C] lvgl_panel_show: checkpoint 6 - prima vecchio sistema");
+    lvgl_page_chrome_preload_status_icons();
     
     // Manteniamo il vecchio sistema come fallback per ora
     if (!lvgl_panel_load_i18n_dictionary(lvgl_panel_get_runtime_language())) {

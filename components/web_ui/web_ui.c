@@ -1362,6 +1362,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddStringToObject(ntp, "s1", cfg->ntp.server1);
     cJSON_AddStringToObject(ntp, "s2", cfg->ntp.server2);
     cJSON_AddNumberToObject(ntp, "tz", cfg->ntp.timezone_offset);
+    cJSON_AddBoolToObject(ntp, "use_dst", cfg->ntp.use_dst);
     cJSON_AddItemToObject(root, "ntp", ntp);
 
     // Server/Cloud configuration
@@ -1940,6 +1941,10 @@ esp_err_t api_config_save(httpd_req_t *req)
         cJSON *tz_offset = cJSON_GetObjectItem(ntp_obj, "tz");
         if (!tz_offset) tz_offset = cJSON_GetObjectItem(ntp_obj, "timezone_offset"); /* compat */
         if (tz_offset && cJSON_IsNumber(tz_offset)) cfg->ntp.timezone_offset = tz_offset->valueint;
+        cJSON *dst_obj = cJSON_GetObjectItem(ntp_obj, "use_dst");
+        if (!dst_obj) dst_obj = cJSON_GetObjectItem(ntp_obj, "dst_enabled"); /* compat */
+        if (!dst_obj) dst_obj = cJSON_GetObjectItem(ntp_obj, "dst");
+        if (dst_obj) cfg->ntp.use_dst = cJSON_IsTrue(dst_obj);
     }
 
     // Server/Cloud configuration
