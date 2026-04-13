@@ -4,10 +4,21 @@
 
 ## 📋 DA FARE
 
+
+
 1. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
 2. file da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
-
+3. Verifica su gestione del credito: Il credito viene gestito in 2 modi: per l'esecuzione dei programmi usai9mo il concetto di COIN ovvero il costo base del ciclo di lavaggio. Per la gestione dell'ammontare in denaro usiamo il cenetesimo di valuta (normalemente l'EURO). 
+   -  Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenedo in memoria gli eventuali frazionari (ad es. 50cent)
+   -  Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile , a prima ECD e poi VCD
+   -  Le chiamate verso il server comunicano sempre il valore in valuta espressa in centesimi
+4. Modifiche all'uso dei puntini sopra la bandiera lingue: 
+   1. I puntini vanno cambiati con le icone presenti in /data/icons
+   2. l'icona cloudKo.png e CloudOk.pgn vanno visualizzate al posto del primo punto a sx e rappresentano lo stato della connessione con i servizi https (KO e OK  rispettivamente)
+   3. l'icona CreditCardKo.png e CreditCardOk.pgn vanno visualizzate al posto del secondo punto da sx e rappresentano lo stato della connessione con i device MDB (Ok e KO  rispettivamente)
+   4. l'icona MoneteKo.png e MoneteOk.pgn vanno visualizzate al posto del terzo punto da sx e rappresentano lo stato della connessione con i device CCTalk (Ok e KO  rispettivamente)
+   5. l'icona QrKo.png e QrOk.pgn vanno visualizzate al posto del punto più a dx e rappresentano lo stato della connessione con lo scanner QRCode (Ok e KO  rispettivamente)
 5. Piano test endpoint e funzioni 
    -	Strutturare i test in 4 livelli: 
    - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
@@ -44,7 +55,7 @@
    - I programmi sono configurabili (tempo, pausa) ma non mappati a uscite fisiche
    - Aggiungere in /config per ogni programma: maschera relay/output attivati durante l'erogazione
 
-9. Config: valore per metodo di pagamento
+9.  Config: valore per metodo di pagamento
    - Aggiungere in /config i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
 

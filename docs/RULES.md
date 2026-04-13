@@ -23,7 +23,7 @@
 - il codice che si trova in  ~/Progetti/0.Clienti/MicroHard/test è una versione precedente di prova  per la stessa configurazione da cui prelevare porzioni di codice specifiche cha vanno riadattate al progetto attuale  : lo chiamerò PSI
 - i comandi git vanno fatti solo su mia richiesta 
 - i commit posso essere proposti ma solo dopo un test di compilazione positivo
-- nei messaggi di commit inserire sempre all'inizio la versione del sorgente (es. v1.2.1)
+- nei messaggi di commit inserire sempre all'inizio la versione del sorgente indicata in /main/app-version..h nel formato tipo v1.2.1
 - salvo esplicita richiesta i build flash e monitor per il test sul device vengono eseguiti in un terminale a parte
 - i file di documentazione vanno salvati in docs
 - quando un #define o un CONFIG_* che influisce sulla compilazione viene aggiunto/modificato/rimosso, aggiornare sempre docs/COMPILE_FLAGS.md nella stessa modifica

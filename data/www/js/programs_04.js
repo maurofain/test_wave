@@ -25,6 +25,9 @@ const LANGUAGE_FLAGS = {
     es: '🇪🇸',
 };
 
+const PROGRAM_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10];
+let programCount = 10;
+
 function tr(key) {
     const i18n = window.uiI18n;
     if (i18n && typeof i18n.translate === 'function') {
@@ -207,16 +210,51 @@ function sortLanguages(languages) {
 }
 
 function renderLanguageToolbar() {
-    const toolbar = document.getElementById('programNameToolbar');
-    if (!toolbar) {
+    const toolbarFlags = document.getElementById('programNameFlags');
+    if (!toolbarFlags) {
         return;
     }
 
-    toolbar.innerHTML = programNameLanguages.map((language) => {
+    toolbarFlags.innerHTML = programNameLanguages.map((language) => {
         const activeClass = language.code === selectedProgramNameLanguage ? ' active' : '';
         return `<button type="button" class="program-name-lang-btn${activeClass}" title="${escapeHtml(language.label || language.code)}" onclick="selectProgramNameLanguage('${escapeHtml(language.code)}')"><span class="program-name-lang-flag">${languageFlag(language.code)}</span><span class="program-name-lang-code">${escapeHtml(String(language.code).toUpperCase())}</span></button>`;
     }).join('');
+    renderProgramCountControl();
 }
+
+function renderProgramCountControl() {
+    const select = document.getElementById('programCountSelect');
+    if (!select) {
+        return;
+    }
+    select.value = String(programCount || 10);
+}
+
+window.onProgramCountChange = async function onProgramCountChange(value) {
+    const count = toInt(value, 10);
+    if (!PROGRAM_COUNT_OPTIONS.includes(count)) {
+        return;
+    }
+    programCount = count;
+    renderProgramCountControl();
+
+    try {
+        const response = await fetch('/api/config/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ n_prg: programCount }),
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || ('HTTP ' + response.status));
+        }
+
+        showStatus(`Numero programmi salvato: ${programCount}`, true);
+    } catch (error) {
+        showStatus(`Errore salvataggio num programmi: ${error.message}`, false);
+    }
+};
 
 function rowHtml(program, idx) {
     const p = normalizeProgram(program, idx);
@@ -298,11 +336,34 @@ window.selectProgramNameLanguage = async function selectProgramNameLanguage(lang
     }
 };
 
+async function loadProgramCount() {
+    const select = document.getElementById('programCountSelect');
+    if (!select) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/config', { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        const data = await response.json();
+        const count = (data.n_prg && PROGRAM_COUNT_OPTIONS.includes(Number(data.n_prg))) ? Number(data.n_prg) : 10;
+        programCount = count;
+        select.value = String(programCount);
+    } catch (error) {
+        console.warn('loadProgramCount failed', error);
+        programCount = 10;
+        select.value = String(programCount);
+    }
+}
+
 async function loadPrograms() {
     try {
         const [programsResponse] = await Promise.all([
             fetch('/api/programs', { cache: 'no-store' }),
             loadProgramNameLanguages(),
+            loadProgramCount(),
         ]);
 
         if (!programsResponse.ok) {
