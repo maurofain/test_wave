@@ -1200,85 +1200,52 @@ static void apply_display_override_from_dip1(device_config_t *cfg)
   }
 }
 
-static bool is_leap_year(int year)
+static void apply_device_timezone(void)
 {
-  return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
-}
+  device_config_t *cfg = device_config_get();
+  if (!cfg) {
+    return;
+  }
 
-static int day_of_week(int year, int month, int day)
-{
-  static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
-  if (month < 3) year -= 1;
-  return (year + year/4 - year/100 + year/400 + t[month - 1] + day) % 7;
-}
+  char tz_value[64] = {0};
+  int tz_hours = cfg->ntp.timezone_offset;
+  char posix_sign = (tz_hours >= 0) ? '-' : '+';
+  int abs_hours = (tz_hours >= 0) ? tz_hours : -tz_hours;
 
-static int last_sunday_of_month(int year, int month)
-{
-  int days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-  if (month == 2 && is_leap_year(year)) {
-    days_in_month[1] = 29;
+  if (cfg->ntp.use_dst) {
+    snprintf(tz_value,
+             sizeof(tz_value),
+             "LOC%c%dDST,M3.5.0/2,M10.5.0/3",
+             posix_sign,
+             abs_hours);
+  } else {
+    snprintf(tz_value,
+             sizeof(tz_value),
+             "LOC%c%d",
+             posix_sign,
+             abs_hours);
   }
-  int last_day = days_in_month[month - 1];
-  int dow = day_of_week(year, month, last_day);
-  return last_day - dow;
-}
 
-static bool is_europe_dst(int year, int month, int day, int hour)
-{
-  if (month < 3 || month > 10) {
-    return false;
-  }
-  if (month > 3 && month < 10) {
-    return true;
-  }
-  if (month == 3) {
-    int last_sunday = last_sunday_of_month(year, month);
-    if (day < last_sunday) {
-      return false;
-    }
-    if (day > last_sunday) {
-      return true;
-    }
-    return hour >= 2;
-  }
-  if (month == 10) {
-    int last_sunday = last_sunday_of_month(year, month);
-    if (day < last_sunday) {
-      return true;
-    }
-    if (day > last_sunday) {
-      return false;
-    }
-    return hour < 3;
-  }
-  return false;
+  setenv("TZ", tz_value, 1);
+  tzset();
+
+  ESP_LOGI(TAG,
+           "[M] [NTP] Timezone applicato: TZ=%s (offset=%+d, DST=%s)",
+           tz_value,
+           tz_hours,
+           cfg->ntp.use_dst ? "on" : "off");
 }
 
 static void ntp_sync_callback(struct timeval *tv)
 {
   device_config_t *cfg = device_config_get();
-  int total_offset_hours = cfg->ntp.timezone_offset;
-  int dst_offset = 0;
-
-  if (cfg->ntp.use_dst) {
-    time_t utc_time = tv->tv_sec;
-    time_t local_time = utc_time + (time_t)cfg->ntp.timezone_offset * 3600;
-    struct tm local_tm;
-    gmtime_r(&local_time, &local_tm);
-    if (is_europe_dst(local_tm.tm_year + 1900, local_tm.tm_mon + 1, local_tm.tm_mday, local_tm.tm_hour)) {
-      dst_offset = 1;
-    }
-  }
-
-  if (cfg->ntp.timezone_offset != 0 || dst_offset != 0) {
-    total_offset_hours += dst_offset;
-    ESP_LOGI(TAG, "[NTP] Local timezone offset: %+d ore%s",
-             total_offset_hours,
-             dst_offset ? " (ora legale attiva)" : "");
+  if (!cfg) {
+    return;
   }
 
   /* Mantieni l'orologio di sistema in UTC: non modificare il valore raw NTP */
   settimeofday(tv, NULL);
+  apply_device_timezone();
 
   time_t now = time(NULL);
   struct tm utc_tm;
@@ -1288,15 +1255,14 @@ static void ntp_sync_callback(struct timeval *tv)
            utc_tm.tm_year + 1900, utc_tm.tm_mon + 1, utc_tm.tm_mday,
            utc_tm.tm_hour, utc_tm.tm_min, utc_tm.tm_sec);
 
-  if (cfg->ntp.timezone_offset != 0 || dst_offset != 0) {
-    time_t local_time = now + (time_t)total_offset_hours * 3600;
+  if (cfg->ntp.timezone_offset != 0 || cfg->ntp.use_dst) {
     struct tm local_tm;
-    gmtime_r(&local_time, &local_tm);
+    localtime_r(&now, &local_tm);
     ESP_LOGI(TAG,
-             "[NTP] Local time: %04d-%02d-%02d %02d:%02d:%02d (UTC%+d)",
+             "[NTP] Local time: %04d-%02d-%02d %02d:%02d:%02d (isdst=%d)",
              local_tm.tm_year + 1900, local_tm.tm_mon + 1, local_tm.tm_mday,
              local_tm.tm_hour, local_tm.tm_min, local_tm.tm_sec,
-             total_offset_hours);
+             local_tm.tm_isdst);
   }
 
   // Quando la sincronizzazione NTP ha successo, aumenta l'intervallo a 1 ora
@@ -1328,6 +1294,7 @@ static void init_sntp(void)
   }
 
   device_config_t *cfg = device_config_get();
+  apply_device_timezone();
 
   ESP_LOGI(TAG, "[NTP] Initializing SNTP with servers: %s, %s",
            cfg->ntp.server1, cfg->ntp.server2);

@@ -66,7 +66,14 @@
    - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
    - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
    - Uscita dallo slideshow al primo evento (credito, touch, tasto)
-
+13. Implementazione della scheda Esp32Cam
+   - prevedere la connessione tramite porta USB di un modulo erp32S3 con cam e software IA per le seguenti funzioni:
+     - Rilevamento movimento per prossimità persone
+     - Riconoscimento facciale per identificazione uomo/donna
+     - Valutazione eta dal volto
+     - salvataggio dell'immagine per sicurezza vandalica
+14. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
+15. 
 ---
 
 ## ⏸️ RITARDATI

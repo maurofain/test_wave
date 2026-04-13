@@ -2,8 +2,9 @@
 #include "embedded_icons.h"
 #include <stddef.h>
 
-const void *get_embedded_icon_src(int index)
+const void *get_embedded_icon_src(int index, bool ok)
 {
     (void)index;
-    return NULL; // nessuna icona embedded di default
+    (void)ok;
+    return NULL;
 }

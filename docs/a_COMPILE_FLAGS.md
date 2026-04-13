@@ -210,6 +210,12 @@ Impatto runtime associato:
 - `CONFIG_USB_CDC_SCANNER_PID`
 - `CONFIG_USB_CDC_SCANNER_DUAL_PID`
 - `CONFIG_USB_OTG_SUPPORTED`
+- `CONFIG_USB_HOST_HUBS_SUPPORTED`
+- `CONFIG_USB_HOST_HUB_MULTI_LEVEL`
+
+Impatto runtime associato:
+- il pannello LVGL usa le icone stato embedded in formato PNG tramite descrittori `lv_image_dsc_t` con `LV_COLOR_FORMAT_RAW_ALPHA`; richiede che il decoder PNG LVGL sia abilitato (`CONFIG_LV_USE_LODEPNG=y` nel progetto attuale).
+- su questa board lo scanner USB CDC e' collegato direttamente alla root port: mantenere `CONFIG_USB_HOST_HUBS_SUPPORTED` e `CONFIG_USB_HOST_HUB_MULTI_LEVEL` disabilitati riduce il consumo di pipe/endpoint del layer HCD ed evita errori di enumerazione tipo `ESP_ERR_NO_MEM` durante `HCD Pipe alloc`.
 
 ## Note
 

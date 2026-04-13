@@ -17,39 +17,18 @@ static bool           s_chrome_status_ok[4] = {true, true, true, true};
 static lv_event_cb_t  s_flag_cb            = NULL;  /* callback per click bandiera */
 static void          *s_flag_ud            = NULL;
 
-/* SPIFFS fallback removed — icons are embedded or stored in docs/icone/normalized
-   Keep NULL entries to avoid fopen attempts on SPIFFS when embedded resources exist. */
-static const char *s_chrome_status_icon_ok_paths[4] = { NULL, NULL, NULL, NULL };
-
-static const char *s_chrome_status_icon_ko_paths[4] = { NULL, NULL, NULL, NULL };
-
-static const char *chrome_get_status_icon_path(int index)
-{
-    if (index < 0 || index >= 4) {
-        return NULL;
-    }
-
-    return s_chrome_status_ok[index]
-        ? s_chrome_status_icon_ok_paths[index]
-        : s_chrome_status_icon_ko_paths[index];
-}
-
 static const void *chrome_get_status_icon_src(int index)
 {
     if (index < 0 || index >= 4) {
         return NULL;
     }
 
-    // Prefer embedded resource if available (faster, evita SPIFFS/flash read during UI build)
-    const void *emb = get_embedded_icon_src(index);
-    if (emb) return emb;
-
-    const char *path = chrome_get_status_icon_path(index);
-    if (!path) {
-        ESP_LOGW("lvgl_page_chrome", "Icona chrome %d path non disponibile", index);
-        return NULL;
+    const void *emb = get_embedded_icon_src(index, s_chrome_status_ok[index]);
+    if (!emb) {
+        ESP_LOGW("lvgl_page_chrome", "[C] Icona chrome %d embedded non disponibile", index);
     }
-    return (const void *)path;
+
+    return emb;
 }
 
 static void chrome_update_status_icons(void)
@@ -172,7 +151,7 @@ void lvgl_page_chrome_remove(void)
 void lvgl_page_chrome_preload_status_icons(void)
 {
     for (int i = 0; i < 4; i++) {
-        (void)chrome_get_status_icon_path(i);
+        (void)chrome_get_status_icon_src(i);
     }
 }
 
