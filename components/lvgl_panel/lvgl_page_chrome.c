@@ -35,6 +35,8 @@ static const uint8_t *s_chrome_status_icon_ok_data[4] = {NULL, NULL, NULL, NULL}
 static size_t         s_chrome_status_icon_ok_size[4] = {0, 0, 0, 0};
 static const uint8_t *s_chrome_status_icon_ko_data[4] = {NULL, NULL, NULL, NULL};
 static size_t         s_chrome_status_icon_ko_size[4] = {0, 0, 0, 0};
+static char           s_chrome_status_icon_ok_normalized[4][256] = {{0}};
+static char           s_chrome_status_icon_ko_normalized[4][256] = {{0}};
 
 static const char *chrome_normalize_spiffs_path(const char *path, char *out_buf, size_t out_buf_size)
 {
@@ -102,6 +104,30 @@ static uint8_t *chrome_load_file_to_psram(const char *path, size_t *out_size)
     return data;
 }
 
+static const char *chrome_get_status_icon_path(int index)
+{
+    if (index < 0 || index >= 4) {
+        return NULL;
+    }
+
+    const char *raw_path = s_chrome_status_ok[index]
+        ? s_chrome_status_icon_ok_paths[index]
+        : s_chrome_status_icon_ko_paths[index];
+    char *normalized = s_chrome_status_ok[index]
+        ? s_chrome_status_icon_ok_normalized[index]
+        : s_chrome_status_icon_ko_normalized[index];
+
+    if (!raw_path) {
+        return NULL;
+    }
+
+    if (!normalized[0]) {
+        chrome_normalize_spiffs_path(raw_path, normalized, sizeof(s_chrome_status_icon_ok_normalized[index]));
+    }
+
+    return normalized[0] ? normalized : NULL;
+}
+
 static const void *chrome_get_status_icon_src(int index)
 {
     if (index < 0 || index >= 4) {
@@ -116,8 +142,13 @@ static const void *chrome_get_status_icon_src(int index)
         return data;
     }
 
-    ESP_LOGW("lvgl_page_chrome", "Icona chrome %d non pre-caricata in PSRAM, nessun fallback runtime", index);
-    return NULL;
+    const char *path = chrome_get_status_icon_path(index);
+    if (path) {
+        ESP_LOGW("lvgl_page_chrome", "Icona chrome %d non pre-caricata in PSRAM, uso fallback file %s", index, path);
+    } else {
+        ESP_LOGW("lvgl_page_chrome", "Icona chrome %d non pre-caricata e path non disponibile", index);
+    }
+    return (const void *)path;
 }
 
 static void chrome_update_status_icons(void)

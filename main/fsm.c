@@ -219,6 +219,45 @@ static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
     return true;
 }
 
+static void fsm_publish_autorenew_payment_event(const fsm_ctx_t *ctx)
+{
+    if (!ctx || ctx->running_price_units <= 0) {
+        return;
+    }
+
+    const char *service_code = (ctx->running_program_name[0] != '\0') ?
+                                   ctx->running_program_name : "SER1";
+
+    fsm_input_event_t pay_ev = {
+        .from = AGN_ID_FSM,
+        .to = {AGN_ID_HTTP_SERVICES},
+        .action = ACTION_ID_PROGRAM_SELECTED,
+        .type = FSM_INPUT_EVENT_PROGRAM_SELECTED,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = ctx->running_price_units,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .data_ptr = NULL,
+        .text = {0},
+        .customer_code = {0},
+    };
+    strncpy(pay_ev.text, service_code, sizeof(pay_ev.text) - 1);
+    snprintf(pay_ev.customer_code, sizeof(pay_ev.customer_code), "%s",
+             ctx->customer_code[0] ? ctx->customer_code : "0");
+
+    if (!fsm_event_publish(&pay_ev, pdMS_TO_TICKS(50))) {
+        ESP_LOGE(TAG, "[M] Publish AUTO_RENEW_PAYMENT fallito (service=%s amount=%ld)",
+                 service_code,
+                 (long)ctx->running_price_units);
+        return;
+    }
+
+    ESP_LOGI(TAG, "[M] AUTO_RENEW_PAYMENT pubblicato (service=%s amount=%ld customer_code=%s)",
+             service_code,
+             (long)ctx->running_price_units,
+             ctx->customer_code[0] ? ctx->customer_code : "0");
+}
+
 static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
 {
     if (!ctx || ctx->running_price_units <= 0) {
@@ -239,6 +278,7 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
     if (!fsm_try_charge_program_cycle(ctx, ctx->running_price_units)) {
         return false;
     }
+    fsm_publish_autorenew_payment_event(ctx);
     ctx->running_elapsed_ms = 0;
     ctx->pause_elapsed_ms = 0;
     ctx->pause_limit_reached = false;
