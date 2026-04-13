@@ -23,6 +23,7 @@ extern bool dump_cctalk_log;
 
 #define CCTALK_CMD_TIMEOUT_MS      (700U)
 #define CCTALK_POLL_INTERVAL_MS    (250U)
+#define CCTALK_REINIT_INTERVAL_MS  (60000U)
 
 static SemaphoreHandle_t s_cctalk_state_lock = NULL;
 static bool s_driver_initialized = false;
@@ -649,6 +650,26 @@ void cctalk_task_run(void *arg)
         if (cctalk_driver_is_acceptor_enabled()) {
             // Passo 4: Ciclo di lettura crediti (comando 229 - Read Buffered Credit)
             cctalk_poll_once();
+
+            static uint32_t s_reinit_timer_ms = 0U;
+            if (!cctalk_driver_is_acceptor_online()) {
+                s_reinit_timer_ms += CCTALK_POLL_INTERVAL_MS;
+                if (s_reinit_timer_ms >= CCTALK_REINIT_INTERVAL_MS) {
+                    s_reinit_timer_ms = 0U;
+                    serial_test_push_monitor_action("CCTALK", "GETTONIERA offline; tentativo reinit");
+                    esp_err_t start_err = cctalk_driver_start_acceptor();
+                    if (start_err != ESP_OK) {
+                        char msg[96];
+                        snprintf(msg, sizeof(msg), "REINIT failed: %s", esp_err_to_name(start_err));
+                        serial_test_push_monitor_action("CCTALK", msg);
+                    } else {
+                        serial_test_push_monitor_action("CCTALK", "REINIT ok");
+                    }
+                }
+            } else {
+                s_reinit_timer_ms = 0U;
+            }
+
             vTaskDelay(pdMS_TO_TICKS(CCTALK_POLL_INTERVAL_MS));  // 250 ms tra letture
         } else {
             vTaskDelay(pdMS_TO_TICKS(200));

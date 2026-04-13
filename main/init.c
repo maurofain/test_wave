@@ -1272,24 +1272,32 @@ static void ntp_sync_callback(struct timeval *tv)
 
   if (cfg->ntp.timezone_offset != 0 || dst_offset != 0) {
     total_offset_hours += dst_offset;
-    tv->tv_sec += (total_offset_hours * 3600);
-    settimeofday(tv, NULL);
-    ESP_LOGI(TAG, "[NTP] Offset del fuso orario applicato: %+d ore%s",
+    ESP_LOGI(TAG, "[NTP] Local timezone offset: %+d ore%s",
              total_offset_hours,
              dst_offset ? " (ora legale attiva)" : "");
-  } else {
-    settimeofday(tv, NULL);
-    ESP_LOGI(TAG, "[NTP] Offset del fuso orario applicato: %d ore", total_offset_hours);
   }
 
+  /* Mantieni l'orologio di sistema in UTC: non modificare il valore raw NTP */
+  settimeofday(tv, NULL);
+
   time_t now = time(NULL);
-  struct tm timeinfo;
-  localtime_r(&now, &timeinfo);
+  struct tm utc_tm;
+  gmtime_r(&now, &utc_tm);
   ESP_LOGI(TAG,
-           "[NTP] Time synchronized: %04d-%02d-%02d %02d:%02d:%02d (UTC%+d)",
-           timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-           timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
-           total_offset_hours);
+           "[NTP] Time synchronized: %04d-%02d-%02d %02d:%02d:%02d UTC",
+           utc_tm.tm_year + 1900, utc_tm.tm_mon + 1, utc_tm.tm_mday,
+           utc_tm.tm_hour, utc_tm.tm_min, utc_tm.tm_sec);
+
+  if (cfg->ntp.timezone_offset != 0 || dst_offset != 0) {
+    time_t local_time = now + (time_t)total_offset_hours * 3600;
+    struct tm local_tm;
+    gmtime_r(&local_time, &local_tm);
+    ESP_LOGI(TAG,
+             "[NTP] Local time: %04d-%02d-%02d %02d:%02d:%02d (UTC%+d)",
+             local_tm.tm_year + 1900, local_tm.tm_mon + 1, local_tm.tm_mday,
+             local_tm.tm_hour, local_tm.tm_min, local_tm.tm_sec,
+             total_offset_hours);
+  }
 
   // Quando la sincronizzazione NTP ha successo, aumenta l'intervallo a 1 ora
   // (3600000 ms) Evita tentativi continui quando l'ora è già corretta

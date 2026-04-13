@@ -329,18 +329,32 @@ static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_caus
 
     if ((focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_CCTALK || focus_agent == AGN_ID_USB_CDC_SCANNER)) {
         bool cctalk_ok = cfg->sensors.cctalk_enabled && cctalk_driver_is_acceptor_enabled() && cctalk_driver_is_acceptor_online();
-        bool scanner_ok = cfg->scanner.enabled;
+        bool scanner_ok = cfg->scanner.enabled && usb_cdc_scanner_is_connected();
         if (!cctalk_ok && !scanner_ok) {
             init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
+            init_agent_status_set(AGN_ID_USB_CDC_SCANNER, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
             tasks_oos_set(out_cause,
                           AGN_ID_CCTALK,
                           "out_of_service_reason_credit_systems",
                           "Nessun sistema di acquisizione credito attivo");
             return true;
         }
-        init_agent_status_set(AGN_ID_CCTALK,
-                              1,
-                              cfg->sensors.cctalk_enabled ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+
+        if (!cfg->sensors.cctalk_enabled) {
+            init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+        } else {
+            init_agent_status_set(AGN_ID_CCTALK,
+                                  cctalk_ok ? 1 : 0,
+                                  cctalk_ok ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_RUNTIME_FAILED);
+        }
+
+        if (!cfg->scanner.enabled) {
+            init_agent_status_set(AGN_ID_USB_CDC_SCANNER, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+        } else {
+            init_agent_status_set(AGN_ID_USB_CDC_SCANNER,
+                                  scanner_ok ? 1 : 0,
+                                  scanner_ok ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_RUNTIME_FAILED);
+        }
     }
 
     if (focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_HTTP_SERVICES) {

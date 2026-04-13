@@ -4,6 +4,7 @@
 #include "esp_err.h"
 #include "device_config.h"
 #include "bsp/esp32_p4_nano.h"
+#include "serial_test.h"
 /* Sperimentali: invio log alla Web UI per diagnostica remota */
 #include "web_ui.h" /* Sperimentali */
 #include <string.h>
@@ -56,6 +57,7 @@
 
 static const char *TAG = "USB_CDC_SCANNER";
 static usb_cdc_scanner_callback_t s_on_barcode = NULL;
+static volatile bool s_scanner_connected = false;
 
 __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
 {
@@ -71,6 +73,7 @@ static cdc_acm_dev_hdl_t s_cdc_dev = NULL;
 static QueueHandle_t s_cdc_data_queue = NULL;
 static bool s_cdc_acm_installed = false;
 #define USB_CDC_SCANNER_RX_QUEUE_LEN 1024
+#define USB_CDC_SCANNER_RETRY_DELAY_MS 5000U
 static const char *SCN_CMD_SETUP = "0000#SCNMOD3;RRDENA1;CIDENA1;SCNENA0;RRDDUR3000;";
 static const char *SCN_CMD_STATE = "0000#SCNENA*;";
 static const char *SCN_CMD_ON = "0000#SCNENA1;";
@@ -119,11 +122,18 @@ static void cdc_event_cb(const cdc_acm_host_dev_event_data_t *event, void *user_
     switch (event->type) {
     case CDC_ACM_HOST_DEVICE_DISCONNECTED:
         ESP_LOGI(TAG, "CDC device disconnected");
+        s_scanner_connected = false;
+        serial_test_push_monitor_action("SCANNER", "CDC device disconnected");
         if (event->data.cdc_hdl) {
             cdc_acm_host_close(event->data.cdc_hdl);
             if (s_cdc_dev == event->data.cdc_hdl) {
                 s_cdc_dev = NULL;
             }
+        }
+        if (s_usb_open_task != NULL) {
+            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+            xTaskNotifyFromISR(s_usb_open_task, 0, eNoAction, &xHigherPriorityTaskWoken);
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
         break;
     case CDC_ACM_HOST_ERROR:
@@ -144,6 +154,12 @@ static void cdc_new_device_cb(usb_device_handle_t usb_dev)
                  device_desc->idVendor, device_desc->idProduct, device_desc->bDeviceClass);
     } else {
         ESP_LOGI(TAG, "New USB device connected: failed to read device descriptor");
+    }
+
+    if (s_usb_open_task != NULL) {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xTaskNotifyFromISR(s_usb_open_task, 0, eNoAction, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
 
@@ -398,6 +414,8 @@ static void usb_cdc_scanner_open_task(void *arg)
         if (err == ESP_OK) {
             ESP_LOGI(TAG, "CDC device opened");
             s_cdc_dev = cdc_dev;
+            s_scanner_connected = true;
+            serial_test_push_monitor_action("SCANNER", "CDC device connected");
 
             vTaskDelay(pdMS_TO_TICKS(100));
             esp_err_t on_err = usb_cdc_scanner_send_on_command();
@@ -486,6 +504,8 @@ static void usb_cdc_scanner_open_task(void *arg)
                                 if (err == ESP_OK) {
                                     ESP_LOGI(TAG, "CDC device opened via fallback VID:PID %04X:%04X", enum_vid, enum_pid);
                                     s_cdc_dev = cdc_dev;
+                                    s_scanner_connected = true;
+                                    serial_test_push_monitor_action("SCANNER", "CDC device connected");
 
                                     vTaskDelay(pdMS_TO_TICKS(100));
                                     esp_err_t on_err = usb_cdc_scanner_send_on_command();
@@ -530,7 +550,7 @@ static void usb_cdc_scanner_open_task(void *arg)
                 ESP_LOGI(TAG, "Retrying in 5s");
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(USB_CDC_SCANNER_RETRY_DELAY_MS));
     }
 }
 
@@ -768,6 +788,11 @@ esp_err_t usb_cdc_scanner_send_off_command(void)
 #endif
 }
 
+bool usb_cdc_scanner_is_connected(void)
+{
+    return s_scanner_connected;
+}
+
 #endif /* DNA_USB_SCANNER == 0 */
 
 /*
@@ -875,6 +900,11 @@ esp_err_t usb_cdc_scanner_send_off_command(void)
 {
     ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_send_off_command");
     return ESP_OK;
+}
+
+bool usb_cdc_scanner_is_connected(void)
+{
+    return false;
 }
 
 #endif /* DNA_USB_SCANNER == 1 */

@@ -2,11 +2,11 @@
 #include "language_flags.h"
 #include "lvgl_panel.h"
 
-#include "esp_heap_caps.h"
 #include "esp_log.h"
 
 #include <stdio.h>
 #include <time.h>
+#include "embedded_icons.h"
 
 extern const lv_font_t GoogleSans35;
 
@@ -31,101 +31,15 @@ static const char *s_chrome_status_icon_ko_paths[4] = {
     "S:/spiffs/icons/QrKo.png",
 };
 
-static const uint8_t *s_chrome_status_icon_ok_data[4] = {NULL, NULL, NULL, NULL};
-static size_t         s_chrome_status_icon_ok_size[4] = {0, 0, 0, 0};
-static const uint8_t *s_chrome_status_icon_ko_data[4] = {NULL, NULL, NULL, NULL};
-static size_t         s_chrome_status_icon_ko_size[4] = {0, 0, 0, 0};
-static char           s_chrome_status_icon_ok_normalized[4][256] = {{0}};
-static char           s_chrome_status_icon_ko_normalized[4][256] = {{0}};
-
-static const char *chrome_normalize_spiffs_path(const char *path, char *out_buf, size_t out_buf_size)
-{
-    if (!path || !out_buf || out_buf_size == 0) {
-        return NULL;
-    }
-
-    if (strncmp(path, "S:/", 3) == 0) {
-        snprintf(out_buf, out_buf_size, "/%s", path + 3);
-    } else {
-        strncpy(out_buf, path, out_buf_size);
-        out_buf[out_buf_size - 1] = '\0';
-    }
-
-    return out_buf;
-}
-
-static uint8_t *chrome_load_file_to_psram(const char *path, size_t *out_size)
-{
-    if (!path || !out_size) {
-        return NULL;
-    }
-
-    char normalized_path[256];
-    const char *path_to_open = chrome_normalize_spiffs_path(path, normalized_path, sizeof(normalized_path));
-    if (!path_to_open) {
-        return NULL;
-    }
-
-    FILE *f = fopen(path_to_open, "rb");
-    if (!f) {
-        ESP_LOGW("lvgl_page_chrome", "Impossibile aprire l'icona SPIFFS: %s", path_to_open);
-        return NULL;
-    }
-
-    if (fseek(f, 0, SEEK_END) != 0) {
-        fclose(f);
-        return NULL;
-    }
-
-    long len = ftell(f);
-    if (len <= 0) {
-        fclose(f);
-        return NULL;
-    }
-
-    rewind(f);
-    size_t size = (size_t)len;
-    uint8_t *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!data) {
-        ESP_LOGE("lvgl_page_chrome", "PSRAM alloc fallita per %s (%u bytes)", path, (unsigned)size);
-        fclose(f);
-        return NULL;
-    }
-
-    size_t read = fread(data, 1, size, f);
-    fclose(f);
-    if (read != size) {
-        ESP_LOGE("lvgl_page_chrome", "Lettura incompleta %s: %u/%u", path, (unsigned)read, (unsigned)size);
-        heap_caps_free(data);
-        return NULL;
-    }
-
-    *out_size = size;
-    return data;
-}
-
 static const char *chrome_get_status_icon_path(int index)
 {
     if (index < 0 || index >= 4) {
         return NULL;
     }
 
-    const char *raw_path = s_chrome_status_ok[index]
+    return s_chrome_status_ok[index]
         ? s_chrome_status_icon_ok_paths[index]
         : s_chrome_status_icon_ko_paths[index];
-    char *normalized = s_chrome_status_ok[index]
-        ? s_chrome_status_icon_ok_normalized[index]
-        : s_chrome_status_icon_ko_normalized[index];
-
-    if (!raw_path) {
-        return NULL;
-    }
-
-    if (!normalized[0]) {
-        chrome_normalize_spiffs_path(raw_path, normalized, sizeof(s_chrome_status_icon_ok_normalized[index]));
-    }
-
-    return normalized[0] ? normalized : NULL;
 }
 
 static const void *chrome_get_status_icon_src(int index)
@@ -134,19 +48,14 @@ static const void *chrome_get_status_icon_src(int index)
         return NULL;
     }
 
-    const uint8_t *data = s_chrome_status_ok[index]
-        ? s_chrome_status_icon_ok_data[index]
-        : s_chrome_status_icon_ko_data[index];
-
-    if (data) {
-        return data;
-    }
+    // Prefer embedded resource if available (faster, evita SPIFFS/flash read during UI build)
+    const void *emb = get_embedded_icon_src(index);
+    if (emb) return emb;
 
     const char *path = chrome_get_status_icon_path(index);
-    if (path) {
-        ESP_LOGW("lvgl_page_chrome", "Icona chrome %d non pre-caricata in PSRAM, uso fallback file %s", index, path);
-    } else {
-        ESP_LOGW("lvgl_page_chrome", "Icona chrome %d non pre-caricata e path non disponibile", index);
+    if (!path) {
+        ESP_LOGW("lvgl_page_chrome", "Icona chrome %d path non disponibile", index);
+        return NULL;
     }
     return (const void *)path;
 }
@@ -271,20 +180,7 @@ void lvgl_page_chrome_remove(void)
 void lvgl_page_chrome_preload_status_icons(void)
 {
     for (int i = 0; i < 4; i++) {
-        if (!s_chrome_status_icon_ok_data[i]) {
-            s_chrome_status_icon_ok_data[i] = chrome_load_file_to_psram(
-                s_chrome_status_icon_ok_paths[i], &s_chrome_status_icon_ok_size[i]);
-            if (!s_chrome_status_icon_ok_data[i]) {
-                ESP_LOGW("lvgl_page_chrome", "Impossibile pre-caricare icona OK %s", s_chrome_status_icon_ok_paths[i]);
-            }
-        }
-        if (!s_chrome_status_icon_ko_data[i]) {
-            s_chrome_status_icon_ko_data[i] = chrome_load_file_to_psram(
-                s_chrome_status_icon_ko_paths[i], &s_chrome_status_icon_ko_size[i]);
-            if (!s_chrome_status_icon_ko_data[i]) {
-                ESP_LOGW("lvgl_page_chrome", "Impossibile pre-caricare icona KO %s", s_chrome_status_icon_ko_paths[i]);
-            }
-        }
+        (void)chrome_get_status_icon_path(i);
     }
 }
 

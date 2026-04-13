@@ -21,6 +21,7 @@ esp_err_t usb_cdc_scanner_send_setup_command(void);
 esp_err_t usb_cdc_scanner_send_state_command(void);
 esp_err_t usb_cdc_scanner_send_on_command(void);
 esp_err_t usb_cdc_scanner_send_off_command(void);
+bool usb_cdc_scanner_is_connected(void);
 
 #ifdef __cplusplus
 }

@@ -17,9 +17,15 @@
    1. I puntini vanno cambiati con le icone presenti in /data/icons
    2. l'icona cloudKo.png e CloudOk.pgn vanno visualizzate al posto del primo punto a sx e rappresentano lo stato della connessione con i servizi https (KO e OK  rispettivamente)
    3. l'icona CreditCardKo.png e CreditCardOk.pgn vanno visualizzate al posto del secondo punto da sx e rappresentano lo stato della connessione con i device MDB (Ok e KO  rispettivamente)
-   4. l'icona MoneteKo.png e MoneteOk.pgn vanno visualizzate al posto del terzo punto da sx e rappresentano lo stato della connessione con i device CCTalk (Ok e KO  rispettivamente)
-   5. l'icona QrKo.png e QrOk.pgn vanno visualizzate al posto del punto più a dx e rappresentano lo stato della connessione con lo scanner QRCode (Ok e KO  rispettivamente)
-5. Piano test endpoint e funzioni 
+5. Verifica la gestione generale delle dei components : tutti i component che gestiscono hardware devono avere queste funzioni e genera un report sullo stato attuale:
+      1. init
+      2. activate
+      3. deactivate
+      4. setup
+      5. status : indica se è disattivato , attivato , offline (attivato ma non operativo) o online (attivato e operativo)
+   5. l'icona MoneteKo.png e MoneteOk.pgn vanno visualizzate al posto del terzo punto da sx e rappresentano lo stato della connessione con i device CCTalk (Ok e KO  rispettivamente)
+   6. l'icona QrKo.png e QrOk.pgn vanno visualizzate al posto del punto più a dx e rappresentano lo stato della connessione con lo scanner QRCode (Ok e KO  rispettivamente)
+6. Piano test endpoint e funzioni 
    -	Strutturare i test in 4 livelli: 
    - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
    - **Contract**: campi obbligatori e tipi minimi della risposta
@@ -40,30 +46,29 @@
    - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
    - 3 flow critici: SD, seriale unificato, backup config su SD
    - Report `junit.xml` + riepilogo markdown
-6. Protocollo moduli 8 I/O RS485 esterni
+7. Protocollo moduli 8 I/O RS485 esterni
    - Driver RS485 presente ma nessun protocollo per slave 8-I/O esterni (uno o due moduli)
    - Definire il protocollo di comunicazione (Modbus RTU o proprietario)
    - Implementare lettura ingressi e scrittura uscite ciclica
    - Aggiungere in /config: numero schede I/O esterne (0, 1, 2)
-
-7. PLC esterno
+8. PLC esterno
    - Definire protocollo di collegamento (seriale RS485 o input digitale diretto)
    - Implementare ricezione impulsi/segnali da PLC (es. segnale avanzamento ciclo)
    - Aggiungere in /config: abilitazione PLC, input/output associati, protocollo
 
-8. Config: assegnazione programmi a I/O e relay
+9. Config: assegnazione programmi a I/O e relay
    - I programmi sono configurabili (tempo, pausa) ma non mappati a uscite fisiche
    - Aggiungere in /config per ogni programma: maschera relay/output attivati durante l'erogazione
 
-9.  Config: valore per metodo di pagamento
+10.  Config: valore per metodo di pagamento
    - Aggiungere in /config i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
 
-10. Ricezione config da server (`api/getconfig`)
+11. Ricezione config da server (`api/getconfig`)
    - L'API server `POST /api/getconfig` è definita ma il device non applica la configurazione ricevuta
    - Implementare il parsing della risposta e aggiornamento della config locale
 
-11. Slideshow immagini idle in standby
+12.  Slideshow immagini idle in standby
    - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
    - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
    - Uscita dallo slideshow al primo evento (credito, touch, tasto)

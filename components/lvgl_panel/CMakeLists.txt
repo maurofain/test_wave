@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "lvgl_page_programmi copy.c" "lvgl_page_ads.c"
+        SRCS "lvgl_page_programmi copy.c" "lvgl_page_ads.c"
          "GoogleSans35.c"
          "GoogleSans40.c"
          "GoogleSans50.c"
@@ -10,6 +10,7 @@ idf_component_register(
          "lvgl_i18n.c"
          "lvgl_page_chrome.c"
          "lvgl_panel.c"
+            "src/embedded_icons_stub.c"
          "lvgl_page_programmi.c"
          "lvgl_page_language.c"
          "lvgl_page_language_2.c"
