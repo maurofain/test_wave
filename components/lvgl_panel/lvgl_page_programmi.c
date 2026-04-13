@@ -10,6 +10,7 @@
 #include "main.h"
 #include "tasks.h"
 #include "usb_cdc_scanner.h"
+#include "cctalk.h"
 #include "mdb.h"
 #include "web_ui_programs.h"
 
@@ -29,6 +30,23 @@ extern const lv_font_t GoogleSans35;
 extern const lv_font_t GoogleSans40;
 
 static const char *TAG = "lvgl_panel";
+
+static void update_chrome_credit_status_icons(void)
+{
+    const device_config_t *cfg = device_config_get();
+    const mdb_status_t *mdb_status = mdb_get_status();
+
+    bool mdb_online = cfg && cfg->sensors.mdb_enabled && mdb_status &&
+                      (mdb_status->coin.is_online || mdb_status->bill.is_online);
+    bool cctalk_online = cfg && cfg->sensors.cctalk_enabled &&
+                         cctalk_driver_is_acceptor_enabled() &&
+                         cctalk_driver_is_acceptor_online();
+    bool scanner_online = cfg && cfg->scanner.enabled && usb_cdc_scanner_is_connected();
+
+    lvgl_page_chrome_set_status_icon_state(1, mdb_online);     /* indice 1 = MDB / CreditCard */
+    lvgl_page_chrome_set_status_icon_state(2, cctalk_online);  /* indice 2 = CCTALK / Coin */
+    lvgl_page_chrome_set_status_icon_state(3, scanner_online); /* indice 3 = Scanner / QR */
+}
 
 #define PANEL_REFRESH_MS 200
 
@@ -2028,9 +2046,7 @@ static void panel_timer_cb(lv_timer_t *t)
         s_last_fsm_state = snap.state;
         last_snap = snap;
 
-        const mdb_status_t *mdb_status = mdb_get_status();
-        bool mdb_online = mdb_status && mdb_status->coin.is_online;
-        lvgl_page_chrome_set_status_icon_state(1, mdb_online); /* indice 1 = MDB / CreditCard */
+        update_chrome_credit_status_icons();
 
         update_state(&snap);
         refresh_prog_buttons(&snap);
@@ -2136,11 +2152,9 @@ void lvgl_page_main_show(void)
     lvgl_page_chrome_set_flag_callback(on_lang_btn, NULL);
     lvgl_page_chrome_add(scr);
 
-    const mdb_status_t *mdb_status = mdb_get_status();
-    bool mdb_online = mdb_status && mdb_status->coin.is_online;
-    lvgl_page_chrome_set_status_icon_state(1, mdb_online); /* indice 1 = MDB / CreditCard */
+    update_chrome_credit_status_icons();
 
-    ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added (MDB %s)", mdb_online ? "ONLINE" : "OFFLINE");
+    ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added e stati credito sincronizzati");
 
     update_time(true);
 

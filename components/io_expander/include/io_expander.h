@@ -2,6 +2,7 @@
 #include "esp_err.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include "hw_common.h"
 
 extern uint8_t io_output_state;
 extern uint8_t io_input_state;
@@ -43,3 +44,4 @@ bool io_get_pin(int pin);
  * @return Valore a 8 bit della porta di ingresso
  */
 uint8_t io_get(void);
+hw_component_status_t io_expander_get_status(void);

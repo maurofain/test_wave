@@ -464,6 +464,12 @@ esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms)
     return ESP_OK;
 }
 
+/* [C] Restituisce lo stato operativo del driver LED */
+hw_component_status_t led_get_status(void)
+{
+    return (s_led_strip != NULL) ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
+}
+
 #endif /* DNA_LED_STRIP == 0 */
 
 /*
@@ -694,6 +700,12 @@ esp_err_t led_fade_out(uint32_t steps, uint32_t step_duration_ms)
     if (!s_mock_inited) return ESP_ERR_INVALID_STATE;
     ESP_LOGI(TAG, "[C] [MOCK] led_fade_out steps=%lu", (unsigned long)steps);
     return ESP_OK;
+}
+
+/* [C] Mockup: stato LED basato su s_mock_inited */
+hw_component_status_t led_get_status(void)
+{
+    return s_mock_inited ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_LED_STRIP */

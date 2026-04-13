@@ -58,6 +58,7 @@ esp_err_t api_emulator_program_stop(httpd_req_t *req);
 esp_err_t api_emulator_program_pause_toggle(httpd_req_t *req);
 esp_err_t api_emulator_fsm_messages_get(httpd_req_t *req);
 esp_err_t api_index_page_handler(httpd_req_t *req);
+esp_err_t api_hw_status_get(httpd_req_t *req);
 esp_err_t files_page_handler(httpd_req_t *req);
 esp_err_t api_files_list_get(httpd_req_t *req);
 esp_err_t api_files_upload_post(httpd_req_t *req);

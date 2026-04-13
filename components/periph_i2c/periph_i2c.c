@@ -72,3 +72,9 @@ i2c_master_bus_handle_t periph_i2c_get_handle(void)
 {
     return s_periph_i2c_handle;
 }
+
+/* [C] Restituisce lo stato operativo del bus I2C periferiche */
+hw_component_status_t periph_i2c_get_status(void)
+{
+    return (s_periph_i2c_handle != NULL) ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
+}

@@ -14,6 +14,9 @@ static const char *TAG = "AUX_GPIO";
 /* Codice reale — escluso se mockup attivo */
 #if DNA_GPIO == 0
 
+/* [C] Tracciamento stato inizializzazione GPIO ausiliari */
+static bool s_aux_gpio_initialized = false;
+
 
 /**
  * @brief Inizializza la GPIO.
@@ -48,6 +51,7 @@ esp_err_t aux_gpio_init(void)
     }
     
     ESP_LOGI(TAG, "Configured GPIO33 (mode %d)", (int)cfg->gpios.gpio33.mode);
+    s_aux_gpio_initialized = true;
     return ESP_OK;
 }
 
@@ -100,6 +104,12 @@ esp_err_t aux_gpio_set_level(int pin, int level)
         return gpio_set_level((gpio_num_t)pin, level);
     }
     return ESP_ERR_INVALID_ARG;
+}
+
+/* [C] Restituisce lo stato operativo dei GPIO ausiliari */
+hw_component_status_t aux_gpio_get_status(void)
+{
+    return s_aux_gpio_initialized ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_GPIO == 0 */
@@ -155,6 +165,12 @@ esp_err_t aux_gpio_set_level(int pin, int level)
 {
     ESP_LOGI(TAG, "[C] [MOCK] aux_gpio_set_level: pin=%d level=%d", pin, level);
     return ESP_OK;
+}
+
+/* [C] Mockup: get_status restituisce DISABLED */
+hw_component_status_t aux_gpio_get_status(void)
+{
+    return HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_GPIO == 1 */

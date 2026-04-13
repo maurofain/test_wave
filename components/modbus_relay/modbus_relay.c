@@ -811,3 +811,10 @@ esp_err_t modbus_relay_get_status(modbus_relay_status_t *out_status)
     give_lock();
     return ESP_OK;
 }
+
+/* [C] Restituisce lo stato operativo del relay Modbus come enum hw_component_status_t */
+hw_component_status_t modbus_relay_get_hw_status(void)
+{
+    if (!s_ctx.initialized) return HW_STATUS_DISABLED;
+    return s_ctx.running ? HW_STATUS_ONLINE : HW_STATUS_OFFLINE;
+}

@@ -10,7 +10,7 @@ idf_component_register(
          "lvgl_i18n.c"
          "lvgl_page_chrome.c"
          "lvgl_panel.c"
-            "src/embedded_icons_stub.c"
+            "src/embedded_icons.c"
          "lvgl_page_programmi.c"
          "lvgl_page_language.c"
          "lvgl_page_language_2.c"

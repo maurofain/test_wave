@@ -323,3 +323,9 @@ esp_err_t eeprom_24lc16_read_byte(uint16_t address, uint8_t *val) {
 esp_err_t eeprom_24lc16_write_byte(uint16_t address, uint8_t val) {
     return eeprom_24lc16_write(address, &val, 1);
 }
+
+/* [C] Restituisce lo stato operativo dell'EEPROM */
+hw_component_status_t eeprom_24lc16_get_status(void)
+{
+    return eeprom_24lc16_is_available() ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
+}

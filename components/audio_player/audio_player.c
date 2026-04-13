@@ -372,3 +372,10 @@ esp_err_t audio_player_play_file(const char *path)
 
     return result;
 }
+
+/* [C] Restituisce lo stato operativo del player audio */
+hw_component_status_t audio_player_get_status(void)
+{
+    if (!s_audio_ready) return HW_STATUS_DISABLED;
+    return s_is_playing ? HW_STATUS_ONLINE : HW_STATUS_ENABLED;
+}

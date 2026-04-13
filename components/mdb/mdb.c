@@ -381,6 +381,36 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
     return ESP_OK;
 }
 
+/**
+ * @brief Segnala la fermata del Polling Engine MDB.
+ *
+ * Attualmente il task non supporta stop in-flight: questa funzione
+ * rappresenta un hook futuro per inviare un segnale di stop al task.
+ */
+esp_err_t mdb_stop_engine(void)
+{
+    /* [C] TODO: implementare segnale di stop al task mdb_engine_run */
+    return ESP_OK;
+}
+
+/**
+ * @brief Restituisce lo stato operativo del driver MDB.
+ *
+ * Mappa is_online di coin/bill nell'enum condiviso hw_component_status_t.
+ */
+hw_component_status_t mdb_get_hw_status(void)
+{
+    const mdb_status_t *st = mdb_get_status();
+    if (!st) return HW_STATUS_DISABLED;
+    /* Se coin o bill è online il bus è operativo */
+    if (st->coin.is_online || st->bill.is_online) return HW_STATUS_ONLINE;
+    /* Se lo stato coin non è INACTIVE il driver è stato avviato ma offline */
+    if (st->coin.state != MDB_STATE_INACTIVE) return HW_STATUS_OFFLINE;
+    if (st->bill.state != MDB_STATE_INACTIVE) return HW_STATUS_OFFLINE;
+    /* init chiamato ma engine non ancora avviato */
+    return HW_STATUS_ENABLED;
+}
+
 #endif /* DNA_MDB == 0 */
 
 /*
@@ -395,6 +425,10 @@ const mdb_status_t *mdb_get_status(void)
 {
     return &s_mock_mdb_status;
 }
+
+/* [C] Mockup: stop_engine e get_hw_status simulati */
+esp_err_t mdb_stop_engine(void) { return ESP_OK; }
+hw_component_status_t mdb_get_hw_status(void) { return HW_STATUS_DISABLED; }
 
 
 /**

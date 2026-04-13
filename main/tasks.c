@@ -64,6 +64,7 @@ static bool s_last_customer_available = false;
 #define OOS_REASON_FALLBACK_LEN 128
 #define OOS_HEALTH_CHECK_MS 1000U
 #define OOS_RETRY_MS 30000U
+#define CREDIT_SYSTEMS_BOOT_GRACE_MS 15000U
 
 typedef struct {
     bool valid;
@@ -327,11 +328,35 @@ static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_caus
         init_agent_status_set(AGN_ID_RS485, 1, INIT_AGENT_ERR_NONE);
     }
 
-    if ((focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_CCTALK || focus_agent == AGN_ID_USB_CDC_SCANNER)) {
-        bool cctalk_ok = cfg->sensors.cctalk_enabled && cctalk_driver_is_acceptor_enabled() && cctalk_driver_is_acceptor_online();
-        bool scanner_ok = cfg->scanner.enabled && usb_cdc_scanner_is_connected();
-        if (!cctalk_ok && !scanner_ok) {
+    if ((focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_CCTALK || focus_agent == AGN_ID_MDB || focus_agent == AGN_ID_USB_CDC_SCANNER)) {
+        bool cctalk_enabled = cfg->sensors.cctalk_enabled;
+        bool mdb_enabled = cfg->sensors.mdb_enabled;
+        bool scanner_enabled = cfg->scanner.enabled;
+
+        bool cctalk_ok = cctalk_enabled && cctalk_driver_is_acceptor_enabled() && cctalk_driver_is_acceptor_online();
+        bool mdb_ok = (mdb_enabled && mdb_get_hw_status() == HW_STATUS_ONLINE);
+        bool scanner_ok = scanner_enabled && usb_cdc_scanner_is_connected();
+        bool any_credit_ok = cctalk_ok || mdb_ok || scanner_ok;
+        uint32_t uptime_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+        bool any_credit_enabled = cctalk_enabled || mdb_enabled || scanner_enabled;
+        bool credit_bootstrap_grace = any_credit_enabled &&
+                                      !any_credit_ok &&
+                                      uptime_ms < CREDIT_SYSTEMS_BOOT_GRACE_MS;
+
+        if (credit_bootstrap_grace) {
+            init_agent_status_set(AGN_ID_CCTALK, 1, INIT_AGENT_ERR_NONE);
+            init_agent_status_set(AGN_ID_MDB, 1, INIT_AGENT_ERR_NONE);
+            init_agent_status_set(AGN_ID_USB_CDC_SCANNER, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+            ESP_LOGI(TAG,
+                     "[M] Grace bootstrap sistemi credito attiva (%lu ms < %u ms): skip health-check",
+                     (unsigned long)uptime_ms,
+                     (unsigned)CREDIT_SYSTEMS_BOOT_GRACE_MS);
+            return false;
+        }
+
+        if (!any_credit_ok) {
             init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
+            init_agent_status_set(AGN_ID_MDB, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
             init_agent_status_set(AGN_ID_USB_CDC_SCANNER, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
             tasks_oos_set(out_cause,
                           AGN_ID_CCTALK,
@@ -346,6 +371,14 @@ static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_caus
             init_agent_status_set(AGN_ID_CCTALK,
                                   cctalk_ok ? 1 : 0,
                                   cctalk_ok ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_RUNTIME_FAILED);
+        }
+
+        if (!cfg->sensors.mdb_enabled) {
+            init_agent_status_set(AGN_ID_MDB, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+        } else {
+            init_agent_status_set(AGN_ID_MDB,
+                                  mdb_ok ? 1 : 0,
+                                  mdb_ok ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_RUNTIME_FAILED);
         }
 
         if (!cfg->scanner.enabled) {
@@ -3120,7 +3153,7 @@ static task_param_t s_tasks[] = {
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = mdb_task,
         .stack_words = 4096,                  /* RISC-V: 4KB; skeleton con margine */
-        .stack_caps = MALLOC_CAP_SPIRAM,
+        .stack_caps = MALLOC_CAP_INTERNAL,    /* [M] Il task apre file da SPIFFS: stack in DRAM interna durante cache disable */
         .arg = NULL,
         .handle = NULL,
     },

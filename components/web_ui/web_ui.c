@@ -3483,6 +3483,9 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
     httpd_uri_t uri_status = {.uri = "/status", .method = HTTP_GET, .handler = status_get_handler};
     httpd_register_uri_handler(server, &uri_status);
 
+    httpd_uri_t uri_hw_status = {.uri = "/api/hw_status", .method = HTTP_GET, .handler = api_hw_status_get};
+    httpd_register_uri_handler(server, &uri_hw_status);
+
     httpd_uri_t uri_api_version = {.uri = "/api/version", .method = HTTP_GET, .handler = api_version_get};
     httpd_register_uri_handler(server, &uri_api_version);
 

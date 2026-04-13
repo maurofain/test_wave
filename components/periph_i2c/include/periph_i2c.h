@@ -1,6 +1,7 @@
 #pragma once
 #include "driver/i2c_master.h"
 #include "esp_err.h"
+#include "hw_common.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,6 +20,7 @@ esp_err_t periph_i2c_init(void);
  *        Ritorna NULL se periph_i2c_init() non è stata ancora chiamata.
  */
 i2c_master_bus_handle_t periph_i2c_get_handle(void);
+hw_component_status_t periph_i2c_get_status(void);
 
 #ifdef __cplusplus
 }

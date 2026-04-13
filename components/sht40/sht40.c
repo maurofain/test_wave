@@ -262,6 +262,12 @@ bool sht40_is_ready(void)
     return s_sht40_ready;
 }
 
+/* [C] Restituisce lo stato operativo del sensore SHT40 */
+hw_component_status_t sht40_get_status(void)
+{
+    return sht40_is_ready() ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
+}
+
 #endif /* DNA_SHT40 == 0 */
 
 /* ============================================================
@@ -326,6 +332,12 @@ esp_err_t sht40_read(float *temp, float *hum)
 bool sht40_is_ready(void)
 {
     return s_sht40_ready;
+}
+
+/* [C] Mockup: get_status restituisce DISABLED (sensore simulato) */
+hw_component_status_t sht40_get_status(void)
+{
+    return HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_SHT40 == 1 */

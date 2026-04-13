@@ -3,7 +3,7 @@
 <head>
   <meta charset='UTF-8'>
   <title>MH1001 control</title>
-  <style>body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}.container{max-width:1000px;margin:20px auto;padding:0 20px}nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}nav a:hover{background:#3498db} .card{background:white;padding:25px;margin:20px 0;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:.3s}.card:hover{transform:translateY(-5px)}h2{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;margin-top:0}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.grid{grid-template-columns:1fr}}.btn-link{display:flex;align-items:center;padding:20px;background:#3498db;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:18px;transition:.3s;gap:15px}.btn-link:hover{background:#2980b9;box-shadow:0 4px 8px rgba(0,0,0,0.2)}.btn-config{background:#27ae60}.btn-config:hover{background:#219150}.btn-test{background:#e67e22}.btn-test:hover{background:#d35400}.btn-emu{background:#8e44ad}.btn-emu:hover{background:#7d3c98}.btn-maint{background:#6c5ce7}.btn-maint:hover{background:#5a4acb}.btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}.btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}.svc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}@media(max-width:900px){.svc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.svc-grid{grid-template-columns:1fr}}.svc-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #ecf0f1;border-radius:8px;background:#fafbfd}.svc-name{display:flex;align-items:center;gap:8px;min-width:0;color:#34495e;font-weight:600}.svc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:currentColor}.svc-icon{flex-shrink:0}.svc-label{min-width:0}.svc-state{margin-left:auto;text-align:right;font-family:monospace;font-weight:700}.svc-on{color:#1e8449}.svc-off{color:#c0392b}.svc-mock{color:#2471a3}</style>
+  <style>body{font-family:Arial;background:#f5f5f5;color:#333;margin:0}header{background:#000;color:white;padding:10px 20px;display:flex;align-items:center;justify-content:space-between}.container{max-width:1000px;margin:20px auto;padding:0 20px}nav{background:#000;padding:10px;display:flex;justify-content:center;gap:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1)}nav a{color:white;text-decoration:none;padding:8px 15px;border-radius:4px;background:#2c3e50;font-weight:bold;font-size:14px;transition:.2s}nav a:hover{background:#3498db} .card{background:white;padding:25px;margin:20px 0;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.1);transition:.3s}.card:hover{transform:translateY(-5px)}h2{color:#2c3e50;border-bottom:3px solid #3498db;padding-bottom:10px;margin-top:0}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:600px){.grid{grid-template-columns:1fr}}.btn-link{display:flex;align-items:center;padding:20px;background:#3498db;color:white;text-decoration:none;border-radius:8px;font-weight:bold;font-size:18px;transition:.3s;gap:15px}.btn-link:hover{background:#2980b9;box-shadow:0 4px 8px rgba(0,0,0,0.2)}.btn-config{background:#27ae60}.btn-config:hover{background:#219150}.btn-test{background:#e67e22}.btn-test:hover{background:#d35400}.btn-emu{background:#8e44ad}.btn-emu:hover{background:#7d3c98}.btn-maint{background:#6c5ce7}.btn-maint:hover{background:#5a4acb}.btn-ota{background:#e74c3c}.btn-ota:hover{background:#c0392b}.icon{font-size:30px}.btn-reboot{display:inline-block;padding:10px 20px;background:#2c3e50;color:white;text-decoration:none;border-radius:5px;margin-top:10px;font-weight:bold}.svc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}@media(max-width:900px){.svc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.svc-grid{grid-template-columns:1fr}}.svc-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #ecf0f1;border-radius:8px;background:#fafbfd}.svc-name{display:flex;align-items:center;gap:8px;min-width:0;color:#34495e;font-weight:600}.svc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:currentColor}.svc-icon{flex-shrink:0}.svc-label{min-width:0}.svc-state{margin-left:auto;text-align:right;font-family:monospace;font-weight:700}.svc-on{color:#1e8449}.svc-off{color:#c0392b}.svc-mock{color:#2471a3}.svc-enabled{color:#1a6ea8}.svc-offline{color:#e67e22}</style>
 </head>
 <body>
 <header>
@@ -67,11 +67,20 @@
   <script>
   (function(){
     function hasIp(v){return !!v&&v!=='0.0.0.0';}
-    function svcItemHtml(icon,label,on,onTxt,offTxt,mock){var cls=mock?'svc-mock':(on?'svc-on':'svc-off');var txt=(on?onTxt:offTxt)+(mock?' ⚙️mock':'');return '<div class="svc-item"><span class="svc-name '+cls+'"><span class="svc-dot" aria-hidden="true"></span><span class="svc-icon">'+icon+'</span><span class="svc-label">'+label+'</span></span><span class="svc-state '+cls+'">'+txt+'</span></div>';}    
+    function svcItemHtml(icon,label,on,onTxt,offTxt,mock){var cls=mock?'svc-mock':(on?'svc-on':'svc-off');var txt=(on?onTxt:offTxt)+(mock?' ⚙️mock':'');return '<div class="svc-item"><span class="svc-name '+cls+'"><span class="svc-dot" aria-hidden="true"></span><span class="svc-icon">'+icon+'</span><span class="svc-label">'+label+'</span></span><span class="svc-state '+cls+'">'+txt+'</span></div>';}
+    function hwStateClass(st){if(st==='online')return 'svc-on';if(st==='enabled')return 'svc-enabled';if(st==='offline')return 'svc-offline';return 'svc-off';}
+    function hwStateText(st){if(st==='online')return 'ONLINE';if(st==='enabled')return 'ATTIVO';if(st==='offline')return 'OFFLINE';return 'DISABILITATO';}
+    function hwSvcItemHtml(icon,label,st,mock){var cls=mock?'svc-mock':hwStateClass(st);var txt=mock?'mock':hwStateText(st);return '<div class="svc-item"><span class="svc-name '+cls+'"><span class="svc-dot" aria-hidden="true"></span><span class="svc-icon">'+icon+'</span><span class="svc-label">'+label+'</span></span><span class="svc-state '+cls+'">'+txt+'</span></div>';}
     function pwmStatusText(sensors){if(!!sensors.pwm1_enabled&&!!sensors.pwm2_enabled)return 'ATTIVO (CH1+CH2)';if(!!sensors.pwm1_enabled)return 'ATTIVO (CH1)';if(!!sensors.pwm2_enabled)return 'ATTIVO (CH2)';return 'DISABILITATO';}
     function remoteLogStatusText(remoteLog){const net=!!remoteLog.use_broadcast;const sd=!!remoteLog.write_to_sd;if(net&&sd)return 'ATTIVO (rete+SD)';if(net)return 'ATTIVO (rete)';if(sd)return 'ATTIVO (SD)';return 'DISABILITATO';}
 
-    async function loadServiceStatus(){var grid=document.getElementById('svc_grid');if(!grid)return;try{const r=await fetch('/status',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const s=await r.json();const c=(s&&s.config)?s.config:{};const sensors=(c&&c.sensors)?c.sensors:{};const remoteLog=(c&&c.rlog)?c.rlog:{};const remote=(s&&s.remote)?s.remote:{};const dna=(s&&s.dna)?s.dna:{};const expansionOn=!!sensors.io_expander_enabled;const expansionOnTxt=expansionOn?'ATTIVA (2 moduli)':'DISABILITATA';const pwmOn=!!sensors.pwm1_enabled||!!sensors.pwm2_enabled;const pwmOnTxt=pwmStatusText(sensors);const remoteOn=!!remoteLog.use_broadcast||!!remoteLog.write_to_sd;const remoteOnTxt=remoteLogStatusText(remoteLog);const remoteEnabled=(typeof remote.enabled==='boolean')?!!remote.enabled:!!(c.server&&c.server.enabled);const remoteOnline=remoteEnabled&&!!remote.online;const remoteOffTxt=remoteEnabled?'OFFLINE':'DISABILITATO';
+    async function loadServiceStatus(){var grid=document.getElementById('svc_grid');if(!grid)return;try{
+      const [r,rhw]=await Promise.all([fetch('/status',{cache:'no-store'}),fetch('/api/hw_status',{cache:'no-store'})]);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const s=await r.json();
+      const hw=rhw.ok?(await rhw.json()):{};
+      const c=(s&&s.config)?s.config:{};const sensors=(c&&c.sensors)?c.sensors:{};const remoteLog=(c&&c.rlog)?c.rlog:{};const remote=(s&&s.remote)?s.remote:{};const dna=(s&&s.dna)?s.dna:{};
+      const remoteOn=!!remoteLog.use_broadcast||!!remoteLog.write_to_sd;const remoteOnTxt=remoteLogStatusText(remoteLog);const remoteEnabled=(typeof remote.enabled==='boolean')?!!remote.enabled:!!(c.server&&c.server.enabled);const remoteOnline=remoteEnabled&&!!remote.online;const remoteOffTxt=remoteEnabled?'OFFLINE':'DISABILITATO';
 
       const rows=[];
       rows.push(svcItemHtml('🌐','Web UI',!!(s.web&&s.web.running),'ATTIVO','FERMO'));
@@ -79,29 +88,27 @@
       rows.push(svcItemHtml('🔌','Ethernet',hasIp(s.ip_eth),'ONLINE','OFFLINE',!!dna.ethernet));
       rows.push(svcItemHtml('🕒','NTP',!!c.ntp_en,'ATTIVO','DISABILITATO'));
       rows.push(svcItemHtml('☁️','Server remoto',remoteOnline,'ONLINE',remoteOffTxt));
-      rows.push(svcItemHtml('🧩','Expansion board',expansionOn,expansionOnTxt,'DISABILITATA',!!dna.io_expander));
-      rows.push(svcItemHtml('💡','LED STRIP',!!sensors.led_enabled,'ATTIVO','DISABILITATO',!!dna.led_strip));
-      rows.push(svcItemHtml('🔤','RS232',!!sensors.rs232_enabled,'ABILITATA','DISABILITATA',!!dna.rs232));
-      rows.push(svcItemHtml('🔠','RS485',!!sensors.rs485_enabled,'ABILITATA','DISABILITATA',!!dna.rs485));
-      rows.push(svcItemHtml('🌡️','SHT40',!!sensors.temperature_enabled,'ATTIVO','DISABILITATO',!!dna.sht40));
-      rows.push(svcItemHtml('〰️','PWM',pwmOn,pwmOnTxt,'DISABILITATO',!!dna.pwm));
       rows.push(svcItemHtml('📊','RemoteLogging',remoteOn,remoteOnTxt,'DISABILITATO',!!dna.remote_logging));
+      rows.push(svcItemHtml('💾','SD card',!!(s.sd&&s.sd.mounted),'MONTATA','NON MONTATA',!!dna.sd_card));
 
-      // Scanner: show when enabled and physically connected
-      const scannerEnabled = !!(c.scanner && c.scanner.en);
-      const scannerConnected = scannerEnabled && !!(s.scanner && s.scanner.connected);
-      const scannerTxtOff = scannerEnabled ? 'OFFLINE' : 'DISABILITATO';
+      // Scanner
+      const scannerEnabled=!!(c.scanner&&c.scanner.en);const scannerConnected=scannerEnabled&&!!(s.scanner&&s.scanner.connected);const scannerTxtOff=scannerEnabled?'OFFLINE':'DISABILITATO';
       rows.push(svcItemHtml('🔍','Scanner',scannerConnected,'ONLINE',scannerTxtOff,!!dna.scanner));
 
-      // ModBus: separate display from Expansion board (Expansion shows only I2C expanders)
-      const modbusEnabled = !!(c.sensors && c.sensors.mdb_enabled);
-      const modbusOnline = !!(s.mdb && s.mdb.coin_online);
-      const modbusTxtOff = modbusEnabled ? 'OFFLINE' : 'DISABILITATO';
-      rows.push(svcItemHtml('🔗','ModBus',modbusOnline,'ONLINE',modbusTxtOff,!!dna.mdb));
-
-      rows.push(svcItemHtml('🎰','MDB',!!(s.mdb&&s.mdb.coin_online),'ONLINE','OFFLINE',!!dna.mdb));
-      rows.push(svcItemHtml('💾','SD card',!!(s.sd&&s.sd.mounted),'MONTATA','NON MONTATA',!!dna.sd_card));
-      rows.push(svcItemHtml('🔁','CCtalk',!!sensors.cctalk_enabled,'ABILITATO','DISABILITATO',!!dna.cctalk));
+      // Componenti hardware — 4 stati: disabled/enabled/offline/online
+      rows.push(hwSvcItemHtml('🧩','I/O Expander',hw.io_expander||'disabled',!!dna.io_expander));
+      rows.push(hwSvcItemHtml('💡','LED Strip',hw.led||'disabled',!!dna.led_strip));
+      rows.push(hwSvcItemHtml('🔤','RS232',hw.rs232||'disabled',!!dna.rs232));
+      rows.push(hwSvcItemHtml('🔠','RS485',hw.rs485||'disabled',!!dna.rs485));
+      rows.push(hwSvcItemHtml('🌡️','SHT40',hw.sht40||'disabled',!!dna.sht40));
+      rows.push(hwSvcItemHtml('〰️','PWM',hw.pwm||'disabled',!!dna.pwm));
+      rows.push(hwSvcItemHtml('🎰','MDB',hw.mdb||'disabled',!!dna.mdb));
+      rows.push(hwSvcItemHtml('🔁','CCtalk',hw.cctalk||'disabled',!!dna.cctalk));
+      rows.push(hwSvcItemHtml('🔗','Modbus Relay',hw.modbus_relay||'disabled',!!dna.rs485));
+      rows.push(hwSvcItemHtml('🔊','Audio',hw.audio_player||'disabled',false));
+      rows.push(hwSvcItemHtml('💾','EEPROM',hw.eeprom||'disabled',false));
+      rows.push(hwSvcItemHtml('🔌','I2C bus',hw.periph_i2c||'disabled',false));
+      rows.push(hwSvcItemHtml('🌐','Digital I/O',hw.digital_io||'disabled',false));
 
       grid.innerHTML=rows.join('');
     }catch(_e){grid.innerHTML=svcItemHtml('⚠️','Stato servizi',false,'ATTIVO','ERRORE LETTURA');}}

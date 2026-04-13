@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "hw_common.h"
 
 #define MODBUS_RELAY_MAX_POINTS 64U
 #define MODBUS_RELAY_MAX_BYTES ((MODBUS_RELAY_MAX_POINTS + 7U) / 8U)
@@ -51,3 +52,4 @@ esp_err_t modbus_relay_write_multiple_coils(uint8_t slave_id,
                                             uint16_t start,
                                             const uint8_t *packed_bits,
                                             uint16_t count);
+hw_component_status_t modbus_relay_get_hw_status(void);

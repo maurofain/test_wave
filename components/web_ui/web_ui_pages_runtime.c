@@ -10,6 +10,20 @@
 #include "app_version.h"
 #include "http_services.h"
 #include "usb_cdc_scanner.h"
+#include "hw_common.h"
+#include "cctalk.h"
+#include "rs232.h"
+#include "rs485.h"
+#include "io_expander.h"
+#include "led.h"
+#include "pwm.h"
+#include "sht40.h"
+#include "aux_gpio.h"
+#include "digital_io.h"
+#include "periph_i2c.h"
+#include "eeprom_24lc16.h"
+#include "audio_player.h"
+#include "modbus_relay.h"
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -176,4 +190,63 @@ esp_err_t httpservices_page_handler(httpd_req_t *req)
 esp_err_t api_index_page_handler(httpd_req_t *req)
 {
     return webpages_send_external_or_error(req, "api.html", "text/html; charset=utf-8");
+}
+
+/* [C] Mappa hw_component_status_t in stringa JSON */
+static const char *hw_status_to_str(hw_component_status_t s)
+{
+    switch (s) {
+        case HW_STATUS_ENABLED:  return "enabled";
+        case HW_STATUS_OFFLINE:  return "offline";
+        case HW_STATUS_ONLINE:   return "online";
+        case HW_STATUS_DISABLED:
+        default:                 return "disabled";
+    }
+}
+
+/**
+ * @brief Espone lo stato operativo di tutti i componenti hardware in formato JSON.
+ *
+ * Ogni campo può assumere i valori: "disabled", "enabled", "offline", "online".
+ *
+ * @param req Richiesta HTTP GET.
+ * @return ESP_OK se la risposta JSON è inviata; ESP_FAIL su errore.
+ */
+esp_err_t api_hw_status_get(httpd_req_t *req)
+{
+    char buf[768];
+    snprintf(buf, sizeof(buf),
+        "{"
+        "\"cctalk\":\"%s\","
+        "\"mdb\":\"%s\","
+        "\"rs232\":\"%s\","
+        "\"rs485\":\"%s\","
+        "\"io_expander\":\"%s\","
+        "\"led\":\"%s\","
+        "\"pwm\":\"%s\","
+        "\"sht40\":\"%s\","
+        "\"aux_gpio\":\"%s\","
+        "\"digital_io\":\"%s\","
+        "\"periph_i2c\":\"%s\","
+        "\"eeprom\":\"%s\","
+        "\"audio_player\":\"%s\","
+        "\"modbus_relay\":\"%s\""
+        "}",
+        hw_status_to_str(cctalk_driver_get_status()),
+        hw_status_to_str(mdb_get_hw_status()),
+        hw_status_to_str(rs232_get_status()),
+        hw_status_to_str(rs485_get_status()),
+        hw_status_to_str(io_expander_get_status()),
+        hw_status_to_str(led_get_status()),
+        hw_status_to_str(pwm_get_status()),
+        hw_status_to_str(sht40_get_status()),
+        hw_status_to_str(aux_gpio_get_status()),
+        hw_status_to_str(digital_io_get_status()),
+        hw_status_to_str(periph_i2c_get_status()),
+        hw_status_to_str(eeprom_24lc16_get_status()),
+        hw_status_to_str(audio_player_get_status()),
+        hw_status_to_str(modbus_relay_get_hw_status())
+    );
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, buf, strlen(buf));
 }

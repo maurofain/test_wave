@@ -13,6 +13,9 @@ static const char *TAG = "PWM_CTRL";
 /* Codice reale — escluso se mockup attivo */
 #if DNA_PWM == 0
 
+/* [C] Tracciamento stato inizializzazione PWM */
+static bool s_pwm_initialized = false;
+
 
 /**
  * @brief Imposta il duty cycle del segnale PWM.
@@ -88,7 +91,14 @@ esp_err_t pwm_init(void) {
     ledc_channel_config(&ch1);
     
     ESP_LOGI(TAG, "[C] PWM inizializzato");
+    s_pwm_initialized = true;
     return ESP_OK;
+}
+
+/* [C] Restituisce lo stato operativo del driver PWM */
+hw_component_status_t pwm_get_status(void)
+{
+    return s_pwm_initialized ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_PWM == 0 */
@@ -148,6 +158,12 @@ esp_err_t pwm_init(void)
     s_mock_duty[1] = 0;
     ESP_LOGI(TAG, "[C] [MOCK] pwm_init: 2 canali simulati");
     return ESP_OK;
+}
+
+/* [C] Mockup: get_status restituisce DISABLED */
+hw_component_status_t pwm_get_status(void)
+{
+    return HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_PWM == 1 */

@@ -861,6 +861,23 @@ bool cctalk_driver_is_acceptor_online(void)
     return online;
 }
 
+/**
+ * @brief Restituisce lo stato operativo del driver CCTalk.
+ *
+ * Mappa le variabili interne nell'enum condiviso hw_component_status_t:
+ *   - DISABLED  : il driver non è stato inizializzato
+ *   - ENABLED   : inizializzato ma acceptor non attivo
+ *   - OFFLINE   : acceptor attivo ma non risponde
+ *   - ONLINE    : acceptor attivo e operativo
+ */
+hw_component_status_t cctalk_driver_get_status(void)
+{
+    if (!s_driver_initialized) return HW_STATUS_DISABLED;
+    if (!cctalk_driver_is_acceptor_enabled()) return HW_STATUS_ENABLED;
+    if (!cctalk_driver_is_acceptor_online()) return HW_STATUS_OFFLINE;
+    return HW_STATUS_ONLINE;
+}
+
 #endif /* DNA_CCTALK == 0 */
 
 /*
@@ -868,6 +885,12 @@ bool cctalk_driver_is_acceptor_online(void)
  * Attiva quando DNA_CCTALK == 1
  */
 #if defined(DNA_CCTALK) && (DNA_CCTALK == 1)
+
+/* [C] Mockup: get_status restituisce sempre DISABLED (nessun HW reale) */
+hw_component_status_t cctalk_driver_get_status(void)
+{
+    return HW_STATUS_DISABLED;
+}
 
 static bool s_mock_acceptor_enabled = false;
 

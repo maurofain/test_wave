@@ -539,3 +539,9 @@ esp_err_t digital_io_output_get_code(uint8_t output_id, char *out_code, size_t o
     (void)snprintf(out_code, out_code_len, "OUT%02u", (unsigned)output_id);
     return ESP_OK;
 }
+
+/* [C] Restituisce lo stato operativo del layer I/O digitale */
+hw_component_status_t digital_io_get_status(void)
+{
+    return s_initialized ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
+}

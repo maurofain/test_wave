@@ -4,6 +4,7 @@
 #include "esp_err.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include "hw_common.h"
 
 /**
  * @brief Inizializza i GPIO ausiliari basandosi sulla configurazione salvata.
@@ -29,5 +30,6 @@ esp_err_t aux_gpio_get_all_json(char *json_buffer, size_t max_len);
  * @return esp_err_t 
  */
 esp_err_t aux_gpio_set_level(int pin, int level);
+hw_component_status_t aux_gpio_get_status(void);
 
 #endif // AUX_GPIO_H

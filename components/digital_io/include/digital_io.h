@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "hw_common.h"
 
 #define DIGITAL_IO_LOCAL_OUTPUT_COUNT 8U
 #define DIGITAL_IO_LOCAL_INPUT_COUNT 8U
@@ -143,3 +144,4 @@ esp_err_t digital_io_input_get_code(uint8_t input_id, char *out_code, size_t out
  * @brief Restituisce il codice descrittivo di una uscita.
  */
 esp_err_t digital_io_output_get_code(uint8_t output_id, char *out_code, size_t out_code_len);
+hw_component_status_t digital_io_get_status(void);

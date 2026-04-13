@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "periph_i2c.c"
     INCLUDE_DIRS "include"
-    REQUIRES driver
+    REQUIRES driver device_config
 )

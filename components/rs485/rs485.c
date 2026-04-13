@@ -1,5 +1,5 @@
 #include "rs485.h"
-#include "device_config.h" in
+#include "device_config.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "esp_log.h"
@@ -14,6 +14,9 @@ static const char *TAG __attribute__((unused)) = "RS485";
 /* Codice reale — escluso se mockup attivo */
 #if DNA_RS485 == 0
 
+/* [C] Stato init UART per get_status */
+static bool s_rs485_initialized = false;
+
 /**
  * @brief Inizializza la porta RS485 in modalità Half-Duplex.
  *
@@ -24,6 +27,7 @@ static const char *TAG __attribute__((unused)) = "RS485";
  * subito dopo l'invio.
  */
 esp_err_t rs485_init(void) {
+  s_rs485_initialized = false;
   device_config_t *d_cfg = device_config_get();
 
   uart_config_t cfg = {
@@ -68,6 +72,7 @@ esp_err_t rs485_init(void) {
 
 //   gpio_set_direction(CONFIG_APP_RS485_DE_GPIO, GPIO_MODE_OUTPUT);
 //   gpio_set_level(CONFIG_APP_RS485_DE_GPIO, 0);
+  s_rs485_initialized = true;
   return ESP_OK;
 }
 
@@ -114,6 +119,17 @@ int rs485_receive(uint8_t *data, size_t max_len, uint32_t timeout_ms) {
  */
 int rs485_send(const uint8_t *data, size_t len) {
   return uart_write_bytes(CONFIG_APP_RS485_UART_PORT, data, len);
+}
+
+/**
+ * @brief Restituisce lo stato operativo del driver RS485.
+ *
+ * DISABLED : uart_driver non installato
+ * ONLINE   : uart_driver installato e porta operativa
+ */
+hw_component_status_t rs485_get_status(void)
+{
+    return s_rs485_initialized ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_RS485 == 0 */
@@ -176,5 +192,8 @@ int rs485_send(const uint8_t *data, size_t len) {
   (void)data;
   return (int)len; /* simulazione invio riuscito */
 }
+
+/* [C] Mockup: get_status restituisce DISABLED (nessun HW reale) */
+hw_component_status_t rs485_get_status(void) { return HW_STATUS_DISABLED; }
 
 #endif /* DNA_RS485 == 1 */

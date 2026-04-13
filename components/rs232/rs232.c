@@ -13,6 +13,9 @@ static const char *TAG __attribute__((unused)) = "RS232";
 /* Codice reale — escluso se mockup attivo */
 #if DNA_RS232 == 0
 
+/* [C] Stato init UART per get_status */
+static bool s_rs232_initialized = false;
+
 /**
  * @brief Inizializza la porta RS232.
  * 
@@ -22,6 +25,7 @@ static const char *TAG __attribute__((unused)) = "RS232";
  * - Se > 0, il driver utilizza un buffer circolare in RAM per trasmissioni asincrone.
  */
 esp_err_t rs232_init(void) {
+    s_rs232_initialized = false;
     device_config_t *d_cfg = device_config_get();
     
     uart_config_t cfg = {
@@ -43,7 +47,9 @@ esp_err_t rs232_init(void) {
     // Calcoliamo i simboli in base al baud rate: (baud * 10ms) / (10 bits * 1000ms) = baud / 1000
     int tout_symbols = d_cfg->rs232.baud_rate / 1000;
     if (tout_symbols < 1) tout_symbols = 1;
-    return uart_set_rx_timeout(CONFIG_APP_RS232_UART_PORT, tout_symbols);
+    ret = uart_set_rx_timeout(CONFIG_APP_RS232_UART_PORT, tout_symbols);
+    if (ret == ESP_OK) s_rs232_initialized = true;
+    return ret;
 }
 
 /**
@@ -78,6 +84,29 @@ int rs232_send(const uint8_t *data, size_t len) {
     return uart_write_bytes(CONFIG_APP_RS232_UART_PORT, data, len);
 }
 
+/**
+ * @brief Deinizializza il driver UART RS232.
+ * @return ESP_OK se il driver è stato eliminato correttamente.
+ */
+esp_err_t rs232_deinit(void)
+{
+    esp_err_t ret = uart_driver_delete(CONFIG_APP_RS232_UART_PORT);
+    if (ret == ESP_ERR_INVALID_STATE) return ESP_OK;
+    return ret;
+}
+
+/**
+ * @brief Restituisce lo stato operativo del driver RS232.
+ *
+ * Poiché RS232 non ha un task attivo né ACK hardware, si considera:
+ *   DISABLED : uart_driver non installato
+ *   ONLINE   : uart_driver installato (la porta è operativa)
+ */
+hw_component_status_t rs232_get_status(void)
+{
+    return s_rs232_initialized ? HW_STATUS_ONLINE : HW_STATUS_DISABLED;
+}
+
 #endif /* DNA_RS232 == 0 */
 
 /*
@@ -97,6 +126,9 @@ int rs232_send(const uint8_t *data, size_t len) {
  *         - ESP_OK: Inizializzazione avvenuta con successo.
  *         - ESP_FAIL: Inizializzazione fallita.
  */
+esp_err_t rs232_deinit(void) { return ESP_OK; }
+hw_component_status_t rs232_get_status(void) { return HW_STATUS_DISABLED; }
+
 esp_err_t rs232_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] rs232_init: porta RS232 simulata");

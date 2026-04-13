@@ -3,10 +3,10 @@
 if(DEFINED F_SHT40 AND "${F_SHT40}" STREQUAL "1")
     idf_component_register(SRCS "sht40.c"
                         INCLUDE_DIRS "include"
-                        REQUIRES driver)
+                        REQUIRES driver device_config)
 else()
     idf_component_register(SRCS "sht40.c"
                         INCLUDE_DIRS "include"
-                        REQUIRES driver
+                        REQUIRES driver device_config
                         PRIV_REQUIRES periph_i2c)
 endif()

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "hw_common.h"
 
 // MDB Addresses
 #define MDB_ADDR_COIN_CHANGER   0x08
@@ -182,3 +183,15 @@ esp_err_t mdb_send_raw_byte(uint8_t data, bool mode_bit);
  * @return ESP_OK se ricevuto pacchetto valido (compreso Checksum)
  */
 esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len, uint32_t timeout_ms);
+
+/**
+ * @brief Ferma il Polling Engine MDB (segnala stop al task).
+ * @return ESP_OK
+ */
+esp_err_t mdb_stop_engine(void);
+
+/**
+ * @brief Restituisce lo stato operativo del driver MDB (disabled/enabled/offline/online).
+ * @return hw_component_status_t
+ */
+hw_component_status_t mdb_get_hw_status(void);

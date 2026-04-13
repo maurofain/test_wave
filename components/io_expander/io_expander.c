@@ -359,6 +359,13 @@ uint8_t io_get(void) {
     return io_input_state;
 }
 
+/* [C] Restituisce lo stato operativo dell'IO expander */
+hw_component_status_t io_expander_get_status(void)
+{
+    if (!s_io_expander_config_enabled) return HW_STATUS_DISABLED;
+    return s_io_exp_ready ? HW_STATUS_ONLINE : HW_STATUS_OFFLINE;
+}
+
 #endif /* DNA_IO_EXPANDER == 0 */
 
 /*
@@ -445,6 +452,12 @@ bool io_get_pin(int pin)
 uint8_t io_get(void)
 {
     return io_input_state;
+}
+
+/* [C] Mockup: get_status restituisce sempre DISABLED (nessun HW reale) */
+hw_component_status_t io_expander_get_status(void)
+{
+    return HW_STATUS_DISABLED;
 }
 
 #endif /* DNA_IO_EXPANDER */

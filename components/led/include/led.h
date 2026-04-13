@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include "led_strip.h"
+#include "hw_common.h"
 
 /**
  * @brief Inizializza il controller LED e crea la striscia
@@ -148,3 +149,4 @@ esp_err_t led_bar_clear(void);
  * @return Stato attuale
  */
 led_bar_state_t led_bar_get_state(void);
+hw_component_status_t led_get_status(void);

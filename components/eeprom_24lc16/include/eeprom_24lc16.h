@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include "hw_common.h"
 
 /**
  * @brief Inizializza l'interfaccia per la EEPROM 24LC16
@@ -43,3 +44,4 @@ esp_err_t eeprom_24lc16_read_byte(uint16_t address, uint8_t *val);
  * @brief Scrive un singolo byte
  */
 esp_err_t eeprom_24lc16_write_byte(uint16_t address, uint8_t val);
+hw_component_status_t eeprom_24lc16_get_status(void);
