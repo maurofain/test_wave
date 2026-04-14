@@ -309,7 +309,7 @@ Body
 | email        | string            |                                                              |
 | name         | string            |                                                              |
 | surname      | string            |                                                              |
-| datetime     | date 		time | data 		ora GMT                                         |
+| datetime     | date 		time | data 		ora GMT in formato ISO8601 UTC con suffisso `Z` (esempio `2026-04-14T11:05:12.717598Z`) |
 | amount       | int               |                                                              |
 | recharge     | bool              | indica 		se si tratta di una ricarica borsellino       |
 | paymenttype  | string            | codice 		tipo pagamento (`CASH`, `CREC`, `BCOIN`, `COIN`, `SATI`, `VOUC`, `CASHL`) |

@@ -1031,7 +1031,7 @@ static char *read_request_body(httpd_req_t *req)
     return buf;
 }
 
-/* Format full date-time string in ISO8601 UTC with explicit offset. */
+/* Formatta una data/ora ISO8601 UTC con offset esplicito. */
 static void format_full_datetime(char *out, size_t len)
 {
     struct timeval now = {0};
@@ -1049,6 +1049,29 @@ static void format_full_datetime(char *out, size_t len)
     }
 
     snprintf(out, len, "%s.%06ld+00:00", prefix, (long)now.tv_usec);
+}
+
+/* Formatta una data/ora ISO8601 UTC con suffisso Z per i payload cloud. */
+static void format_full_datetime_zulu(char *out, size_t len)
+{
+    struct timeval now = {0};
+    time_t seconds = 0;
+    struct tm tm = {0};
+    char prefix[32] = {0};
+
+    if (!out || len == 0) {
+        return;
+    }
+
+    gettimeofday(&now, NULL);
+    seconds = now.tv_sec;
+    gmtime_r(&seconds, &tm);
+    if (strftime(prefix, sizeof(prefix), "%Y-%m-%dT%H:%M:%S", &tm) == 0) {
+        out[0] = '\0';
+        return;
+    }
+
+    snprintf(out, len, "%s.%06ldZ", prefix, (long)now.tv_usec);
 }
 
 static bool format_login_password_date(char *out, size_t len)
@@ -2420,7 +2443,7 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
     cJSON_AddItemToObject(req, "customer", cust);
 
     char datetime_iso[40] = {0};
-    format_full_datetime(datetime_iso, sizeof(datetime_iso));
+    format_full_datetime_zulu(datetime_iso, sizeof(datetime_iso));
     int32_t request_amount = amount * 100;
 
     cJSON_AddStringToObject(req, "datetime", datetime_iso);
@@ -2473,7 +2496,7 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
         return ESP_ERR_NO_MEM;
     }
 
-    ESP_LOGI(TAG, "payment: type=%s service=%s body=%s", payment_type_code, service, body);
+    ESP_LOGI(TAG, "[C] payment: type=%s service=%s body=%s", payment_type_code, service, body);
 
     char *resp = NULL;
     int status = 0;

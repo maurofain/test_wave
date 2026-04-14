@@ -164,6 +164,7 @@ Body richiesto (schema):
 - `paymenttype` viene inviato come stringa e non piu come intero.
 - I valori supportati sono: `CASH`, `CREC`, `BCOIN`, `COIN`, `SATI`, `VOUC`, `CASHL`.
 - `services[].code` usa un enum chiuso con questi valori: `CWASH`, `CGATE`, `CLANE`, `CCLEAN`.
+- `datetime` nel body `payment` deve essere serializzato in UTC ISO8601 con suffisso `Z` (esempio `2026-04-14T11:05:12.717598Z`); il backend rifiuta il formato con offset esplicito `+00:00`.
 - Nel runtime attuale la FSM propaga il tipo pagamento verso `http_services`; il codice servizio viene normalizzato verso i codici del server.
 
 Response (schema):
@@ -227,6 +228,7 @@ Body include cliente, importi, contanti inseriti/resto, servizi acquistati.
 
 Nota implementativa attuale (`http_services_payment`):
 - `paymenttype` impostato a `CASH`
+- `datetime` inviato in formato UTC ISO8601 con suffisso `Z`
 - `paymentdata` impostato a stringa vuota
 - `cashentered` valorizzato con una voce (`value=amount`, `quantity=1`, `position=99`) se `amount > 0`
 - `services[0]` valorizzato con `code=service_code`, `amount`, `quantity=1`, `used=true`, `recharge=false`.
