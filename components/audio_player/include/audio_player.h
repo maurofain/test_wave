@@ -1,5 +1,6 @@
 #pragma once
 
+#include "component_status.h"
 #include "esp_err.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -12,6 +13,7 @@ esp_err_t audio_player_init(void);
 esp_err_t audio_player_set_volume(uint8_t volume);
 esp_err_t audio_player_stop(void);
 bool audio_player_is_playing(void);
+device_component_status_t audio_player_get_component_status(void);
 esp_err_t audio_player_play_file(const char *path);
 
 #ifdef __cplusplus

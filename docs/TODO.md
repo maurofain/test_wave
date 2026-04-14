@@ -77,7 +77,13 @@
      - Valutazione eta dal volto
      - salvataggio dell'immagine per sicurezza vandalica
 14. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
-15. 
+15. Crea la funzione status per i component SHT40, NTP, PWM, RS232
+16. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
+17. Alza le icone di stato per non far sovrapportre la bandiera alla progression bar
+18. nella sezione 'Stato servizi' indica con 'Disab.' in colore blu i device esclusi tramite DNA
+19. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
+20. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
+
 ---
 
 ## ⏸️ RITARDATI

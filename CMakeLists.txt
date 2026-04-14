@@ -30,6 +30,7 @@ set(F_RS485           0)
 set(F_MDB             0)
 set(F_SHT40           0)
 set(F_CCTALK          0)
+set(F_AUDIO           1)
 set(F_REMOTE_LOGGING  0)
 set(F_ERROR_DUMP      1)
 # not implemented
@@ -81,6 +82,7 @@ add_compile_definitions(
     DNA_MDB=${F_MDB}
     DNA_SHT40=${F_SHT40}
     DNA_CCTALK=${F_CCTALK}
+    DNA_AUDIO=${F_AUDIO}
     DNA_REMOTE_LOGGING=${F_REMOTE_LOGGING}
     DNA_ERROR_DUMP=${F_ERROR_DUMP}
     DNA_I2C=${F_I2C}

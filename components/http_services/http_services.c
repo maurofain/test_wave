@@ -11,6 +11,7 @@ extern bool send_http_log;
 #include "esp_err.h"
 #include "esp_system.h"
 #include "cJSON.h"
+#include "mbedtls/md5.h"
 #include "device_config.h"
 #include "esp_http_client.h"
 #include <sys/stat.h>
@@ -25,6 +26,7 @@ extern bool send_http_log;
    avoid adding a component dependency (web_ui already depends on http_services). */
 #ifdef HTTP_SERVICES_LOG_TO_UI
 extern void web_ui_add_log(const char *level, const char *tag, const char *message);
+static void webui_log_chunked(const char *level, const char *tag, const char *label, const char *msg);
 #endif
 
 static const char *TAG = "HTTP_SERVICES";
@@ -58,8 +60,10 @@ static esp_err_t http_services_login_if_needed(bool force_refresh);
 static bool http_services_cfg_remote_enabled(const device_config_t *cfg);
 static bool validate_token(const char *token);
 static void http_services_set_online(bool online, const char *reason);
+static char *http_services_build_login_body(const char *serial);
 static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header,
                              char **out_resp, int *out_status, size_t *out_len);
+static bool http_services_text_contains_case_insensitive(const char *haystack, const char *needle);
 
 device_component_status_t http_services_get_component_status(void)
 {
@@ -1027,13 +1031,275 @@ static char *read_request_body(httpd_req_t *req)
     return buf;
 }
 
-/* Format full date-time string in ISO format */
+/* Format full date-time string in ISO8601 UTC with explicit offset. */
 static void format_full_datetime(char *out, size_t len)
 {
-    time_t now = time(NULL);
+    struct timeval now = {0};
+    gettimeofday(&now, NULL);
+    time_t seconds = now.tv_sec;
     struct tm tm;
-    gmtime_r(&now, &tm); /* use UTC for the "Z" suffix */
-    strftime(out, len, "%Y-%m-%dT%H:%M:%S.000Z", &tm);
+    char prefix[32] = {0};
+
+    gmtime_r(&seconds, &tm);
+    if (strftime(prefix, sizeof(prefix), "%Y-%m-%dT%H:%M:%S", &tm) == 0) {
+        if (len > 0) {
+            out[0] = '\0';
+        }
+        return;
+    }
+
+    snprintf(out, len, "%s.%06ld+00:00", prefix, (long)now.tv_usec);
+}
+
+static bool format_login_password_date(char *out, size_t len)
+{
+    struct timeval now = {0};
+    time_t seconds = 0;
+    struct tm tm = {0};
+
+    if (!out || len == 0) {
+        return false;
+    }
+
+    gettimeofday(&now, NULL);
+    seconds = now.tv_sec;
+    gmtime_r(&seconds, &tm);
+    return strftime(out, len, "%m%Y%d", &tm) > 0;
+}
+
+static bool md5_hex_encode(const char *input, char *out, size_t out_len)
+{
+    unsigned char digest[16] = {0};
+    static const char hex_digits[] = "0123456789abcdef";
+
+    if (!input || !out || out_len < 33) {
+        return false;
+    }
+
+    if (mbedtls_md5((const unsigned char *)input, strlen(input), digest) != 0) {
+        return false;
+    }
+
+    for (size_t index = 0; index < sizeof(digest); ++index) {
+        out[index * 2] = hex_digits[(digest[index] >> 4) & 0x0F];
+        out[index * 2 + 1] = hex_digits[digest[index] & 0x0F];
+    }
+    out[32] = '\0';
+    return true;
+}
+
+static bool http_services_build_login_password(const char *serial, char *password_out, size_t password_len)
+{
+    char date_part[16] = {0};
+    char seed[96] = {0};
+
+    if (!serial || serial[0] == '\0' || !password_out || password_len < 33) {
+        return false;
+    }
+
+    if (!format_login_password_date(date_part, sizeof(date_part))) {
+        return false;
+    }
+
+    snprintf(seed, sizeof(seed), "%s%s", serial, date_part);
+    return md5_hex_encode(seed, password_out, password_len);
+}
+
+static char *http_services_extract_login_serial(const char *body)
+{
+    cJSON *root = NULL;
+    cJSON *serial_item = NULL;
+    char *serial = NULL;
+
+    if (!body || body[0] == '\0') {
+        return NULL;
+    }
+
+    root = cJSON_Parse(body);
+    if (!root) {
+        return NULL;
+    }
+
+    serial_item = cJSON_GetObjectItemCaseSensitive(root, "serial");
+    if (cJSON_IsString(serial_item) && serial_item->valuestring && serial_item->valuestring[0] != '\0') {
+        serial = strdup(serial_item->valuestring);
+    }
+
+    cJSON_Delete(root);
+    return serial;
+}
+
+static char *http_services_build_login_body(const char *serial)
+{
+    char password[33] = {0};
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        return NULL;
+    }
+
+    if (!http_services_build_login_password(serial, password, sizeof(password))) {
+        cJSON_Delete(root);
+        return NULL;
+    }
+
+    cJSON_AddStringToObject(root, "serial", serial ? serial : "");
+    cJSON_AddStringToObject(root, "password", password);
+
+    char *body = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return body;
+}
+
+const char *http_services_paid_service_code_to_string(http_services_paid_service_code_t code)
+{
+    switch (code) {
+        case HTTP_SERVICES_PAID_SERVICE_CGATE:
+            return "CGATE";
+        case HTTP_SERVICES_PAID_SERVICE_CLANE:
+            return "CLANE";
+        case HTTP_SERVICES_PAID_SERVICE_CCLEAN:
+            return "CCLEAN";
+        case HTTP_SERVICES_PAID_SERVICE_CWASH:
+        default:
+            return "CWASH";
+    }
+}
+
+const char *http_services_payment_type_to_string(http_services_payment_type_t type)
+{
+    switch (type) {
+        case HTTP_SERVICES_PAYMENT_TYPE_CREC:
+            return "CREC";
+        case HTTP_SERVICES_PAYMENT_TYPE_BCOIN:
+            return "BCOIN";
+        case HTTP_SERVICES_PAYMENT_TYPE_COIN:
+            return "COIN";
+        case HTTP_SERVICES_PAYMENT_TYPE_SATI:
+            return "SATI";
+        case HTTP_SERVICES_PAYMENT_TYPE_VOUC:
+            return "VOUC";
+        case HTTP_SERVICES_PAYMENT_TYPE_CASHL:
+            return "CASHL";
+        case HTTP_SERVICES_PAYMENT_TYPE_CASH:
+        default:
+            return "CASH";
+    }
+}
+
+static bool http_services_text_contains_case_insensitive(const char *haystack, const char *needle)
+{
+    return haystack && needle && strcasestr(haystack, needle) != NULL;
+}
+
+http_services_paid_service_code_t http_services_paid_service_code_from_string(const char *code_or_label)
+{
+    if (!code_or_label || code_or_label[0] == '\0') {
+        return HTTP_SERVICES_PAID_SERVICE_CWASH;
+    }
+
+    if (strcasecmp(code_or_label, "CWASH") == 0) {
+        return HTTP_SERVICES_PAID_SERVICE_CWASH;
+    }
+    if (strcasecmp(code_or_label, "CGATE") == 0) {
+        return HTTP_SERVICES_PAID_SERVICE_CGATE;
+    }
+    if (strcasecmp(code_or_label, "CLANE") == 0) {
+        return HTTP_SERVICES_PAID_SERVICE_CLANE;
+    }
+    if (strcasecmp(code_or_label, "CCLEAN") == 0) {
+        return HTTP_SERVICES_PAID_SERVICE_CCLEAN;
+    }
+
+    if (http_services_text_contains_case_insensitive(code_or_label, "gate")) {
+        return HTTP_SERVICES_PAID_SERVICE_CGATE;
+    }
+    if (http_services_text_contains_case_insensitive(code_or_label, "lane") ||
+        http_services_text_contains_case_insensitive(code_or_label, "pista")) {
+        return HTTP_SERVICES_PAID_SERVICE_CLANE;
+    }
+    if (http_services_text_contains_case_insensitive(code_or_label, "clean") ||
+        http_services_text_contains_case_insensitive(code_or_label, "aspir") ||
+        http_services_text_contains_case_insensitive(code_or_label, "vacuum")) {
+        return HTTP_SERVICES_PAID_SERVICE_CCLEAN;
+    }
+
+    return HTTP_SERVICES_PAID_SERVICE_CWASH;
+}
+
+static void log_http_outgoing_request(const char *url,
+                                      const char *content_type,
+                                      const char *date_hdr,
+                                      const char *accept_hdr,
+                                      const char *auth_hdr,
+                                      const char *user_agent_hdr,
+                                      const char *connection_hdr,
+                                      const char *accept_encoding_hdr,
+                                      const char *body)
+{
+    const char *safe_url = url ? url : "(null)";
+    const char *safe_content_type = content_type ? content_type : "application/json";
+    const char *safe_date = date_hdr ? date_hdr : "";
+    const char *safe_accept = accept_hdr ? accept_hdr : "";
+    const char *safe_body = body ? body : "";
+    const char *safe_connection = connection_hdr ? connection_hdr : "";
+    const char *safe_accept_encoding = accept_encoding_hdr ? accept_encoding_hdr : "";
+    const char *safe_auth = auth_hdr ? auth_hdr : "";
+    const char *safe_user_agent = user_agent_hdr ? user_agent_hdr : "";
+    size_t needed = snprintf(NULL,
+                             0,
+                             "POST %s HTTP/1.1\nContent-Type: %s\nDate: %s%s%s%s%s\n\n%s",
+                             safe_url,
+                             safe_content_type,
+                             safe_date,
+                             safe_connection[0] != '\0' ? "\nConnection: " : "",
+                             safe_connection,
+                             safe_accept_encoding[0] != '\0' ? "\nAccept-Encoding: " : "",
+                             safe_accept_encoding,
+                             safe_body);
+    if (safe_auth[0] != '\0') {
+        needed += snprintf(NULL, 0, "\nAuthorization: %s", safe_auth);
+    }
+    if (safe_accept[0] != '\0') {
+        needed += snprintf(NULL, 0, "\nAccept: %s", safe_accept);
+    }
+    if (safe_user_agent[0] != '\0') {
+        needed += snprintf(NULL, 0, "\nUser-Agent: %s", safe_user_agent);
+    }
+
+    char *raw = malloc(needed + 1);
+    if (!raw) {
+        ESP_LOGW(TAG, "[C] Impossibile allocare il dump della richiesta HTTP");
+        return;
+    }
+
+    int written = snprintf(raw,
+                           needed + 1,
+                           "POST %s HTTP/1.1\nContent-Type: %s\nDate: %s",
+                           safe_url,
+                           safe_content_type,
+                           safe_date);
+    if (safe_accept[0] != '\0') {
+        written += snprintf(raw + written, needed + 1 - (size_t)written, "\nAccept: %s", safe_accept);
+    }
+    if (safe_user_agent[0] != '\0') {
+        written += snprintf(raw + written, needed + 1 - (size_t)written, "\nUser-Agent: %s", safe_user_agent);
+    }
+    if (safe_auth[0] != '\0') {
+        written += snprintf(raw + written, needed + 1 - (size_t)written, "\nAuthorization: %s", safe_auth);
+    }
+    if (safe_connection[0] != '\0') {
+        written += snprintf(raw + written, needed + 1 - (size_t)written, "\nConnection: %s", safe_connection);
+    }
+    if (safe_accept_encoding[0] != '\0') {
+        written += snprintf(raw + written, needed + 1 - (size_t)written, "\nAccept-Encoding: %s", safe_accept_encoding);
+    }
+    snprintf(raw + written, needed + 1 - (size_t)written, "\n\n%s", safe_body);
+
+    ESP_LOGI(TAG, "RAW HTTP OUT:\n%s", raw);
+#ifdef HTTP_SERVICES_LOG_TO_UI
+    webui_log_chunked("INFO", TAG, "RAW HTTP OUT", raw);
+#endif
+    free(raw);
 }
 
 /*
@@ -1281,14 +1547,23 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
         /* only required headers for the remote server: Content-Type and Date
            on fallback attempt we will also force Connection: close and Accept-Encoding: identity */
         const char hdr_content_type[40] = "application/json";
+        const char hdr_accept[8] = "*/*";
+        const char hdr_user_agent[16] = "curl/8.14.1";
+        const char *hdr_connection = NULL;
+        const char *hdr_accept_encoding = NULL;
         esp_http_client_set_header(client, "Content-Type", hdr_content_type);
+        esp_http_client_set_header(client, "Accept", hdr_accept);
+        esp_http_client_set_header(client, "User-Agent", hdr_user_agent);
 
-        char date_hdr[64] = "2026-01-23T13:25:13.218763+01:00";
+        char date_hdr[64] = {0};
+        format_full_datetime(date_hdr, sizeof(date_hdr));
         esp_http_client_set_header(client, "Date", date_hdr);
 
         if (use_fallback_headers) {
             esp_http_client_set_header(client, "Connection", "close");
             esp_http_client_set_header(client, "Accept-Encoding", "identity");
+            hdr_connection = "close";
+            hdr_accept_encoding = "identity";
             ESP_LOGI(TAG, "Using fallback headers: Connection: close, Accept-Encoding: identity (attempt %d)", attempt + 1);
         }
 
@@ -1310,6 +1585,15 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
 #ifdef HTTP_SERVICES_LOG_TO_UI
         web_ui_add_log("INFO", TAG, url);
 #endif
+        log_http_outgoing_request(url,
+                      hdr_content_type,
+                      date_hdr,
+                                  hdr_accept,
+                      hdr_authorization,
+                                  hdr_user_agent,
+                      hdr_connection,
+                      hdr_accept_encoding,
+                      post_body);
         {
             /* log the Date value actually sent */
             ESP_LOGI(TAG, "OUT Header: Date: %s", date_hdr);
@@ -1321,10 +1605,14 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
             ESP_LOGI(TAG, "OUT Header: Authorization: %s", hdr_authorization);
             ESP_LOGI(TAG, "[C] OUT Authorization length=%u", (unsigned)strlen(hdr_authorization));
         }
+        ESP_LOGI(TAG, "OUT Header: Accept: %s", hdr_accept);
+        ESP_LOGI(TAG, "OUT Header: User-Agent: %s", hdr_user_agent);
         ESP_LOGI(TAG, "OUT Header: Content-Type: %s", hdr_content_type);
 
 #ifdef HTTP_SERVICES_LOG_TO_UI
         if (hdr_authorization) webui_log_chunked("INFO", TAG, "OUT Authorization", hdr_authorization);
+        webui_log_chunked("INFO", TAG, "OUT Header: Accept", hdr_accept);
+        webui_log_chunked("INFO", TAG, "OUT Header: User-Agent", hdr_user_agent);
         webui_log_chunked("INFO", TAG, "OUT Header: Content-Type", hdr_content_type);
 #endif
 
@@ -1617,13 +1905,32 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
     }
 
     /* special case: if override_with_config_credentials == true, build login body from config */
-    char login_body[256];
     const char *send_body = body_to_send;
-    if (override_with_config_credentials) {
+    char *login_body = NULL;
+    char *login_serial = NULL;
+    if (override_with_config_credentials || (remote_path && strcmp(remote_path, "/api/login") == 0)) {
         device_config_t *cfg = device_config_get();
-        snprintf(login_body, sizeof(login_body), "{\"serial\":\"%s\",\"password\":\"%s\"}", cfg->server.serial, cfg->server.password);
+        const char *serial_for_login = NULL;
+
+        login_serial = http_services_extract_login_serial(body_to_send);
+        if (login_serial && login_serial[0] != '\0') {
+            serial_for_login = login_serial;
+        } else if (cfg && cfg->server.serial[0] != '\0') {
+            serial_for_login = cfg->server.serial;
+        }
+
+        login_body = http_services_build_login_body(serial_for_login);
+        if (!login_body) {
+            if (login_serial) free(login_serial);
+            if (auth_hdr) free(auth_hdr);
+            if (incoming_body) free(incoming_body);
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_send(req,
+                                   "{\"iserror\":true,\"codeerror\":500,\"deserror\":\"login_body_build_failed\"}",
+                                   -1);
+        }
         send_body = login_body;
-        ESP_LOGI(TAG, "Using config credentials for login (serial=%s)", cfg->server.serial);
+        ESP_LOGI(TAG, "[C] Login remoto: password ricalcolata per serial=%s", serial_for_login ? serial_for_login : "(null)");
         ESP_LOGD(TAG, "Login body: %s", send_body);
 #ifdef HTTP_SERVICES_LOG_TO_UI
         webui_log_chunked("INFO", TAG, "Login body", send_body);
@@ -1643,6 +1950,8 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
 
     esp_err_t err = remote_post(remote_path, send_body, auth_to_send, &remote_resp, &status, &remote_len);
 
+    if (login_body) free(login_body);
+    if (login_serial) free(login_serial);
     if (auth_hdr) free(auth_hdr);
     if (incoming_body) free(incoming_body);
 
@@ -1704,7 +2013,7 @@ static esp_err_t forward_post(httpd_req_t *req, const char *remote_path, const c
 static esp_err_t api_login_post(httpd_req_t *req)
 {
     if (send_http_log) ESP_LOGI(TAG, "POST /api/login -> proxy to remote server");
-    return forward_post(req, "/api/login", NULL, true);
+    return forward_post(req, "/api/login", NULL, false);
 }
 
 /**
@@ -1841,23 +2150,24 @@ static esp_err_t http_services_login_if_needed(bool force_refresh)
         return ESP_OK;
     }
 
-    if (!cfg || cfg->server.serial[0] == '\0' || cfg->server.password[0] == '\0') {
+    if (!cfg || cfg->server.serial[0] == '\0') {
         http_services_set_online(false, "login_missing_credentials");
-        ESP_LOGE(TAG, "[C] Login non possibile: credenziali server non configurate");
+        ESP_LOGE(TAG, "[C] Login non possibile: seriale server non configurato");
         return ESP_ERR_INVALID_STATE;
     }
 
-    char login_body[256];
-    snprintf(login_body,
-             sizeof(login_body),
-             "{\"serial\":\"%s\",\"password\":\"%s\"}",
-             cfg->server.serial,
-             cfg->server.password);
+    char *login_body = http_services_build_login_body(cfg->server.serial);
+    if (!login_body) {
+        http_services_set_online(false, "login_body_build_failed");
+        ESP_LOGE(TAG, "[C] Login remoto: impossibile generare il body JSON con password MD5 dinamica");
+        return ESP_ERR_NO_MEM;
+    }
 
     char *resp = NULL;
     int status = 0;
     size_t resp_len = 0;
     esp_err_t err = remote_post("/api/login", login_body, NULL, &resp, &status, &resp_len);
+    free(login_body);
     if (err != ESP_OK) {
         http_services_set_online(false, "login_http_error");
         ESP_LOGE(TAG, "[C] Login remoto fallito: %s", esp_err_to_name(err));
@@ -2063,7 +2373,8 @@ esp_err_t http_services_getcustomers(const char *code, const char *telephone,
  * ========================================================================= */
 esp_err_t http_services_payment(const http_services_customer_t *customer,
                                 int32_t amount,
-                                const char *service_code,
+                                http_services_paid_service_code_t service_code,
+                                http_services_payment_type_t payment_type,
                                 http_services_payment_response_t *out)
 {
     if (!out) return ESP_ERR_INVALID_ARG;
@@ -2073,7 +2384,8 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
         amount = 0;
     }
 
-    const char *service = (service_code && service_code[0] != '\0') ? service_code : "SER1";
+    const char *service = http_services_paid_service_code_to_string(service_code);
+    const char *payment_type_code = http_services_payment_type_to_string(payment_type);
 
     esp_err_t token_err = http_services_login_if_needed(true);
     if (token_err != ESP_OK) {
@@ -2113,7 +2425,7 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
 
     cJSON_AddStringToObject(req, "datetime", datetime_iso);
     cJSON_AddNumberToObject(req, "amount", request_amount);
-    cJSON_AddStringToObject(req, "paymenttype", "CASH");
+    cJSON_AddStringToObject(req, "paymenttype", payment_type_code);
     cJSON_AddStringToObject(req, "paymentdata", "");
 
     cJSON *cashreturned = cJSON_CreateArray();
@@ -2161,7 +2473,7 @@ esp_err_t http_services_payment(const http_services_customer_t *customer,
         return ESP_ERR_NO_MEM;
     }
 
-    ESP_LOGI(TAG, "payment: body=%s", body);
+    ESP_LOGI(TAG, "payment: type=%s service=%s body=%s", payment_type_code, service, body);
 
     char *resp = NULL;
     int status = 0;

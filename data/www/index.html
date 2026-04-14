@@ -93,14 +93,12 @@
       rows.push(svcItemComponentHtml('🔍','Scanner',s.scanner&&s.scanner.status,!!dna.scanner));
 
       // ModBus: separate display from Expansion board (Expansion shows only I2C expanders)
-      const modbusEnabled = !!(c.sensors && c.sensors.mdb_enabled);
-      const modbusOnline = !!(s.mdb && s.mdb.coin_online);
-      const modbusTxtOff = modbusEnabled ? 'OFFLINE' : 'DISABILITATO';
-      rows.push(svcItemHtml('🔗','ModBus',modbusOnline,'ONLINE',modbusTxtOff,!!dna.mdb));
+      rows.push(svcItemComponentHtml('🔗','ModBus',s.modbus&&s.modbus.status,!!dna.rs485));
 
       rows.push(svcItemComponentHtml('🎰','MDB',s.mdb&&s.mdb.status,!!dna.mdb));
       rows.push(svcItemHtml('💾','SD card',!!(s.sd&&s.sd.mounted),'MONTATA','NON MONTATA',!!dna.sd_card));
       rows.push(svcItemComponentHtml('🔁','CCtalk',s.cctalk&&s.cctalk.status,!!dna.cctalk));
+      rows.push(svcItemComponentHtml('🔊','Audio',s.audio&&s.audio.status,!!dna.audio));
 
       grid.innerHTML=rows.join('');
     }catch(_e){grid.innerHTML=svcItemHtml('⚠️','Stato servizi',false,'ATTIVO','ERRORE LETTURA');}}

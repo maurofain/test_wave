@@ -79,6 +79,7 @@ static volatile bool s_modbus_hard_inhibit = false;
 static volatile bool s_oos_modbus_recovery_test_active = false;
 
 static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event);
+static http_services_payment_type_t tasks_payment_type_from_session_source(fsm_session_source_t source);
 
 static bool tasks_is_out_of_service_state(void)
 {
@@ -2708,7 +2709,7 @@ static void normalize_barcode_text(const char *input, char *output, size_t outpu
 /**
  * @brief Pubblica verso FSM il credito ECD ricavato da QR.
  */
-static void publish_qr_credit_event(const char *barcode, int32_t ecd_amount)
+static void publish_qr_credit_event(const char *customer_code, int32_t ecd_amount)
 {
     if (ecd_amount <= 0) {
         return;
@@ -2725,19 +2726,19 @@ static void publish_qr_credit_event(const char *barcode, int32_t ecd_amount)
         .aux_u32 = 0,
         .text = {0},
     };
-    if (barcode && barcode[0] != '\0') {
-        strncpy(credit_ev.text, barcode, sizeof(credit_ev.text) - 1);
+    if (customer_code && customer_code[0] != '\0') {
+        strncpy(credit_ev.text, customer_code, sizeof(credit_ev.text) - 1);
     }
 
     if (!fsm_event_publish(&credit_ev, pdMS_TO_TICKS(50))) {
-        ESP_LOGE(TAG, "[M] Publish QR_CREDIT fallito (barcode=%s ecd=%ld)",
-                 barcode ? barcode : "",
+        ESP_LOGE(TAG, "[M] Publish QR_CREDIT fallito (customer_code=%s ecd=%ld)",
+                 customer_code ? customer_code : "",
                  (long)ecd_amount);
         return;
     }
 
-    ESP_LOGI(TAG, "[M] QR_CREDIT pubblicato (barcode=%s ecd=%ld)",
-             barcode ? barcode : "",
+    ESP_LOGI(TAG, "[M] QR_CREDIT pubblicato (customer_code=%s ecd=%ld)",
+             customer_code ? customer_code : "",
              (long)ecd_amount);
 }
 
@@ -2764,7 +2765,7 @@ static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
         .value_i32 = payment_amount,
         .value_u32 = 0,
-        .aux_u32 = 0,
+        .aux_u32 = (uint32_t)ctx->session_source,
         .text = {0},
         .customer_code = {0},
     };
@@ -2782,6 +2783,23 @@ static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_
     ESP_LOGI(TAG, "[M] PAYMENT_EVENT pubblicato (service=%s amount=%ld)",
              service_code,
              (long)payment_amount);
+}
+
+static http_services_payment_type_t tasks_payment_type_from_session_source(fsm_session_source_t source)
+{
+    switch (source) {
+        case FSM_SESSION_SOURCE_QR:
+            return HTTP_SERVICES_PAYMENT_TYPE_SATI;
+        case FSM_SESSION_SOURCE_CARD:
+            return HTTP_SERVICES_PAYMENT_TYPE_CASHL;
+        case FSM_SESSION_SOURCE_COIN:
+            return HTTP_SERVICES_PAYMENT_TYPE_COIN;
+        case FSM_SESSION_SOURCE_TOUCH:
+        case FSM_SESSION_SOURCE_KEY:
+        case FSM_SESSION_SOURCE_NONE:
+        default:
+            return HTTP_SERVICES_PAYMENT_TYPE_CASH;
+    }
 }
 
 
@@ -2806,6 +2824,8 @@ static void http_services_task(void *arg)
 
         if (event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED && event.action == ACTION_ID_PROGRAM_SELECTED) {
             const char *service_code = (event.text[0] != '\0') ? event.text : "SER1";
+            http_services_paid_service_code_t payment_service = http_services_paid_service_code_from_string(service_code);
+            http_services_payment_type_t payment_type = tasks_payment_type_from_session_source((fsm_session_source_t)event.aux_u32);
             int32_t amount = (event.value_i32 > 0) ? event.value_i32 : 0;
             
             /* [C] Usa customer_code dall'evento FSM, altrimenti fallback su s_last_customer */
@@ -2825,19 +2845,21 @@ static void http_services_task(void *arg)
             }
 
             http_services_payment_response_t pay_resp;
-            esp_err_t pay_err = http_services_payment(customer_ptr, amount, service_code, &pay_resp);
+            esp_err_t pay_err = http_services_payment(customer_ptr, amount, payment_service, payment_type, &pay_resp);
             if (pay_err != ESP_OK || pay_resp.common.iserror) {
                 ESP_LOGE(TAG,
-                         "[M] payment fallita service=%s amount=%ld err=%s code=%ld des=%s",
-                         service_code,
+                         "[M] payment fallita service=%s type=%s amount=%ld err=%s code=%ld des=%s",
+                         http_services_paid_service_code_to_string(payment_service),
+                         http_services_payment_type_to_string(payment_type),
                          (long)amount,
                          esp_err_to_name(pay_err),
                          (long)pay_resp.common.codeerror,
                          pay_resp.common.deserror);
             } else {
                 ESP_LOGI(TAG,
-                         "[M] payment OK service=%s amount=%ld paymentid=%ld",
-                         service_code,
+                         "[M] payment OK service=%s type=%s amount=%ld paymentid=%ld",
+                         http_services_paid_service_code_to_string(payment_service),
+                         http_services_payment_type_to_string(payment_type),
                          (long)amount,
                          (long)pay_resp.paymentid);
             }
@@ -2907,7 +2929,10 @@ static void http_services_task(void *arg)
             continue;
         }
 
-        publish_qr_credit_event(barcode, selected->amount);
+        const char *resolved_customer_code = selected->code[0] != '\0'
+                                                 ? selected->code
+                                                 : barcode;
+        publish_qr_credit_event(resolved_customer_code, selected->amount);
     }
 }
 

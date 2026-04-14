@@ -5,9 +5,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "device_config.h"
 #include "esp_log.h"
 #include "esp_codec_dev.h"
 #include "bsp/esp32_p4_nano.h"
+
+#ifndef DNA_AUDIO
+#define DNA_AUDIO 0
+#endif
+
+#if DNA_AUDIO == 0
 
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3_ex.h"
@@ -19,6 +26,7 @@
 static const char *TAG = "AUDIO_PLAYER";
 static esp_codec_dev_handle_t s_speaker = NULL;
 static bool s_audio_ready = false;
+static bool s_audio_fault = false;
 static bool s_stop_requested = false;
 static bool s_is_playing = false;
 static uint8_t s_volume = 75;
@@ -166,6 +174,7 @@ static esp_err_t play_mp3_file(const char *path)
     int open_res = esp_codec_dev_open(s_speaker, &sample_info);
     if (open_res != ESP_CODEC_DEV_OK) {
         mp3dec_ex_close(&decoder);
+        s_audio_fault = true;
         ESP_LOGE(TAG, "[C] Apertura codec per MP3 fallita: %d", open_res);
         return ESP_FAIL;
     }
@@ -189,6 +198,7 @@ static esp_err_t play_mp3_file(const char *path)
         int decoded_bytes = (int)(decoded_samples * sizeof(mp3d_sample_t));
         int write_res = esp_codec_dev_write(s_speaker, pcm_samples, decoded_bytes);
         if (write_res != ESP_CODEC_DEV_OK) {
+            s_audio_fault = true;
             ESP_LOGE(TAG, "[C] Scrittura PCM MP3 fallita: %d", write_res);
             result = ESP_FAIL;
             break;
@@ -208,6 +218,7 @@ esp_err_t audio_player_init(void)
 
     s_speaker = bsp_audio_codec_speaker_init();
     if (!s_speaker) {
+        s_audio_fault = true;
         ESP_LOGE(TAG, "[C] Inizializzazione speaker fallita");
         return ESP_FAIL;
     }
@@ -218,6 +229,7 @@ esp_err_t audio_player_init(void)
     }
 
     s_audio_ready = true;
+    s_audio_fault = false;
     ESP_LOGI(TAG, "[C] Audio player inizializzato");
     return ESP_OK;
 }
@@ -236,6 +248,7 @@ esp_err_t audio_player_set_volume(uint8_t volume)
 
     int vol_res = esp_codec_dev_set_out_vol(s_speaker, s_volume);
     if (vol_res != ESP_CODEC_DEV_OK) {
+        s_audio_fault = true;
         ESP_LOGW(TAG, "[C] Impostazione volume fallita: %d", vol_res);
         return ESP_FAIL;
     }
@@ -253,6 +266,25 @@ esp_err_t audio_player_stop(void)
 bool audio_player_is_playing(void)
 {
     return s_is_playing;
+}
+
+device_component_status_t audio_player_get_component_status(void)
+{
+    const device_config_t *config = device_config_get();
+
+    if (config == NULL || !config->audio.enabled) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (s_is_playing) {
+        return DEVICE_COMPONENT_STATUS_ONLINE;
+    }
+
+    if (s_audio_fault) {
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
+    }
+
+    return DEVICE_COMPONENT_STATUS_ACTIVE;
 }
 
 esp_err_t audio_player_play_file(const char *path)
@@ -324,6 +356,7 @@ esp_err_t audio_player_play_file(const char *path)
 
     int open_res = esp_codec_dev_open(s_speaker, &sample_info);
     if (open_res != ESP_CODEC_DEV_OK) {
+        s_audio_fault = true;
         ESP_LOGE(TAG, "[C] Apertura codec fallita: %d", open_res);
         fclose(f);
         s_is_playing = false;
@@ -349,6 +382,7 @@ esp_err_t audio_player_play_file(const char *path)
 
         int write_res = esp_codec_dev_write(s_speaker, buffer, (int)read_len);
         if (write_res != ESP_CODEC_DEV_OK) {
+            s_audio_fault = true;
             ESP_LOGE(TAG, "[C] Scrittura audio fallita: %d", write_res);
             result = ESP_FAIL;
             break;
@@ -372,3 +406,132 @@ esp_err_t audio_player_play_file(const char *path)
 
     return result;
 }
+
+/*
+ * Mockup audio: nessun codec/I2S reale, nessun accesso hardware speaker.
+ * Attiva quando DNA_AUDIO == 1.
+ */
+#else
+
+static const char *TAG = "AUDIO_PLAYER";
+static bool s_audio_ready = false;
+static bool s_audio_fault = false;
+static bool s_stop_requested = false;
+static bool s_is_playing = false;
+static uint8_t s_volume = 75;
+
+
+/**
+ * @brief Inizializza il player audio simulato.
+ *
+ * @return esp_err_t Sempre ESP_OK in modalita' mock.
+ */
+esp_err_t audio_player_init(void)
+{
+    s_audio_ready = true;
+    s_audio_fault = false;
+    ESP_LOGI(TAG, "[C] [MOCK] Audio player inizializzato (DNA_AUDIO=1)");
+    return ESP_OK;
+}
+
+
+/**
+ * @brief Imposta il volume del player audio simulato.
+ *
+ * @param [in] volume Volume richiesto (0-100).
+ * @return esp_err_t Sempre ESP_OK in modalita' mock.
+ */
+esp_err_t audio_player_set_volume(uint8_t volume)
+{
+    if (volume > 100U) {
+        volume = 100U;
+    }
+
+    s_volume = volume;
+    s_audio_ready = true;
+    s_audio_fault = false;
+    ESP_LOGI(TAG, "[C] [MOCK] Volume audio impostato: %u", (unsigned)s_volume);
+    return ESP_OK;
+}
+
+
+/**
+ * @brief Richiede l'interruzione della riproduzione simulata.
+ *
+ * @return esp_err_t Sempre ESP_OK.
+ */
+esp_err_t audio_player_stop(void)
+{
+    s_stop_requested = true;
+    s_is_playing = false;
+    ESP_LOGI(TAG, "[C] [MOCK] audio_player_stop");
+    return ESP_OK;
+}
+
+
+/**
+ * @brief Indica se il player simulato risulta in riproduzione.
+ *
+ * @return true Se marcato come in riproduzione, false altrimenti.
+ */
+bool audio_player_is_playing(void)
+{
+    return s_is_playing;
+}
+
+device_component_status_t audio_player_get_component_status(void)
+{
+    const device_config_t *config = device_config_get();
+
+    if (config == NULL || !config->audio.enabled) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (s_is_playing) {
+        return DEVICE_COMPONENT_STATUS_ONLINE;
+    }
+
+    if (s_audio_fault) {
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
+    }
+
+    return DEVICE_COMPONENT_STATUS_ACTIVE;
+}
+
+
+/**
+ * @brief Simula la riproduzione di un file audio da SPIFFS.
+ *
+ * @param [in] path Path del file richiesto.
+ * @return esp_err_t ESP_OK se il path e' valido, errore altrimenti.
+ */
+esp_err_t audio_player_play_file(const char *path)
+{
+    if (path == NULL || path[0] == '\0') {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (strncmp(path, "/spiffs/", 8) != 0) {
+        ESP_LOGW(TAG, "[C] [MOCK] Path non SPIFFS: %s", path);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    s_audio_ready = true;
+    s_stop_requested = false;
+    s_is_playing = true;
+    ESP_LOGI(TAG, "[C] [MOCK] Riproduzione audio simulata: %s (volume=%u)",
+             path,
+             (unsigned)s_volume);
+
+    if (s_stop_requested) {
+        s_is_playing = false;
+        s_stop_requested = false;
+        ESP_LOGI(TAG, "[C] [MOCK] Riproduzione interrotta: %s", path);
+        return ESP_OK;
+    }
+
+    s_is_playing = false;
+    return ESP_OK;
+}
+
+#endif /* DNA_AUDIO == 0 */

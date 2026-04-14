@@ -13,6 +13,23 @@
 #define HTTP_SERVICES_MAX_FILES 32
 #define HTTP_SERVICES_MAX_ACTIVITIES 16
 
+typedef enum {
+	HTTP_SERVICES_PAID_SERVICE_CWASH = 0,
+	HTTP_SERVICES_PAID_SERVICE_CGATE,
+	HTTP_SERVICES_PAID_SERVICE_CLANE,
+	HTTP_SERVICES_PAID_SERVICE_CCLEAN,
+} http_services_paid_service_code_t;
+
+typedef enum {
+	HTTP_SERVICES_PAYMENT_TYPE_CASH = 0,
+	HTTP_SERVICES_PAYMENT_TYPE_CREC,
+	HTTP_SERVICES_PAYMENT_TYPE_BCOIN,
+	HTTP_SERVICES_PAYMENT_TYPE_COIN,
+	HTTP_SERVICES_PAYMENT_TYPE_SATI,
+	HTTP_SERVICES_PAYMENT_TYPE_VOUC,
+	HTTP_SERVICES_PAYMENT_TYPE_CASHL,
+} http_services_payment_type_t;
+
 typedef struct {
 	bool iserror;
 	int32_t codeerror;
@@ -85,6 +102,10 @@ typedef struct {
 	http_services_operator_t operators[HTTP_SERVICES_MAX_FILES];
 } http_services_getoperators_response_t;
 
+const char *http_services_paid_service_code_to_string(http_services_paid_service_code_t code);
+http_services_paid_service_code_t http_services_paid_service_code_from_string(const char *code_or_label);
+const char *http_services_payment_type_to_string(http_services_payment_type_t type);
+
 /**
  * Register HTTP API handlers implemented by the http_services component.
  * Provides proxy handlers for POST routes under /api/ used by cloud services.
@@ -143,13 +164,15 @@ esp_err_t http_services_getcustomers(const char *code, const char *telephone,
  *
  * @param customer      Optional customer context (NULL -> empty customer fields).
  * @param amount        Payment amount (>= 0).
- * @param service_code  Optional service identifier (fallback: "SER1").
+ * @param service_code  Service code normalizzato secondo la specifica server.
+ * @param payment_type  Payment type codificato secondo la specifica server.
  * @param out           Output response struct. Must not be NULL.
  * @return ESP_OK on HTTP 200 + valid JSON response, ESP_ERR_* otherwise.
  */
 esp_err_t http_services_payment(const http_services_customer_t *customer,
 								int32_t amount,
-								const char *service_code,
+								http_services_paid_service_code_t service_code,
+								http_services_payment_type_t payment_type,
 								http_services_payment_response_t *out);
 
 /**

@@ -184,6 +184,29 @@ static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source
     }
 }
 
+static bool fsm_can_replace_touch_only_session_with_qr(const fsm_ctx_t *ctx)
+{
+    if (!ctx) {
+        return false;
+    }
+
+    if (ctx->state != FSM_STATE_CREDIT ||
+        ctx->session_mode != FSM_SESSION_MODE_OPEN_PAYMENTS) {
+        return false;
+    }
+
+    if (ctx->session_source != FSM_SESSION_SOURCE_TOUCH &&
+        ctx->session_source != FSM_SESSION_SOURCE_KEY) {
+        return false;
+    }
+
+    return (ctx->credit_cents <= 0) &&
+           (ctx->ecd_coins <= 0) &&
+           (ctx->vcd_coins <= 0) &&
+           (ctx->ecd_cents_residual <= 0) &&
+           (ctx->vcd_cents_residual <= 0);
+}
+
 static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source)
 {
     if (!ctx) {
@@ -236,7 +259,7 @@ static void fsm_publish_autorenew_payment_event(const fsm_ctx_t *ctx)
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
         .value_i32 = ctx->running_price_units,
         .value_u32 = 0,
-        .aux_u32 = 0,
+        .aux_u32 = (uint32_t)ctx->session_source,
         .data_ptr = NULL,
         .text = {0},
         .customer_code = {0},
@@ -740,10 +763,18 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             ctx->vcd_used = 0;
             ctx->vcd_cents_residual = 0;
             ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;  // Now vcd_coins=0, so credit = ecd only
+            bool replace_touch_only_session = fsm_can_replace_touch_only_session_with_qr(ctx);
             if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
-                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED &&
+                !replace_touch_only_session) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");
                 return false;
+            }
+            if (replace_touch_only_session) {
+                ctx->session_source = FSM_SESSION_SOURCE_NONE;
+                ctx->session_mode = FSM_SESSION_MODE_NONE;
+                ctx->allow_additional_payments = false;
+                ESP_LOGI(TAG, "[M] QR_CREDIT sostituisce sessione touch senza credito");
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_QR);
             /* [C] Memorizza il codice cliente da QR per successiva api/payment */

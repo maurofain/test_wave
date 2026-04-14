@@ -21,7 +21,7 @@ Questo documento descrive le chiamate previste dal file `servizi2.docx`, lo stat
 ## Note protocollo
 - Header richiesto: `Authorization: Bearer <token>` (dopo login).
 - Header richiesto: `Date` con data/ora terminale.
-- Login: password calcolata come `MD5(MMYYYYdd + serial)`.
+- Login: password calcolata come `MD5(serial + MMyyyydd)` usando la data UTC corrente del device.
 
 ## Mappatura implementazione attuale
 - Proxy remoto implementato per tutte le route sopra.
@@ -41,7 +41,7 @@ Questo documento descrive le chiamate previste dal file `servizi2.docx`, lo stat
 - Handler registrati dal componente `http_services`: `POST /api/login`, `POST /api/keepalive`, `POST /api/getimages`, `POST /api/getconfig`, `POST /api/gettranslations`, `POST /api/getfirmware`, `POST /api/payment`, `POST /api/serviceused`, `POST /api/paymentoffline`, `POST /api/getcustomers`, `POST /api/getoperators`, `POST /api/activity`, `POST /api/deviceactivity`.
 - Le chiamate `getimages/getconfig/gettranslations/getfirmware` eseguono anche sync FTP locale su SPIFFS se la risposta remota è OK.
 - Le API C dirette `http_services_getcustomers(...)` e `http_services_payment(...)` forzano login remoto (`http_services_login_if_needed(true)`) e includono gestione retry su `401/403` per `getcustomers`.
-- Login remoto: usa credenziali runtime in `device_config.server` (`serial` + `password` già in formato previsto server), non calcola automaticamente MD5 in questa fase del componente.
+- Login remoto: usa il `serial` runtime in `device_config.server` e ricalcola automaticamente la password MD5 prima di ogni `POST /api/login`.
 - In presenza del flag `DNA_SERVER_POST=1` i POST remoti sono inibiti (modalità debug/simulazione cloud).
 
 ## Strutture C di risposta
@@ -130,7 +130,7 @@ Body richiesto:
 ```json
 {
   "serial": "AD-34-DFG-333",
-  "password": "<md5(MMYYYYdd+serial)>"
+  "password": "<md5(serial+MMyyyydd)>"
 }
 ```
 
@@ -158,6 +158,13 @@ Body richiesto (schema):
   ]
 }
 ```
+
+### Aggiornamento payload `payment` / `paymentoffline`
+
+- `paymenttype` viene inviato come stringa e non piu come intero.
+- I valori supportati sono: `CASH`, `CREC`, `BCOIN`, `COIN`, `SATI`, `VOUC`, `CASHL`.
+- `services[].code` usa un enum chiuso con questi valori: `CWASH`, `CGATE`, `CLANE`, `CCLEAN`.
+- Nel runtime attuale la FSM propaga il tipo pagamento verso `http_services`; il codice servizio viene normalizzato verso i codici del server.
 
 Response (schema):
 ```json

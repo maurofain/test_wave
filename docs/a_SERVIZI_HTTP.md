@@ -10,7 +10,7 @@ Richiesta token per chiamate successive
   - lettura scanner -> `http_services_getcustomers(...)`
   - avvio programma (`FSM` `CREDIT->RUNNING`) -> `http_services_payment(...)`
   - nessuna `payment` su cambio programma (`PROGRAM_SWITCH`).
-- Login remoto usa credenziali runtime `device_config.server.serial/password`; il componente non ricalcola qui la password MD5.
+- Login remoto usa il `serial` runtime e ricalcola sempre la password come `MD5(serial + MMyyyydd)` usando la data UTC corrente del device; il campo password in configurazione resta solo per compatibilità UI/debug.
 - Se `DNA_SERVER_POST=1`, i POST remoti sono disabilitati (debug cloud).
 
 ## Endpoint remoti file manager (local device)
@@ -45,7 +45,7 @@ Note:
 
 - Corpo (POST /api/login)
   - JSON: `{"serial":"<serial>","password":"<md5>"}`
-  - `password` è tipicamente `MD5(MMYYYYdd + serial)` ma il terminale può memorizzare un MD5 statico in configurazione; il server accetta il valore memorizzato.
+  - `password` è ricalcolata dal firmware come `MD5(serial + MMyyyydd)` usando la data UTC corrente del device.
 
 - Risposta
   - 200 OK con JSON: `{ "access_token": "<JWT>" }`
@@ -102,7 +102,7 @@ Nell’header aggiungere parametro **Date** con la data del terminale
 
 
 
-Password = MD5(MMyyyydd + serial)
+Password = MD5(serial + MMyyyydd)
 
 
 
@@ -312,7 +312,7 @@ Body
 | datetime     | date 		time | data 		ora GMT                                         |
 | amount       | int               |                                                              |
 | recharge     | bool              | indica 		se si tratta di una ricarica borsellino       |
-| paymenttype  | int               | codice 		tipo pagamento(elettronico/contanti/promozioni/test) |
+| paymenttype  | string            | codice 		tipo pagamento (`CASH`, `CREC`, `BCOIN`, `COIN`, `SATI`, `VOUC`, `CASHL`) |
 | paymentdata  | string            | dati 		aggiuntivi relativi al pagamento                |
 | cashreturned | list              |                                                              |
 | value        | int               | valore 		banconota\moneta                              |
@@ -323,7 +323,7 @@ Body
 | quantity     | int               | quantità                                                     |
 | position     | int               | posizione                                                    |
 | services     | list              | elenco 		servizi acquistati                            |
-| code         | string            | codice 		servizio                                      |
+| code         | string            | codice 		servizio (`CWASH`, `CGATE`, `CLANE`, `CCLEAN`) |
 | amount       | int               | importo 		servizio                                     |
 | quantity     | int               | quantità                                                     |
 | used         | bool              | utilizzato                                                   |
@@ -391,7 +391,7 @@ Body
 | datetime     | date 		time | data 		ora GMT                                         |
 | amount       | int               |                                                              |
 | recharge     | bool              | indica 		se si tratta di una ricarica borsellino       |
-| paymenttype  | int               | codice 		tipo pagamento(elettronico/contanti/promozioni/test) |
+| paymenttype  | string            | codice 		tipo pagamento (`CASH`, `CREC`, `BCOIN`, `COIN`, `SATI`, `VOUC`, `CASHL`) |
 | paymentdata  | string            | dati 		aggiuntivi relativi al pagamento                |
 | cashreturned | list              |                                                              |
 | value        | int               | valore 		banconota\moneta                              |
@@ -402,7 +402,24 @@ Body
 | quantity     | int               | quantità                                                     |
 | position     | int               | posizione                                                    |
 | services     | list              | elenco 		servizi acquistati                            |
-| code         | string            | codice 		servizio                                      |
+| code         | string            | codice 		servizio (`CWASH`, `CGATE`, `CLANE`, `CCLEAN`) |
+
+Codici servizi usati nel payload `payment/services[].code` e `serviceused/services[].code`:
+
+- `CWASH`: credito per car wash
+- `CGATE`: credito usufruito per gate
+- `CLANE`: credito usufruito per pista
+- `CCLEAN`: credito usufruito per aspiratore
+
+Codici `paymenttype` usati nel payload `payment`:
+
+- `CASH`: contanti
+- `CREC`: credit card
+- `BCOIN`: bit coin
+- `COIN`: gettoni
+- `SATI`: Satispay
+- `VOUC`: vaucher
+- `CASHL`: cash less tessera o gettone
 | amount       | int               | importo 		servizio                                     |
 | quantity     | int               | quantità                                                     |
 | used         | bool              | utilizzato                                                   |

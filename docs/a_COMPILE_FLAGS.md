@@ -127,6 +127,11 @@ componenti.
   su `CONFIG_APP_RS232_UART_PORT` con default seriale **9600, N, 8, 1**.
   Quando impostato a `1`, il driver viene simulato e non tocca hardware UART.
 
+### `DNA_AUDIO`
+- **File:** `CMakeLists.txt`, `components/audio_player/audio_player.c`
+- **Valori:** `1` = mockup attivo (nessun codec/I2S reale), `0` = player reale
+- **Impatto:** quando impostato a `1`, il modulo audio non inizializza lo speaker BSP e non accede al codec. Le API pubbliche (`audio_player_init`, `audio_player_set_volume`, `audio_player_stop`, `audio_player_is_playing`, `audio_player_play_file`) restano disponibili e simulano una riproduzione riuscita per path `"/spiffs/..."`, utile per testare la logica FSM/UI senza hardware audio.
+
 ### `DNA_SD_CARD`
 - **File:** `main/app_version.h`, `components/sd_card/sd_card.c`
 - **Valori:** `1` = mockup attivo (nessun hardware reale), `0` = driver SD reale
@@ -212,10 +217,13 @@ Impatto runtime associato:
 - `CONFIG_USB_OTG_SUPPORTED`
 - `CONFIG_USB_HOST_HUBS_SUPPORTED`
 - `CONFIG_USB_HOST_HUB_MULTI_LEVEL`
+- `CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM`
 
 Impatto runtime associato:
 - il pannello LVGL usa le icone stato embedded in formato PNG tramite descrittori `lv_image_dsc_t` con `LV_COLOR_FORMAT_RAW_ALPHA`; richiede che il decoder PNG LVGL sia abilitato (`CONFIG_LV_USE_LODEPNG=y` nel progetto attuale).
 - su questa board lo scanner USB CDC e' collegato direttamente alla root port: mantenere `CONFIG_USB_HOST_HUBS_SUPPORTED` e `CONFIG_USB_HOST_HUB_MULTI_LEVEL` disabilitati riduce il consumo di pipe/endpoint del layer HCD ed evita errori di enumerazione tipo `ESP_ERR_NO_MEM` durante `HCD Pipe alloc`.
+- la configurazione di progetto da usare in build e' quindi con entrambi i flag hub disabilitati, salvo casi espliciti di topologia USB con hub esterno realmente necessario.
+- su ESP32-P4, abilitare `CONFIG_USB_HOST_DWC_DMA_CAP_MEMORY_IN_PSRAM` permette al controller USB-DWC di usare buffer DMA in PSRAM e riduce la pressione sulla RAM interna durante l'allocazione delle pipe di enumerazione (`EP0` compresa).
 
 ## Note
 
