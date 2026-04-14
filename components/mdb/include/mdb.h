@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include "component_status.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -149,6 +150,11 @@ void mdb_engine_run(void *arg);
  * @return Puntatore alla struttura di stato (sola lettura)
  */
 const mdb_status_t* mdb_get_status(void);
+
+/**
+ * @brief Restituisce lo stato sintetico del componente MDB.
+ */
+device_component_status_t mdb_get_component_status(void);
 
 /**
  * @brief Invia un pacchetto MDB (Indirizzo + Dati + Checksum)

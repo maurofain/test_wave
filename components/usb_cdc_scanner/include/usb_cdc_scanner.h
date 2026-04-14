@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "esp_err.h"
+#include "component_status.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +23,7 @@ esp_err_t usb_cdc_scanner_send_state_command(void);
 esp_err_t usb_cdc_scanner_send_on_command(void);
 esp_err_t usb_cdc_scanner_send_off_command(void);
 bool usb_cdc_scanner_is_connected(void);
+device_component_status_t usb_cdc_scanner_get_component_status(void);
 
 #ifdef __cplusplus
 }

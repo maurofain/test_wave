@@ -3,7 +3,6 @@
 ---
 
 ## 📋 DA FARE
-## 📋 DA FARE
 
 1. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
@@ -26,6 +25,11 @@
      3. `deactivate`
      4. `setup`
      5. `status` : indica se è `disattivato`, `attivato`, `offline` (attivato ma non operativo) o `online` (attivato e operativo).
+    - Report verifica componenti status/recovery:
+       - `MDB`: esegue polling periodico e può andare `offline`, ma il recupero automatico è debole. In caso di errori ripetuti di setup può autospegnersi logicamente e non sempre completa una reinizializzazione autonoma.
+       - `CCTalk`: esegue polling periodico, rileva la perdita del device, passa `offline` e tenta la reinizializzazione automatica con ritorno a `online` quando il device risponde di nuovo.
+       - `Scanner USB`: esegue monitoraggio periodico del bus e tenta la riapertura del device; in caso di disconnessione passa `offline`. La riconnessione fisica è gestita, ma il ciclo completo di `setup` dopo reconnect non è ancora robusto quanto CCTalk.
+       - `HttpServices`: esegue controllo periodico logico del servizio remoto, passa `offline` su errore/token invalido e gestisce recovery con relogin, keepalive e retry/backoff fino al ritorno `online`.
 6. Piano test endpoint e funzioni
    - Strutturare i test in 4 livelli:
      - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido

@@ -27,6 +27,7 @@ extern bool dump_cctalk_log;
 
 static SemaphoreHandle_t s_cctalk_state_lock = NULL;
 static bool s_driver_initialized = false;
+static bool s_driver_init_failed = false;
 static bool s_acceptor_enabled = false;
 static bool s_acceptor_online = false;
 static bool s_event_counter_valid = false;
@@ -34,6 +35,29 @@ static uint8_t s_last_event_counter = 0;
 static uint32_t s_poll_error_streak = 0;
 static char s_coin_id_cache[16][16] = {{0}};
 static bool s_coin_id_cache_valid[16] = {0};
+
+device_component_status_t cctalk_driver_get_component_status(void)
+{
+    const device_config_t *cfg = device_config_get();
+
+    if (s_driver_init_failed) {
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
+    }
+
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!s_driver_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    if (cctalk_driver_is_acceptor_enabled() && cctalk_driver_is_acceptor_online()) {
+        return DEVICE_COMPONENT_STATUS_ONLINE;
+    }
+
+    return DEVICE_COMPONENT_STATUS_OFFLINE;
+}
 
 
 /**
@@ -690,9 +714,11 @@ void cctalk_task_run(void *arg)
 esp_err_t cctalk_driver_init(void)
 {
     cctalk_state_init_once();
+    s_driver_init_failed = false;
 
     if (!cctalk_state_take(200)) {
         ESP_LOGE(TAG, "[C] driver init lock timeout");
+        s_driver_init_failed = true;
         return ESP_FAIL;
     }
 
@@ -870,6 +896,23 @@ bool cctalk_driver_is_acceptor_online(void)
 #if defined(DNA_CCTALK) && (DNA_CCTALK == 1)
 
 static bool s_mock_acceptor_enabled = false;
+static bool s_mock_driver_initialized = false;
+
+device_component_status_t cctalk_driver_get_component_status(void)
+{
+    const device_config_t *cfg = device_config_get();
+
+    if (!cfg || !cfg->sensors.cctalk_enabled) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!s_mock_driver_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    return s_mock_acceptor_enabled ? DEVICE_COMPONENT_STATUS_ONLINE
+                                   : DEVICE_COMPONENT_STATUS_OFFLINE;
+}
 
 
 /**
@@ -884,6 +927,7 @@ static bool s_mock_acceptor_enabled = false;
 esp_err_t cctalk_driver_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] cctalk_driver_init: CCtalk disabilitato");
+    s_mock_driver_initialized = true;
     return ESP_OK;
 }
 

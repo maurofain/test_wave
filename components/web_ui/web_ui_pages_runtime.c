@@ -8,6 +8,7 @@
 #include "sd_card.h"
 #include "tasks.h"
 #include "app_version.h"
+#include "cctalk.h"
 #include "http_services.h"
 #include "usb_cdc_scanner.h"
 #include <time.h>
@@ -66,6 +67,10 @@ esp_err_t status_get_handler(httpd_req_t *req)
     bool remote_online = http_services_is_remote_online();
     bool remote_token = http_services_has_auth_token();
     bool scanner_connected = usb_cdc_scanner_is_connected();
+    device_component_status_t mdb_component_status = mdb_get_component_status();
+    device_component_status_t cctalk_component_status = cctalk_driver_get_component_status();
+    device_component_status_t scanner_component_status = usb_cdc_scanner_get_component_status();
+    device_component_status_t http_component_status = http_services_get_component_status();
 
     time_t board_time_val = time(NULL);
     struct tm board_tm;
@@ -84,8 +89,8 @@ esp_err_t status_get_handler(httpd_req_t *req)
     snprintf(resp, resp_cap,
              "{\"partition_running\":\"%s\",\"partition_boot\":\"%s\",\"ip_ap\":\"%s\",\"ip_sta\":\"%s\",\"ip_eth\":\"%s\","
              "\"web\":{\"running\":%s},"
-             "\"remote\":{\"enabled\":%s,\"online\":%s,\"token\":%s},"
-             "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%u},"
+             "\"remote\":{\"enabled\":%s,\"online\":%s,\"token\":%s,\"status\":\"%s\"},"
+             "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%u,\"status\":\"%s\"},"
              "\"sd\":{\"mounted\":%s,\"present\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"},"
              "\"env\":{\"temp\":%.1f,\"hum\":%.1f},"
                          "\"sensors\":{"
@@ -93,7 +98,8 @@ esp_err_t status_get_handler(httpd_req_t *req)
                              "\"temperature\":%d,\"cctalk\":%d,\"sd_card\":%d,\"eeprom\":%d,"
                              "\"pwm1\":%d,\"pwm2\":%d,\"remote_logging\":%d"
                          "},"
-                         "\"scanner\":{\"enabled\":%s,\"connected\":%s},"
+                         "\"cctalk\":{\"enabled\":%s,\"online\":%s,\"status\":\"%s\"},"
+                         "\"scanner\":{\"enabled\":%s,\"connected\":%s,\"status\":\"%s\"},"
              "\"board_time\":\"%s\","
              "\"config\":%s}",
              running ? running->label : "?", boot ? boot->label : "?", ap_ip, sta_ip, eth_ip,
@@ -101,7 +107,9 @@ esp_err_t status_get_handler(httpd_req_t *req)
              remote_enabled ? "true" : "false",
              remote_online ? "true" : "false",
              remote_token ? "true" : "false",
+             device_component_status_to_string(http_component_status),
              mdb->coin.is_online ? "true" : "false", mdb->coin.state, (unsigned int)mdb->coin.credit_cents,
+             device_component_status_to_string(mdb_component_status),
              sd_mounted ? "true" : "false", sd_present ? "true" : "false",
              (unsigned long long)sd_total_kb, (unsigned long long)sd_used_kb,
              sd_card_get_last_error(),
@@ -109,7 +117,11 @@ esp_err_t status_get_handler(httpd_req_t *req)
             cfg->sensors.io_expander_enabled, cfg->sensors.led_enabled, cfg->sensors.rs232_enabled, cfg->sensors.rs485_enabled, cfg->sensors.mdb_enabled,
             cfg->sensors.temperature_enabled, cfg->sensors.cctalk_enabled, cfg->sensors.sd_card_enabled, cfg->sensors.eeprom_enabled,
             cfg->sensors.pwm1_enabled, cfg->sensors.pwm2_enabled, cfg->remote_log.use_broadcast,
+            cfg->sensors.cctalk_enabled ? "true" : "false",
+            cctalk_driver_is_acceptor_online() ? "true" : "false",
+            device_component_status_to_string(cctalk_component_status),
             cfg->scanner.enabled ? "true" : "false", scanner_connected ? "true" : "false",
+            device_component_status_to_string(scanner_component_status),
              board_time_str,
              config_json ? config_json : "{}"
              );

@@ -67,6 +67,22 @@ __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
 static bool s_usb_host_initialized = false;
 static bool s_usb_bsp_started = false;
 
+device_component_status_t usb_cdc_scanner_get_component_status(void)
+{
+    const device_config_t *cfg = device_config_get();
+
+    if (!cfg || !cfg->scanner.enabled) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!s_usb_host_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    return s_scanner_connected ? DEVICE_COMPONENT_STATUS_ONLINE
+                               : DEVICE_COMPONENT_STATUS_OFFLINE;
+}
+
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
 static TaskHandle_t s_usb_open_task = NULL;
 static cdc_acm_dev_hdl_t s_cdc_dev = NULL;
@@ -802,6 +818,22 @@ bool usb_cdc_scanner_is_connected(void)
 #if defined(DNA_USB_SCANNER) && (DNA_USB_SCANNER == 1)
 
 static const char *TAG_MOCK = "USB_SCN";
+static bool s_mock_scanner_initialized = false;
+
+device_component_status_t usb_cdc_scanner_get_component_status(void)
+{
+    const device_config_t *cfg = device_config_get();
+
+    if (!cfg || !cfg->scanner.enabled) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!s_mock_scanner_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    return DEVICE_COMPONENT_STATUS_OFFLINE;
+}
 
 
 /**
@@ -815,6 +847,7 @@ static const char *TAG_MOCK = "USB_SCN";
 void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config)
 {
     (void)config;
+    s_mock_scanner_initialized = true;
     ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_init: scanner USB simulato");
 }
 

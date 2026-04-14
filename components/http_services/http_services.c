@@ -56,8 +56,35 @@ static size_t s_http_pending_cap = 0;
 
 static esp_err_t http_services_login_if_needed(bool force_refresh);
 static bool http_services_cfg_remote_enabled(const device_config_t *cfg);
+static bool validate_token(const char *token);
+static void http_services_set_online(bool online, const char *reason);
 static esp_err_t remote_post(const char *remote_path, const char *body, const char *auth_header,
                              char **out_resp, int *out_status, size_t *out_len);
+
+device_component_status_t http_services_get_component_status(void)
+{
+    if (!http_services_is_remote_enabled()) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!s_http_services_initial_token_done) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    if (s_remote_online && validate_token(g_auth_token)) {
+        return DEVICE_COMPONENT_STATUS_ONLINE;
+    }
+
+    return DEVICE_COMPONENT_STATUS_OFFLINE;
+}
+
+void http_services_notify_network_available(bool available, const char *reason)
+{
+    if (!available) {
+        s_http_services_initial_token_done = true;
+        http_services_set_online(false, reason ? reason : "network_unavailable");
+    }
+}
 
 static bool http_services_ftp_enabled(const device_config_t *cfg)
 {
@@ -564,7 +591,7 @@ static void http_services_sync_ftp_for_endpoint(const char *remote_path, const c
  * @param [in] token Puntatore al token da validare.
  * @return true se il token è valido, false altrimenti.
  */
-bool validate_token(const char *token) {
+static bool validate_token(const char *token) {
     // Add actual token validation logic here
     return token != NULL && strlen(token) > 0;
 }
@@ -722,6 +749,7 @@ bool http_services_has_auth_token(void)
  */
 esp_err_t http_services_sync_runtime_state(bool force_login)
 {
+    s_http_services_initial_token_done = true;
     device_config_t *cfg = device_config_get();
     if (!http_services_cfg_remote_enabled(cfg)) {
         if (keepalive_task_is_running()) {
@@ -1799,6 +1827,7 @@ static esp_err_t api_paymentoffline_post(httpd_req_t *req)
  */
 static esp_err_t http_services_login_if_needed(bool force_refresh)
 {
+    s_http_services_initial_token_done = true;
     device_config_t *cfg = device_config_get();
     if (!http_services_cfg_remote_enabled(cfg)) {
         http_services_clear_token("login_disabled");

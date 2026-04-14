@@ -24,9 +24,35 @@ static const char *TAG = "MDB";
 
 static mdb_status_t s_mdb_status = {0};
 static uint8_t s_coin_setup_retries = 0;
+static bool s_mdb_driver_initialized = false;
+static bool s_mdb_init_failed = false;
+static bool s_mdb_runtime_fault = false;
 
 const mdb_status_t* mdb_get_status(void) {
     return &s_mdb_status;
+}
+
+device_component_status_t mdb_get_component_status(void)
+{
+    const device_config_t *cfg = device_config_get();
+
+    if (s_mdb_init_failed || s_mdb_runtime_fault) {
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
+    }
+
+    if (!cfg || !cfg->sensors.mdb_enabled || !cfg->mdb.coin_acceptor_en) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!s_mdb_driver_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    if (s_mdb_status.coin.is_online && s_mdb_status.coin.state == MDB_STATE_IDLE_POLLING) {
+        return DEVICE_COMPONENT_STATUS_ONLINE;
+    }
+
+    return DEVICE_COMPONENT_STATUS_OFFLINE;
 }
 
 // Helper per calcolare la parità di un byte (ritorna true se dispari)
@@ -88,6 +114,7 @@ static void mdb_coin_sm(void) {
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_RESET, NULL, 0);
             vTaskDelay(pdMS_TO_TICKS(500)); // Aspetta reboot periferica
             s_coin_setup_retries = 0;
+            s_mdb_runtime_fault = false;
             s_mdb_status.coin.state = MDB_STATE_INIT_SETUP;
             break;
 
@@ -113,6 +140,7 @@ static void mdb_coin_sm(void) {
                     mdb_send_ack();
                     s_mdb_status.coin.state = MDB_STATE_INIT_ENABLE; // Passa alla fase di abilitazione
                     s_mdb_status.coin.is_online = true;
+                    s_mdb_runtime_fault = false;
                 } else {
                     ESP_LOGW(TAG, "Gettoniera MDB: Risposta di setup troppo breve (%zu)", rx_len);
                     s_coin_setup_retries++;
@@ -128,6 +156,7 @@ static void mdb_coin_sm(void) {
                 }
                 s_mdb_status.coin.is_online = false;
                 s_mdb_status.coin.state = MDB_STATE_INACTIVE;
+                s_mdb_runtime_fault = true;
                 ESP_LOGE(TAG, "Gettoniera MDB: setup fallito %u volte, periferica disabilitata a runtime", (unsigned)s_coin_setup_retries);
             }
             break;
@@ -171,6 +200,7 @@ static void mdb_coin_sm(void) {
                     }
                 }
                 s_mdb_status.coin.is_online = true;
+                s_mdb_runtime_fault = false;
             } else {
                 s_mdb_status.coin.is_online = false;
                 ESP_LOGD(TAG, "Gettoniera MDB: Nessuna risposta");
@@ -227,6 +257,13 @@ esp_err_t mdb_start_engine(void) {
 esp_err_t mdb_init(void)
 {
     device_config_t *d_cfg = device_config_get();
+    if (!d_cfg) {
+        s_mdb_driver_initialized = false;
+        s_mdb_init_failed = true;
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    s_mdb_init_failed = false;
     ESP_LOGI(TAG, "Inizializzazione MDB su UART %d (TX:%d RX:%d)", MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO);
 
     uart_config_t uart_config = {
@@ -239,14 +276,36 @@ esp_err_t mdb_init(void)
     };
 
     esp_err_t ret = uart_driver_install(MDB_UART_PORT, d_cfg->mdb_serial.rx_buf_size, d_cfg->mdb_serial.tx_buf_size, 0, NULL, 0);
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) return ret;
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        s_mdb_driver_initialized = false;
+        s_mdb_init_failed = true;
+        return ret;
+    }
     
-    ESP_ERROR_CHECK(uart_param_config(MDB_UART_PORT, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ret = uart_param_config(MDB_UART_PORT, &uart_config);
+    if (ret != ESP_OK) {
+        s_mdb_driver_initialized = false;
+        s_mdb_init_failed = true;
+        return ret;
+    }
+    ret = uart_set_pin(MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    if (ret != ESP_OK) {
+        s_mdb_driver_initialized = false;
+        s_mdb_init_failed = true;
+        return ret;
+    }
     
     // Usiamo modalità RS485 Half Duplex per controllo RTS se necessario, 
     // ma MDB è solitamente TTL. Usiamo UART_MODE_UART o RS485_APP_CTRL.
-    ESP_ERROR_CHECK(uart_set_mode(MDB_UART_PORT, UART_MODE_UART));
+    ret = uart_set_mode(MDB_UART_PORT, UART_MODE_UART);
+    if (ret != ESP_OK) {
+        s_mdb_driver_initialized = false;
+        s_mdb_init_failed = true;
+        return ret;
+    }
+
+    s_mdb_driver_initialized = true;
+    s_mdb_runtime_fault = false;
 
     return ESP_OK;
 }
@@ -390,10 +449,27 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
 #if defined(DNA_MDB) && (DNA_MDB == 1)
 
 static mdb_status_t s_mock_mdb_status = {0};
+static bool s_mock_mdb_initialized = false;
 
 const mdb_status_t *mdb_get_status(void)
 {
     return &s_mock_mdb_status;
+}
+
+device_component_status_t mdb_get_component_status(void)
+{
+    const device_config_t *cfg = device_config_get();
+
+    if (!cfg || !cfg->sensors.mdb_enabled || !cfg->mdb.coin_acceptor_en) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!s_mock_mdb_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    return s_mock_mdb_status.coin.is_online ? DEVICE_COMPONENT_STATUS_ONLINE
+                                            : DEVICE_COMPONENT_STATUS_OFFLINE;
 }
 
 
@@ -409,6 +485,9 @@ const mdb_status_t *mdb_get_status(void)
 esp_err_t mdb_init(void)
 {
     ESP_LOGI(TAG, "[C] [MOCK] mdb_init: bus MDB simulato");
+    s_mock_mdb_initialized = true;
+    s_mock_mdb_status.coin.state = MDB_STATE_IDLE_POLLING;
+    s_mock_mdb_status.coin.is_online = true;
     return ESP_OK;
 }
 

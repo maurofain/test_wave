@@ -1,29 +1,50 @@
 #!/usr/bin/env bash
-# Convert image icons in data/icons into embedded C resources for LVGL
+# Genera le icone embed per il chrome LVGL a partire da docs/icone/normalized.
 # Usage: ./scripts/embed_icons.sh
-# Requires: xxd (for -i) and optional image conversion if needed for LVGL
+# Requires: xxd
 
 set -euo pipefail
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ICONS_DIR="$ROOT/docs/icone/normalized"
 OUT_SRC="$ROOT/components/lvgl_panel/src/embedded_icons.c"
 OUT_HEADER="$ROOT/components/lvgl_panel/include/embedded_icons_images.h"
+TMP_DIR="$(mktemp -d)"
+
+trap 'rm -rf "$TMP_DIR"' EXIT
 
 mkdir -p "$(dirname "$OUT_SRC")"
 mkdir -p "$(dirname "$OUT_HEADER")"
 
-# Map names -> indices expected by code
-declare -A MAP
-MAP[CloudOk.png]=0
-MAP[CloudKo.png]=0
-MAP[CreditCardOk.png]=1
-MAP[CreditCardKo.png]=1
-MAP[MoneteOk3.png]=2
-MAP[MoneteKo.png]=2
-MAP[QrOk.png]=3
-MAP[QrKo.png]=3
+ICON_SPECS=(
+    "0|cloud|CloudKo.png|CloudOk.png"
+    "1|credit|CreditCardKo.png|CreditCardOk.png"
+    "2|coin|MoneteKo.png|MoneteOk3.png"
+    "3|qr|QrKo.png|QrOk.png"
+)
 
-# Start output files
+declare -A KO_SYMBOLS
+declare -A OK_SYMBOLS
+
+dump_icon_to_header() {
+    local file_path="$1"
+    local relative_path="${file_path#$ROOT/}"
+    local temp_file="$TMP_DIR/$(basename "$file_path").xxd"
+    local symbol_name
+
+    (cd "$ROOT" && xxd -i "$relative_path") > "$temp_file"
+    cat "$temp_file" >> "$OUT_HEADER"
+    printf '\n' >> "$OUT_HEADER"
+
+    symbol_name="$(awk '/^unsigned char / {gsub(/\[\]/, "", $3); print $3; exit}' "$temp_file")"
+    if [[ -z "$symbol_name" ]]; then
+        echo "Errore: simbolo non rilevato per $relative_path" >&2
+        exit 1
+    fi
+
+    printf '%s\n' "$symbol_name"
+}
+
 cat > "$OUT_HEADER" <<'EOF'
 // Generated header: embedded icon arrays
 #ifndef EMBEDDED_ICONS_IMAGES_H
@@ -33,44 +54,71 @@ cat > "$OUT_HEADER" <<'EOF'
 
 EOF
 
-# We'll build a C file that defines arrays and a lookup function
 cat > "$OUT_SRC" <<'EOF'
 #include "embedded_icons.h"
 #include "embedded_icons_images.h"
 
-// Return embedded image pointer by index, or NULL
-const void *get_embedded_icon_src(int index)
-{
-    switch(index) {
+#include "lvgl.h"
+
+#include <stddef.h>
+
+#define DECLARE_EMBEDDED_ICON_DSC(name, map_symbol, width_px, height_px) \
+    static const lv_image_dsc_t name = {                               \
+        .header.magic = LV_IMAGE_HEADER_MAGIC,                         \
+        .header.cf = LV_COLOR_FORMAT_RAW_ALPHA,                        \
+        .header.flags = 0,                                             \
+        .header.w = (width_px),                                        \
+        .header.h = (height_px),                                       \
+        .header.stride = 0,                                            \
+        .data_size = sizeof(map_symbol),                               \
+        .data = (const uint8_t *)(map_symbol),                         \
+        .reserved = NULL,                                              \
+    }
+
 EOF
 
-for f in "$ICONS_DIR"/*.{png,jpg,jpeg}; do
-    [ -e "$f" ] || continue
-    name=$(basename "$f")
-    idx=${MAP[$name]:-}
-    if [ -z "$idx" ]; then
-        echo "Skipping $name (no mapping)"
-        continue
+for spec in "${ICON_SPECS[@]}"; do
+    IFS='|' read -r idx alias ko_file ok_file <<< "$spec"
+    ko_path="$ICONS_DIR/$ko_file"
+    ok_path="$ICONS_DIR/$ok_file"
+
+    if [[ ! -f "$ko_path" ]]; then
+        echo "Errore: file KO mancante: $ko_path" >&2
+        exit 1
     fi
-    varname=$(echo "$name" | sed 's/[^a-zA-Z0-9]/_/g')
-    # use xxd -i to dump array
-    echo "Generating $name -> var $varname (idx $idx)"
-    xxd -i "$f" > /tmp/icon_${varname}.i.c
-    # extract array name and length using awk to avoid regex bracket issues
-    arr_name=$(awk '/unsigned char/ {print $3; exit}' /tmp/icon_${varname}.i.c)
-    len_name=$(awk '/_len/ {print $3; exit}' /tmp/icon_${varname}.i.c)
-    # append to header
-    sed -n '1,200p' /tmp/icon_${varname}.i.c >> "$OUT_HEADER"
-    echo >> "$OUT_HEADER"
-    # append to src switch
+    if [[ ! -f "$ok_path" ]]; then
+        echo "Errore: file OK mancante: $ok_path" >&2
+        exit 1
+    fi
+
+    echo "Generating $ko_file / $ok_file (idx $idx)"
+    KO_SYMBOLS[$alias]="$(dump_icon_to_header "$ko_path")"
+    OK_SYMBOLS[$alias]="$(dump_icon_to_header "$ok_path")"
+
     cat >> "$OUT_SRC" <<EOF
-        case $idx: return (const void *)${arr_name};
+DECLARE_EMBEDDED_ICON_DSC(s_icon_${alias}_ko, ${KO_SYMBOLS[$alias]}, 48, 48);
+DECLARE_EMBEDDED_ICON_DSC(s_icon_${alias}_ok, ${OK_SYMBOLS[$alias]}, 48, 48);
+
 EOF
-    rm /tmp/icon_${varname}.i.c
 done
 
 cat >> "$OUT_SRC" <<'EOF'
-        default: return NULL;
+const void *get_embedded_icon_src(int index, bool ok)
+{
+    switch (index) {
+EOF
+
+for spec in "${ICON_SPECS[@]}"; do
+    IFS='|' read -r idx alias ko_file ok_file <<< "$spec"
+    cat >> "$OUT_SRC" <<EOF
+        case $idx:
+            return ok ? (const void *)&s_icon_${alias}_ok : (const void *)&s_icon_${alias}_ko;
+EOF
+done
+
+cat >> "$OUT_SRC" <<'EOF'
+        default:
+            return NULL;
     }
 }
 EOF
@@ -80,8 +128,3 @@ cat >> "$OUT_HEADER" <<'EOF'
 EOF
 
 echo "Embedded icons generated to: $OUT_SRC and $OUT_HEADER"
-
-# Note: Running this script will generate C arrays that must be compiled into the firmware.
-# After running, re-run idf.py build.
-
-exit 0

@@ -2,6 +2,7 @@
 
 #include "esp_err.h"
 #include "esp_http_server.h"
+#include "component_status.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -104,6 +105,19 @@ bool http_services_is_remote_online(void);
  * @brief Indica se è presente un token JWT remoto in memoria.
  */
 bool http_services_has_auth_token(void);
+
+/**
+ * @brief Restituisce lo stato sintetico del componente HTTP services.
+ */
+device_component_status_t http_services_get_component_status(void);
+
+/**
+ * @brief Notifica al componente HTTP services un cambio di disponibilita' rete.
+ *
+ * Quando available e' false il componente passa immediatamente OFFLINE senza
+ * attendere il prossimo keepalive o errore HTTP.
+ */
+void http_services_notify_network_available(bool available, const char *reason);
 
 /**
  * @brief Sincronizza lo stato runtime HTTP services con la config corrente.

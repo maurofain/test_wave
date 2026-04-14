@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "esp_err.h"
+#include "component_status.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,6 +84,7 @@ esp_err_t cctalk_driver_start_acceptor(void);
 esp_err_t cctalk_driver_stop_acceptor(void);
 bool cctalk_driver_is_acceptor_enabled(void);
 bool cctalk_driver_is_acceptor_online(void);
+device_component_status_t cctalk_driver_get_component_status(void);
 
 // Entry point del task di ricezione CCtalk. Da chiamare dopo cctalk_driver_init().
 void cctalk_task_run(void *arg);

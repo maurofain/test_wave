@@ -18,14 +18,17 @@
         .reserved = NULL,                                              \
     }
 
-DECLARE_EMBEDDED_ICON_DSC(s_icon_cloud_ko, _home_mauro_1P_MicroHard_test_wave_data_icons_CloudKo_png, 48, 48);
-DECLARE_EMBEDDED_ICON_DSC(s_icon_cloud_ok, _home_mauro_1P_MicroHard_test_wave_data_icons_CloudOk_png, 48, 48);
-DECLARE_EMBEDDED_ICON_DSC(s_icon_credit_ko, _home_mauro_1P_MicroHard_test_wave_data_icons_CreditCardKo_png, 48, 48);
-DECLARE_EMBEDDED_ICON_DSC(s_icon_credit_ok, _home_mauro_1P_MicroHard_test_wave_data_icons_CreditCardOk_png, 48, 48);
-DECLARE_EMBEDDED_ICON_DSC(s_icon_coin_ko, _home_mauro_1P_MicroHard_test_wave_data_icons_MoneteKo_png, 48, 48);
-DECLARE_EMBEDDED_ICON_DSC(s_icon_coin_ok, _home_mauro_1P_MicroHard_test_wave_data_icons_MoneteOk3_png, 48, 48);
-DECLARE_EMBEDDED_ICON_DSC(s_icon_qr_ko, _home_mauro_1P_MicroHard_test_wave_data_icons_QrKo_png, 48, 48);
-DECLARE_EMBEDDED_ICON_DSC(s_icon_qr_ok, _home_mauro_1P_MicroHard_test_wave_data_icons_QrOk_png, 48, 48);
+DECLARE_EMBEDDED_ICON_DSC(s_icon_cloud_ko, docs_icone_normalized_CloudKo_png, 48, 48);
+DECLARE_EMBEDDED_ICON_DSC(s_icon_cloud_ok, docs_icone_normalized_CloudOk_png, 48, 48);
+
+DECLARE_EMBEDDED_ICON_DSC(s_icon_credit_ko, docs_icone_normalized_CreditCardKo_png, 48, 48);
+DECLARE_EMBEDDED_ICON_DSC(s_icon_credit_ok, docs_icone_normalized_CreditCardOk_png, 48, 48);
+
+DECLARE_EMBEDDED_ICON_DSC(s_icon_coin_ko, docs_icone_normalized_MoneteKo_png, 48, 48);
+DECLARE_EMBEDDED_ICON_DSC(s_icon_coin_ok, docs_icone_normalized_MoneteOk3_png, 48, 48);
+
+DECLARE_EMBEDDED_ICON_DSC(s_icon_qr_ko, docs_icone_normalized_QrKo_png, 48, 48);
+DECLARE_EMBEDDED_ICON_DSC(s_icon_qr_ok, docs_icone_normalized_QrOk_png, 48, 48);
 
 const void *get_embedded_icon_src(int index, bool ok)
 {

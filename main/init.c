@@ -1277,6 +1277,22 @@ static void init_sntp(void);
 
 static bool s_sntp_initialized = false; /* [C] Flag: init_sntp() già chiamato */
 
+static bool init_netif_has_ip(esp_netif_t *netif)
+{
+  if (!netif)
+  {
+    return false;
+  }
+
+  esp_netif_ip_info_t ip_info = {0};
+  if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK)
+  {
+    return false;
+  }
+
+  return ip_info.ip.addr != 0;
+}
+
 /**
  * @brief Inizializza il servizio SNTP.
  *
@@ -1516,6 +1532,10 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
   break;
   case ETHERNET_EVENT_DISCONNECTED:
     ESP_LOGW(TAG, "[M] Collegamento Ethernet inattivo");
+    if (!init_netif_has_ip(s_netif_sta))
+    {
+      http_services_notify_network_available(false, "eth_link_down");
+    }
     if (bsp_display_lock(0))
     {
       lvgl_page_chrome_set_status_icon_state(0, false); /* Cloud = rete offline */

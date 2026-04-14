@@ -2,6 +2,11 @@
 #include "language_flags.h"
 #include "lvgl_panel.h"
 
+#include "cctalk.h"
+#include "http_services.h"
+#include "mdb.h"
+#include "usb_cdc_scanner.h"
+
 #include "esp_log.h"
 
 #include <stdio.h>
@@ -16,6 +21,19 @@ static lv_obj_t      *s_chrome_status_icons[4] = {NULL, NULL, NULL, NULL};
 static bool           s_chrome_status_ok[4] = {true, true, true, true};
 static lv_event_cb_t  s_flag_cb            = NULL;  /* callback per click bandiera */
 static void          *s_flag_ud            = NULL;
+
+static bool chrome_component_is_online(device_component_status_t status)
+{
+    return status == DEVICE_COMPONENT_STATUS_ONLINE;
+}
+
+static void chrome_sync_component_status(void)
+{
+    s_chrome_status_ok[0] = chrome_component_is_online(http_services_get_component_status());
+    s_chrome_status_ok[1] = chrome_component_is_online(mdb_get_component_status());
+    s_chrome_status_ok[2] = chrome_component_is_online(cctalk_driver_get_component_status());
+    s_chrome_status_ok[3] = chrome_component_is_online(usb_cdc_scanner_get_component_status());
+}
 
 static const void *chrome_get_status_icon_src(int index)
 {
@@ -33,6 +51,8 @@ static const void *chrome_get_status_icon_src(int index)
 
 static void chrome_update_status_icons(void)
 {
+    chrome_sync_component_status();
+
     for (int i = 0; i < 4; i++) {
         if (!s_chrome_status_icons[i] || !lv_obj_is_valid(s_chrome_status_icons[i])) {
             continue;
@@ -67,6 +87,7 @@ static void chrome_time_timer_cb(lv_timer_t *timer)
 {
     (void)timer;
     chrome_update_time_label();
+    chrome_update_status_icons();
 }
 
 void lvgl_page_chrome_add(lv_obj_t *scr)
@@ -113,6 +134,7 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
     lv_obj_align(flag, LV_ALIGN_TOP_RIGHT, -right_margin, top_margin + icon_size + gap);
 
     const int32_t icons_top = top_margin;
+    chrome_sync_component_status();
     for (int i = 0; i < 4; i++) {
         s_chrome_status_icons[i] = lv_image_create(scr);
         lv_obj_set_size(s_chrome_status_icons[i], icon_size, icon_size);
@@ -150,6 +172,7 @@ void lvgl_page_chrome_remove(void)
 
 void lvgl_page_chrome_preload_status_icons(void)
 {
+    chrome_sync_component_status();
     for (int i = 0; i < 4; i++) {
         (void)chrome_get_status_icon_src(i);
     }
