@@ -83,6 +83,8 @@
 18. nella sezione 'Stato servizi' indica con 'Disab.' in colore blu i device esclusi tramite DNA
 19. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
 20. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
+22. Permangono del glimps sullo schermo MIPI
+23. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
 
 ---
 

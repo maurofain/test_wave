@@ -123,7 +123,24 @@ typedef struct {
         mdb_device_state_t state;
         bool is_online;
     } bill;
+    struct {
+        mdb_device_state_t state;
+        bool is_online;
+        uint8_t online_devices;
+        uint8_t active_device_index;
+        uint8_t feature_level;
+        uint8_t last_response_code;
+        uint16_t credit_cents;
+        uint16_t approved_price_cents;
+        uint16_t approved_revalue_cents;
+        uint16_t revalue_limit_cents;
+        uint8_t revalue_status;
+        bool session_open;
+    } cashless;
 } mdb_status_t;
+
+typedef bool (*mdb_cashless_credit_callback_t)(int32_t vcd_amount_cents, const char *source_tag);
+typedef bool (*mdb_cashless_vend_callback_t)(bool approved, int32_t amount_cents, const char *source_tag);
 
 /**
  * @brief Inizializza l'interfaccia MDB (UART a 9 bit)
@@ -188,3 +205,38 @@ esp_err_t mdb_send_raw_byte(uint8_t data, bool mode_bit);
  * @return ESP_OK se ricevuto pacchetto valido (compreso Checksum)
  */
 esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len, uint32_t timeout_ms);
+
+/**
+ * @brief Registra il callback usato dal componente MDB per pubblicare il credito cashless verso il runtime.
+ */
+void mdb_register_cashless_credit_callback(mdb_cashless_credit_callback_t callback);
+
+/**
+ * @brief Registra il callback usato dal componente MDB per notificare l'esito delle richieste vend cashless.
+ */
+void mdb_register_cashless_vend_callback(mdb_cashless_vend_callback_t callback);
+
+/**
+ * @brief Richiede un VEND_REQUEST sul device cashless attivo.
+ */
+bool mdb_cashless_request_program_vend(uint16_t amount_cents, uint16_t item_number);
+
+/**
+ * @brief Richiede l'invio del comando VEND_SUCCESS per il vend approvato corrente.
+ */
+bool mdb_cashless_confirm_vend_success(uint16_t approved_amount_cents);
+
+/**
+ * @brief Richiede la chiusura della sessione cashless attiva.
+ */
+bool mdb_cashless_complete_active_session(void);
+
+/**
+ * @brief Richiede il limite di ricarica del device cashless attivo.
+ */
+bool mdb_cashless_request_active_revalue_limit(void);
+
+/**
+ * @brief Richiede una ricarica sul device cashless attivo.
+ */
+bool mdb_cashless_request_active_revalue(uint16_t amount_cents);

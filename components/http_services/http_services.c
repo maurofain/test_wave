@@ -20,7 +20,7 @@ extern bool send_http_log;
 #include <unistd.h>
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
-#define HTTP_SERVICES_LOG_TO_UI
+// #define HTTP_SERVICES_LOG_TO_UI
 
 /* web_ui_add_log is used only when HTTP_SERVICES_LOG_TO_UI is enabled; declare here to
    avoid adding a component dependency (web_ui already depends on http_services). */

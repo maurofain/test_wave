@@ -51,6 +51,7 @@ static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type);
 static void fsm_reset_runtime_locked(fsm_ctx_t *ctx);
 static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source);
 static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source);
+static void fsm_reset_card_vend_pending(fsm_ctx_t *ctx);
 static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost);
 static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx);
 static const char *fsm_source_tag_to_display_name(const char *source_tag);
@@ -170,6 +171,19 @@ static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
     ctx->pre_fine_ciclo_active = false;
 }
 
+static void fsm_reset_card_vend_pending(fsm_ctx_t *ctx)
+{
+    if (!ctx) {
+        return;
+    }
+
+    ctx->card_vend_pending = false;
+    ctx->pending_program_price_units = 0;
+    ctx->pending_pause_max_ms = 0;
+    ctx->pending_running_target_ms = 0;
+    memset(ctx->pending_program_name, 0, sizeof(ctx->pending_program_name));
+}
+
 static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source)
 {
     if (!ctx) {
@@ -287,6 +301,11 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
         return false;
     }
 
+    if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
+        fsm_append_message("Rinnovo automatico disabilitato su sessione card");
+        return false;
+    }
+
     if (ctx->stop_after_cycle_requested) {
         fsm_append_message("Stop a fine ciclo richiesto: rinnovo automatico disabilitato");
         return false;
@@ -376,6 +395,8 @@ static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type)
         case FSM_INPUT_EVENT_COIN: return "coin";
         case FSM_INPUT_EVENT_TOKEN: return "token";
         case FSM_INPUT_EVENT_CARD_CREDIT: return "card_credit";
+        case FSM_INPUT_EVENT_CARD_VEND_APPROVED: return "card_vend_approved";
+        case FSM_INPUT_EVENT_CARD_VEND_DENIED: return "card_vend_denied";
         case FSM_INPUT_EVENT_QR_CREDIT: return "qr_credit";
         case FSM_INPUT_EVENT_QR_SCANNED: return "qr_scanned";
         case FSM_INPUT_EVENT_PROGRAM_SELECTED: return "program_selected";
@@ -481,11 +502,17 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->ads_enabled = true;
     ctx->qr_credit_pending = false;
     ctx->allow_additional_payments = false;
+    ctx->card_vend_pending = false;
+    ctx->card_session_complete_required = false;
     ctx->stop_after_cycle_requested = false;
     ctx->pre_fine_ciclo_active = false;
     ctx->out_of_service_agent = (int32_t)AGN_ID_NONE;
     memset(ctx->out_of_service_reason, 0, sizeof(ctx->out_of_service_reason));
     memset(ctx->customer_code, 0, sizeof(ctx->customer_code));
+    ctx->pending_program_price_units = 0;
+    ctx->pending_pause_max_ms = 0;
+    ctx->pending_running_target_ms = 0;
+    memset(ctx->pending_program_name, 0, sizeof(ctx->pending_program_name));
 }
 
 
@@ -573,6 +600,10 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_PROGRAM_STOP) {
+                if (ctx->session_source == FSM_SESSION_SOURCE_CARD && ctx->card_session_complete_required) {
+                    (void)tasks_request_card_session_complete();
+                    ctx->card_session_complete_required = false;
+                }
                 bool has_credit = (ctx->credit_cents > 0) ||
                                   ((ctx->ecd_coins + ctx->vcd_coins) > 0);
                 fsm_reset_runtime_locked(ctx);
@@ -589,6 +620,10 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 }
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_CREDIT_ENDED) {
+                if (ctx->session_source == FSM_SESSION_SOURCE_CARD && ctx->card_session_complete_required) {
+                    (void)tasks_request_card_session_complete();
+                    ctx->card_session_complete_required = false;
+                }
                 fsm_reset_runtime_locked(ctx);
                 ctx->session_mode = FSM_SESSION_MODE_NONE;
                 ctx->session_source = FSM_SESSION_SOURCE_NONE;
@@ -606,6 +641,10 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->pause_limit_reached = false;
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_PROGRAM_STOP) {
+                if (ctx->session_source == FSM_SESSION_SOURCE_CARD && ctx->card_session_complete_required) {
+                    (void)tasks_request_card_session_complete();
+                    ctx->card_session_complete_required = false;
+                }
                 bool has_credit = (ctx->credit_cents > 0) ||
                                   ((ctx->ecd_coins + ctx->vcd_coins) > 0);
                 fsm_reset_runtime_locked(ctx);
@@ -790,6 +829,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_CARD_CREDIT: {
             ctx->qr_credit_pending = false;
+            if (ctx->card_vend_pending) {
+                fsm_append_message("Vend card in corso: credito aggiuntivo ignorato");
+                return false;
+            }
             if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
                 ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");
@@ -813,6 +856,11 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
 
+            if (ctx->card_vend_pending) {
+                fsm_append_message("Attendere conferma pagamento card in corso");
+                return false;
+            }
+
             int32_t prev_credit_cents = ctx->credit_cents;
             int32_t prev_ecd_coins = ctx->ecd_coins;
             int32_t prev_vcd_coins = ctx->vcd_coins;
@@ -830,6 +878,38 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             if (ctx->credit_cents <= 0) {
                 fsm_append_message("Credito a zero: selezione programma non consentita");
                 return false;
+            }
+
+            if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
+                int32_t vend_amount = (event->value_i32 > 0) ? event->value_i32 : 0;
+
+                if (vend_amount <= 0) {
+                    fsm_append_message("Importo programma non valido per sessione card");
+                    return false;
+                }
+
+                if (ctx->credit_cents < vend_amount) {
+                    fsm_append_message("Credito insufficiente per avvio programma");
+                    return false;
+                }
+
+                ctx->pending_pause_max_ms = event->value_u32;
+                ctx->pending_running_target_ms = event->aux_u32;
+                ctx->pending_program_price_units = vend_amount;
+                snprintf(ctx->pending_program_name,
+                         sizeof(ctx->pending_program_name),
+                         "%s",
+                         event->text[0] ? event->text : "programma");
+
+                if (!tasks_request_card_vend(vend_amount, 0xFFFFU)) {
+                    fsm_reset_card_vend_pending(ctx);
+                    fsm_append_message("Richiesta VEND MDB fallita");
+                    return false;
+                }
+
+                ctx->card_vend_pending = true;
+                fsm_append_message("Richiesta VEND MDB inviata: attesa conferma");
+                return true;
             }
 
             if (event->value_u32 > 0) {
@@ -879,6 +959,75 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
             return true;
 
+        case FSM_INPUT_EVENT_CARD_VEND_APPROVED: {
+            int32_t approved_amount = (event->value_i32 > 0)
+                                          ? event->value_i32
+                                          : ctx->pending_program_price_units;
+
+            if (!ctx->card_vend_pending ||
+                ctx->session_source != FSM_SESSION_SOURCE_CARD ||
+                ctx->state != FSM_STATE_CREDIT) {
+                fsm_append_message("CARD_VEND_APPROVED inatteso");
+                return false;
+            }
+
+            if (approved_amount <= 0) {
+                fsm_reset_card_vend_pending(ctx);
+                fsm_append_message("Importo approvato non valido");
+                return false;
+            }
+
+            if (!tasks_request_card_vend_success(approved_amount)) {
+                (void)tasks_request_card_session_complete();
+                fsm_reset_card_vend_pending(ctx);
+                fsm_append_message("VEND_SUCCESS MDB non accodato");
+                return false;
+            }
+
+            if (ctx->pending_pause_max_ms > 0U) {
+                ctx->pause_max_ms = ctx->pending_pause_max_ms;
+            }
+            if (ctx->pending_running_target_ms > 0U) {
+                ctx->running_target_ms = ctx->pending_running_target_ms;
+            }
+            ctx->running_price_units = approved_amount;
+            snprintf(ctx->running_program_name,
+                     sizeof(ctx->running_program_name),
+                     "%s",
+                     ctx->pending_program_name[0] ? ctx->pending_program_name : "programma");
+
+            if (!fsm_try_charge_program_cycle(ctx, approved_amount)) {
+                (void)tasks_request_card_session_complete();
+                fsm_reset_card_vend_pending(ctx);
+                fsm_append_message("Credito locale incoerente dopo VEND_APPROVED");
+                return false;
+            }
+
+            if (!fsm_handle_event(ctx, FSM_EVENT_PROGRAM_SELECTED)) {
+                ctx->credit_cents += approved_amount;
+                ctx->vcd_coins += approved_amount;
+                ctx->vcd_used -= approved_amount;
+                (void)tasks_request_card_session_complete();
+                fsm_reset_card_vend_pending(ctx);
+                fsm_append_message("Avvio programma fallito dopo VEND_APPROVED");
+                return false;
+            }
+
+            ctx->card_session_complete_required = true;
+            fsm_reset_card_vend_pending(ctx);
+            return true;
+        }
+
+        case FSM_INPUT_EVENT_CARD_VEND_DENIED:
+            if (!ctx->card_vend_pending || ctx->session_source != FSM_SESSION_SOURCE_CARD) {
+                return false;
+            }
+
+            (void)tasks_request_card_session_complete();
+            fsm_reset_card_vend_pending(ctx);
+            fsm_append_message("Pagamento card negato dal lettore MDB");
+            return true;
+
         case FSM_INPUT_EVENT_PROGRAM_STOP:
             if (event->aux_u32 == 1U &&
                 (ctx->state == FSM_STATE_RUNNING || ctx->state == FSM_STATE_PAUSED)) {
@@ -902,6 +1051,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             break;
 
         case FSM_INPUT_EVENT_CREDIT_ENDED:
+            if (ctx->card_vend_pending) {
+                (void)tasks_request_card_session_complete();
+                fsm_reset_card_vend_pending(ctx);
+            }
             if (event->aux_u32 == 1U) {
                 ctx->vcd_coins = 0;
                 ctx->vcd_used = 0;

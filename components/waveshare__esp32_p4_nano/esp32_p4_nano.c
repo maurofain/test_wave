@@ -723,6 +723,22 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
     esp_lcd_dpi_panel_config_t dpi_config = ILI9881C_720_1280_PANEL_60HZ_DPI_CONFIG(LCD_COLOR_PIXEL_FORMAT_RGB565);
 #endif
     dpi_config.num_fbs = CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
+    ESP_LOGI(TAG,
+             "[C] MIPI 7A cfg: dpi_clk=%uMHz num_fbs=%u lane=%u bitrate=%uMbps avoid_tear=%d full_refresh=%d",
+             (unsigned)dpi_config.dpi_clock_freq_mhz,
+             (unsigned)dpi_config.num_fbs,
+             (unsigned)BSP_LCD_MIPI_DSI_LANE_NUM,
+             (unsigned)BSP_LCD_MIPI_DSI_LANE_BITRATE_MBPS,
+#if CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR
+             1,
+#else
+             0,
+#endif
+#if CONFIG_BSP_DISPLAY_LVGL_FULL_REFRESH
+             1);
+#else
+             0);
+#endif
 
     ili9881c_vendor_config_t vendor_config = {
         .mipi_config = {

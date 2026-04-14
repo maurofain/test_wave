@@ -1,4 +1,5 @@
 #include "mdb.h"
+#include "mdb_cashless.h"
 #include "esp_log.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
@@ -8,7 +9,11 @@
 #include "sdkconfig.h"
 #include <string.h>
 
-static const char *TAG = "MDB";
+static const char *TAG_INIT = "MDB_INIT";
+static const char *TAG_IO = "MDB_IO";
+static const char *TAG_COIN = "MDB_COIN";
+static const char *TAG_CASH = "MDB_CASH";
+static const char *TAG_ENGINE = "MDB_ENGINE";
 
 #ifndef DNA_MDB
 #define DNA_MDB 0
@@ -21,26 +26,274 @@ static const char *TAG = "MDB";
 #define MDB_TX_GPIO     CONFIG_APP_MDB_TX_GPIO
 #define MDB_RX_GPIO     CONFIG_APP_MDB_RX_GPIO
 #define MDB_COIN_SETUP_MAX_RETRIES 5
+#define MDB_CASHLESS_SETUP_MAX_RETRIES 5
+
+#define MDB_CASHLESS_CMD_RESET      0x00
+#define MDB_CASHLESS_CMD_SETUP      0x01
+#define MDB_CASHLESS_CMD_POLL       0x02
+#define MDB_CASHLESS_CMD_VEND       0x03
+#define MDB_CASHLESS_CMD_ENABLE     0x04
+#define MDB_CASHLESS_CMD_REVALUE    0x05
+#define MDB_CASHLESS_CMD_EXPANSION  0x07
+
+#define MDB_CASHLESS_EXP_REQUEST_ID             0x00
+#define MDB_CASHLESS_EXP_REQUEST_FEATURE_ENABLE 0x04
+#define MDB_CASHLESS_VEND_REQUEST               0x00
+#define MDB_CASHLESS_VEND_SUCCESS               0x02
+#define MDB_CASHLESS_VEND_SESSION_COMPLETE      0x04
+#define MDB_CASHLESS_REVALUE_REQUEST            0x00
+#define MDB_CASHLESS_REVALUE_LIMIT_REQUEST      0x01
 
 static mdb_status_t s_mdb_status = {0};
 static uint8_t s_coin_setup_retries = 0;
+static uint8_t s_cashless_reset_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static uint8_t s_cashless_setup_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static bool s_mdb_driver_initialized = false;
 static bool s_mdb_init_failed = false;
 static bool s_mdb_runtime_fault = false;
+static mdb_cashless_credit_callback_t s_mdb_cashless_credit_callback = NULL;
+static mdb_cashless_vend_callback_t s_mdb_cashless_vend_callback = NULL;
+
+static const uint8_t s_pk4_setup_vmc_caps[] = {0x00, 0x02, 0x00, 0x00, 0x00};
+static const uint8_t s_pk4_setup_vmc_maxmin[] = {0x01, 0xFF, 0xFF, 0x00, 0x00};
+static const uint8_t s_pk4_request_id_payload[] = {
+    0x00,
+    'M', 'H', 'I',
+    '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '1',
+    'E', 'S', 'P', '3', '2', '-', 'P', '4', '-', 'V', 'M', 'C',
+    0x00, 0x01,
+};
+static const uint8_t s_pk4_enable_payload[] = {0x01};
+
+static void mdb_cashless_update_public_status(void);
+static void mdb_cashless_sm(size_t device_index);
+static void mdb_cashless_dispatch_pending_credit(void);
+static void mdb_cashless_dispatch_pending_vend(void);
+static bool mdb_cashless_get_active_device_index(size_t *device_index);
+static esp_err_t mdb_cashless_send_vend_command(uint8_t device_address,
+                                                uint8_t subcommand,
+                                                uint16_t amount_cents,
+                                                uint16_t item_number,
+                                                uint8_t *rx,
+                                                size_t rx_size,
+                                                size_t *rx_len,
+                                                uint32_t timeout_ms);
+static esp_err_t mdb_cashless_send_revalue_command(uint8_t device_address,
+                                                   uint8_t subcommand,
+                                                   uint16_t amount_cents,
+                                                   uint8_t *rx,
+                                                   size_t rx_size,
+                                                   size_t *rx_len,
+                                                   uint32_t timeout_ms);
+static esp_err_t mdb_cashless_send_simple_command(uint8_t device_address,
+                                                  uint8_t command,
+                                                  const uint8_t *payload,
+                                                  size_t payload_len,
+                                                  uint8_t *rx,
+                                                  size_t rx_size,
+                                                  size_t *rx_len,
+                                                  uint32_t timeout_ms);
+
+static const char *mdb_state_to_string(mdb_device_state_t state)
+{
+    switch (state) {
+        case MDB_STATE_INACTIVE: return "inactive";
+        case MDB_STATE_INIT_RESET: return "init_reset";
+        case MDB_STATE_INIT_SETUP: return "init_setup";
+        case MDB_STATE_INIT_EXPANSION: return "init_expansion";
+        case MDB_STATE_INIT_ENABLE: return "init_enable";
+        case MDB_STATE_IDLE_POLLING: return "idle_polling";
+        case MDB_STATE_ERROR: return "error";
+        default: return "unknown";
+    }
+}
+
+static const char *mdb_cashless_command_to_string(uint8_t command, uint8_t subcommand)
+{
+    switch (command) {
+        case MDB_CASHLESS_CMD_RESET:
+            return "reset";
+        case MDB_CASHLESS_CMD_SETUP:
+            return "setup";
+        case MDB_CASHLESS_CMD_POLL:
+            return "poll";
+        case MDB_CASHLESS_CMD_ENABLE:
+            return "enable";
+        case MDB_CASHLESS_CMD_EXPANSION:
+            if (subcommand == MDB_CASHLESS_EXP_REQUEST_ID) {
+                return "exp_request_id";
+            }
+            if (subcommand == MDB_CASHLESS_EXP_REQUEST_FEATURE_ENABLE) {
+                return "exp_feature_enable";
+            }
+            return "expansion";
+        case MDB_CASHLESS_CMD_VEND:
+            if (subcommand == MDB_CASHLESS_VEND_REQUEST) {
+                return "vend_request";
+            }
+            if (subcommand == MDB_CASHLESS_VEND_SUCCESS) {
+                return "vend_success";
+            }
+            if (subcommand == MDB_CASHLESS_VEND_SESSION_COMPLETE) {
+                return "vend_session_complete";
+            }
+            return "vend";
+        case MDB_CASHLESS_CMD_REVALUE:
+            if (subcommand == MDB_CASHLESS_REVALUE_REQUEST) {
+                return "revalue_request";
+            }
+            if (subcommand == MDB_CASHLESS_REVALUE_LIMIT_REQUEST) {
+                return "revalue_limit";
+            }
+            return "revalue";
+        default:
+            return "unknown";
+    }
+}
+
+static void mdb_log_packet_bytes(const char *tag, const char *label, const uint8_t *data, size_t len)
+{
+    char buffer[256] = {0};
+    size_t offset = 0;
+    size_t max_bytes = len;
+
+    if (!tag || !label) {
+        return;
+    }
+
+    if (!data || len == 0U) {
+        ESP_LOGI(tag, "[C] [%s] <empty>", label);
+        return;
+    }
+
+    if (max_bytes > 24U) {
+        max_bytes = 24U;
+    }
+
+    for (size_t index = 0; index < max_bytes && offset + 4U < sizeof(buffer); ++index) {
+        offset += (size_t)snprintf(buffer + offset, sizeof(buffer) - offset, "%02X ", data[index]);
+    }
+
+    if (len > max_bytes && offset + 5U < sizeof(buffer)) {
+        snprintf(buffer + offset, sizeof(buffer) - offset, "...");
+    } else if (offset > 0U) {
+        buffer[offset - 1U] = '\0';
+    }
+
+    ESP_LOGI(tag, "[C] [%s] len=%u data=%s", label, (unsigned)len, buffer);
+}
 
 const mdb_status_t* mdb_get_status(void) {
     return &s_mdb_status;
 }
 
+void mdb_register_cashless_credit_callback(mdb_cashless_credit_callback_t callback)
+{
+    s_mdb_cashless_credit_callback = callback;
+}
+
+void mdb_register_cashless_vend_callback(mdb_cashless_vend_callback_t callback)
+{
+    s_mdb_cashless_vend_callback = callback;
+}
+
+bool mdb_cashless_request_program_vend(uint16_t amount_cents, uint16_t item_number)
+{
+    size_t device_index = 0;
+
+    if (amount_cents == 0U || !mdb_cashless_get_active_device_index(&device_index)) {
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_request_program_vend] richiesta ignorata amount=%u item=0x%04X",
+                 (unsigned)amount_cents,
+                 (unsigned)item_number);
+        return false;
+    }
+
+    ESP_LOGI(TAG_CASH,
+             "[C] [mdb_cashless_request_program_vend] dev=%u amount=%u item=0x%04X",
+             (unsigned)device_index,
+             (unsigned)amount_cents,
+             (unsigned)item_number);
+    return mdb_cashless_prepare_vend_request(device_index, amount_cents, item_number);
+}
+
+bool mdb_cashless_confirm_vend_success(uint16_t approved_amount_cents)
+{
+    size_t device_index = 0;
+
+    if (approved_amount_cents == 0U || !mdb_cashless_get_active_device_index(&device_index)) {
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_confirm_vend_success] conferma ignorata amount=%u",
+                 (unsigned)approved_amount_cents);
+        return false;
+    }
+
+    ESP_LOGI(TAG_CASH,
+             "[C] [mdb_cashless_confirm_vend_success] dev=%u amount=%u",
+             (unsigned)device_index,
+             (unsigned)approved_amount_cents);
+    return mdb_cashless_prepare_vend_success(device_index, approved_amount_cents);
+}
+
+bool mdb_cashless_complete_active_session(void)
+{
+    size_t device_index = 0;
+
+    if (!mdb_cashless_get_active_device_index(&device_index)) {
+        ESP_LOGW(TAG_CASH, "[C] [mdb_cashless_complete_active_session] nessun device cashless attivo");
+        return false;
+    }
+
+    ESP_LOGI(TAG_CASH,
+             "[C] [mdb_cashless_complete_active_session] dev=%u richiesta chiusura sessione",
+             (unsigned)device_index);
+    return mdb_cashless_request_session_complete(device_index);
+}
+
+bool mdb_cashless_request_active_revalue_limit(void)
+{
+    size_t device_index = 0;
+
+    if (!mdb_cashless_get_active_device_index(&device_index)) {
+        ESP_LOGW(TAG_CASH, "[C] [mdb_cashless_request_active_revalue_limit] nessun device cashless attivo");
+        return false;
+    }
+
+    ESP_LOGI(TAG_CASH,
+             "[C] [mdb_cashless_request_active_revalue_limit] dev=%u richiesta limite",
+             (unsigned)device_index);
+    return mdb_cashless_request_revalue_limit(device_index);
+}
+
+bool mdb_cashless_request_active_revalue(uint16_t amount_cents)
+{
+    size_t device_index = 0;
+
+    if (amount_cents == 0U || !mdb_cashless_get_active_device_index(&device_index)) {
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_request_active_revalue] richiesta ignorata amount=%u",
+                 (unsigned)amount_cents);
+        return false;
+    }
+
+    ESP_LOGI(TAG_CASH,
+             "[C] [mdb_cashless_request_active_revalue] dev=%u amount=%u",
+             (unsigned)device_index,
+             (unsigned)amount_cents);
+    return mdb_cashless_prepare_revalue(device_index, amount_cents);
+}
+
 device_component_status_t mdb_get_component_status(void)
 {
     const device_config_t *cfg = device_config_get();
+    bool coin_enabled = cfg && cfg->sensors.mdb_enabled && cfg->mdb.coin_acceptor_en;
+    bool cashless_enabled = cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en;
 
     if (s_mdb_init_failed || s_mdb_runtime_fault) {
         return DEVICE_COMPONENT_STATUS_OFFLINE;
     }
 
-    if (!cfg || !cfg->sensors.mdb_enabled || !cfg->mdb.coin_acceptor_en) {
+    if (!cfg || !cfg->sensors.mdb_enabled || (!coin_enabled && !cashless_enabled)) {
         return DEVICE_COMPONENT_STATUS_DISABLED;
     }
 
@@ -48,7 +301,8 @@ device_component_status_t mdb_get_component_status(void)
         return DEVICE_COMPONENT_STATUS_ACTIVE;
     }
 
-    if (s_mdb_status.coin.is_online && s_mdb_status.coin.state == MDB_STATE_IDLE_POLLING) {
+    if ((coin_enabled && s_mdb_status.coin.is_online && s_mdb_status.coin.state == MDB_STATE_IDLE_POLLING) ||
+        (cashless_enabled && s_mdb_status.cashless.is_online)) {
         return DEVICE_COMPONENT_STATUS_ONLINE;
     }
 
@@ -87,6 +341,7 @@ static void mdb_send_ack(void) {
     uart_set_parity(MDB_UART_PORT, UART_PARITY_EVEN);
     uart_write_bytes(MDB_UART_PORT, &ack, 1);
     uart_wait_tx_done(MDB_UART_PORT, pdMS_TO_TICKS(10));
+    ESP_LOGI(TAG_IO, "[C] [mdb_send_ack] ACK inviato sul bus MDB");
 }
 
 // Logica per la Macchina a Stati della Gettoniera (Coin Acceptor)
@@ -106,11 +361,17 @@ static void mdb_coin_sm(void) {
 
     switch (s_mdb_status.coin.state) {
         case MDB_STATE_INACTIVE:
-            if (device_config_get()->mdb.coin_acceptor_en) s_mdb_status.coin.state = MDB_STATE_INIT_RESET;
+            if (device_config_get()->mdb.coin_acceptor_en) {
+                ESP_LOGI(TAG_COIN,
+                         "[C] [mdb_coin_sm] state=%s -> %s",
+                         mdb_state_to_string(s_mdb_status.coin.state),
+                         mdb_state_to_string(MDB_STATE_INIT_RESET));
+                s_mdb_status.coin.state = MDB_STATE_INIT_RESET;
+            }
             break;
 
         case MDB_STATE_INIT_RESET:
-            ESP_LOGI(TAG, "Gettoniera MDB: Invio RESET...");
+            ESP_LOGI(TAG_COIN, "[C] [mdb_coin_sm] invio RESET gettoniera");
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_RESET, NULL, 0);
             vTaskDelay(pdMS_TO_TICKS(500)); // Aspetta reboot periferica
             s_coin_setup_retries = 0;
@@ -119,7 +380,7 @@ static void mdb_coin_sm(void) {
             break;
 
         case MDB_STATE_INIT_SETUP:
-            ESP_LOGI(TAG, "Gettoniera MDB: Invio SETUP...");
+            ESP_LOGI(TAG_COIN, "[C] [mdb_coin_sm] invio SETUP gettoniera");
             mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_CMD_SETUP, NULL, 0);
             if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 100) == ESP_OK) {
                 if (rx_len >= 23) {
@@ -133,7 +394,7 @@ static void mdb_coin_sm(void) {
                         s_mdb_status.coin.coin_values[i] = rx[7 + i];
                     }
                     
-                    ESP_LOGI(TAG, "Setup Gettoniera MDB: Livello %d, Valuta %04X, Fattore di Scala %d, Decimali %d", 
+                    ESP_LOGI(TAG_COIN, "[C] [mdb_coin_sm] setup ok level=%d currency=%04X scaling=%d decimals=%d", 
                              s_mdb_status.coin.feature_level, s_mdb_status.coin.currency_code,
                              s_mdb_status.coin.scaling_factor, s_mdb_status.coin.decimal_places);
                     
@@ -142,10 +403,14 @@ static void mdb_coin_sm(void) {
                     s_mdb_status.coin.is_online = true;
                     s_mdb_runtime_fault = false;
                 } else {
-                    ESP_LOGW(TAG, "Gettoniera MDB: Risposta di setup troppo breve (%zu)", rx_len);
+                    ESP_LOGW(TAG_COIN, "[C] [mdb_coin_sm] setup risposta troppo breve len=%u", (unsigned)rx_len);
                     s_coin_setup_retries++;
                 }
             } else {
+                ESP_LOGW(TAG_COIN,
+                         "[C] [mdb_coin_sm] setup senza risposta valida retry=%u/%u",
+                         (unsigned)(s_coin_setup_retries + 1U),
+                         (unsigned)MDB_COIN_SETUP_MAX_RETRIES);
                 s_coin_setup_retries++;
             }
 
@@ -157,18 +422,20 @@ static void mdb_coin_sm(void) {
                 s_mdb_status.coin.is_online = false;
                 s_mdb_status.coin.state = MDB_STATE_INACTIVE;
                 s_mdb_runtime_fault = true;
-                ESP_LOGE(TAG, "Gettoniera MDB: setup fallito %u volte, periferica disabilitata a runtime", (unsigned)s_coin_setup_retries);
+                ESP_LOGE(TAG_COIN,
+                         "[C] [mdb_coin_sm] setup fallito %u volte, gettoniera disabilitata a runtime",
+                         (unsigned)s_coin_setup_retries);
             }
             break;
 
         case MDB_STATE_INIT_ENABLE:
-            ESP_LOGI(TAG, "Gettoniera MDB: Abilitazione di tutti i tipi di monete...");
+            ESP_LOGI(TAG_COIN, "[C] [mdb_coin_sm] abilito tutti i tipi di moneta");
             {
                 uint8_t enable_data[4] = {0xFF, 0xFF, 0xFF, 0xFF}; // Abilita tutto (Accept & Dispense)
                 mdb_send_packet(MDB_ADDR_COIN_CHANGER | MDB_COIN_CMD_COIN_TYPE, enable_data, 4);
             }
             if (mdb_receive_packet(rx, sizeof(rx), &rx_len, 50) == ESP_OK && rx[0] == MDB_ACK) {
-                ESP_LOGI(TAG, "Gettoniera MDB: Abilitata!");
+                ESP_LOGI(TAG_COIN, "[C] [mdb_coin_sm] gettoniera abilitata");
                 s_mdb_status.coin.state = MDB_STATE_IDLE_POLLING;
             }
             break;
@@ -181,7 +448,7 @@ static void mdb_coin_sm(void) {
                     // Tutto OK, nessun evento
                 } else {
                     // Dati ricevuti (es. moneta inserita)
-                    ESP_LOGI(TAG, "Evento Gettoniera MDB: Ricevuti %zu byte", rx_len);
+                    ESP_LOGI(TAG_COIN, "[C] [mdb_coin_sm] evento gettoniera len=%u", (unsigned)rx_len);
                     mdb_send_ack();
                     
                     // Parsing eventi (solo i più importanti)
@@ -192,9 +459,14 @@ static void mdb_coin_sm(void) {
                             uint8_t type = b & 0x0F;
                             uint16_t real_val = s_mdb_status.coin.coin_values[type] * s_mdb_status.coin.scaling_factor;
                             s_mdb_status.coin.credit_cents += real_val;
-                            ESP_LOGI(TAG, "Gettoniera MDB: Moneta tipo %d accreditata (+%d unità), Routing: %d", type, real_val, routing);
+                            ESP_LOGI(TAG_COIN,
+                                     "[C] [mdb_coin_sm] moneta tipo=%d routing=%d credito=+%u cent totale=%u",
+                                     type,
+                                     routing,
+                                     (unsigned)real_val,
+                                     (unsigned)s_mdb_status.coin.credit_cents);
                         } else if (b == 0x0B) { // Reset del Changer
-                            ESP_LOGW(TAG, "Gettoniera MDB: Reset rilevato, ri-inizializzazione...");
+                            ESP_LOGW(TAG_COIN, "[C] [mdb_coin_sm] reset gettoniera rilevato, riavvio setup");
                             s_mdb_status.coin.state = MDB_STATE_INIT_SETUP;
                         }
                     }
@@ -203,12 +475,634 @@ static void mdb_coin_sm(void) {
                 s_mdb_runtime_fault = false;
             } else {
                 s_mdb_status.coin.is_online = false;
-                ESP_LOGD(TAG, "Gettoniera MDB: Nessuna risposta");
+                ESP_LOGD(TAG_COIN, "[C] [mdb_coin_sm] nessuna risposta dal poll gettoniera");
             }
             break;
             
         default: break;
     }
+}
+
+static void mdb_cashless_update_public_status(void)
+{
+    const mdb_cashless_device_t *active_device = NULL;
+    size_t online_devices = 0;
+
+    s_mdb_status.cashless.state = MDB_STATE_INACTIVE;
+    s_mdb_status.cashless.is_online = false;
+    s_mdb_status.cashless.online_devices = 0;
+    s_mdb_status.cashless.active_device_index = 0xFF;
+    s_mdb_status.cashless.feature_level = 0;
+    s_mdb_status.cashless.last_response_code = 0;
+    s_mdb_status.cashless.credit_cents = 0;
+    s_mdb_status.cashless.approved_price_cents = 0;
+    s_mdb_status.cashless.approved_revalue_cents = 0;
+    s_mdb_status.cashless.revalue_limit_cents = 0;
+    s_mdb_status.cashless.revalue_status = 0;
+    s_mdb_status.cashless.session_open = false;
+
+    for (size_t device_index = 0; device_index < mdb_cashless_get_device_count(); ++device_index) {
+        const mdb_cashless_device_t *device = mdb_cashless_get_device(device_index);
+        if (!device) {
+            continue;
+        }
+
+        if (device->present) {
+            online_devices++;
+            if (!active_device) {
+                active_device = device;
+                s_mdb_status.cashless.active_device_index = (uint8_t)device_index;
+            }
+        }
+    }
+
+    s_mdb_status.cashless.online_devices = (uint8_t)online_devices;
+    s_mdb_status.cashless.is_online = (online_devices > 0U);
+
+    if (active_device) {
+        s_mdb_status.cashless.state = active_device->poll_state;
+        s_mdb_status.cashless.feature_level = active_device->feature_level;
+        s_mdb_status.cashless.last_response_code = active_device->last_response_code;
+        s_mdb_status.cashless.credit_cents = active_device->credit_cents;
+        s_mdb_status.cashless.approved_price_cents = active_device->approved_price_cents;
+        s_mdb_status.cashless.approved_revalue_cents = active_device->approved_revalue_cents;
+        s_mdb_status.cashless.revalue_limit_cents = active_device->revalue_limit_cents;
+        s_mdb_status.cashless.revalue_status = (uint8_t)active_device->revalue_status;
+        s_mdb_status.cashless.session_open = active_device->session_open;
+    }
+}
+
+static void mdb_cashless_dispatch_pending_credit(void)
+{
+    size_t device_index = 0;
+    uint16_t credit_cents = 0;
+
+    if (!s_mdb_cashless_credit_callback) {
+        return;
+    }
+
+    if (!mdb_cashless_get_pending_credit_event(&device_index, &credit_cents)) {
+        return;
+    }
+
+    if (credit_cents == 0U) {
+        mdb_cashless_ack_pending_credit_event(device_index);
+        return;
+    }
+
+    if (s_mdb_cashless_credit_callback((int32_t)credit_cents, "mdb_cashless")) {
+        ESP_LOGI(TAG_CASH,
+             "[C] [mdb_cashless_dispatch_pending_credit] dev=%u credito=%u cent sincronizzato verso FSM",
+                 (unsigned)device_index,
+                 (unsigned)credit_cents);
+        mdb_cashless_ack_pending_credit_event(device_index);
+    }
+}
+
+static void mdb_cashless_dispatch_pending_vend(void)
+{
+    size_t device_index = 0;
+    uint16_t amount_cents = 0;
+    bool approved = false;
+
+    if (!s_mdb_cashless_vend_callback) {
+        return;
+    }
+
+    if (!mdb_cashless_get_pending_vend_event(&device_index, &approved, &amount_cents)) {
+        return;
+    }
+
+    if (s_mdb_cashless_vend_callback(approved, (int32_t)amount_cents, "mdb_cashless")) {
+        ESP_LOGI(TAG_CASH,
+             "[C] [mdb_cashless_dispatch_pending_vend] dev=%u esito=%s amount=%u",
+                 (unsigned)device_index,
+                 approved ? "approved" : "denied",
+                 (unsigned)amount_cents);
+        mdb_cashless_ack_pending_vend_event(device_index);
+    }
+}
+
+static bool mdb_cashless_get_active_device_index(size_t *device_index)
+{
+    if (!device_index) {
+        return false;
+    }
+
+    for (size_t index = 0; index < mdb_cashless_get_device_count(); ++index) {
+        const mdb_cashless_device_t *device = mdb_cashless_get_device(index);
+        if (!device || !device->present || !device->session_open) {
+            continue;
+        }
+
+        *device_index = index;
+        return true;
+    }
+
+    if (s_mdb_status.cashless.is_online &&
+        s_mdb_status.cashless.active_device_index < MDB_CASHLESS_DEVICE_COUNT) {
+        *device_index = s_mdb_status.cashless.active_device_index;
+        return true;
+    }
+
+    return false;
+}
+
+static esp_err_t mdb_cashless_send_vend_command(uint8_t device_address,
+                                                uint8_t subcommand,
+                                                uint16_t amount_cents,
+                                                uint16_t item_number,
+                                                uint8_t *rx,
+                                                size_t rx_size,
+                                                size_t *rx_len,
+                                                uint32_t timeout_ms)
+{
+    uint8_t payload[5] = {0};
+
+    payload[0] = subcommand;
+    payload[1] = (uint8_t)((amount_cents >> 8) & 0xFFU);
+    payload[2] = (uint8_t)(amount_cents & 0xFFU);
+    payload[3] = (uint8_t)((item_number >> 8) & 0xFFU);
+    payload[4] = (uint8_t)(item_number & 0xFFU);
+
+    return mdb_cashless_send_simple_command(device_address,
+                                            MDB_CASHLESS_CMD_VEND,
+                                            payload,
+                                            sizeof(payload),
+                                            rx,
+                                            rx_size,
+                                            rx_len,
+                                            timeout_ms);
+}
+
+static esp_err_t mdb_cashless_send_revalue_command(uint8_t device_address,
+                                                   uint8_t subcommand,
+                                                   uint16_t amount_cents,
+                                                   uint8_t *rx,
+                                                   size_t rx_size,
+                                                   size_t *rx_len,
+                                                   uint32_t timeout_ms)
+{
+    uint8_t payload[3] = {0};
+    size_t payload_len = 1U;
+
+    payload[0] = subcommand;
+    if (subcommand == MDB_CASHLESS_REVALUE_REQUEST) {
+        payload[1] = (uint8_t)((amount_cents >> 8) & 0xFFU);
+        payload[2] = (uint8_t)(amount_cents & 0xFFU);
+        payload_len = 3U;
+    }
+
+    return mdb_cashless_send_simple_command(device_address,
+                                            MDB_CASHLESS_CMD_REVALUE,
+                                            payload,
+                                            payload_len,
+                                            rx,
+                                            rx_size,
+                                            rx_len,
+                                            timeout_ms);
+}
+
+static esp_err_t mdb_cashless_send_simple_command(uint8_t device_address,
+                                                  uint8_t command,
+                                                  const uint8_t *payload,
+                                                  size_t payload_len,
+                                                  uint8_t *rx,
+                                                  size_t rx_size,
+                                                  size_t *rx_len,
+                                                  uint32_t timeout_ms)
+{
+    uint8_t subcommand = (payload && payload_len > 0U) ? payload[0] : 0xFFU;
+
+    ESP_LOGI(TAG_IO,
+             "[C] [mdb_cashless_send_simple_command] addr=0x%02X cmd=%s(0x%02X) payload_len=%u timeout=%u",
+             device_address,
+             mdb_cashless_command_to_string(command, subcommand),
+             command,
+             (unsigned)payload_len,
+             (unsigned)timeout_ms);
+    if (payload && payload_len > 0U) {
+        mdb_log_packet_bytes(TAG_IO, "mdb_cashless_send_simple_command.tx_payload", payload, payload_len);
+    }
+
+    esp_err_t err = mdb_send_packet(device_address | command, payload, payload_len);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG_IO,
+                 "[C] [mdb_cashless_send_simple_command] tx fallita addr=0x%02X cmd=0x%02X err=%s",
+                 device_address,
+                 command,
+                 esp_err_to_name(err));
+        return err;
+    }
+
+    err = mdb_receive_packet(rx, rx_size, rx_len, timeout_ms);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG_IO,
+                 "[C] [mdb_cashless_send_simple_command] rx fallita addr=0x%02X cmd=0x%02X err=%s",
+                 device_address,
+                 command,
+                 esp_err_to_name(err));
+        return err;
+    }
+
+    if (*rx_len > 1U) {
+        mdb_send_ack();
+    }
+
+    mdb_log_packet_bytes(TAG_IO, "mdb_cashless_send_simple_command.rx", rx, *rx_len);
+
+    return ESP_OK;
+}
+
+static void mdb_cashless_sm(size_t device_index)
+{
+    const device_config_t *cfg = device_config_get();
+    const mdb_cashless_device_t *device = mdb_cashless_get_device(device_index);
+    mdb_cashless_device_t *device_rw = NULL;
+    uint8_t rx[64] = {0};
+    size_t rx_len = 0;
+    esp_err_t ret = ESP_OK;
+    bool response_ok = false;
+    bool parsed_response = false;
+
+    if (!cfg || !device) {
+        return;
+    }
+
+    device_rw = (mdb_cashless_device_t *)device;
+
+    if (!cfg->mdb.cashless_en) {
+        s_cashless_reset_retries[device_index] = 0;
+        s_cashless_setup_retries[device_index] = 0;
+        if (device->poll_state != MDB_STATE_INACTIVE || device->present) {
+            ESP_LOGI(TAG_CASH,
+                     "[C] [mdb_cashless_sm] dev=%u cashless disabilitato da config, reset stato runtime",
+                     (unsigned)device_index);
+        }
+        mdb_cashless_reset_device(device_index);
+        mdb_cashless_update_public_status();
+        return;
+    }
+
+    switch (device->poll_state) {
+        case MDB_STATE_INACTIVE:
+            ESP_LOGI(TAG_CASH,
+                     "[C] [mdb_cashless_sm] dev=%u addr=0x%02X state=%s -> %s",
+                     (unsigned)device_index,
+                     device->address,
+                     mdb_state_to_string(device->poll_state),
+                     mdb_state_to_string(MDB_STATE_INIT_SETUP));
+            s_cashless_reset_retries[device_index] = 0;
+            s_cashless_setup_retries[device_index] = 0;
+            device_rw->last_response_code = 0;
+            device_rw->poll_state = MDB_STATE_INIT_SETUP;
+            break;
+
+        case MDB_STATE_INIT_RESET:
+            ESP_LOGI(TAG_CASH,
+                     "[C] [mdb_cashless_sm] dev=%u addr=0x%02X invio RESET PK4",
+                     (unsigned)device_index,
+                     device->address);
+            ret = mdb_cashless_send_simple_command(device->address,
+                                                   MDB_CASHLESS_CMD_RESET,
+                                                   NULL,
+                                                   0,
+                                                   rx,
+                                                   sizeof(rx),
+                                                   &rx_len,
+                                                   100);
+            if (ret == ESP_OK) {
+                response_ok = (rx_len > 0U);
+                parsed_response = response_ok && !(rx_len == 1U && rx[0] == MDB_ACK);
+                if (parsed_response) {
+                    mdb_cashless_handle_poll_response(device_index, rx, rx_len);
+                }
+
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u addr=0x%02X POLL dopo RESET",
+                         (unsigned)device_index,
+                         device->address);
+                ret = mdb_cashless_send_simple_command(device->address,
+                                                       MDB_CASHLESS_CMD_POLL,
+                                                       NULL,
+                                                       0,
+                                                       rx,
+                                                       sizeof(rx),
+                                                       &rx_len,
+                                                       40);
+                if (ret == ESP_OK) {
+                    response_ok = (rx_len > 0U);
+                    parsed_response = response_ok && !(rx_len == 1U && rx[0] == MDB_ACK);
+                    if (parsed_response) {
+                        mdb_cashless_handle_poll_response(device_index, rx, rx_len);
+                    }
+                }
+
+                s_cashless_reset_retries[device_index] = 0;
+                s_cashless_setup_retries[device_index] = 0;
+                device_rw->last_response_code = 0;
+                device_rw->poll_state = MDB_STATE_INIT_SETUP;
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u -> %s",
+                         (unsigned)device_index,
+                         mdb_state_to_string(device_rw->poll_state));
+            } else if (++s_cashless_reset_retries[device_index] >= MDB_CASHLESS_SETUP_MAX_RETRIES) {
+                device_rw->poll_state = MDB_STATE_ERROR;
+                ESP_LOGE(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u reset fallito %u volte -> error",
+                         (unsigned)device_index,
+                         (unsigned)s_cashless_reset_retries[device_index]);
+            } else {
+                ESP_LOGW(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u reset retry=%u/%u",
+                         (unsigned)device_index,
+                         (unsigned)s_cashless_reset_retries[device_index],
+                         (unsigned)MDB_CASHLESS_SETUP_MAX_RETRIES);
+            }
+            break;
+
+        case MDB_STATE_INIT_SETUP:
+            if (!device->config_read) {
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u addr=0x%02X invio SETUP capacita VMC",
+                         (unsigned)device_index,
+                         device->address);
+                ret = mdb_cashless_send_simple_command(device->address,
+                                                       MDB_CASHLESS_CMD_SETUP,
+                                                       s_pk4_setup_vmc_caps,
+                                                       sizeof(s_pk4_setup_vmc_caps),
+                                                       rx,
+                                                       sizeof(rx),
+                                                       &rx_len,
+                                                       120);
+                response_ok = (ret == ESP_OK && rx_len > 0U);
+                if (ret == ESP_OK && rx_len >= 2U) {
+                    s_cashless_setup_retries[device_index] = 0;
+                    device_rw->feature_level = rx[0];
+                    device_rw->cash_sale_support = (rx_len > 7U) && ((rx[7] & 0x08U) != 0U);
+                    device_rw->config_read = true;
+                    ESP_LOGI(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u setup#1 ok level=%u cash_sale=%d",
+                             (unsigned)device_index,
+                             (unsigned)device_rw->feature_level,
+                             device_rw->cash_sale_support ? 1 : 0);
+                } else if (++s_cashless_setup_retries[device_index] >= MDB_CASHLESS_SETUP_MAX_RETRIES) {
+                    device_rw->poll_state = MDB_STATE_ERROR;
+                    ESP_LOGE(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u setup#1 fallito %u volte -> error",
+                             (unsigned)device_index,
+                             (unsigned)s_cashless_setup_retries[device_index]);
+                } else {
+                    ESP_LOGW(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u setup#1 retry=%u/%u",
+                             (unsigned)device_index,
+                             (unsigned)s_cashless_setup_retries[device_index],
+                             (unsigned)MDB_CASHLESS_SETUP_MAX_RETRIES);
+                }
+                break;
+            }
+
+            if (!device->vmc_setup_done) {
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u addr=0x%02X invio SETUP max/min price",
+                         (unsigned)device_index,
+                         device->address);
+                ret = mdb_cashless_send_simple_command(device->address,
+                                                       MDB_CASHLESS_CMD_SETUP,
+                                                       s_pk4_setup_vmc_maxmin,
+                                                       sizeof(s_pk4_setup_vmc_maxmin),
+                                                       rx,
+                                                       sizeof(rx),
+                                                       &rx_len,
+                                                       120);
+                response_ok = (ret == ESP_OK && rx_len > 0U);
+                if (ret == ESP_OK && rx_len == 1U && rx[0] == MDB_ACK) {
+                    device_rw->vmc_setup_done = true;
+                    s_cashless_setup_retries[device_index] = 0;
+                    device_rw->poll_state = MDB_STATE_INIT_EXPANSION;
+                    ESP_LOGI(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u setup#2 ok -> %s",
+                             (unsigned)device_index,
+                             mdb_state_to_string(device_rw->poll_state));
+                } else if (++s_cashless_setup_retries[device_index] >= MDB_CASHLESS_SETUP_MAX_RETRIES) {
+                    device_rw->poll_state = MDB_STATE_ERROR;
+                    ESP_LOGE(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u setup#2 fallito %u volte -> error",
+                             (unsigned)device_index,
+                             (unsigned)s_cashless_setup_retries[device_index]);
+                } else {
+                    ESP_LOGW(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u setup#2 retry=%u/%u",
+                             (unsigned)device_index,
+                             (unsigned)s_cashless_setup_retries[device_index],
+                             (unsigned)MDB_CASHLESS_SETUP_MAX_RETRIES);
+                }
+            }
+            break;
+
+        case MDB_STATE_INIT_EXPANSION:
+            if (!device->expansion_read) {
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u richiedo REQUEST_ID PK4",
+                         (unsigned)device_index);
+                ret = mdb_cashless_send_simple_command(device->address,
+                                                       MDB_CASHLESS_CMD_EXPANSION,
+                                                       s_pk4_request_id_payload,
+                                                       sizeof(s_pk4_request_id_payload),
+                                                       rx,
+                                                       sizeof(rx),
+                                                       &rx_len,
+                                                       120);
+                if (ret == ESP_OK) {
+                    response_ok = (rx_len > 0U);
+                    parsed_response = response_ok;
+                    mdb_cashless_handle_poll_response(device_index, rx, rx_len);
+                }
+                break;
+            }
+
+            device_rw->poll_state = MDB_STATE_INIT_ENABLE;
+            ESP_LOGI(TAG_CASH,
+                     "[C] [mdb_cashless_sm] dev=%u -> %s",
+                     (unsigned)device_index,
+                     mdb_state_to_string(device_rw->poll_state));
+            break;
+
+        case MDB_STATE_INIT_ENABLE:
+            ESP_LOGI(TAG_CASH,
+                     "[C] [mdb_cashless_sm] dev=%u invio ENABLE",
+                     (unsigned)device_index);
+            ret = mdb_cashless_send_simple_command(device->address,
+                                                   MDB_CASHLESS_CMD_ENABLE,
+                                                   s_pk4_enable_payload,
+                                                   sizeof(s_pk4_enable_payload),
+                                                   rx,
+                                                   sizeof(rx),
+                                                   &rx_len,
+                                                   80);
+            response_ok = (ret == ESP_OK && rx_len > 0U);
+            if (ret == ESP_OK) {
+                device_rw->poll_state = MDB_STATE_IDLE_POLLING;
+                device_rw->enabled_status = true;
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u cashless abilitato -> %s",
+                         (unsigned)device_index,
+                         mdb_state_to_string(device_rw->poll_state));
+            }
+            break;
+
+        case MDB_STATE_IDLE_POLLING:
+            if (device->vend_status == MDB_VEND_PENDING && device->request_price_cents > 0U) {
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u invio VEND_REQUEST amount=%u item=0x%04X",
+                         (unsigned)device_index,
+                         (unsigned)device->request_price_cents,
+                         (unsigned)device->cash_sale_item_number);
+                ret = mdb_cashless_send_vend_command(device->address,
+                                                     MDB_CASHLESS_VEND_REQUEST,
+                                                     device->request_price_cents,
+                                                     device->cash_sale_item_number,
+                                                     rx,
+                                                     sizeof(rx),
+                                                     &rx_len,
+                                                     120);
+                response_ok = (ret == ESP_OK && rx_len > 0U);
+                if (ret == ESP_OK) {
+                    device_rw->vend_status = MDB_VEND_WORKING;
+                    ESP_LOGI(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u vend in attesa esito lettore",
+                             (unsigned)device_index);
+                }
+                break;
+            }
+
+            if (device->vend_success_requested && device->approved_price_cents > 0U) {
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u invio VEND_SUCCESS amount=%u",
+                         (unsigned)device_index,
+                         (unsigned)device->approved_price_cents);
+                ret = mdb_cashless_send_vend_command(device->address,
+                                                     MDB_CASHLESS_VEND_SUCCESS,
+                                                     device->approved_price_cents,
+                                                     device->cash_sale_item_number,
+                                                     rx,
+                                                     sizeof(rx),
+                                                     &rx_len,
+                                                     120);
+                response_ok = (ret == ESP_OK && rx_len > 0U);
+                if (ret == ESP_OK) {
+                    device_rw->vend_success_requested = false;
+                    device_rw->session_state = MDB_CASHLESS_SESSION_OPEN;
+                    ESP_LOGI(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u VEND_SUCCESS confermato al lettore",
+                             (unsigned)device_index);
+                }
+                break;
+            }
+
+            if (device->session_complete_requested) {
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u invio SESSION_COMPLETE",
+                         (unsigned)device_index);
+                ret = mdb_cashless_send_vend_command(device->address,
+                                                     MDB_CASHLESS_VEND_SESSION_COMPLETE,
+                                                     0U,
+                                                     0xFFFFU,
+                                                     rx,
+                                                     sizeof(rx),
+                                                     &rx_len,
+                                                     120);
+                response_ok = (ret == ESP_OK && rx_len > 0U);
+                if (ret == ESP_OK) {
+                    device_rw->session_complete_requested = false;
+                    ESP_LOGI(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u richiesta chiusura sessione inviata",
+                             (unsigned)device_index);
+                }
+                break;
+            }
+
+            if (device->revalue_status == MDB_REVALUE_REQUEST_PENDING) {
+                uint8_t revalue_subcommand = (device->revalue_price_cents > 0U)
+                                                 ? MDB_CASHLESS_REVALUE_REQUEST
+                                                 : MDB_CASHLESS_REVALUE_LIMIT_REQUEST;
+
+                ESP_LOGI(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u invio %s amount=%u",
+                         (unsigned)device_index,
+                         (revalue_subcommand == MDB_CASHLESS_REVALUE_REQUEST) ? "REVALUE_REQUEST" : "REVALUE_LIMIT",
+                         (unsigned)device->revalue_price_cents);
+
+                ret = mdb_cashless_send_revalue_command(device->address,
+                                                        revalue_subcommand,
+                                                        device->revalue_price_cents,
+                                                        rx,
+                                                        sizeof(rx),
+                                                        &rx_len,
+                                                        120);
+                response_ok = (ret == ESP_OK && rx_len > 0U);
+                if (ret == ESP_OK) {
+                    parsed_response = !(rx_len == 1U && rx[0] == MDB_ACK) && response_ok;
+                    if (!(rx_len == 1U && rx[0] == MDB_ACK)) {
+                        mdb_cashless_handle_poll_response(device_index, rx, rx_len);
+                    }
+                    if (revalue_subcommand == MDB_CASHLESS_REVALUE_REQUEST &&
+                        device_rw->revalue_status == MDB_REVALUE_REQUEST_PENDING) {
+                        device_rw->revalue_status = MDB_REVALUE_IN_PROGRESS;
+                        ESP_LOGI(TAG_CASH,
+                                 "[C] [mdb_cashless_sm] dev=%u rivalutazione in progress",
+                                 (unsigned)device_index);
+                    }
+                }
+                break;
+            }
+
+            ret = mdb_cashless_send_simple_command(device->address,
+                                                   MDB_CASHLESS_CMD_POLL,
+                                                   NULL,
+                                                   0,
+                                                   rx,
+                                                   sizeof(rx),
+                                                   &rx_len,
+                                                   40);  //TIMEOUT BREVE PER POLL
+            response_ok = (ret == ESP_OK && rx_len > 0U);
+            if (ret == ESP_OK) {
+                parsed_response = !(rx_len == 1U && rx[0] == MDB_ACK) && response_ok;
+                if (!(rx_len == 1U && rx[0] == MDB_ACK)) {
+                    mdb_cashless_handle_poll_response(device_index, rx, rx_len);
+                }
+            }
+            break;
+
+        case MDB_STATE_ERROR:
+            break;
+
+        default:
+            ESP_LOGW(TAG_CASH,
+                     "[C] [mdb_cashless_sm] dev=%u stato sconosciuto=%d, ritorno a init_reset",
+                     (unsigned)device_index,
+                     (int)device->poll_state);
+            device_rw->poll_state = MDB_STATE_INIT_RESET;
+            break;
+    }
+
+    if (parsed_response && device_rw->last_response_code == MDB_CASHLESS_RESP_JUST_RESET) {
+        device_rw->poll_state = MDB_STATE_INIT_SETUP;
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_sm] dev=%u lettore ha segnalato JUST_RESET -> init_setup",
+                 (unsigned)device_index);
+    }
+
+    if (parsed_response && device_rw->last_response_code == MDB_CASHLESS_RESP_OUT_OF_SEQUENCE) {
+        device_rw->poll_state = MDB_STATE_IDLE_POLLING;
+        s_cashless_reset_retries[device_index] = 0;
+        s_cashless_setup_retries[device_index] = 0;
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_sm] dev=%u OUT_OF_SEQUENCE -> idle_polling",
+                 (unsigned)device_index);
+    }
+
+    mdb_cashless_update_public_status();
 }
 
 
@@ -219,9 +1113,14 @@ static void mdb_coin_sm(void) {
  *  @return Nessun valore di ritorno.
  */
 void mdb_engine_run(void *arg) {
-    ESP_LOGI(TAG, "Motore di polling MDB avviato");
+    ESP_LOGI(TAG_ENGINE, "[C] [mdb_engine_run] motore di polling MDB avviato");
     while (1) {
         mdb_coin_sm();
+        for (size_t device_index = 0; device_index < mdb_cashless_get_device_count(); ++device_index) {
+            mdb_cashless_sm(device_index);
+        }
+        mdb_cashless_dispatch_pending_credit();
+        mdb_cashless_dispatch_pending_vend();
         // mdb_bill_sm(); // futuro
         vTaskDelay(pdMS_TO_TICKS(500)); // Ciclo di polling
     }
@@ -240,7 +1139,7 @@ void mdb_engine_run(void *arg) {
 esp_err_t mdb_start_engine(void) {
     /* Il task mdb_engine è ora gestito da tasks.c tramite mdb_engine_run().
      * Questa funzione è mantenuta per retrocompatibilità ma non crea il task. */
-    ESP_LOGI(TAG, "mdb_start_engine: task gestito da tasks.c (mdb_engine_run)");
+    ESP_LOGI(TAG_ENGINE, "[C] [mdb_start_engine] task gestito da tasks.c (mdb_engine_run)");
     return ESP_OK;
 }
 
@@ -257,14 +1156,25 @@ esp_err_t mdb_start_engine(void) {
 esp_err_t mdb_init(void)
 {
     device_config_t *d_cfg = device_config_get();
+    int tout_symbols = 0;
+
     if (!d_cfg) {
         s_mdb_driver_initialized = false;
         s_mdb_init_failed = true;
+        ESP_LOGE(TAG_INIT, "[C] [mdb_init] device_config non disponibile");
         return ESP_ERR_INVALID_STATE;
     }
 
     s_mdb_init_failed = false;
-    ESP_LOGI(TAG, "Inizializzazione MDB su UART %d (TX:%d RX:%d)", MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO);
+    ESP_LOGI(TAG_INIT,
+             "[C] [mdb_init] uart=%d tx=%d rx=%d baud=%ld stop_bits=%d rx_buf=%d tx_buf=%d",
+             MDB_UART_PORT,
+             MDB_TX_GPIO,
+             MDB_RX_GPIO,
+             (long)d_cfg->mdb_serial.baud_rate,
+             d_cfg->mdb_serial.stop_bits,
+             d_cfg->mdb_serial.rx_buf_size,
+             d_cfg->mdb_serial.tx_buf_size);
 
     uart_config_t uart_config = {
         .baud_rate = d_cfg->mdb_serial.baud_rate,
@@ -279,6 +1189,7 @@ esp_err_t mdb_init(void)
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
         s_mdb_driver_initialized = false;
         s_mdb_init_failed = true;
+        ESP_LOGE(TAG_INIT, "[C] [mdb_init] uart_driver_install fallita: %s", esp_err_to_name(ret));
         return ret;
     }
     
@@ -286,12 +1197,14 @@ esp_err_t mdb_init(void)
     if (ret != ESP_OK) {
         s_mdb_driver_initialized = false;
         s_mdb_init_failed = true;
+        ESP_LOGE(TAG_INIT, "[C] [mdb_init] uart_param_config fallita: %s", esp_err_to_name(ret));
         return ret;
     }
     ret = uart_set_pin(MDB_UART_PORT, MDB_TX_GPIO, MDB_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (ret != ESP_OK) {
         s_mdb_driver_initialized = false;
         s_mdb_init_failed = true;
+        ESP_LOGE(TAG_INIT, "[C] [mdb_init] uart_set_pin fallita: %s", esp_err_to_name(ret));
         return ret;
     }
     
@@ -301,11 +1214,31 @@ esp_err_t mdb_init(void)
     if (ret != ESP_OK) {
         s_mdb_driver_initialized = false;
         s_mdb_init_failed = true;
+        ESP_LOGE(TAG_INIT, "[C] [mdb_init] uart_set_mode fallita: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    /* Imposta il timeout RX hardware per scaricare nel ring buffer le trame MDB
+       corte non appena il bus torna silenzioso. */
+    tout_symbols = d_cfg->mdb_serial.baud_rate / 1000;
+    if (tout_symbols < 1) {
+        tout_symbols = 1;
+    }
+    ret = uart_set_rx_timeout(MDB_UART_PORT, tout_symbols);
+    if (ret != ESP_OK) {
+        s_mdb_driver_initialized = false;
+        s_mdb_init_failed = true;
+        ESP_LOGE(TAG_INIT, "[C] [mdb_init] uart_set_rx_timeout fallita: %s", esp_err_to_name(ret));
         return ret;
     }
 
     s_mdb_driver_initialized = true;
     s_mdb_runtime_fault = false;
+    mdb_cashless_init_state();
+    mdb_cashless_update_public_status();
+    ESP_LOGI(TAG_INIT,
+             "[C] [mdb_init] inizializzazione MDB completata (rx_tout=%d simboli)",
+             tout_symbols);
 
     return ESP_OK;
 }
@@ -363,8 +1296,8 @@ esp_err_t mdb_send_raw_byte(uint8_t data, bool mode_bit)
 esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
     uint8_t checksum = address;
-    
-    ESP_LOGD(TAG, "Invio pacchetto MDB: Indirizzo 0x%02X, Lunghezza %zu", address, len);
+
+    ESP_LOGI(TAG_IO, "[C] [mdb_send_packet] addr=0x%02X len=%u", address, (unsigned)len);
 
     // Svuota buffer RX prima di inviare
     uart_flush_input(MDB_UART_PORT);
@@ -380,6 +1313,21 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 
     // 3. Invia Checksum (9° bit = 0)
     mdb_send_byte(checksum, false);
+
+    {
+        uint8_t raw[40] = {0};
+        size_t raw_len = 0;
+
+        if (len + 2U <= sizeof(raw)) {
+            raw[raw_len++] = address;
+            if (data && len > 0U) {
+                memcpy(raw + raw_len, data, len);
+                raw_len += len;
+            }
+            raw[raw_len++] = checksum;
+            mdb_log_packet_bytes(TAG_IO, "mdb_send_packet.tx", raw, raw_len);
+        }
+    }
 
     return ESP_OK;
 }
@@ -425,15 +1373,26 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
         }
     }
 
-    if (received == 0) return ESP_ERR_TIMEOUT;
+    if (received == 0) {
+        ESP_LOGI(TAG_IO, "[C] [mdb_receive_packet] timeout dopo %u ms", (unsigned)timeout_ms);
+        return ESP_ERR_TIMEOUT;
+    }
     *out_len = received;
 
-    if (received == 1) return ESP_OK;
+    mdb_log_packet_bytes(TAG_IO, "mdb_receive_packet.rx", out_data, received);
+
+    if (received == 1) {
+        ESP_LOGI(TAG_IO, "[C] [mdb_receive_packet] byte singolo=0x%02X", out_data[0]);
+        return ESP_OK;
+    }
 
     for (size_t i = 0; i < received - 1; i++) checksum += out_data[i];
     
     if (checksum != out_data[received - 1]) {
-        ESP_LOGW(TAG, "Errore Checksum MDB: Calcolato 0x%02X != Ricevuto 0x%02X", checksum, out_data[received-1]);
+        ESP_LOGW(TAG_IO,
+                 "[C] [mdb_receive_packet] checksum errata calc=0x%02X recv=0x%02X",
+                 checksum,
+                 out_data[received - 1]);
         return ESP_ERR_INVALID_CRC;
     }
 
@@ -448,8 +1407,11 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
  */
 #if defined(DNA_MDB) && (DNA_MDB == 1)
 
+static const char *TAG_MOCK = "MDB_MOCK";
 static mdb_status_t s_mock_mdb_status = {0};
 static bool s_mock_mdb_initialized = false;
+static mdb_cashless_credit_callback_t s_mock_credit_callback = NULL;
+static mdb_cashless_vend_callback_t s_mock_vend_callback = NULL;
 
 const mdb_status_t *mdb_get_status(void)
 {
@@ -459,8 +1421,10 @@ const mdb_status_t *mdb_get_status(void)
 device_component_status_t mdb_get_component_status(void)
 {
     const device_config_t *cfg = device_config_get();
+    bool coin_enabled = cfg && cfg->sensors.mdb_enabled && cfg->mdb.coin_acceptor_en;
+    bool cashless_enabled = cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en;
 
-    if (!cfg || !cfg->sensors.mdb_enabled || !cfg->mdb.coin_acceptor_en) {
+    if (!cfg || !cfg->sensors.mdb_enabled || (!coin_enabled && !cashless_enabled)) {
         return DEVICE_COMPONENT_STATUS_DISABLED;
     }
 
@@ -468,8 +1432,58 @@ device_component_status_t mdb_get_component_status(void)
         return DEVICE_COMPONENT_STATUS_ACTIVE;
     }
 
-    return s_mock_mdb_status.coin.is_online ? DEVICE_COMPONENT_STATUS_ONLINE
-                                            : DEVICE_COMPONENT_STATUS_OFFLINE;
+    return (s_mock_mdb_status.coin.is_online || s_mock_mdb_status.cashless.is_online)
+               ? DEVICE_COMPONENT_STATUS_ONLINE
+               : DEVICE_COMPONENT_STATUS_OFFLINE;
+}
+
+void mdb_register_cashless_credit_callback(mdb_cashless_credit_callback_t callback)
+{
+    s_mock_credit_callback = callback;
+}
+
+void mdb_register_cashless_vend_callback(mdb_cashless_vend_callback_t callback)
+{
+    s_mock_vend_callback = callback;
+}
+
+bool mdb_cashless_request_program_vend(uint16_t amount_cents, uint16_t item_number)
+{
+    ESP_LOGI(TAG_MOCK,
+             "[C] [MOCK] mdb_cashless_request_program_vend: amount=%u item=0x%04X",
+             (unsigned)amount_cents,
+             (unsigned)item_number);
+    (void)s_mock_credit_callback;
+    (void)s_mock_vend_callback;
+    return true;
+}
+
+bool mdb_cashless_confirm_vend_success(uint16_t approved_amount_cents)
+{
+    ESP_LOGI(TAG_MOCK,
+             "[C] [MOCK] mdb_cashless_confirm_vend_success: amount=%u",
+             (unsigned)approved_amount_cents);
+    return true;
+}
+
+bool mdb_cashless_complete_active_session(void)
+{
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] mdb_cashless_complete_active_session");
+    return true;
+}
+
+bool mdb_cashless_request_active_revalue_limit(void)
+{
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] mdb_cashless_request_active_revalue_limit");
+    return true;
+}
+
+bool mdb_cashless_request_active_revalue(uint16_t amount_cents)
+{
+    ESP_LOGI(TAG_MOCK,
+             "[C] [MOCK] mdb_cashless_request_active_revalue: amount=%u",
+             (unsigned)amount_cents);
+    return true;
 }
 
 
@@ -484,10 +1498,16 @@ device_component_status_t mdb_get_component_status(void)
  */
 esp_err_t mdb_init(void)
 {
-    ESP_LOGI(TAG, "[C] [MOCK] mdb_init: bus MDB simulato");
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] mdb_init: bus MDB simulato");
     s_mock_mdb_initialized = true;
     s_mock_mdb_status.coin.state = MDB_STATE_IDLE_POLLING;
     s_mock_mdb_status.coin.is_online = true;
+    s_mock_mdb_status.cashless.state = MDB_STATE_IDLE_POLLING;
+    s_mock_mdb_status.cashless.is_online = true;
+    s_mock_mdb_status.cashless.online_devices = 1;
+    s_mock_mdb_status.cashless.active_device_index = 0;
+    s_mock_mdb_status.cashless.session_open = true;
+    s_mock_mdb_status.cashless.revalue_limit_cents = 1000;
     return ESP_OK;
 }
 
@@ -503,7 +1523,7 @@ esp_err_t mdb_init(void)
  */
 esp_err_t mdb_start_engine(void)
 {
-    ESP_LOGI(TAG, "[C] [MOCK] mdb_start_engine: polling disabilitato");
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] mdb_start_engine: polling disabilitato");
     return ESP_OK;
 }
 
@@ -534,14 +1554,14 @@ void mdb_engine_run(void *arg)
  */
 esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
-    ESP_LOGI(TAG, "[C] [MOCK] mdb_send_packet: addr=0x%02X len=%zu ignorato", address, len);
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] mdb_send_packet: addr=0x%02X len=%zu ignorato", address, len);
     (void)data;
     return ESP_OK;
 }
 
 esp_err_t mdb_send_raw_byte(uint8_t data, bool mode_bit)
 {
-    ESP_LOGI(TAG, "[C] [MOCK] mdb_send_raw_byte: data=0x%02X b9=%d ignorato", data, (int)mode_bit);
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] mdb_send_raw_byte: data=0x%02X b9=%d ignorato", data, (int)mode_bit);
     return ESP_OK;
 }
 

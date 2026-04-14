@@ -209,6 +209,8 @@ typedef enum {
     FSM_INPUT_EVENT_QR_CREDIT,
     FSM_INPUT_EVENT_QR_SCANNED,
     FSM_INPUT_EVENT_PROGRAM_SELECTED,
+    FSM_INPUT_EVENT_CARD_VEND_APPROVED,
+    FSM_INPUT_EVENT_CARD_VEND_DENIED,
     FSM_INPUT_EVENT_PROGRAM_STOP,
     FSM_INPUT_EVENT_PROGRAM_PAUSE_TOGGLE,
     FSM_INPUT_EVENT_CREDIT_ENDED,
@@ -262,11 +264,17 @@ typedef struct {
     bool ads_enabled;
     bool qr_credit_pending;      /* true dopo scansione QR, false quando arriva il credito VCD */
     bool allow_additional_payments;
+    bool card_vend_pending;
+    bool card_session_complete_required;
     bool stop_after_cycle_requested; /* true se richiesto stop al termine del ciclo corrente */
     bool pre_fine_ciclo_active;  /* true quando la soglia PreFineCiclo è stata raggiunta */
     int32_t out_of_service_agent; /* AGN_ID_* che ha causato lo stato OOS */
     char out_of_service_reason[FSM_EVENT_TEXT_MAX_LEN]; /* chiave motivo OOS */
     char customer_code[FSM_EVENT_TEXT_MAX_LEN]; /* [C] codice cliente per api/payment (QR, Card, o "0" per monete) */
+    int32_t pending_program_price_units;
+    uint32_t pending_pause_max_ms;
+    uint32_t pending_running_target_ms;
+    char pending_program_name[FSM_EVENT_TEXT_MAX_LEN];
 } fsm_ctx_t;
 
 void fsm_init(fsm_ctx_t *ctx);

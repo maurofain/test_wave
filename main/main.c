@@ -68,6 +68,9 @@ static void apply_boot_log_policy(void)
     esp_log_level_set("USB", ESP_LOG_ERROR);
     esp_log_level_set("usb_host", ESP_LOG_ERROR);
     esp_log_level_set("cdc_acm", ESP_LOG_ERROR);
+
+    /* MDB: manteniamo i log di trasporto in DEBUG per seguire TX/RX sul bus. */
+    esp_log_level_set("MDB_IO", ESP_LOG_DEBUG);
 }
 
 /*
@@ -95,6 +98,9 @@ static void apply_post_boot_log_policy(void)
     esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
     esp_log_level_set("httpd_uri",  ESP_LOG_ERROR);
     esp_log_level_set("httpd",      ESP_LOG_ERROR);
+
+    /* MDB: manteniamo il dump TX/RX attivo anche dopo il bootstrap. */
+    esp_log_level_set("MDB_IO", ESP_LOG_DEBUG);
 }
 
 

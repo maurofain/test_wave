@@ -1313,6 +1313,166 @@ esp_err_t api_cctalk_log_txrx_set(httpd_req_t *req)
     return ret;
 }
 
+/**
+ * @brief Restituisce lo stato runtime del cashless MDB e della ricarica NFC.
+ *
+ * Endpoint: `GET /api/mdb/cashless/status`
+ */
+esp_err_t api_mdb_cashless_status_get(httpd_req_t *req)
+{
+    const mdb_status_t *mdb = mdb_get_status();
+    cJSON *root = cJSON_CreateObject();
+    cJSON *cashless = cJSON_CreateObject();
+
+    if (!root || !cashless || !mdb) {
+        cJSON_Delete(root);
+        cJSON_Delete(cashless);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    cJSON_AddStringToObject(root, "status", "ok");
+    cJSON_AddBoolToObject(cashless, "online", mdb->cashless.is_online);
+    cJSON_AddNumberToObject(cashless, "state", mdb->cashless.state);
+    cJSON_AddNumberToObject(cashless, "online_devices", mdb->cashless.online_devices);
+    cJSON_AddNumberToObject(cashless, "active_device_index", mdb->cashless.active_device_index);
+    cJSON_AddNumberToObject(cashless, "feature_level", mdb->cashless.feature_level);
+    cJSON_AddNumberToObject(cashless, "last_response_code", mdb->cashless.last_response_code);
+    cJSON_AddBoolToObject(cashless, "session_open", mdb->cashless.session_open);
+    cJSON_AddNumberToObject(cashless, "credit_cents", mdb->cashless.credit_cents);
+    cJSON_AddNumberToObject(cashless, "approved_price_cents", mdb->cashless.approved_price_cents);
+    cJSON_AddNumberToObject(cashless, "approved_revalue_cents", mdb->cashless.approved_revalue_cents);
+    cJSON_AddNumberToObject(cashless, "revalue_limit_cents", mdb->cashless.revalue_limit_cents);
+    cJSON_AddNumberToObject(cashless, "revalue_status", mdb->cashless.revalue_status);
+    cJSON_AddItemToObject(root, "cashless", cashless);
+
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
+/**
+ * @brief Richiede il limite massimo di ricarica al device cashless attivo.
+ *
+ * Endpoint: `POST /api/mdb/cashless/revalue_limit`
+ */
+esp_err_t api_mdb_cashless_revalue_limit_post(httpd_req_t *req)
+{
+    cJSON *root = cJSON_CreateObject();
+
+    if (!root) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    if (!mdb_cashless_request_active_revalue_limit()) {
+        cJSON_AddStringToObject(root, "status", "error");
+        cJSON_AddStringToObject(root, "message", "cashless_not_ready");
+        char *json_err = cJSON_PrintUnformatted(root);
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "409 Conflict");
+        httpd_resp_set_type(req, "application/json");
+        if (!json_err) {
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        esp_err_t ret_err = httpd_resp_send(req, json_err, HTTPD_RESP_USE_STRLEN);
+        free(json_err);
+        return ret_err;
+    }
+
+    ESP_LOGI(TAG, "[C] POST /api/mdb/cashless/revalue_limit");
+    cJSON_AddStringToObject(root, "status", "ok");
+    cJSON_AddStringToObject(root, "message", "revalue_limit_requested");
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
+/**
+ * @brief Richiede una ricarica NFC sul device cashless attivo.
+ *
+ * Endpoint: `POST /api/mdb/cashless/revalue` body JSON `{amount_cents:<int>}`
+ */
+esp_err_t api_mdb_cashless_revalue_post(httpd_req_t *req)
+{
+    char body[128] = {0};
+    int received = httpd_req_recv(req, body, sizeof(body) - 1);
+    if (received <= 0) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"empty body\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    body[received] = '\0';
+
+    cJSON *json_body = cJSON_Parse(body);
+    if (!json_body) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"invalid json\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    cJSON *amount_item = cJSON_GetObjectItem(json_body, "amount_cents");
+    if (!cJSON_IsNumber(amount_item) || amount_item->valueint <= 0 || amount_item->valueint > UINT16_MAX) {
+        cJSON_Delete(json_body);
+        httpd_resp_set_status(req, "400 Bad Request");
+        return httpd_resp_send(req, "{\"error\":\"missing/invalid amount_cents\"}", HTTPD_RESP_USE_STRLEN);
+    }
+
+    uint16_t amount_cents = (uint16_t)amount_item->valueint;
+    cJSON_Delete(json_body);
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    if (!mdb_cashless_request_active_revalue(amount_cents)) {
+        cJSON_AddStringToObject(root, "status", "error");
+        cJSON_AddStringToObject(root, "message", "cashless_not_ready");
+        char *json_err = cJSON_PrintUnformatted(root);
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "409 Conflict");
+        httpd_resp_set_type(req, "application/json");
+        if (!json_err) {
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        esp_err_t ret_err = httpd_resp_send(req, json_err, HTTPD_RESP_USE_STRLEN);
+        free(json_err);
+        return ret_err;
+    }
+
+    ESP_LOGI(TAG, "[C] POST /api/mdb/cashless/revalue amount=%u", (unsigned)amount_cents);
+    cJSON_AddStringToObject(root, "status", "ok");
+    cJSON_AddStringToObject(root, "message", "revalue_requested");
+    cJSON_AddNumberToObject(root, "amount_cents", amount_cents);
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!json) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    free(json);
+    return ret;
+}
+
 // Handler API GET /api/config
 
 /**
@@ -3564,6 +3724,15 @@ esp_err_t web_ui_register_handlers(httpd_handle_t server)
 
     httpd_uri_t uri_api_cctalk_log_set = {.uri = "/api/cctalk/log_txrx", .method = HTTP_POST, .handler = api_cctalk_log_txrx_set};
     httpd_register_uri_handler(server, &uri_api_cctalk_log_set);
+
+    httpd_uri_t uri_api_mdb_cashless_status = {.uri = "/api/mdb/cashless/status", .method = HTTP_GET, .handler = api_mdb_cashless_status_get};
+    httpd_register_uri_handler(server, &uri_api_mdb_cashless_status);
+
+    httpd_uri_t uri_api_mdb_cashless_revalue_limit = {.uri = "/api/mdb/cashless/revalue_limit", .method = HTTP_POST, .handler = api_mdb_cashless_revalue_limit_post};
+    httpd_register_uri_handler(server, &uri_api_mdb_cashless_revalue_limit);
+
+    httpd_uri_t uri_api_mdb_cashless_revalue = {.uri = "/api/mdb/cashless/revalue", .method = HTTP_POST, .handler = api_mdb_cashless_revalue_post};
+    httpd_register_uri_handler(server, &uri_api_mdb_cashless_revalue);
 
     /* Runtime flag: enable_api_log (GET/POST) */
     httpd_uri_t uri_api_runtime_get = {.uri = "/api/runtime/enable_api_log", .method = HTTP_GET, .handler = api_runtime_enable_api_log_get};

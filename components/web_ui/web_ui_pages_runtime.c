@@ -124,7 +124,11 @@ esp_err_t status_get_handler(httpd_req_t *req)
              "\"web\":{\"running\":%s},"
              "\"remote\":{\"enabled\":%s,\"online\":%s,\"token\":%s,\"status\":\"%s\"},"
              "\"modbus\":{\"enabled\":%s,\"running\":%s,\"initialized\":%s,\"poll_ok\":%lu,\"poll_err\":%lu,\"last_error\":%ld,\"last_update_ms\":%lu,\"status\":\"%s\"},"
-             "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%u,\"status\":\"%s\"},"
+             "\"mdb\":{\"coin_online\":%s,\"coin_state\":%d,\"credit\":%u,\"status\":\"%s\","
+                 "\"cashless_online\":%s,\"cashless_state\":%d,\"cashless_online_devices\":%u,\"cashless_active_device\":%u,"
+                 "\"cashless_feature_level\":%u,\"cashless_last_response\":%u,\"cashless_session_open\":%s,"
+                 "\"cashless_credit_cents\":%u,\"cashless_approved_price_cents\":%u,\"cashless_approved_revalue_cents\":%u,"
+                 "\"cashless_revalue_limit_cents\":%u,\"cashless_revalue_status\":%u},"
              "\"sd\":{\"mounted\":%s,\"present\":%s,\"total_kb\":%llu,\"used_kb\":%llu,\"last_error\":\"%s\"},"
              "\"env\":{\"temp\":%.1f,\"hum\":%.1f},"
              "\"sensors\":{"
@@ -153,6 +157,18 @@ esp_err_t status_get_handler(httpd_req_t *req)
              device_component_status_to_string(modbus_component_status),
              mdb->coin.is_online ? "true" : "false", mdb->coin.state, (unsigned int)mdb->coin.credit_cents,
              device_component_status_to_string(mdb_component_status),
+             mdb->cashless.is_online ? "true" : "false",
+             mdb->cashless.state,
+             (unsigned)mdb->cashless.online_devices,
+             (unsigned)mdb->cashless.active_device_index,
+             (unsigned)mdb->cashless.feature_level,
+             (unsigned)mdb->cashless.last_response_code,
+             mdb->cashless.session_open ? "true" : "false",
+             (unsigned)mdb->cashless.credit_cents,
+             (unsigned)mdb->cashless.approved_price_cents,
+             (unsigned)mdb->cashless.approved_revalue_cents,
+             (unsigned)mdb->cashless.revalue_limit_cents,
+             (unsigned)mdb->cashless.revalue_status,
              sd_mounted ? "true" : "false", sd_present ? "true" : "false",
              (unsigned long long)sd_total_kb, (unsigned long long)sd_used_kb,
              sd_card_get_last_error(),

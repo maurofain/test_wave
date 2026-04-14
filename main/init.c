@@ -2419,6 +2419,18 @@ esp_err_t init_run_factory(void)
 
   if (cfg->sensors.mdb_enabled)
   {
+    ESP_LOGI(TAG,
+             "[M] MDB bootstrap: enabled=%d coin=%d cashless=%d",
+             cfg->sensors.mdb_enabled ? 1 : 0,
+             cfg->mdb.coin_acceptor_en ? 1 : 0,
+             cfg->mdb.cashless_en ? 1 : 0);
+
+    if (!cfg->mdb.coin_acceptor_en && !cfg->mdb.cashless_en)
+    {
+      ESP_LOGW(TAG,
+               "[M] MDB abilitato ma senza periferiche attive (coin_acceptor_en=0 cashless_en=0)");
+    }
+
     /* mdb_init() inizializza solo l'hardware UART.
      * Il task di polling (mdb_engine) è avviato da tasks_start_all() via
      * s_tasks[]. */

@@ -1014,10 +1014,11 @@ static void _set_defaults(device_config_t *config)
     config->sensors.pwm2_enabled = true;
     config->sensors.sd_card_enabled = true;
 
-    // Default MDB
-    config->mdb.coin_acceptor_en = true;
+    // Default MDB: nel progetto MicroHard la gettoniera lavora su CCTalk,
+    // mentre il bus MDB e' riservato al cashless/NFC.
+    config->mdb.coin_acceptor_en = false;
     config->mdb.bill_validator_en = false;
-    config->mdb.cashless_en = false;
+    config->mdb.cashless_en = true;
 
     // Default Display
     config->display.enabled = true; // display abilitato di default
@@ -1790,6 +1791,25 @@ esp_err_t device_config_load(device_config_t *config)
                         "cashless_en",
                         NULL,
                         config->mdb.cashless_en);
+                }
+
+                /* Normalizzazione progetto MicroHard:
+                   - gettoniera su CCTalk
+                   - lettore NFC/cashless su MDB
+                   Se CCTalk e' attivo, il coin acceptor MDB non va avviato. */
+                if (config->sensors.cctalk_enabled && config->mdb.coin_acceptor_en) {
+                    ESP_LOGW(TAG,
+                             "[CONFIG] cctalk attivo: forzo mdb.coin_acceptor_en=0 e mantengo il bus MDB per cashless");
+                    config->mdb.coin_acceptor_en = false;
+                }
+
+                if (config->sensors.mdb_enabled &&
+                    !config->mdb.coin_acceptor_en &&
+                    !config->mdb.bill_validator_en &&
+                    !config->mdb.cashless_en) {
+                    ESP_LOGW(TAG,
+                             "[CONFIG] mdb attivo senza periferiche: forzo cashless_en=1 per il lettore NFC");
+                    config->mdb.cashless_en = true;
                 }
 
                 // Analisi config Display

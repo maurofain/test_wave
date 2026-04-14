@@ -173,6 +173,20 @@ Questi simboli arrivano da `sdkconfig`/Kconfig e abilitano percorsi compilati co
 - `CONFIG_LV_FS_STDIO_PATH`
 - `CONFIG_LV_USE_TJPGD`
 
+### Display MIPI / anti-tearing
+- `CONFIG_BSP_LCD_DPI_BUFFER_NUMS`
+- `CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR`
+- `CONFIG_BSP_DISPLAY_LVGL_FULL_REFRESH`
+- `CONFIG_BSP_LCD_TYPE_720_1280_7_INCH_A`
+- `CONFIG_BSP_LCD_COLOR_FORMAT_RGB565`
+- `CONFIG_BSP_LCD_MIPI_DSI_LANE_BITRATE_MBPS`
+
+Impatto runtime associato:
+- per il pannello MIPI 7" A, `CONFIG_BSP_LCD_DPI_BUFFER_NUMS=2` consente al BSP di creare due framebuffer DPI completi, prerequisito per attivare l'anti-tearing LVGL;
+- `CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR=y` abilita nel porting LVGL-DSI la modalita di aggiornamento che evita tearing/glitch visibili durante refresh e animazioni;
+- `CONFIG_BSP_DISPLAY_LVGL_FULL_REFRESH=y` forza il buffer mode coerente con l'anti-tearing del BSP;
+- il build corrente mantiene `RGB565` e lane bitrate MIPI a `1500 Mbps` lato Kconfig, mentre il BSP applica il mapping del pannello selezionato a runtime.
+
 Impatto runtime associato:
 - abilita in LVGL il driver file `stdio` (mount VFS già disponibile su `/spiffs`), quindi percorsi come `S:/spiffs/logo.jpg`.
 - abilita il decoder JPEG TJPGD usato dalla splash screen per mostrare `logo.jpg` dalla prima pagina.

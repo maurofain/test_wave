@@ -80,6 +80,7 @@ static volatile bool s_oos_modbus_recovery_test_active = false;
 
 static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event);
 static http_services_payment_type_t tasks_payment_type_from_session_source(fsm_session_source_t source);
+static bool tasks_publish_card_vend_result_event(bool approved, int32_t amount_cents, const char *source_tag);
 
 static bool tasks_is_out_of_service_state(void)
 {
@@ -1341,6 +1342,88 @@ bool tasks_publish_card_credit_event(int32_t vcd_amount_cents, const char *sourc
     return true;
 }
 
+static bool tasks_publish_card_vend_result_event(bool approved, int32_t amount_cents, const char *source_tag)
+{
+    if (!fsm_event_queue_init(0)) {
+        ESP_LOGW(TAG, "[M] Hook card vend: coda FSM non disponibile");
+        return false;
+    }
+
+    fsm_input_event_t ev = {
+        .from = AGN_ID_MDB,
+        .to = {AGN_ID_FSM},
+        .action = ACTION_ID_NONE,
+        .type = approved ? FSM_INPUT_EVENT_CARD_VEND_APPROVED : FSM_INPUT_EVENT_CARD_VEND_DENIED,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = amount_cents,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .text = {0},
+    };
+
+    if (source_tag && source_tag[0] != '\0') {
+        strncpy(ev.text, source_tag, sizeof(ev.text) - 1);
+    } else {
+        strncpy(ev.text, approved ? "card_vend_approved" : "card_vend_denied", sizeof(ev.text) - 1);
+    }
+
+    if (!fsm_event_publish(&ev, pdMS_TO_TICKS(20))) {
+        ESP_LOGW(TAG,
+                 "[M] Hook card vend: publish %s fallito",
+                 approved ? "CARD_VEND_APPROVED" : "CARD_VEND_DENIED");
+        return false;
+    }
+
+    ESP_LOGI(TAG,
+             "[M] Hook card vend: %s pubblicato (%ld)",
+             approved ? "CARD_VEND_APPROVED" : "CARD_VEND_DENIED",
+             (long)amount_cents);
+    return true;
+}
+
+bool tasks_request_card_vend(int32_t amount_cents, uint16_t item_number)
+{
+    if (amount_cents <= 0 || amount_cents > UINT16_MAX) {
+        ESP_LOGW(TAG, "[M] Richiesta vend card non valida (%ld)", (long)amount_cents);
+        return false;
+    }
+
+    if (!mdb_cashless_request_program_vend((uint16_t)amount_cents, item_number)) {
+        ESP_LOGW(TAG, "[M] Richiesta VEND_REQUEST MDB fallita (%ld)", (long)amount_cents);
+        return false;
+    }
+
+    ESP_LOGI(TAG, "[M] Richiesta VEND_REQUEST MDB accodata (%ld)", (long)amount_cents);
+    return true;
+}
+
+bool tasks_request_card_vend_success(int32_t approved_amount_cents)
+{
+    if (approved_amount_cents <= 0 || approved_amount_cents > UINT16_MAX) {
+        ESP_LOGW(TAG, "[M] Richiesta vend success card non valida (%ld)", (long)approved_amount_cents);
+        return false;
+    }
+
+    if (!mdb_cashless_confirm_vend_success((uint16_t)approved_amount_cents)) {
+        ESP_LOGW(TAG, "[M] Richiesta VEND_SUCCESS MDB fallita (%ld)", (long)approved_amount_cents);
+        return false;
+    }
+
+    ESP_LOGI(TAG, "[M] Richiesta VEND_SUCCESS MDB accodata (%ld)", (long)approved_amount_cents);
+    return true;
+}
+
+bool tasks_request_card_session_complete(void)
+{
+    if (!mdb_cashless_complete_active_session()) {
+        ESP_LOGW(TAG, "[M] Richiesta SESSION_COMPLETE MDB fallita");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "[M] Richiesta SESSION_COMPLETE MDB accodata");
+    return true;
+}
+
 esp_err_t tasks_publish_play_audio(const char *audio_path, agn_id_t sender)
 {
     if (!audio_path || audio_path[0] == '\0') {
@@ -2241,6 +2324,9 @@ static void fsm_task(void *arg)
             ((event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED &&
               state_before == FSM_STATE_CREDIT &&
               fsm.state == FSM_STATE_RUNNING) ||
+                         (event.type == FSM_INPUT_EVENT_CARD_VEND_APPROVED &&
+                            state_before == FSM_STATE_CREDIT &&
+                            fsm.state == FSM_STATE_RUNNING) ||
              (event.type == FSM_INPUT_EVENT_PROGRAM_SWITCH &&
               (state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) &&
               fsm.state == FSM_STATE_RUNNING))) {
@@ -3044,6 +3130,8 @@ static void cctalk_engine_wrapper(void *arg)
  */
 static void mdb_engine_wrapper(void *arg)
 {
+    mdb_register_cashless_credit_callback(tasks_publish_card_credit_event);
+    mdb_register_cashless_vend_callback(tasks_publish_card_vend_result_event);
     mdb_engine_run(NULL);
 }
 
@@ -3333,6 +3421,10 @@ static task_param_t s_tasks[] = {
 
 static task_param_t *find_task_by_name(const char *name)
 {
+    if (name && strcmp(name, "mdb") == 0) {
+        name = "mdb_engine";
+    }
+
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         if (strcmp(s_tasks[i].name, name) == 0) {
             return &s_tasks[i];
@@ -3568,6 +3660,19 @@ void tasks_start_all(void)
                            : TASK_STATE_IDLE;
         }
 
+        if (cfg && strcmp(t->name, "mdb_engine") == 0) {
+            bool mdb_runtime_enabled = cfg->sensors.mdb_enabled &&
+                                       (cfg->mdb.coin_acceptor_en || cfg->mdb.cashless_en);
+            t->state = mdb_runtime_enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
+            ESP_LOGI(TAG,
+                     "[M] Task %s forzato %s (mdb=%d coin=%d cashless=%d)",
+                     t->name,
+                     (t->state == TASK_STATE_RUN) ? "RUN" : "IDLE",
+                     cfg->sensors.mdb_enabled ? 1 : 0,
+                     cfg->mdb.coin_acceptor_en ? 1 : 0,
+                     cfg->mdb.cashless_en ? 1 : 0);
+        }
+
         if (strcmp(t->name, "fsm") == 0) {
             ESP_LOGI(TAG, "[M] Task saltato %s (avvio differito post-bootstrap UI)", t->name);
             continue;
@@ -3583,6 +3688,16 @@ void tasks_start_all(void)
             continue;
         }
         if (t->state != TASK_STATE_RUN) {
+            if (cfg && strcmp(t->name, "mdb_engine") == 0) {
+                ESP_LOGW(TAG,
+                         "[M] Task saltato %s (stato=%d, mdb=%d coin=%d cashless=%d)",
+                         t->name,
+                         (int)t->state,
+                         cfg->sensors.mdb_enabled ? 1 : 0,
+                         cfg->mdb.coin_acceptor_en ? 1 : 0,
+                         cfg->mdb.cashless_en ? 1 : 0);
+                continue;
+            }
             ESP_LOGI(TAG, "[M] Task saltato %s (stato=%d)", t->name, (int)t->state);
             continue;
         }
@@ -3691,6 +3806,19 @@ void tasks_apply_n_run(void)
                 t->state = TASK_STATE_IDLE;
                 ESP_LOGI(TAG, "[M] Task %s forzato IDLE (scanner.enabled=false)", t->name);
             }
+        }
+
+        if (strcmp(t->name, "mdb_engine") == 0) {
+            bool mdb_runtime_enabled = cfg->sensors.mdb_enabled &&
+                                       (cfg->mdb.coin_acceptor_en || cfg->mdb.cashless_en);
+            t->state = mdb_runtime_enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
+            ESP_LOGI(TAG,
+                     "[M] Task %s forzato %s (mdb=%d coin=%d cashless=%d)",
+                     t->name,
+                     (t->state == TASK_STATE_RUN) ? "RUN" : "IDLE",
+                     cfg->sensors.mdb_enabled ? 1 : 0,
+                     cfg->mdb.coin_acceptor_en ? 1 : 0,
+                     cfg->mdb.cashless_en ? 1 : 0);
         }
 
         if (t->state == TASK_STATE_RUN) {
