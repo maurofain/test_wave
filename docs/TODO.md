@@ -14,9 +14,7 @@
    - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
 4. Quandoviene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
 5. Se il gettone vine rimosso dal MDB si deve resettare il VCD e uscire dalla schermata programmi e resettare il sistema MDB per una nuova acquisizione
-6. Non viene sotrtratto credito al gettone MDB. 
-7. Se il getttone arriva a credito 0 si ese a ADS, se rimane inserito dopo un'interruzione dell'autorepeat si ritorna in scelta programmi e dopo il rimeout di passa in ADS
-8. Verifica la gestione generale dei componenti hardware
+7. Verifica la gestione generale dei componenti hardware
    - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:
      1. `init`
      2. `activate`
@@ -54,25 +52,23 @@
 11. Ricezione config da server (`api/getconfig`)
    - L'API server `POST /api/getconfig` è definita ma il device non applica la configurazione ricevuta
    - Implementare il parsing della risposta e aggiornamento della config locale
-12. Slideshow immagini idle in standby
-   - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
-   - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
-   - Uscita dallo slideshow al primo evento (credito, touch, tasto)
-13. Implementazione della scheda Esp32Cam
+  
+12. Implementazione della scheda Esp32Cam
    - prevedere la connessione tramite porta USB di un modulo erp32S3 con cam e software IA per le seguenti funzioni:
      - Rilevamento movimento per prossimità persone
      - Riconoscimento facciale per identificazione uomo/donna
      - Valutazione eta dal volto
      - salvataggio dell'immagine per sicurezza vandalica
-14. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
-15. Crea la funzione status per i component SHT40, NTP, PWM, RS232
-16. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
-17. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
-18. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
-19. Permangono del glimps sullo schermo MIPI
-20. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
-21. manca la vode FTP nello Stato Servizi
-22.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' conun altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 aal 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2
+13. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
+14. Crea la funzione status per i component SHT40, NTP, PWM, RS232
+15. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
+16. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
+17. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
+18. Permangono del glimps sullo schermo MIPI
+19. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
+20. manca la vode FTP nello Stato Servizi
+21.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' conun altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 aal 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2
+22.  Togliamo 'test loopback' e 'invia stringa' da /test -> MDB
 
 
 ---
@@ -498,3 +494,30 @@ Il credito è espresso in coin (1 coin = 1€). Le sorgenti sono:
 
 - 1 solo ciclo selezionabile alla volta (no prenotazione multipla)
 - Cambio programma in corso: relay mask ricalcolata e aggiornata immediatamente
+
+### NOTE
+
+ti descrivo cosa mi aspetto (una mia simulazione) così puoi confrontare il flusso attuale e correggerlo:
+- rilevazione TAG
+I (105808) MDB_CEVT: ****************************************
+I (105808) MDB_CEVT: [C] NFC TAG INSERITO: dev=0 addr=0x10 present=1 session_open=1 credit=3999
+I (105818) MDB_CEVT: ****************************************
+- Avvio programma 
+I (114738) TASKS: [M] Output programma 'Lavaggio' verificati (tentativo 1/3, mask=0x0021)
+- riduzione credito :
+I (114738) MDB_CASH:*****************************
+I (114738) MDB_CASH:] Prelevato credito : 1 coin = 100 cents, Disponibili 38 coin
+I (114738) MDB_CASH:*****************************
+I (114738) TASKS: [M] AVVIO PROGRAMMA: Lavaggio
+- messaggio fine ciclo (non presente)
+I (114738) TASKS: [M] PROGRAMMA TERMINATO: Lavaggio
+I (114738) MDB_CASH:*****************************
+I (114738) MDB_CASH:] Prelevato credito : 1 coin = 100 cents, Disponibili 37 coin
+I (114738) MDB_CASH:*****************************
+I (114738) TASKS: [M] AVVIO PROGRAMMA: Lavaggio
+- messaggio fine ciclo (non presente)
+I (114738) TASKS: [M] PROGRAMMA TERMINATO: Lavaggio
+I (114738) MDB_CASH:*****************************
+I (114738) MDB_CASH:*NFC TAG RIMOSSO : Credito 3799 cent
+I (114738) MDB_CASH:*****************************
+I (114738) MDB: TERMINALE RESETTATO E PRONTO 

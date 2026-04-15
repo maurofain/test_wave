@@ -1121,7 +1121,7 @@ static void log_peripherals_from_config(const device_config_t *cfg)
   }
 
   ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════════════════════════╗");
-  ESP_LOGI(TAG, "[M] ║        STATO PERIFERICHE E FUNZIONALITÀ ABILITATE               ║");
+  ESP_LOGI(TAG, "[M] ║        STATO PERIFERICHE E FUNZIONALITÀ ABILITATE              ║");
   ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════════════════════════╝");
   
   /* Rete e comunicazione */

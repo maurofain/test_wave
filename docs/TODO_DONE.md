@@ -21,4 +21,14 @@
    4. L'icona `MoneteKo.png` e `MoneteOk.png` vanno visualizzate al posto del terzo punto da sinistra e rappresentano lo stato della connessione con i device CCTalk (OK e KO rispettivamente).
    5. L'icona `QrKo.png` e `QrOk.png` vanno visualizzate al posto del punto più a destra e rappresentano lo stato della connessione con lo scanner QRCode (OK e KO rispettivamente).
 - [x] PLC esterno: definito protocollo di collegamento, implementata ricezione impulsi/segnali da PLC e aggiunta configurazione in `/config`
+- [x] Bloccati CCTALK, scanner e MDB durante l'esecuzione del programma fino al termine dell'esecuzione/autoripetizione
+- [x] Gestito reset VCD e richiesta MDB SESSION_COMPLETE alla rimozione del gettone e uscita dalla schermata programmi
+- [x] Bloccati CCTALK/Scanner/MDB durante l'esecuzione del programma fino al termine o alla sua autoripetizione
+- [x] Gestito reset VCD e richiesta SESSION_COMPLETE MDB al rilevamento di token rimosso durante ciclo MDB
 - [x] Garantito che il codice cliente nel payload `api/payment` sia una stringa vuota quando non presente
+- [x] Corretto il comando CREDIT_ENDED nello stato CREDIT per permettere il reset crediti MDB e il ritorno a ADS/IDLE
+- [x] Completato il punto 6: zero credito manda ad ADS, token MDB inserito dopo stop ritorna a scelta programmi e timeout poi ADS
+- [x] 12. Slideshow immagini idle in standby
+   - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
+   - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
+   - Uscita dallo slideshow al primo evento (credito, touch, tasto)

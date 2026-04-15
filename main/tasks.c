@@ -16,6 +16,7 @@
 #include "usb_cdc_scanner.h" // Scanner QR
 #include "cctalk.h"          // cctalk_driver_init + cctalk_task_run
 #include "mdb.h"             // mdb_init + mdb_engine_run
+#include "mdb_cashless.h"
 #include "sd_card.h"         // sd_card_init_monitor + sd_card_monitor_run
 #include "http_services.h"
 #include "modbus_relay.h"
@@ -130,9 +131,20 @@ static void tasks_set_modbus_recovery_test_active(bool active)
     portEXIT_CRITICAL(&s_oos_lock);
 }
 
+static bool tasks_is_program_active(void)
+{
+    fsm_ctx_t snap = {0};
+    if (!fsm_runtime_snapshot(&snap)) {
+        return false;
+    }
+    return (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED);
+}
+
 static bool tasks_is_modbus_runtime_blocked(void)
 {
-    return tasks_is_out_of_service_state() || tasks_is_modbus_hard_inhibited();
+    return tasks_is_out_of_service_state() ||
+           tasks_is_modbus_hard_inhibited() ||
+           tasks_is_program_active();
 }
 
 bool digital_io_modbus_runtime_allowed(void)
@@ -142,7 +154,8 @@ bool digital_io_modbus_runtime_allowed(void)
 
 bool usb_cdc_scanner_runtime_allowed(void)
 {
-    return !tasks_is_out_of_service_state();
+    return !tasks_is_out_of_service_state() &&
+           !tasks_is_program_active();
 }
 
 static const char *tasks_agent_name(agn_id_t agent)
@@ -1403,6 +1416,10 @@ bool tasks_request_card_vend(int32_t amount_cents, uint16_t item_number)
         return false;
     }
 
+    ESP_LOGI(TAG, "[M] [CARD_VEND] invio VEND_REQUEST MDB amount=%ld item=0x%04X",
+             (long)amount_cents,
+             (unsigned)item_number);
+
     if (!mdb_cashless_request_program_vend((uint16_t)amount_cents, item_number)) {
         ESP_LOGW(TAG, "[M] Richiesta VEND_REQUEST MDB fallita (%ld)", (long)amount_cents);
         return false;
@@ -1437,6 +1454,23 @@ bool tasks_request_card_session_complete(void)
 
     ESP_LOGI(TAG, "[M] Richiesta SESSION_COMPLETE MDB accodata");
     return true;
+}
+
+static bool tasks_is_card_session_removed(void)
+{
+    if (mdb_cashless_get_device_count() == 0) {
+        return false;
+    }
+
+    const mdb_cashless_device_t *device = mdb_cashless_get_device(0);
+    if (!device) {
+        return false;
+    }
+
+    /* Il campo present indica la presenza del lettore cashless sul bus MDB,
+       non la presenza del tag NFC. La chiusura della sessione viene
+       rilevata da session_open == false. */
+    return (device->present && !device->session_open);
 }
 
 esp_err_t tasks_publish_play_audio(const char *audio_path, agn_id_t sender)
@@ -2066,6 +2100,8 @@ static void fsm_task(void *arg)
     uint32_t alive_ms = 0;
     static const uint32_t ALIVE_INTERVAL_MS = 10000;
     bool cctalk_forced_stop_for_vcd = false;
+    bool cctalk_forced_stop_for_program = false;
+    bool scanner_forced_off_for_program = false;
     TickType_t next_health_check = xTaskGetTickCount();
     TickType_t next_oos_retry = 0;
     tasks_oos_cause_t active_oos = {0};
@@ -2214,31 +2250,102 @@ static void fsm_task(void *arg)
             tasks_set_out_of_service_runtime(false);
         }
 
+        if (fsm.state == FSM_STATE_CREDIT &&
+            fsm.session_source == FSM_SESSION_SOURCE_CARD &&
+            !fsm.card_vend_pending &&
+            tasks_is_card_session_removed()) {
+            if (fsm.card_session_complete_required) {
+                (void)tasks_request_card_session_complete();
+                fsm.card_session_complete_required = false;
+            }
+
+            fsm_input_event_t card_removed_event = {
+                .from = AGN_ID_MDB,
+                .to = {AGN_ID_FSM},
+                .action = ACTION_ID_CREDIT_ENDED,
+                .type = FSM_INPUT_EVENT_CREDIT_ENDED,
+                .timestamp_ms = (uint32_t)pdTICKS_TO_MS(now_tick),
+                .value_i32 = 0,
+                .value_u32 = 0,
+                .aux_u32 = 1,
+                .data_ptr = NULL,
+                .text = {0},
+            };
+            strncpy(card_removed_event.text, "nfc_removed", sizeof(card_removed_event.text) - 1);
+
+            if (fsm_event_publish(&card_removed_event, pdMS_TO_TICKS(20))) {
+                changed = true;
+                ESP_LOGI(TAG, "[M] NFC rimosso dopo stop programma: evento CREDIT_ENDED inviato");
+            }
+
+            /* Non forzare un reset del dispositivo cashless su normale chiusura sessione,
+               lasciamo il driver MDB gestire il ritorno a stato idle e la successiva
+               reinserzione del tag senza bip di ripristino. */
+        }
+
         bool vcd_locked_session =
             (fsm.session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) &&
             (fsm.session_source == FSM_SESSION_SOURCE_QR ||
              fsm.session_source == FSM_SESSION_SOURCE_CARD) &&
             !fsm.allow_additional_payments;
+        bool active_program_session =
+            (fsm.state == FSM_STATE_RUNNING || fsm.state == FSM_STATE_PAUSED);
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->sensors.cctalk_enabled) {
-            if (vcd_locked_session && !cctalk_forced_stop_for_vcd) {
+            bool cctalk_stop_needed = vcd_locked_session || active_program_session;
+
+            if (cctalk_stop_needed && !cctalk_forced_stop_for_vcd && !cctalk_forced_stop_for_program) {
                 if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_STOP)) {
-                    cctalk_forced_stop_for_vcd = true;
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK disabilitata durante sessione VCD");
+                    cctalk_forced_stop_for_program = active_program_session;
+                    if (active_program_session) {
+                        ESP_LOGI(TAG, "[M] Gettoniera CCTALK disabilitata durante programma attivo");
+                    } else {
+                        cctalk_forced_stop_for_vcd = true;
+                        ESP_LOGI(TAG, "[M] Gettoniera CCTALK disabilitata durante sessione VCD");
+                    }
                 } else {
-                    ESP_LOGW(TAG, "[M] Richiesta stop gettoniera CCTALK non pubblicata (sessione VCD)");
+                    ESP_LOGW(TAG, "[M] Richiesta stop gettoniera CCTALK non pubblicata (sessione VCD o programma attivo)");
                 }
-            } else if (cctalk_forced_stop_for_vcd && !vcd_locked_session &&
-                       (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS)) {
+            } else if (!cctalk_stop_needed && (cctalk_forced_stop_for_vcd || cctalk_forced_stop_for_program) &&
+                       (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
                 if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_START)) {
                     cctalk_forced_stop_for_vcd = false;
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo sessione VCD");
+                    cctalk_forced_stop_for_program = false;
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo fine programma/sessione VCD");
                 } else {
-                    ESP_LOGW(TAG, "[M] Richiesta start gettoniera CCTALK non pubblicata (fine sessione VCD)");
+                    ESP_LOGW(TAG, "[M] Richiesta start gettoniera CCTALK non pubblicata (fine programma/sessione VCD)");
                 }
             }
         } else {
             cctalk_forced_stop_for_vcd = false;
+            cctalk_forced_stop_for_program = false;
+        }
+
+        if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->scanner.enabled) {
+            if (active_program_session && !scanner_forced_off_for_program) {
+                esp_err_t off_err = usb_cdc_scanner_send_off_command();
+                if (off_err == ESP_OK) {
+                    scanner_forced_off_for_program = true;
+                    ESP_LOGI(TAG, "[M] Scanner QR disabilitato durante programma attivo");
+                } else {
+                    ESP_LOGW(TAG, "[M] Richiesta off scanner non pubblicata durante programma attivo: %s", esp_err_to_name(off_err));
+                }
+            } else if (!active_program_session && scanner_forced_off_for_program &&
+                       (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
+                esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
+                esp_err_t on_err = usb_cdc_scanner_send_on_command();
+                if (setup_err == ESP_OK && on_err == ESP_OK) {
+                    scanner_forced_off_for_program = false;
+                    ESP_LOGI(TAG, "[M] Scanner QR riabilitato dopo fine programma");
+                } else {
+                    ESP_LOGW(TAG,
+                             "[M] Riabilitazione scanner fallita dopo fine programma (setup=%s on=%s)",
+                             esp_err_to_name(setup_err),
+                             esp_err_to_name(on_err));
+                }
+            }
+        } else {
+            scanner_forced_off_for_program = false;
         }
 
         if (event_received &&
@@ -2280,6 +2387,35 @@ static void fsm_task(void *arg)
         bool natural_cycle_end = left_program_state && !forced_stop_requested && !credit_forced_end;
 
         if (left_program_state) {
+            tasks_apply_n_run();
+            bool hardware_session_open = false;
+            if (cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en &&
+                mdb_cashless_get_device_count() > 0) {
+                const mdb_cashless_device_t *device = mdb_cashless_get_device(0);
+                if (device && device->session_open) {
+                    hardware_session_open = true;
+                }
+            }
+            bool keep_cashless_active = (cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en &&
+                                         ((fsm.state == FSM_STATE_CREDIT &&
+                                           fsm.session_source == FSM_SESSION_SOURCE_CARD) ||
+                                          hardware_session_open));
+            if (cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en) {
+                if (keep_cashless_active) {
+                    ESP_LOGI(TAG, "[M] Mantengo cashless attivo: sessione CARD ancora valida o hardware session open");
+                } else {
+                    size_t mdb_count = mdb_cashless_get_device_count();
+                    for (size_t i = 0; i < mdb_count; ++i) {
+                        mdb_cashless_reset_device(i);
+                    }
+                    ESP_LOGI(TAG, "[M] MDB cashless reattivato dopo fine programma");
+                }
+            }
+
+            if (state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) {
+                ESP_LOGI(TAG, "[M] PROGRAMMA TERMINATO: %s", fsm.running_program_name[0] ? fsm.running_program_name : "<programma>");
+            }
+
             esp_err_t clear_err = web_ui_program_clear_outputs();
             if (clear_err == ESP_OK) {
                 fsm_append_message("Reset relay eseguito in uscita da RUNNING/PAUSED");
@@ -2333,6 +2469,21 @@ static void fsm_task(void *arg)
                                                       reason_fallback,
                                                       agent_name);
             }
+        }
+
+        if (event_received &&
+            ((event.type == FSM_INPUT_EVENT_PROGRAM_SELECTED &&
+              state_before == FSM_STATE_CREDIT &&
+              fsm.state == FSM_STATE_RUNNING) ||
+             (event.type == FSM_INPUT_EVENT_CARD_VEND_APPROVED &&
+              state_before == FSM_STATE_CREDIT &&
+              fsm.state == FSM_STATE_RUNNING))) {
+            ESP_LOGI(TAG, "****************************************");
+            ESP_LOGI(TAG, "[M] AVVIO PROGRAMMA: %s",
+                     fsm.running_program_name[0] ? fsm.running_program_name : "<nome non disponibile>");
+            ESP_LOGI(TAG, "[M] Credito residuo dopo avvio: %ld coin", (long)fsm.credit_cents);
+            ESP_LOGI(TAG, "[M] Stato FSM dopo avvio: %s", fsm_state_to_string(fsm.state));
+            ESP_LOGI(TAG, "****************************************");
         }
 
         if (event_received &&

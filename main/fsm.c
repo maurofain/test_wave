@@ -73,6 +73,20 @@ static const char *fsm_source_tag_to_display_name(const char *source_tag)
     return "PAGAMENTO";
 }
 
+static const char *fsm_session_source_to_string(fsm_session_source_t source)
+{
+    switch (source) {
+        case FSM_SESSION_SOURCE_NONE:  return "NONE";
+        case FSM_SESSION_SOURCE_TOUCH: return "TOUCH";
+        case FSM_SESSION_SOURCE_KEY:   return "KEY";
+        case FSM_SESSION_SOURCE_COIN:  return "COIN";
+        case FSM_SESSION_SOURCE_CCTALK:return "CCTALK";
+        case FSM_SESSION_SOURCE_QR:    return "QR";
+        case FSM_SESSION_SOURCE_CARD:  return "CARD";
+        default:                      return "UNKNOWN";
+    }
+}
+
 static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms)
 {
     size_t dropped = 0;
@@ -145,7 +159,7 @@ static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
     snprintf(line1, sizeof(line1), " CREDITI RICEVUTI - %s", display_name);
     snprintf(line2, sizeof(line2), " Importo: %ld cent", (long)amount_cents);
     snprintf(line3, sizeof(line3), " ECD dopo: %ld | VCD dopo: %ld", (long)ctx->ecd_coins, (long)ctx->vcd_coins);
-    snprintf(line4, sizeof(line4), " Credito totale: %ld cent", (long)ctx->credit_cents);
+    snprintf(line4, sizeof(line4), " Credito totale: %ld coin", (long)ctx->credit_cents);
     ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════╗");
     ESP_LOGI(TAG, "[M] ║%-44s║", line1);
     ESP_LOGI(TAG, "[M] ║%-44s║", line2);
@@ -181,8 +195,10 @@ static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
     ctx->inactivity_ms = 0;
     ctx->stop_after_cycle_requested = false;
     ctx->pre_fine_ciclo_active = false;
-    ctx->customer_code[0] = '\0';
-    ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+    if (ctx->session_source != FSM_SESSION_SOURCE_CARD && ctx->session_source != FSM_SESSION_SOURCE_QR) {
+        ctx->customer_code[0] = '\0';
+        ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+    }
 }
 
 static void fsm_reset_card_vend_pending(fsm_ctx_t *ctx)
@@ -254,12 +270,26 @@ static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_sourc
 
 static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
 {
+    const char *source_str = ctx ? fsm_session_source_to_string(ctx->payment_credit_source) : "UNKNOWN";
     if (!ctx || cost <= 0 || ctx->credit_cents < cost) {
+        ESP_LOGW(TAG, "****************************************");
+        ESP_LOGW(TAG, "[M] [USE_CREDIT] riduzione credito FALLITA");
+        ESP_LOGW(TAG, "[M] Tipo pagamento: %s", source_str);
+        ESP_LOGW(TAG, "[M] Costo richiesto: %ld credit=%ld", (long)cost, ctx ? (long)ctx->credit_cents : 0L);
+        ESP_LOGW(TAG, "****************************************");
         return false;
     }
     int32_t f_ecd = (ctx->ecd_coins >= cost) ? cost : ctx->ecd_coins;
     int32_t f_vcd = cost - f_ecd;
     if (f_vcd > ctx->vcd_coins) {
+        ESP_LOGW(TAG, "****************************************");
+        ESP_LOGW(TAG, "[M] [USE_CREDIT] riduzione credito FALLITA");
+        ESP_LOGW(TAG, "[M] Tipo pagamento: %s", source_str);
+        ESP_LOGW(TAG, "[M] Dettaglio: insufficiente VCD cost=%ld ecd=%ld vcd=%ld",
+                 (long)cost,
+                 (long)ctx->ecd_coins,
+                 (long)ctx->vcd_coins);
+        ESP_LOGW(TAG, "****************************************");
         return false;
     }
     ctx->ecd_coins    -= f_ecd;
@@ -267,9 +297,15 @@ static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
     ctx->ecd_used     += f_ecd;
     ctx->vcd_used     += f_vcd;
     ctx->credit_cents -= cost;
-    ESP_LOGI(TAG, "[M] [USE_CREDIT] cost=%ld from_ecd=%ld from_vcd=%ld ecd_rem=%ld vcd_rem=%ld credit=%ld",
-             (long)cost, (long)f_ecd, (long)f_vcd,
-             (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->credit_cents);
+    ESP_LOGI(TAG, "****************************************");
+    ESP_LOGI(TAG, "[M] [USE_CREDIT] riduzione credito EFFETTUATA");
+    ESP_LOGI(TAG, "[M] Tipo pagamento: %s", source_str);
+    ESP_LOGI(TAG, "[M] Dettaglio: cost=%ld from_ecd=%ld from_vcd=%ld", (long)cost, (long)f_ecd, (long)f_vcd);
+    ESP_LOGI(TAG, "[M] Stato dopo sconto: ecd_rem=%ld vcd_rem=%ld credit=%ld",
+             (long)ctx->ecd_coins,
+             (long)ctx->vcd_coins,
+             (long)ctx->credit_cents);
+    ESP_LOGI(TAG, "****************************************");
     return true;
 }
 
@@ -607,6 +643,15 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_PAYMENT_ACCEPTED) {
                 ctx->inactivity_ms = 0;
+            } else if (event == FSM_EVENT_CREDIT_ENDED) {
+                fsm_reset_runtime_locked(ctx);
+                ctx->session_mode = FSM_SESSION_MODE_NONE;
+                ctx->session_source = FSM_SESSION_SOURCE_NONE;
+                ctx->allow_additional_payments = false;
+                ctx->customer_code[0] = '\0';
+                ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
+                ctx->inactivity_ms = 0;
             }
             break;
 
@@ -622,10 +667,15 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                     (void)tasks_request_card_session_complete();
                     ctx->card_session_complete_required = false;
                 }
+                ESP_LOGI(TAG, "****************************************");
+                ESP_LOGI(TAG, "[M] PROGRAMMA TERMINATO: %s",
+                         ctx->running_program_name[0] ? ctx->running_program_name : "<programma>");
+                ESP_LOGI(TAG, "****************************************");
                 bool has_credit = (ctx->credit_cents > 0) ||
                                   ((ctx->ecd_coins + ctx->vcd_coins) > 0);
+                bool stay_in_credit = has_credit || (ctx->session_source == FSM_SESSION_SOURCE_CARD);
                 fsm_reset_runtime_locked(ctx);
-                if (has_credit) {
+                if (stay_in_credit) {
                     ctx->state = FSM_STATE_CREDIT;
                     if (ctx->credit_cents <= 0) {
                         ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;
@@ -634,7 +684,9 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                     ctx->session_mode = FSM_SESSION_MODE_NONE;
                     ctx->session_source = FSM_SESSION_SOURCE_NONE;
                     ctx->allow_additional_payments = false;
-                    ctx->state = FSM_STATE_IDLE;
+                    ctx->customer_code[0] = '\0';
+                    ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
                 }
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_CREDIT_ENDED) {
@@ -642,10 +694,16 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                     (void)tasks_request_card_session_complete();
                     ctx->card_session_complete_required = false;
                 }
+                ESP_LOGI(TAG, "****************************************");
+                ESP_LOGI(TAG, "[M] PROGRAMMA TERMINATO: %s",
+                         ctx->running_program_name[0] ? ctx->running_program_name : "<programma>");
+                ESP_LOGI(TAG, "****************************************");
                 fsm_reset_runtime_locked(ctx);
                 ctx->session_mode = FSM_SESSION_MODE_NONE;
                 ctx->session_source = FSM_SESSION_SOURCE_NONE;
                 ctx->allow_additional_payments = false;
+                ctx->customer_code[0] = '\0';
+                ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
                 ctx->state = FSM_STATE_IDLE;
                 ctx->inactivity_ms = 0;
             }
@@ -663,10 +721,15 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                     (void)tasks_request_card_session_complete();
                     ctx->card_session_complete_required = false;
                 }
+                ESP_LOGI(TAG, "****************************************");
+                ESP_LOGI(TAG, "[M] PROGRAMMA TERMINATO: %s",
+                         ctx->running_program_name[0] ? ctx->running_program_name : "<programma>");
+                ESP_LOGI(TAG, "****************************************");
                 bool has_credit = (ctx->credit_cents > 0) ||
                                   ((ctx->ecd_coins + ctx->vcd_coins) > 0);
+                bool stay_in_credit = has_credit || (ctx->session_source == FSM_SESSION_SOURCE_CARD);
                 fsm_reset_runtime_locked(ctx);
-                if (has_credit) {
+                if (stay_in_credit) {
                     ctx->state = FSM_STATE_CREDIT;
                     if (ctx->credit_cents <= 0) {
                         ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;
@@ -675,7 +738,9 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                     ctx->session_mode = FSM_SESSION_MODE_NONE;
                     ctx->session_source = FSM_SESSION_SOURCE_NONE;
                     ctx->allow_additional_payments = false;
-                    ctx->state = FSM_STATE_IDLE;
+                    ctx->customer_code[0] = '\0';
+                    ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
                 }
                 ctx->inactivity_ms = 0;
             } else if (event == FSM_EVENT_CREDIT_ENDED) {
@@ -683,6 +748,8 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->session_mode = FSM_SESSION_MODE_NONE;
                 ctx->session_source = FSM_SESSION_SOURCE_NONE;
                 ctx->allow_additional_payments = false;
+                ctx->customer_code[0] = '\0';
+                ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
                 ctx->state = FSM_STATE_IDLE;
                 ctx->inactivity_ms = 0;
             }
@@ -752,6 +819,18 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
     if (ctx->state == FSM_STATE_OUT_OF_SERVICE) {
         return false;
     }
+
+    if ((ctx->state == FSM_STATE_RUNNING || ctx->state == FSM_STATE_PAUSED) &&
+        (etype == FSM_INPUT_EVENT_COIN ||
+         etype == FSM_INPUT_EVENT_TOKEN ||
+         etype == FSM_INPUT_EVENT_CARD_CREDIT ||
+         etype == FSM_INPUT_EVENT_QR_CREDIT ||
+         etype == FSM_INPUT_EVENT_QR_SCANNED)) {
+        ESP_LOGW(TAG, "[M] Ignorato evento acqusizione durante programma attivo: %s",
+                 fsm_input_event_type_to_string(etype));
+        return false;
+    }
+
     if (etype == FSM_INPUT_EVENT_NONE && event->action != ACTION_ID_NONE) {
         switch (event->action) {
             case ACTION_ID_USER_ACTIVITY:          etype = FSM_INPUT_EVENT_USER_ACTIVITY;        break;
@@ -1114,6 +1193,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 (void)tasks_request_card_session_complete();
                 fsm_reset_card_vend_pending(ctx);
             }
+            if (event->aux_u32 == 1U && ctx->session_source == FSM_SESSION_SOURCE_CARD) {
+                (void)tasks_request_card_session_complete();
+                ESP_LOGI(TAG, "[M] Reset MDB sessione dopo rimozione gettone e uscita da programmi");
+            }
             if (event->aux_u32 == 1U) {
                 ctx->vcd_coins = 0;
                 ctx->vcd_used = 0;
@@ -1259,7 +1342,11 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
 
                 ctx->credit_cents = 0;
                 fsm_reset_runtime_locked(ctx);
-                ctx->state = FSM_STATE_CREDIT;  /* [M] CREDIT (non IDLE) per mostrare il popup di ringraziamento */
+                if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
+                    ctx->state = FSM_STATE_CREDIT;  /* [M] CREDIT per mantenere la sessione CARD aperta e dopo timeout andare in ADS */
+                } else {
+                    ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
+                }
                 ctx->inactivity_ms = 0;
                 return true;
             }
