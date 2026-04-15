@@ -12,8 +12,11 @@
    - Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenendo in memoria gli eventuali frazionari (es. 50 cent).
    - Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile: prima ECD e poi VCD.
    - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
-
-5. Verifica la gestione generale dei componenti hardware
+4. Quandoviene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
+5. Se il gettone vine rimosso dal MDB si deve resettare il VCD e uscire dalla schermata programmi e resettare il sistema MDB per una nuova acquisizione
+6. Non viene sotrtratto credito al gettone MDB. 
+7. Se il getttone arriva a credito 0 si ese a ADS, se rimane inserito dopo un'interruzione dell'autorepeat si ritorna in scelta programmi e dopo il rimeout di passa in ADS
+8. Verifica la gestione generale dei componenti hardware
    - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:
      1. `init`
      2. `activate`
@@ -25,7 +28,7 @@
        - `CCTalk`: esegue polling periodico, rileva la perdita del device, passa `offline` e tenta la reinizializzazione automatica con ritorno a `online` quando il device risponde di nuovo.
        - `Scanner USB`: esegue monitoraggio periodico del bus e tenta la riapertura del device; in caso di disconnessione passa `offline`. La riconnessione fisica è gestita, ma il ciclo completo di `setup` dopo reconnect non è ancora robusto quanto CCTalk.
        - `HttpServices`: esegue controllo periodico logico del servizio remoto, passa `offline` su errore/token invalido e gestisce recovery con relogin, keepalive e retry/backoff fino al ritorno `online`.
-6. Piano test endpoint e funzioni
+9. Piano test endpoint e funzioni
    - Strutturare i test in 4 livelli:
      - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
      - **Contract**: campi obbligatori e tipi minimi della risposta
@@ -43,19 +46,9 @@
      - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
      - 3 flow critici: SD, seriale unificato, backup config su SD
      - Report `junit.xml` + riepilogo markdown
-7. Protocollo moduli 8 I/O RS485 esterni
-   - Driver RS485 presente ma nessun protocollo per slave 8-I/O esterni (uno o due moduli)
-   - Definire il protocollo di comunicazione (Modbus RTU o proprietario)
-   - Implementare lettura ingressi e scrittura uscite ciclica
-   - Aggiungere in `/config`: numero schede I/O esterne (0, 1, 2)
-8. PLC esterno
-   - Definire protocollo di collegamento (seriale RS485 o input digitale diretto)
-   - Implementare ricezione impulsi/segnali da PLC (es. segnale avanzamento ciclo)
-   - Aggiungere in `/config`: abilitazione PLC, input/output associati, protocollo
-9. Config: assegnazione programmi a I/O e relay
-   - I programmi sono configurabili (tempo, pausa) ma non mappati a uscite fisiche
-   - Aggiungere in `/config` per ogni programma: maschera relay/output attivati durante l'erogazione
 10. Config: valore per metodo di pagamento
+   - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
+   - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
    - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
 11. Ricezione config da server (`api/getconfig`)
@@ -74,15 +67,12 @@
 14. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
 15. Crea la funzione status per i component SHT40, NTP, PWM, RS232
 16. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
-19. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
-20. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
-22. Permangono del glimps sullo schermo MIPI
-23. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
-24. il codice pagamento nell'invio al httpservices va completato con il codice alfanumerico del tipo di pagamento:
-   - pagamento con monete : HTTP_SERVICES_PAYMENT_TYPE_CASH - CASH
-   - pagamento con QRCode : HTTP_SERVICES_PAYMENT_TYPE_WALL - WALL
-   - pagamento con MDB    : HTTP_SERVICES_PAYMENT_TYPE_CASHL- CASHL
-27.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' conun altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 aal 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2
+17. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
+18. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
+19. Permangono del glimps sullo schermo MIPI
+20. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
+21. manca la vode FTP nello Stato Servizi
+22.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' conun altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 aal 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2
 
 
 ---
@@ -147,6 +137,8 @@
     - `ERROR.log` per crash con stack trace (nome file = timestamp)
     - In assenza SD: solo invio al server remoto
     - `activity.json` in SPIFFS, caricato in PSRAM al boot; API `device_activity_find()`
+39. Protocollo moduli 8 I/O RS485 esterni
+40. Config: assegnazione programmi a I/O e relay
 39. FSM per la gestione del ciclo operativo della macchina (vedi `FSM.md`)
 40. Schermata "Fuori servizio" (font 48px) attivata su `ERROR_LOCK` (reboot consecutivi ≥ 3)
 41. Coda eventi FSM — estensione struttura: campi `from`, `to[10]`, `action_id` aggiunti a `fsm_input_event_t`; tabella agenti e azioni compilata; mailbox condivisa con lock; API `publish_ex`/`claim_for_agent`/`ack_for_agent`

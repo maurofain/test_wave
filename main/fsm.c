@@ -181,6 +181,8 @@ static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
     ctx->inactivity_ms = 0;
     ctx->stop_after_cycle_requested = false;
     ctx->pre_fine_ciclo_active = false;
+    ctx->customer_code[0] = '\0';
+    ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
 }
 
 static void fsm_reset_card_vend_pending(fsm_ctx_t *ctx)
@@ -204,6 +206,9 @@ static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source
     ctx->session_source = source;
     ctx->session_mode = FSM_SESSION_MODE_OPEN_PAYMENTS;
     ctx->allow_additional_payments = true;
+    if (source != FSM_SESSION_SOURCE_QR && source != FSM_SESSION_SOURCE_CARD) {
+        ctx->customer_code[0] = '\0';
+    }
     if (ctx->state == FSM_STATE_IDLE || ctx->state == FSM_STATE_ADS) {
         ctx->state = FSM_STATE_CREDIT;
         ctx->inactivity_ms = 0;
@@ -292,7 +297,7 @@ static void fsm_publish_autorenew_payment_event(const fsm_ctx_t *ctx)
     };
     strncpy(pay_ev.text, service_code, sizeof(pay_ev.text) - 1);
     snprintf(pay_ev.customer_code, sizeof(pay_ev.customer_code), "%s",
-             ctx->customer_code[0] ? ctx->customer_code : "0");
+             ctx->customer_code[0] ? ctx->customer_code : "");
 
     if (!fsm_event_publish(&pay_ev, pdMS_TO_TICKS(50))) {
         ESP_LOGE(TAG, "[M] Publish AUTO_RENEW_PAYMENT fallito (service=%s amount=%ld)",
@@ -304,7 +309,7 @@ static void fsm_publish_autorenew_payment_event(const fsm_ctx_t *ctx)
     ESP_LOGI(TAG, "[M] AUTO_RENEW_PAYMENT pubblicato (service=%s amount=%ld customer_code=%s)",
              service_code,
              (long)ctx->running_price_units,
-             ctx->customer_code[0] ? ctx->customer_code : "0");
+             ctx->customer_code[0] ? ctx->customer_code : "");
 }
 
 static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
@@ -491,6 +496,7 @@ void fsm_init(fsm_ctx_t *ctx)
 
     ctx->state = FSM_STATE_IDLE;
     ctx->session_source = FSM_SESSION_SOURCE_NONE;
+    ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
     ctx->session_mode = FSM_SESSION_MODE_NONE;
     ctx->credit_cents = 0;
     ctx->ecd_coins = 0;
@@ -781,13 +787,14 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
-            /* [C] Codice cliente "0" per pagamento monete */
-            snprintf(ctx->customer_code, sizeof(ctx->customer_code), "0");
+            /* [C] Nessun codice cliente per pagamento monete */
+            ctx->customer_code[0] = '\0';
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           true,
                                           (event->text[0] != '\0') ? event->text : "coin");
+                ctx->payment_credit_source = FSM_SESSION_SOURCE_COIN;
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -797,13 +804,18 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
-            /* [C] Codice cliente "0" per pagamento token */
-            snprintf(ctx->customer_code, sizeof(ctx->customer_code), "0");
+            /* [C] Nessun codice cliente per pagamento token */
+            ctx->customer_code[0] = '\0';
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           true,
                                           (event->text[0] != '\0') ? event->text : "token");
+                if (event->from == AGN_ID_CCTALK) {
+                    ctx->payment_credit_source = FSM_SESSION_SOURCE_CCTALK;
+                } else {
+                    ctx->payment_credit_source = FSM_SESSION_SOURCE_COIN;
+                }
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -830,12 +842,13 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_QR);
             /* [C] Memorizza il codice cliente da QR per successiva api/payment */
             snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s",
-                     (event->text[0] != '\0') ? event->text : "0");
+                     (event->text[0] != '\0') ? event->text : "");
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           false,
                                           (event->text[0] != '\0') ? event->text : "qr_vcd");
+                ctx->payment_credit_source = FSM_SESSION_SOURCE_QR;
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
@@ -853,12 +866,13 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_CARD);
             /* [C] Memorizza il codice cliente da Card per successiva api/payment */
             snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s",
-                     (event->text[0] != '\0') ? event->text : "0");
+                     (event->text[0] != '\0') ? event->text : "");
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
                                           false,
                                           (event->text[0] != '\0') ? event->text : "card_vcd");
+                ctx->payment_credit_source = FSM_SESSION_SOURCE_CARD;
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
         }

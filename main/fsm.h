@@ -22,6 +22,7 @@ typedef enum {
     FSM_SESSION_SOURCE_TOUCH,
     FSM_SESSION_SOURCE_KEY,
     FSM_SESSION_SOURCE_COIN,
+    FSM_SESSION_SOURCE_CCTALK,
     FSM_SESSION_SOURCE_QR,
     FSM_SESSION_SOURCE_CARD,
 } fsm_session_source_t;
@@ -241,6 +242,7 @@ typedef struct {
 typedef struct {
     fsm_state_t state;
     fsm_session_source_t session_source;
+    fsm_session_source_t payment_credit_source;
     fsm_session_mode_t session_mode;
     int32_t credit_cents;       /* crediti totali disponibili (1 credito = 1 euro) */
     int32_t ecd_coins;          /* crediti ECD disponibili */
@@ -270,7 +272,7 @@ typedef struct {
     bool pre_fine_ciclo_active;  /* true quando la soglia PreFineCiclo è stata raggiunta */
     int32_t out_of_service_agent; /* AGN_ID_* che ha causato lo stato OOS */
     char out_of_service_reason[FSM_EVENT_TEXT_MAX_LEN]; /* chiave motivo OOS */
-    char customer_code[FSM_EVENT_TEXT_MAX_LEN]; /* [C] codice cliente per api/payment (QR, Card, o "0" per monete) */
+    char customer_code[FSM_EVENT_TEXT_MAX_LEN]; /* [C] codice cliente per api/payment (QR, Card, o stringa vuota se non presente) */
     int32_t pending_program_price_units;
     uint32_t pending_pause_max_ms;
     uint32_t pending_running_target_ms;

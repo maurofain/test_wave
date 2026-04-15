@@ -68,6 +68,13 @@ componenti.
   - in `main/init.c`: salta il preboot crash-send (`try_send_pending_crash_record`)
   - in `http_services.c`: blocca il forwarding POST remoto (`remote_post`)
 
+### `DNA_HTTP_SERVICES_NON_BLOCKING`
+- **File:** `main/init.c`, `main/tasks.c`
+- **Valori:** `1` tratta la mancanza di connessione al server HTTP `http_services` come non bloccante, `0` mantiene il comportamento tradizionale.
+- **Impatto:**
+  - in `main/init.c`: mantiene lo stato di init `HTTP_SERVICES` attivo anche se il login remoto fallisce all'avvio
+  - in `main/tasks.c`: evita di impostare l'agente `HTTP_SERVICES` come error state e non attiva la condizione `out_of_service` quando la rete o il token remoto non sono disponibili
+
 ### `DNA_LVGL_COUNTDOWN_BG`
 - **File:** `components/lvgl_panel/lvgl_panel.c` (definito in `CMakeLists.txt` radice)
 - **Valori:** `0` modalità barra verticale (default), `1` modalità sfondo countdown pieno

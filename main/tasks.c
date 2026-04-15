@@ -362,31 +362,46 @@ static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_caus
     if (focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_HTTP_SERVICES) {
         if (http_services_is_remote_enabled()) {
             if (!tasks_network_available()) {
+#if DNA_HTTP_SERVICES_NON_BLOCKING
+                init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_NETWORK_NO_IP);
+                ESP_LOGW(TAG, "[M] [HTTP_SVC] Rete non disponibile ma non bloccante");
+#else
                 init_agent_status_set(AGN_ID_HTTP_SERVICES, 0, INIT_AGENT_ERR_NETWORK_NO_IP);
                 tasks_oos_set(out_cause,
                               AGN_ID_HTTP_SERVICES,
                               "out_of_service_reason_network_down",
                               "Rete non disponibile");
                 return true;
+#endif
             }
 
             esp_err_t sync_err = http_services_sync_runtime_state(false);
             if (sync_err != ESP_OK || !http_services_has_auth_token()) {
+#if DNA_HTTP_SERVICES_NON_BLOCKING
+                init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_REMOTE_LOGIN_FAILED);
+                ESP_LOGW(TAG, "[M] [HTTP_SVC] Token remoto non disponibile ma non bloccante");
+#else
                 init_agent_status_set(AGN_ID_HTTP_SERVICES, 0, INIT_AGENT_ERR_REMOTE_LOGIN_FAILED);
                 tasks_oos_set(out_cause,
                               AGN_ID_HTTP_SERVICES,
                               "out_of_service_reason_remote_token",
                               "Errore richiesta token remoto");
                 return true;
+#endif
             }
 
             if (!http_services_is_remote_online()) {
+#if DNA_HTTP_SERVICES_NON_BLOCKING
+                init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_RUNTIME_FAILED);
+                ESP_LOGW(TAG, "[M] [HTTP_SVC] Server remoto non raggiungibile ma non bloccante");
+#else
                 init_agent_status_set(AGN_ID_HTTP_SERVICES, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
                 tasks_oos_set(out_cause,
                               AGN_ID_HTTP_SERVICES,
                               "out_of_service_reason_remote_unreachable",
                               "Server remoto non raggiungibile");
                 return true;
+#endif
             }
 
             init_agent_status_set(AGN_ID_HTTP_SERVICES, 1, INIT_AGENT_ERR_NONE);
@@ -2843,6 +2858,10 @@ static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_
                                    ? ctx->running_program_name
                                    : ((source_event && source_event->text[0] != '\0') ? source_event->text : "SER1");
 
+    fsm_session_source_t payment_source = (ctx->payment_credit_source != FSM_SESSION_SOURCE_NONE)
+                                           ? ctx->payment_credit_source
+                                           : ctx->session_source;
+
     fsm_input_event_t pay_ev = {
         .from = AGN_ID_FSM,
         .to = {AGN_ID_HTTP_SERVICES},
@@ -2851,13 +2870,13 @@ static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_
         .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
         .value_i32 = payment_amount,
         .value_u32 = 0,
-        .aux_u32 = (uint32_t)ctx->session_source,
+        .aux_u32 = (uint32_t)payment_source,
         .text = {0},
         .customer_code = {0},
     };
     strncpy(pay_ev.text, service_code, sizeof(pay_ev.text) - 1);
     snprintf(pay_ev.customer_code, sizeof(pay_ev.customer_code), "%s",
-             ctx->customer_code[0] ? ctx->customer_code : "0");
+             ctx->customer_code[0] ? ctx->customer_code : "");
 
     if (!fsm_event_publish(&pay_ev, pdMS_TO_TICKS(50))) {
         ESP_LOGE(TAG, "[M] Publish PAYMENT_EVENT fallito (service=%s amount=%ld)",
@@ -2866,18 +2885,22 @@ static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_
         return;
     }
 
-    ESP_LOGI(TAG, "[M] PAYMENT_EVENT pubblicato (service=%s amount=%ld)",
+    ESP_LOGI(TAG, "[M] PAYMENT_EVENT pubblicato (service=%s amount=%ld source=%u customer=%s)",
              service_code,
-             (long)payment_amount);
+             (long)payment_amount,
+             (unsigned)ctx->session_source,
+             pay_ev.customer_code[0] ? pay_ev.customer_code : "<none>");
 }
 
 static http_services_payment_type_t tasks_payment_type_from_session_source(fsm_session_source_t source)
 {
     switch (source) {
         case FSM_SESSION_SOURCE_QR:
-            return HTTP_SERVICES_PAYMENT_TYPE_SATI;
+            return HTTP_SERVICES_PAYMENT_TYPE_WALLET;
         case FSM_SESSION_SOURCE_CARD:
             return HTTP_SERVICES_PAYMENT_TYPE_CASHL;
+        case FSM_SESSION_SOURCE_CCTALK:
+            return HTTP_SERVICES_PAYMENT_TYPE_CASH;
         case FSM_SESSION_SOURCE_COIN:
             return HTTP_SERVICES_PAYMENT_TYPE_COIN;
         case FSM_SESSION_SOURCE_TOUCH:
@@ -2913,6 +2936,20 @@ static void http_services_task(void *arg)
             http_services_paid_service_code_t payment_service = http_services_paid_service_code_from_string(service_code);
             http_services_payment_type_t payment_type = tasks_payment_type_from_session_source((fsm_session_source_t)event.aux_u32);
             int32_t amount = (event.value_i32 > 0) ? event.value_i32 : 0;
+
+            if (payment_type == HTTP_SERVICES_PAYMENT_TYPE_CASH &&
+                event.customer_code[0] != '\0' &&
+                (fsm_session_source_t)event.aux_u32 == FSM_SESSION_SOURCE_NONE) {
+                payment_type = HTTP_SERVICES_PAYMENT_TYPE_WALLET;
+                ESP_LOGI(TAG, "[M] payment type overridden to WALL because customer_code present and source NONE");
+            }
+
+            ESP_LOGI(TAG, "[M] payment event received service=%s source=%u type=%s amount=%ld customer=%s",
+                     service_code,
+                     (unsigned)event.aux_u32,
+                     http_services_payment_type_to_string(payment_type),
+                     (long)amount,
+                     event.customer_code[0] ? event.customer_code : "<none>");
             
             /* [C] Usa customer_code dall'evento FSM, altrimenti fallback su s_last_customer */
             http_services_customer_t customer = {0};

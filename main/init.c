@@ -1493,10 +1493,18 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
       }
       else
       {
+#if DNA_HTTP_SERVICES_NON_BLOCKING
+        init_agent_status_set(AGN_ID_HTTP_SERVICES, 1,
+                              INIT_AGENT_ERR_REMOTE_LOGIN_FAILED);
+        ESP_LOGW(TAG,
+                 "[M] [HTTP_SVC] Login iniziale token fallito ma non bloccante: %s",
+                 esp_err_to_name(hs_sync_err));
+#else
         init_agent_status_set(AGN_ID_HTTP_SERVICES, 0,
                               INIT_AGENT_ERR_REMOTE_LOGIN_FAILED);
         ESP_LOGW(TAG, "[M] [HTTP_SVC] Login iniziale token fallito: %s",
                  esp_err_to_name(hs_sync_err));
+#endif
       }
     }
   }

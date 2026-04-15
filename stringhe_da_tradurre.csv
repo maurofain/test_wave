@@ -357,11 +357,11 @@ web_ui/webpages_embedded.c;83;<div class='container'>
 web_ui/webpages_embedded.c;84;<div id='alert'></div>
 web_ui/webpages_embedded.c;85;<form id='configForm'>
 web_ui/webpages_embedded.c;87;"<div class='section collapsed' style='background:#f1f4f6; border-left:5px solid #3498db;'>"
-web_ui/webpages_embedded.c;88;"<h2 onclick='var s=this.parentElement;s.classList.toggle(\""collapsed\"");var i=this.querySelector(\"".section-toggle-icon\"");if(i){i.innerText=s.classList.contains(\""collapsed\"")?\""▸\"":\""▾\"";}' tabindex='0'>🆔 Identità Dispositivo<span class='section-toggle-icon'>▸</span></h2>"
+web_ui/webpages_embedded.c;88;"<h2 onclick='var s=this.parentElement;s.classList.toggle(\""collapsed\"");var i=this.querySelector(\"".section-toggle-icon\"");if(i){i.innerText=s.classList.contains(\""collapsed\"")?\""▸\"":\""▾\"";}' tabindex='0'>🆔 Configurazione Dispositivo<span class='section-toggle-icon'>▸</span></h2>"
 web_ui/webpages_embedded.c;89;<div class='form-group'><label>Nome Dispositivo</label>
 web_ui/webpages_embedded.c;90;"<input type='text' id='dev_name' name='dev_name' placeholder='es: TestWave-01' style='font-size:1.1em; font-weight:bold;'></div>"
 web_ui/webpages_embedded.c;91;<div class='form-group'><label>Nome Impianto</label>
-web_ui/webpages_embedded.c;92;"<input type='text' id='location_name' name='location_name' placeholder='es: Ceglia Carwashing' style='font-size:1.0em;'></div>"
+web_ui/webpages_embedded.c;92;"<input type='text' id='location_name' name='location_name' placeholder='es: Caswashing Plant' style='font-size:1.0em;'></div>"
 web_ui/webpages_embedded.c;93;<div class='form-group'><label>Lingua Pannello Utente (LCD)</label>
 web_ui/webpages_embedded.c;94;"<select id='ui_user_language' name='ui_user_language' style='width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;'><option value='it'>Italiano (IT)</option></select></div>"
 web_ui/webpages_embedded.c;95;<div class='form-group'><label>Lingua Backend (Web UI/Server)</label>

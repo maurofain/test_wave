@@ -16,7 +16,7 @@
       var h2 = sections[i].querySelector('h2');
       if (!h2) continue;
       var t = normalizeText(h2.textContent);
-      if (t.indexOf('identità dispositivo') !== -1 || t.indexOf('identita dispositivo') !== -1) {
+      if (t.indexOf('Configurazione Dispositivo') !== -1 || t.indexOf('identita dispositivo') !== -1) {
         return sections[i];
       }
     }

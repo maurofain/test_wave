@@ -20,7 +20,7 @@ extern bool send_http_log;
 #include <unistd.h>
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
-// #define HTTP_SERVICES_LOG_TO_UI
+#define HTTP_SERVICES_LOG_TO_UI
 
 /* web_ui_add_log is used only when HTTP_SERVICES_LOG_TO_UI is enabled; declare here to
    avoid adding a component dependency (web_ui already depends on http_services). */
@@ -1320,8 +1320,9 @@ static void log_http_outgoing_request(const char *url,
     }
     snprintf(raw + written, needed + 1 - (size_t)written, "\n\n%s", safe_body);
 
-    ESP_LOGI(TAG, "RAW HTTP OUT:\n%s", raw);
+
 #ifdef HTTP_SERVICES_LOG_TO_UI
+    ESP_LOGI(TAG, "RAW HTTP OUT:\n%s", raw);
     webui_log_chunked("INFO", TAG, "RAW HTTP OUT", raw);
 #endif
     free(raw);
@@ -1665,6 +1666,21 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
         status = esp_http_client_get_status_code(client);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "esp_http_client_perform returned %s (attempt %d)", esp_err_to_name(err), attempt + 1);
+            if (err == ESP_ERR_HTTP_EAGAIN && attempt + 1 < max_attempts) {
+                ESP_LOGW(TAG, "Transient HTTP EAGAIN, retrying remote_post (attempt %d)", attempt + 2);
+                if (acc.buf) {
+                    free(acc.buf);
+                    acc.buf = NULL;
+                    acc.len = acc.cap = 0;
+                }
+                esp_http_client_cleanup(client);
+                client = NULL;
+                vTaskDelay(pdMS_TO_TICKS(150));
+                esp_log_level_set("HTTP_CLIENT", prev_http_client_level);
+                esp_log_level_set("esp_http_client", prev_esp_http_client_level);
+                esp_log_level_set("esp_tls", prev_esp_tls_level);
+                continue;
+            }
         }
         /* ripristina i livelli precedenti */
         esp_log_level_set("HTTP_CLIENT", prev_http_client_level);

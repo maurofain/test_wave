@@ -1077,7 +1077,7 @@ typedef struct {
  *       "scope_text": "p_config",
  *       "symbol": "P_CONFIG_IDENTITA_DISPOSITIVO",
  *       "values": [
- *         "🆔 Identità Dispositivo",
+ *         "🆔 Configurazione Dispositivo",
  *         "🆔 Device Identity",
  *         "🆔 Device Identity",
  *         "🆔 Device Identity",
