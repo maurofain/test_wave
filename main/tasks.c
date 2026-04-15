@@ -3661,20 +3661,25 @@ void tasks_start_all(void)
         }
 
         if (cfg && strcmp(t->name, "mdb_engine") == 0) {
+            bool coin_runtime_enabled = cfg->mdb.coin_acceptor_en && !cfg->sensors.cctalk_enabled;
             bool mdb_runtime_enabled = cfg->sensors.mdb_enabled &&
-                                       (cfg->mdb.coin_acceptor_en || cfg->mdb.cashless_en);
+                                       (coin_runtime_enabled || cfg->mdb.cashless_en);
             t->state = mdb_runtime_enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
             ESP_LOGI(TAG,
                      "[M] Task %s forzato %s (mdb=%d coin=%d cashless=%d)",
                      t->name,
                      (t->state == TASK_STATE_RUN) ? "RUN" : "IDLE",
                      cfg->sensors.mdb_enabled ? 1 : 0,
-                     cfg->mdb.coin_acceptor_en ? 1 : 0,
+                     coin_runtime_enabled ? 1 : 0,
                      cfg->mdb.cashless_en ? 1 : 0);
         }
 
         if (strcmp(t->name, "fsm") == 0) {
             ESP_LOGI(TAG, "[M] Task saltato %s (avvio differito post-bootstrap UI)", t->name);
+            continue;
+        }
+        if (strcmp(t->name, "mdb_engine") == 0) {
+            ESP_LOGI(TAG, "[M] Task saltato %s (avvio differito alla comparsa schermata ADS/Programmi)", t->name);
             continue;
         }
         // Rispetta la configurazione di display: se headless salta lvgl/touchscreen
@@ -3694,7 +3699,7 @@ void tasks_start_all(void)
                          t->name,
                          (int)t->state,
                          cfg->sensors.mdb_enabled ? 1 : 0,
-                         cfg->mdb.coin_acceptor_en ? 1 : 0,
+                         (cfg->mdb.coin_acceptor_en && !cfg->sensors.cctalk_enabled) ? 1 : 0,
                          cfg->mdb.cashless_en ? 1 : 0);
                 continue;
             }
@@ -3809,15 +3814,16 @@ void tasks_apply_n_run(void)
         }
 
         if (strcmp(t->name, "mdb_engine") == 0) {
+            bool coin_runtime_enabled = cfg->mdb.coin_acceptor_en && !cfg->sensors.cctalk_enabled;
             bool mdb_runtime_enabled = cfg->sensors.mdb_enabled &&
-                                       (cfg->mdb.coin_acceptor_en || cfg->mdb.cashless_en);
+                                       (coin_runtime_enabled || cfg->mdb.cashless_en);
             t->state = mdb_runtime_enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
             ESP_LOGI(TAG,
                      "[M] Task %s forzato %s (mdb=%d coin=%d cashless=%d)",
                      t->name,
                      (t->state == TASK_STATE_RUN) ? "RUN" : "IDLE",
                      cfg->sensors.mdb_enabled ? 1 : 0,
-                     cfg->mdb.coin_acceptor_en ? 1 : 0,
+                     coin_runtime_enabled ? 1 : 0,
                      cfg->mdb.cashless_en ? 1 : 0);
         }
 

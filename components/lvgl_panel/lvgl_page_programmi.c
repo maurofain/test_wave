@@ -404,17 +404,9 @@ static void panel_enable_payment_devices_on_programs_open(void)
     }
 
     bool scanner_was_enabled = cfg->scanner.enabled;
-    bool coin_was_enabled = cfg->mdb.coin_acceptor_en;
+    bool cctalk_was_enabled = cfg->sensors.cctalk_enabled;
 
     cfg->scanner.enabled = true;
-    cfg->mdb.coin_acceptor_en = true;
-
-    if (cfg->sensors.mdb_enabled) {
-        esp_err_t mdb_err = mdb_init();
-        if (mdb_err != ESP_OK) {
-            ESP_LOGW(TAG, "[C] Inizializzazione MDB in apertura programmi fallita: %s", esp_err_to_name(mdb_err));
-        }
-    }
 
     tasks_apply_n_run();
 
@@ -439,11 +431,11 @@ static void panel_enable_payment_devices_on_programs_open(void)
     }
 
     ESP_LOGI(TAG,
-             "[C] Apertura programmi: scanner=%d->%d gettoniera=%d->%d",
+             "[C] Apertura programmi: scanner=%d->%d cctalk=%d->%d",
              scanner_was_enabled ? 1 : 0,
              cfg->scanner.enabled ? 1 : 0,
-             coin_was_enabled ? 1 : 0,
-             cfg->mdb.coin_acceptor_en ? 1 : 0);
+             cctalk_was_enabled ? 1 : 0,
+             cfg->sensors.cctalk_enabled ? 1 : 0);
 }
 
 static void reinit_payment_devices_if_reactivated(void)
@@ -2030,7 +2022,7 @@ static void panel_timer_cb(lv_timer_t *t)
 
         const mdb_status_t *mdb_status = mdb_get_status();
         bool mdb_online = mdb_status && mdb_status->coin.is_online;
-        lvgl_page_chrome_set_status_icon_state(1, mdb_online); /* indice 1 = MDB / CreditCard */
+        lvgl_page_chrome_set_status_icon_state(LVGL_CHROME_STATUS_ICON_CARD, mdb_online);
 
         update_state(&snap);
         refresh_prog_buttons(&snap);
@@ -2137,8 +2129,8 @@ void lvgl_page_main_show(void)
     lvgl_page_chrome_add(scr);
 
     const mdb_status_t *mdb_status = mdb_get_status();
-    bool mdb_online = mdb_status && mdb_status->coin.is_online;
-    lvgl_page_chrome_set_status_icon_state(1, mdb_online); /* indice 1 = MDB / CreditCard */
+    bool mdb_online = mdb_status && mdb_status->cashless.is_online;
+    lvgl_page_chrome_set_status_icon_state(LVGL_CHROME_STATUS_ICON_CARD, mdb_online);
 
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: chrome added (MDB %s)", mdb_online ? "ONLINE" : "OFFLINE");
 

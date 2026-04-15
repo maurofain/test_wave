@@ -12,12 +12,7 @@
    - Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenendo in memoria gli eventuali frazionari (es. 50 cent).
    - Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile: prima ECD e poi VCD.
    - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
-4. Modifiche all'uso dei puntini sopra la bandiera lingue
-   1. I puntini vanno cambiati con le icone presenti in `/docs/icone/normalized` (icona embedded nel firmware o servita da SD/SPIFFS a seconda della scelta).
-   2. L'icona `CloudKo.png` e `CloudOk.png` vanno visualizzate al posto del primo punto a sinistra e rappresentano lo stato della connessione con i servizi HTTPS (KO e OK rispettivamente).
-   3. L'icona `CreditCardKo.png` e `CreditCardOk.png` vanno visualizzate al posto del secondo punto da sinistra e rappresentano lo stato della connessione con i device MDB (OK e KO rispettivamente).
-   4. L'icona `MoneteKo.png` e `MoneteOk.png` vanno visualizzate al posto del terzo punto da sinistra e rappresentano lo stato della connessione con i device CCTalk (OK e KO rispettivamente).
-   5. L'icona `QrKo.png` e `QrOk.png` vanno visualizzate al posto del punto più a destra e rappresentano lo stato della connessione con lo scanner QRCode (OK e KO rispettivamente).
+
 5. Verifica la gestione generale dei componenti hardware
    - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:
      1. `init`
@@ -79,12 +74,16 @@
 14. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
 15. Crea la funzione status per i component SHT40, NTP, PWM, RS232
 16. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
-17. Alza le icone di stato per non far sovrapportre la bandiera alla progression bar
-18. nella sezione 'Stato servizi' indica con 'Disab.' in colore blu i device esclusi tramite DNA
 19. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
 20. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
 22. Permangono del glimps sullo schermo MIPI
 23. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
+24. il codice pagamento nell'invio al httpservices va completato con il codice alfanumerico del tipo di pagamento:
+   - pagamento con monete : HTTP_SERVICES_PAYMENT_TYPE_CASH - CASH
+   - pagamento con QRCode : HTTP_SERVICES_PAYMENT_TYPE_WALL - WALL
+   - pagamento con MDB    : HTTP_SERVICES_PAYMENT_TYPE_CASHL- CASHL
+27.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' conun altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 aal 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2
+
 
 ---
 

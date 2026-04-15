@@ -417,6 +417,15 @@ void app_main(void)
         ESP_LOGI(TAG, LOG_CTX_PREFIX " [M] display disabilitato: salto slideshow");
     }
 
+    /* Avvia MDB solo dopo che la UI ha mostrato ADS o la pagina principale.
+     * In headless usiamo questo stesso punto come fallback post-bootstrap. */
+    if (cfg && cfg->sensors.mdb_enabled &&
+        (cfg->mdb.coin_acceptor_en || cfg->mdb.cashless_en)) {
+        if (!tasks_start_named("mdb_engine")) {
+            ESP_LOGE(TAG, LOG_CTX_PREFIX " impossibile avviare task MDB dopo bootstrap UI");
+        }
+    }
+
     if (!tasks_start_named("fsm")) {
         ESP_LOGE(TAG, LOG_CTX_PREFIX " impossibile avviare task FSM dopo bootstrap UI");
     }

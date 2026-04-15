@@ -3,8 +3,10 @@
 #include "lvgl_panel.h"
 
 #include "cctalk.h"
+#include "device_config.h"
 #include "http_services.h"
 #include "mdb.h"
+#include "modbus_relay.h"
 #include "usb_cdc_scanner.h"
 
 #include "esp_log.h"
@@ -17,31 +19,64 @@ extern const lv_font_t GoogleSans35;
 
 static lv_obj_t      *s_chrome_time_lbl   = NULL;
 static lv_timer_t    *s_chrome_time_timer  = NULL;
-static lv_obj_t      *s_chrome_status_icons[4] = {NULL, NULL, NULL, NULL};
-static bool           s_chrome_status_ok[4] = {true, true, true, true};
+static lv_obj_t      *s_chrome_status_icons[LVGL_CHROME_STATUS_ICON_COUNT] = {NULL, NULL, NULL, NULL, NULL};
+static bool           s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_COUNT] = {true, true, true, true, true};
 static lv_event_cb_t  s_flag_cb            = NULL;  /* callback per click bandiera */
 static void          *s_flag_ud            = NULL;
+static const uint8_t  s_chrome_embedded_icon_map[LVGL_CHROME_STATUS_ICON_COUNT] = {4, 0, 1, 2, 3};
 
 static bool chrome_component_is_online(device_component_status_t status)
 {
     return status == DEVICE_COMPONENT_STATUS_ONLINE;
 }
 
+static bool chrome_component_is_ready(device_component_status_t status)
+{
+    return status == DEVICE_COMPONENT_STATUS_ONLINE ||
+           status == DEVICE_COMPONENT_STATUS_ACTIVE;
+}
+
+static device_component_status_t chrome_modbus_component_status(void)
+{
+    const device_config_t *cfg = device_config_get();
+    modbus_relay_status_t modbus_status = {0};
+    bool status_available = (modbus_relay_get_status(&modbus_status) == ESP_OK);
+
+    if (!cfg || !cfg->sensors.rs485_enabled || !cfg->modbus.enabled) {
+        return DEVICE_COMPONENT_STATUS_DISABLED;
+    }
+
+    if (!status_available) {
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
+    }
+
+    if (modbus_status.running && modbus_status.poll_ok_count > 0U && modbus_status.last_error == ESP_OK) {
+        return DEVICE_COMPONENT_STATUS_ONLINE;
+    }
+
+    if (modbus_status.initialized || modbus_status.running) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    return DEVICE_COMPONENT_STATUS_OFFLINE;
+}
+
 static void chrome_sync_component_status(void)
 {
-    s_chrome_status_ok[0] = chrome_component_is_online(http_services_get_component_status());
-    s_chrome_status_ok[1] = chrome_component_is_online(mdb_get_component_status());
-    s_chrome_status_ok[2] = chrome_component_is_online(cctalk_driver_get_component_status());
-    s_chrome_status_ok[3] = chrome_component_is_online(usb_cdc_scanner_get_component_status());
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_MODBUS] = chrome_component_is_ready(chrome_modbus_component_status());
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CLOUD] = chrome_component_is_online(http_services_get_component_status());
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CARD] = chrome_component_is_online(mdb_get_component_status());
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_COIN] = chrome_component_is_online(cctalk_driver_get_component_status());
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_QR] = chrome_component_is_online(usb_cdc_scanner_get_component_status());
 }
 
 static const void *chrome_get_status_icon_src(int index)
 {
-    if (index < 0 || index >= 4) {
+    if (index < 0 || index >= LVGL_CHROME_STATUS_ICON_COUNT) {
         return NULL;
     }
 
-    const void *emb = get_embedded_icon_src(index, s_chrome_status_ok[index]);
+    const void *emb = get_embedded_icon_src(s_chrome_embedded_icon_map[index], s_chrome_status_ok[index]);
     if (!emb) {
         ESP_LOGW("lvgl_page_chrome", "[C] Icona chrome %d embedded non disponibile", index);
     }
@@ -53,7 +88,7 @@ static void chrome_update_status_icons(void)
 {
     chrome_sync_component_status();
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < LVGL_CHROME_STATUS_ICON_COUNT; i++) {
         if (!s_chrome_status_icons[i] || !lv_obj_is_valid(s_chrome_status_icons[i])) {
             continue;
         }
@@ -104,14 +139,14 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
     s_chrome_time_lbl = lv_label_create(scr);
     lv_obj_set_style_text_color(s_chrome_time_lbl, lv_color_hex(0xEEEEEE), LV_PART_MAIN);
     lv_obj_set_style_text_font(s_chrome_time_lbl, &GoogleSans35, LV_PART_MAIN);
-    lv_obj_align(s_chrome_time_lbl, LV_ALIGN_TOP_LEFT, 18, 14);
+    lv_obj_align(s_chrome_time_lbl, LV_ALIGN_TOP_LEFT, 18, 10);
     chrome_update_time_label();
     s_chrome_time_timer = lv_timer_create(chrome_time_timer_cb, 1000, NULL);
 
     const int32_t icon_size = 48;
-    const int32_t gap = 12;
+    const int32_t gap = 8;
     const int32_t right_margin = 18;
-    const int32_t top_margin = 18;
+    const int32_t top_margin = 4;  //mf era 8
 
     const char *lang = lvgl_panel_get_runtime_language();
     if (!lang || lang[0] == '\0') {
@@ -135,7 +170,7 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
 
     const int32_t icons_top = top_margin;
     chrome_sync_component_status();
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < LVGL_CHROME_STATUS_ICON_COUNT; i++) {
         s_chrome_status_icons[i] = lv_image_create(scr);
         lv_obj_set_size(s_chrome_status_icons[i], icon_size, icon_size);
         lv_image_set_src(s_chrome_status_icons[i], chrome_get_status_icon_src(i));
@@ -144,7 +179,7 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
         lv_obj_set_style_border_width(s_chrome_status_icons[i], 0, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(s_chrome_status_icons[i], LV_OPA_TRANSP, LV_PART_MAIN);
         lv_obj_align(s_chrome_status_icons[i], LV_ALIGN_TOP_RIGHT,
-                     -(right_margin + (3 - i) * (icon_size + gap)),
+                     -(right_margin + ((LVGL_CHROME_STATUS_ICON_COUNT - 1) - i) * (icon_size + gap)),
                      icons_top);
     }
 
@@ -173,7 +208,7 @@ void lvgl_page_chrome_remove(void)
 void lvgl_page_chrome_preload_status_icons(void)
 {
     chrome_sync_component_status();
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < LVGL_CHROME_STATUS_ICON_COUNT; i++) {
         (void)chrome_get_status_icon_src(i);
     }
 }
@@ -186,18 +221,19 @@ void lvgl_page_chrome_set_flag_callback(lv_event_cb_t cb, void *user_data)
 
 void lvgl_page_chrome_set_status_icon_state(uint8_t idx, bool ok)
 {
-    if (idx >= 4) {
+    if (idx >= LVGL_CHROME_STATUS_ICON_COUNT) {
         return;
     }
     s_chrome_status_ok[idx] = ok;
     chrome_update_status_icons();
 }
 
-void lvgl_page_chrome_set_status_icons(bool cloud_ok, bool card_ok, bool coin_ok, bool qr_ok)
+void lvgl_page_chrome_set_status_icons(bool modbus_ok, bool cloud_ok, bool card_ok, bool coin_ok, bool qr_ok)
 {
-    s_chrome_status_ok[0] = cloud_ok;
-    s_chrome_status_ok[1] = card_ok;
-    s_chrome_status_ok[2] = coin_ok;
-    s_chrome_status_ok[3] = qr_ok;
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_MODBUS] = modbus_ok;
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CLOUD] = cloud_ok;
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CARD] = card_ok;
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_COIN] = coin_ok;
+    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_QR] = qr_ok;
     chrome_update_status_icons();
 }

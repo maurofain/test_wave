@@ -1465,7 +1465,7 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
 
       if (bsp_display_lock(0))
       {
-        lvgl_page_chrome_set_status_icon_state(0, true); /* Cloud = rete online */
+        lvgl_page_chrome_set_status_icon_state(LVGL_CHROME_STATUS_ICON_CLOUD, true);
         bsp_display_unlock();
       }
     }
@@ -1538,7 +1538,7 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
     }
     if (bsp_display_lock(0))
     {
-      lvgl_page_chrome_set_status_icon_state(0, false); /* Cloud = rete offline */
+      lvgl_page_chrome_set_status_icon_state(LVGL_CHROME_STATUS_ICON_CLOUD, false);
       bsp_display_unlock();
     }
     break;

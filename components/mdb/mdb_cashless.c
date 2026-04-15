@@ -333,16 +333,38 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             return true;
 
         case MDB_CASHLESS_RESP_SESSION_CANCEL:
-            device->vend_status = MDB_VEND_DENIED;
-            device->session_state = MDB_CASHLESS_SESSION_ENDING;
-            device->vend_result_pending = true;
-            device->vend_result_approved = false;
-            device->vend_result_cents = 0U;
-            ESP_LOGW(TAG_CASH_EVT,
-                     "[C] [mdb_cashless_handle_poll_response] dev=%u session_cancel vend_status=%s",
-                     (unsigned)device_index,
-                     mdb_cashless_vend_status_to_string(device->vend_status));
+        {
+            MDB_VEND_STATUS previous_vend_status = device->vend_status;
+            mdb_cashless_session_state_t previous_session_state = device->session_state;
+
+            device->session_open = false;
+            device->session_state = MDB_CASHLESS_SESSION_IDLE;
+            device->session_complete_requested = false;
+            device->vend_success_requested = false;
+
+            if (previous_vend_status == MDB_VEND_PENDING ||
+                previous_vend_status == MDB_VEND_WORKING ||
+                previous_session_state == MDB_CASHLESS_SESSION_VEND_REQUESTED ||
+                previous_session_state == MDB_CASHLESS_SESSION_VEND_APPROVED) {
+                device->vend_status = MDB_VEND_DENIED;
+                device->vend_result_pending = true;
+                device->vend_result_approved = false;
+                device->vend_result_cents = 0U;
+                ESP_LOGW(TAG_CASH_EVT,
+                         "[C] [mdb_cashless_handle_poll_response] dev=%u session_cancel vend_status=%s",
+                         (unsigned)device_index,
+                         mdb_cashless_vend_status_to_string(device->vend_status));
+            } else {
+                device->vend_status = MDB_VEND_IDLE;
+                device->vend_result_pending = false;
+                device->vend_result_approved = false;
+                device->vend_result_cents = 0U;
+                ESP_LOGI(TAG_CASH_EVT,
+                         "[C] [mdb_cashless_handle_poll_response] dev=%u session_cancel senza vendita attiva",
+                         (unsigned)device_index);
+            }
             return true;
+            }
 
         case MDB_CASHLESS_RESP_VEND_APPROVED:
             device->vend_status = MDB_VEND_APPROVED;

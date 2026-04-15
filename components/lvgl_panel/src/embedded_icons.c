@@ -30,6 +30,9 @@ DECLARE_EMBEDDED_ICON_DSC(s_icon_coin_ok, docs_icone_normalized_MoneteOk3_png, 4
 DECLARE_EMBEDDED_ICON_DSC(s_icon_qr_ko, docs_icone_normalized_QrKo_png, 48, 48);
 DECLARE_EMBEDDED_ICON_DSC(s_icon_qr_ok, docs_icone_normalized_QrOk_png, 48, 48);
 
+DECLARE_EMBEDDED_ICON_DSC(s_icon_skio_ko, docs_icone_normalized_SkioKo_png, 48, 48);
+DECLARE_EMBEDDED_ICON_DSC(s_icon_skio_ok, docs_icone_normalized_SkioOk_png, 48, 48);
+
 const void *get_embedded_icon_src(int index, bool ok)
 {
     switch (index) {
@@ -41,6 +44,8 @@ const void *get_embedded_icon_src(int index, bool ok)
             return ok ? (const void *)&s_icon_coin_ok : (const void *)&s_icon_coin_ko;
         case 3:
             return ok ? (const void *)&s_icon_qr_ok : (const void *)&s_icon_qr_ko;
+        case 4:
+            return ok ? (const void *)&s_icon_skio_ok : (const void *)&s_icon_skio_ko;
         default:
             return NULL;
     }

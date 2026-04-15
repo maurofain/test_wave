@@ -52,6 +52,7 @@ static void fsm_reset_runtime_locked(fsm_ctx_t *ctx);
 static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source);
 static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source);
 static void fsm_reset_card_vend_pending(fsm_ctx_t *ctx);
+static bool fsm_program_price_units_to_cents(int32_t price_units, int32_t *amount_cents);
 static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost);
 static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx);
 static const char *fsm_source_tag_to_display_name(const char *source_tag);
@@ -152,6 +153,17 @@ static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
     ESP_LOGI(TAG, "[M] ║%-44s║", line4);
     ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════╝");
 
+}
+
+static bool fsm_program_price_units_to_cents(int32_t price_units, int32_t *amount_cents)
+{
+    if (!amount_cents || price_units <= 0 ||
+        price_units > (int32_t)(UINT16_MAX / FSM_CENTS_PER_CREDIT)) {
+        return false;
+    }
+
+    *amount_cents = price_units * FSM_CENTS_PER_CREDIT;
+    return true;
 }
 
 static void fsm_reset_runtime_locked(fsm_ctx_t *ctx)
@@ -881,27 +893,38 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
 
             if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
-                int32_t vend_amount = (event->value_i32 > 0) ? event->value_i32 : 0;
+                int32_t vend_amount_units = (event->value_i32 > 0) ? event->value_i32 : 0;
+                int32_t vend_amount_cents = 0;
 
-                if (vend_amount <= 0) {
+                if (vend_amount_units <= 0) {
                     fsm_append_message("Importo programma non valido per sessione card");
                     return false;
                 }
 
-                if (ctx->credit_cents < vend_amount) {
+                if (ctx->credit_cents < vend_amount_units) {
                     fsm_append_message("Credito insufficiente per avvio programma");
+                    return false;
+                }
+
+                if (!fsm_program_price_units_to_cents(vend_amount_units, &vend_amount_cents)) {
+                    fsm_append_message("Costo programma non valido per addebito NFC");
                     return false;
                 }
 
                 ctx->pending_pause_max_ms = event->value_u32;
                 ctx->pending_running_target_ms = event->aux_u32;
-                ctx->pending_program_price_units = vend_amount;
+                ctx->pending_program_price_units = vend_amount_units;
                 snprintf(ctx->pending_program_name,
                          sizeof(ctx->pending_program_name),
                          "%s",
                          event->text[0] ? event->text : "programma");
 
-                if (!tasks_request_card_vend(vend_amount, 0xFFFFU)) {
+                ESP_LOGI(TAG,
+                         "[M] [CARD_VEND] richiesta avvio ciclo %ld crediti -> %ld cent",
+                         (long)vend_amount_units,
+                         (long)vend_amount_cents);
+
+                if (!tasks_request_card_vend(vend_amount_cents, 0xFFFFU)) {
                     fsm_reset_card_vend_pending(ctx);
                     fsm_append_message("Richiesta VEND MDB fallita");
                     return false;
@@ -960,9 +983,9 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return true;
 
         case FSM_INPUT_EVENT_CARD_VEND_APPROVED: {
-            int32_t approved_amount = (event->value_i32 > 0)
-                                          ? event->value_i32
-                                          : ctx->pending_program_price_units;
+            int32_t requested_amount_units = ctx->pending_program_price_units;
+            int32_t requested_amount_cents = 0;
+            int32_t approved_amount_cents = (event->value_i32 > 0) ? event->value_i32 : 0;
 
             if (!ctx->card_vend_pending ||
                 ctx->session_source != FSM_SESSION_SOURCE_CARD ||
@@ -971,13 +994,35 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
 
-            if (approved_amount <= 0) {
+            if (!fsm_program_price_units_to_cents(requested_amount_units, &requested_amount_cents)) {
+                (void)tasks_request_card_session_complete();
+                fsm_reset_card_vend_pending(ctx);
+                fsm_append_message("Costo programma non valido dopo VEND_APPROVED");
+                return false;
+            }
+
+            if (approved_amount_cents <= 0) {
+                approved_amount_cents = requested_amount_cents;
+            }
+
+            if (approved_amount_cents != requested_amount_cents) {
+                ESP_LOGW(TAG,
+                         "[M] [CARD_VEND] importo approvato incoerente: richiesti=%ld cent approvati=%ld cent",
+                         (long)requested_amount_cents,
+                         (long)approved_amount_cents);
+                (void)tasks_request_card_session_complete();
+                fsm_reset_card_vend_pending(ctx);
+                fsm_append_message("Importo approvato MDB incoerente");
+                return false;
+            }
+
+            if (requested_amount_units <= 0) {
                 fsm_reset_card_vend_pending(ctx);
                 fsm_append_message("Importo approvato non valido");
                 return false;
             }
 
-            if (!tasks_request_card_vend_success(approved_amount)) {
+            if (!tasks_request_card_vend_success(approved_amount_cents)) {
                 (void)tasks_request_card_session_complete();
                 fsm_reset_card_vend_pending(ctx);
                 fsm_append_message("VEND_SUCCESS MDB non accodato");
@@ -990,13 +1035,13 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             if (ctx->pending_running_target_ms > 0U) {
                 ctx->running_target_ms = ctx->pending_running_target_ms;
             }
-            ctx->running_price_units = approved_amount;
+            ctx->running_price_units = requested_amount_units;
             snprintf(ctx->running_program_name,
                      sizeof(ctx->running_program_name),
                      "%s",
                      ctx->pending_program_name[0] ? ctx->pending_program_name : "programma");
 
-            if (!fsm_try_charge_program_cycle(ctx, approved_amount)) {
+            if (!fsm_try_charge_program_cycle(ctx, requested_amount_units)) {
                 (void)tasks_request_card_session_complete();
                 fsm_reset_card_vend_pending(ctx);
                 fsm_append_message("Credito locale incoerente dopo VEND_APPROVED");
@@ -1004,9 +1049,9 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
 
             if (!fsm_handle_event(ctx, FSM_EVENT_PROGRAM_SELECTED)) {
-                ctx->credit_cents += approved_amount;
-                ctx->vcd_coins += approved_amount;
-                ctx->vcd_used -= approved_amount;
+                ctx->credit_cents += requested_amount_units;
+                ctx->vcd_coins += requested_amount_units;
+                ctx->vcd_used -= requested_amount_units;
                 (void)tasks_request_card_session_complete();
                 fsm_reset_card_vend_pending(ctx);
                 fsm_append_message("Avvio programma fallito dopo VEND_APPROVED");

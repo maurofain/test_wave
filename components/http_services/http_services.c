@@ -1203,6 +1203,8 @@ const char *http_services_payment_type_to_string(http_services_payment_type_t ty
             return "VOUC";
         case HTTP_SERVICES_PAYMENT_TYPE_CASHL:
             return "CASHL";
+        case HTTP_SERVICES_PAYMENT_TYPE_WALLET:
+            return "WALL";
         case HTTP_SERVICES_PAYMENT_TYPE_CASH:
         default:
             return "CASH";

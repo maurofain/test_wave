@@ -65,6 +65,17 @@ static const uint8_t s_pk4_request_id_payload[] = {
 };
 static const uint8_t s_pk4_enable_payload[] = {0x01};
 
+static bool mdb_coin_runtime_enabled(const device_config_t *cfg)
+{
+    return cfg && cfg->sensors.mdb_enabled && cfg->mdb.coin_acceptor_en &&
+           !cfg->sensors.cctalk_enabled;
+}
+
+static bool mdb_cashless_runtime_enabled(const device_config_t *cfg)
+{
+    return cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en;
+}
+
 static void mdb_cashless_update_public_status(void);
 static void mdb_cashless_sm(size_t device_index);
 static void mdb_cashless_dispatch_pending_credit(void);
@@ -108,7 +119,8 @@ static const char *mdb_state_to_string(mdb_device_state_t state)
     }
 }
 
-static const char *mdb_cashless_command_to_string(uint8_t command, uint8_t subcommand)
+static __attribute__((unused)) const char *mdb_cashless_command_to_string(uint8_t command,
+                                                                          uint8_t subcommand)
 {
     switch (command) {
         case MDB_CASHLESS_CMD_RESET:
@@ -151,7 +163,10 @@ static const char *mdb_cashless_command_to_string(uint8_t command, uint8_t subco
     }
 }
 
-static void mdb_log_packet_bytes(const char *tag, const char *label, const uint8_t *data, size_t len)
+static __attribute__((unused)) void mdb_log_packet_bytes(const char *tag,
+                                                         const char *label,
+                                                         const uint8_t *data,
+                                                         size_t len)
 {
     char buffer[256] = {0};
     size_t offset = 0;
@@ -286,8 +301,12 @@ bool mdb_cashless_request_active_revalue(uint16_t amount_cents)
 device_component_status_t mdb_get_component_status(void)
 {
     const device_config_t *cfg = device_config_get();
-    bool coin_enabled = cfg && cfg->sensors.mdb_enabled && cfg->mdb.coin_acceptor_en;
-    bool cashless_enabled = cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en;
+    bool coin_enabled = mdb_coin_runtime_enabled(cfg);
+    bool cashless_enabled = mdb_cashless_runtime_enabled(cfg);
+
+    if (cashless_enabled && s_mdb_status.cashless.is_online) {
+        return DEVICE_COMPONENT_STATUS_ONLINE;
+    }
 
     if (s_mdb_init_failed || s_mdb_runtime_fault) {
         return DEVICE_COMPONENT_STATUS_OFFLINE;
@@ -341,7 +360,7 @@ static void mdb_send_ack(void) {
     uart_set_parity(MDB_UART_PORT, UART_PARITY_EVEN);
     uart_write_bytes(MDB_UART_PORT, &ack, 1);
     uart_wait_tx_done(MDB_UART_PORT, pdMS_TO_TICKS(10));
-    ESP_LOGI(TAG_IO, "[C] [mdb_send_ack] ACK inviato sul bus MDB");
+    // ESP_LOGI(TAG_IO, "[C] [mdb_send_ack] ACK inviato sul bus MDB");
 }
 
 // Logica per la Macchina a Stati della Gettoniera (Coin Acceptor)
@@ -358,10 +377,22 @@ static void mdb_coin_sm(void) {
     uint8_t rx[36];
     size_t rx_len;
     esp_err_t ret;
+    device_config_t *cfg = device_config_get();
+
+    if (!mdb_coin_runtime_enabled(cfg)) {
+        if (s_mdb_status.coin.state != MDB_STATE_INACTIVE || s_mdb_status.coin.is_online) {
+            ESP_LOGI(TAG_COIN,
+                     "[C] [mdb_coin_sm] gettoniera MDB inattiva: progetto su CCTalk o config disabilitata");
+        }
+        s_coin_setup_retries = 0;
+        s_mdb_status.coin.state = MDB_STATE_INACTIVE;
+        s_mdb_status.coin.is_online = false;
+        return;
+    }
 
     switch (s_mdb_status.coin.state) {
         case MDB_STATE_INACTIVE:
-            if (device_config_get()->mdb.coin_acceptor_en) {
+            if (cfg->mdb.coin_acceptor_en) {
                 ESP_LOGI(TAG_COIN,
                          "[C] [mdb_coin_sm] state=%s -> %s",
                          mdb_state_to_string(s_mdb_status.coin.state),
@@ -415,13 +446,12 @@ static void mdb_coin_sm(void) {
             }
 
             if (s_coin_setup_retries >= MDB_COIN_SETUP_MAX_RETRIES) {
-                device_config_t *cfg = device_config_get();
                 if (cfg) {
                     cfg->mdb.coin_acceptor_en = false;
                 }
                 s_mdb_status.coin.is_online = false;
                 s_mdb_status.coin.state = MDB_STATE_INACTIVE;
-                s_mdb_runtime_fault = true;
+                s_mdb_runtime_fault = !mdb_cashless_runtime_enabled(cfg);
                 ESP_LOGE(TAG_COIN,
                          "[C] [mdb_coin_sm] setup fallito %u volte, gettoniera disabilitata a runtime",
                          (unsigned)s_coin_setup_retries);
@@ -672,18 +702,16 @@ static esp_err_t mdb_cashless_send_simple_command(uint8_t device_address,
                                                   size_t *rx_len,
                                                   uint32_t timeout_ms)
 {
-    uint8_t subcommand = (payload && payload_len > 0U) ? payload[0] : 0xFFU;
-
-    ESP_LOGI(TAG_IO,
-             "[C] [mdb_cashless_send_simple_command] addr=0x%02X cmd=%s(0x%02X) payload_len=%u timeout=%u",
-             device_address,
-             mdb_cashless_command_to_string(command, subcommand),
-             command,
-             (unsigned)payload_len,
-             (unsigned)timeout_ms);
-    if (payload && payload_len > 0U) {
-        mdb_log_packet_bytes(TAG_IO, "mdb_cashless_send_simple_command.tx_payload", payload, payload_len);
-    }
+    // ESP_LOGI(TAG_IO,
+    //          "[C] [mdb_cashless_send_simple_command] addr=0x%02X cmd=%s(0x%02X) payload_len=%u timeout=%u",
+    //          device_address,
+    //          mdb_cashless_command_to_string(command, subcommand),
+    //          command,
+    //          (unsigned)payload_len,
+    //          (unsigned)timeout_ms);
+    // if (payload && payload_len > 0U) {
+    //     mdb_log_packet_bytes(TAG_IO, "mdb_cashless_send_simple_command.tx_payload", payload, payload_len);
+    // }
 
     esp_err_t err = mdb_send_packet(device_address | command, payload, payload_len);
     if (err != ESP_OK) {
@@ -697,11 +725,14 @@ static esp_err_t mdb_cashless_send_simple_command(uint8_t device_address,
 
     err = mdb_receive_packet(rx, rx_size, rx_len, timeout_ms);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG_IO,
-                 "[C] [mdb_cashless_send_simple_command] rx fallita addr=0x%02X cmd=0x%02X err=%s",
-                 device_address,
-                 command,
-                 esp_err_to_name(err));
+        /* Il timeout durante il POLL idle è atteso: evitiamo flood nel log. */
+        if (!(command == MDB_CASHLESS_CMD_POLL && err == ESP_ERR_TIMEOUT)) {
+            ESP_LOGW(TAG_IO,
+                     "[C] [mdb_cashless_send_simple_command] rx fallita addr=0x%02X cmd=0x%02X err=%s",
+                     device_address,
+                     command,
+                     esp_err_to_name(err));
+        }
         return err;
     }
 
@@ -709,7 +740,7 @@ static esp_err_t mdb_cashless_send_simple_command(uint8_t device_address,
         mdb_send_ack();
     }
 
-    mdb_log_packet_bytes(TAG_IO, "mdb_cashless_send_simple_command.rx", rx, *rx_len);
+    // mdb_log_packet_bytes(TAG_IO, "mdb_cashless_send_simple_command.rx", rx, *rx_len);
 
     return ESP_OK;
 }
@@ -751,11 +782,11 @@ static void mdb_cashless_sm(size_t device_index)
                      (unsigned)device_index,
                      device->address,
                      mdb_state_to_string(device->poll_state),
-                     mdb_state_to_string(MDB_STATE_INIT_SETUP));
+                     mdb_state_to_string(MDB_STATE_INIT_RESET));
             s_cashless_reset_retries[device_index] = 0;
             s_cashless_setup_retries[device_index] = 0;
             device_rw->last_response_code = 0;
-            device_rw->poll_state = MDB_STATE_INIT_SETUP;
+            device_rw->poll_state = MDB_STATE_INIT_RESET;
             break;
 
         case MDB_STATE_INIT_RESET:
@@ -1064,7 +1095,7 @@ static void mdb_cashless_sm(size_t device_index)
                                                    rx,
                                                    sizeof(rx),
                                                    &rx_len,
-                                                   40);  //TIMEOUT BREVE PER POLL
+                                                   50);  //TIMEOUT BREVE PER POLL
             response_ok = (ret == ESP_OK && rx_len > 0U);
             if (ret == ESP_OK) {
                 parsed_response = !(rx_len == 1U && rx[0] == MDB_ACK) && response_ok;
@@ -1094,11 +1125,12 @@ static void mdb_cashless_sm(size_t device_index)
     }
 
     if (parsed_response && device_rw->last_response_code == MDB_CASHLESS_RESP_OUT_OF_SEQUENCE) {
-        device_rw->poll_state = MDB_STATE_IDLE_POLLING;
+        device_rw->poll_state = MDB_STATE_INIT_RESET;
+        device_rw->enabled_status = false;
         s_cashless_reset_retries[device_index] = 0;
         s_cashless_setup_retries[device_index] = 0;
         ESP_LOGW(TAG_CASH,
-                 "[C] [mdb_cashless_sm] dev=%u OUT_OF_SEQUENCE -> idle_polling",
+                 "[C] [mdb_cashless_sm] dev=%u OUT_OF_SEQUENCE -> init_reset",
                  (unsigned)device_index);
     }
 
@@ -1157,6 +1189,13 @@ esp_err_t mdb_init(void)
 {
     device_config_t *d_cfg = device_config_get();
     int tout_symbols = 0;
+
+    if (s_mdb_driver_initialized) {
+        /* Evita reinizializzazioni della UART MDB quando la UI riapre la pagina Programmi. */
+        s_mdb_init_failed = false;
+        s_mdb_runtime_fault = false;
+        return ESP_OK;
+    }
 
     if (!d_cfg) {
         s_mdb_driver_initialized = false;
@@ -1297,7 +1336,7 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
 {
     uint8_t checksum = address;
 
-    ESP_LOGI(TAG_IO, "[C] [mdb_send_packet] addr=0x%02X len=%u", address, (unsigned)len);
+    // ESP_LOGI(TAG_IO, "[C] [mdb_send_packet] addr=0x%02X len=%u", address, (unsigned)len);
 
     // Svuota buffer RX prima di inviare
     uart_flush_input(MDB_UART_PORT);
@@ -1325,7 +1364,7 @@ esp_err_t mdb_send_packet(uint8_t address, const uint8_t *data, size_t len)
                 raw_len += len;
             }
             raw[raw_len++] = checksum;
-            mdb_log_packet_bytes(TAG_IO, "mdb_send_packet.tx", raw, raw_len);
+            // mdb_log_packet_bytes(TAG_IO, "mdb_send_packet.tx", raw, raw_len);
         }
     }
 
@@ -1374,15 +1413,15 @@ esp_err_t mdb_receive_packet(uint8_t *out_data, size_t max_len, size_t *out_len,
     }
 
     if (received == 0) {
-        ESP_LOGI(TAG_IO, "[C] [mdb_receive_packet] timeout dopo %u ms", (unsigned)timeout_ms);
+        // ESP_LOGI(TAG_IO, "[C] [mdb_receive_packet] timeout dopo %u ms", (unsigned)timeout_ms);
         return ESP_ERR_TIMEOUT;
     }
     *out_len = received;
 
-    mdb_log_packet_bytes(TAG_IO, "mdb_receive_packet.rx", out_data, received);
+    // mdb_log_packet_bytes(TAG_IO, "mdb_receive_packet.rx", out_data, received);
 
     if (received == 1) {
-        ESP_LOGI(TAG_IO, "[C] [mdb_receive_packet] byte singolo=0x%02X", out_data[0]);
+        // ESP_LOGI(TAG_IO, "[C] [mdb_receive_packet] byte singolo=0x%02X", out_data[0]);
         return ESP_OK;
     }
 

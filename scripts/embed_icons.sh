@@ -21,6 +21,7 @@ ICON_SPECS=(
     "1|credit|CreditCardKo.png|CreditCardOk.png"
     "2|coin|MoneteKo.png|MoneteOk3.png"
     "3|qr|QrKo.png|QrOk.png"
+    "4|skio|SkioKo.png|SkioOk.png"
 )
 
 declare -A KO_SYMBOLS

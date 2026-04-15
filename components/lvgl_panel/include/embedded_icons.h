@@ -4,7 +4,7 @@
 
 #include <stdbool.h>
 
-// Restituisce un puntatore alla risorsa embedded per indice (0..3) e stato.
+// Restituisce un puntatore alla risorsa embedded per indice (0..4) e stato.
 // L'oggetto restituito e' un buffer contenente l'immagine in formato supportato da LVGL.
 const void *get_embedded_icon_src(int index, bool ok);
 
