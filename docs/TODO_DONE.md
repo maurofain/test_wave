@@ -28,6 +28,7 @@
 - [x] Garantito che il codice cliente nel payload `api/payment` sia una stringa vuota quando non presente
 - [x] Corretto il comando CREDIT_ENDED nello stato CREDIT per permettere il reset crediti MDB e il ritorno a ADS/IDLE
 - [x] Completato il punto 6: zero credito manda ad ADS, token MDB inserito dopo stop ritorna a scelta programmi e timeout poi ADS
+- [x] 5. Se il gettone vine rimosso dal MDB si deve resettare il VCD e uscire dalla schermata programmi e resettare il sistema MDB per una nuova acquisizione
 - [x] 12. Slideshow immagini idle in standby
    - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
    - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)

@@ -102,6 +102,36 @@
   let manualStatusIsError = false;
   let manualStatusUntil = 0;
 
+  function hideLegacyMdbTestControls() {
+    const section = document.getElementById('section_mdb');
+    const btn = document.getElementById('btn_mdb');
+    const input = document.getElementById('mdb_input');
+    const mode = document.getElementById('mdb_mode');
+    const status = document.getElementById('mdb_status');
+
+    if (!section || section.dataset.legacyMdbHidden === '1') {
+      return;
+    }
+
+    if (btn && btn.closest('.test-item')) {
+      btn.closest('.test-item').style.display = 'none';
+    }
+
+    if (input && input.closest('.test-item')) {
+      input.closest('.test-item').style.display = 'none';
+    }
+
+    if (mode && mode.parentElement && mode.parentElement.parentElement) {
+      mode.parentElement.parentElement.style.display = 'none';
+    }
+
+    if (status) {
+      status.style.display = 'none';
+    }
+
+    section.dataset.legacyMdbHidden = '1';
+  }
+
   function translate(text) {
     if (window.uiI18n && typeof window.uiI18n.translate === 'function') {
       return window.uiI18n.translate(text);
@@ -274,6 +304,14 @@
     clampRechargeAmount();
   }
 
+  function resetCashlessSessionFields() {
+    clearPendingRevalue();
+    cashlessUiState.revalueLimitCents = CASHLESS_DEFAULT_LIMIT_CENTS;
+    setFieldCents('cashless_current_credit', 0);
+    setFieldCents('cashless_revalue_limit', 0);
+    clampRechargeAmount();
+  }
+
   function renderCashlessStatus(cashless) {
     const statusBox = document.getElementById('cashless_revalue_status');
     if (!statusBox) {
@@ -350,6 +388,8 @@
     if (!mdbSection || document.getElementById('cashless_revalue_panel')) {
       return;
     }
+
+    hideLegacyMdbTestControls();
 
     const title = document.createElement('h3');
     title.className = 'side-title';
@@ -452,16 +492,14 @@
 
       const cashless = await fetchCashlessStatus();
       const isReady = !!(cashless && cashless.online && cashless.session_open);
-      const creditCents = cashless ? cashless.credit_cents : 0;
-      const displayedCreditCents = getDisplayedCreditCents(creditCents, cashless ? cashless.revalue_status : 0);
+      if (isReady) {
+        const creditCents = cashless ? cashless.credit_cents : 0;
+        const displayedCreditCents = getDisplayedCreditCents(creditCents, cashless ? cashless.revalue_status : 0);
 
-      setFieldCents('cashless_current_credit', displayedCreditCents);
-      if (cashless) {
+        setFieldCents('cashless_current_credit', displayedCreditCents);
         updateRevalueLimit(cashless);
       } else {
-        cashlessUiState.revalueLimitCents = CASHLESS_DEFAULT_LIMIT_CENTS;
-        setFieldCents('cashless_revalue_limit', 0);
-        clampRechargeAmount();
+        resetCashlessSessionFields();
       }
 
       cashlessUiState.sessionOpen = isReady;
@@ -469,11 +507,7 @@
       renderCashlessStatus(cashless);
     } catch (_error) {
       cashlessUiState.sessionOpen = false;
-      cashlessUiState.revalueLimitCents = CASHLESS_DEFAULT_LIMIT_CENTS;
-      clearPendingRevalue();
-      setFieldCents('cashless_current_credit', 0);
-      setFieldCents('cashless_revalue_limit', 0);
-      clampRechargeAmount();
+      resetCashlessSessionFields();
       applyCashlessAvailability(false);
       renderCashlessStatus(null);
     }
@@ -657,6 +691,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    hideLegacyMdbTestControls();
     ensureCashlessRevaluePanel();
     refreshCashlessRevaluePanel();
     if (!cashlessUiState.timerId) {
