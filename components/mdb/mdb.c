@@ -629,12 +629,6 @@ static bool mdb_cashless_get_active_device_index(size_t *device_index)
         return true;
     }
 
-    if (s_mdb_status.cashless.is_online &&
-        s_mdb_status.cashless.active_device_index < MDB_CASHLESS_DEVICE_COUNT) {
-        *device_index = s_mdb_status.cashless.active_device_index;
-        return true;
-    }
-
     return false;
 }
 
@@ -648,17 +642,39 @@ static esp_err_t mdb_cashless_send_vend_command(uint8_t device_address,
                                                 uint32_t timeout_ms)
 {
     uint8_t payload[5] = {0};
+    size_t payload_len = 1U;
 
     payload[0] = subcommand;
-    payload[1] = (uint8_t)((amount_cents >> 8) & 0xFFU);
-    payload[2] = (uint8_t)(amount_cents & 0xFFU);
-    payload[3] = (uint8_t)((item_number >> 8) & 0xFFU);
-    payload[4] = (uint8_t)(item_number & 0xFFU);
+
+    switch (subcommand) {
+        case MDB_CASHLESS_VEND_REQUEST:
+            payload[1] = (uint8_t)((amount_cents >> 8) & 0xFFU);
+            payload[2] = (uint8_t)(amount_cents & 0xFFU);
+            payload[3] = (uint8_t)((item_number >> 8) & 0xFFU);
+            payload[4] = (uint8_t)(item_number & 0xFFU);
+            payload_len = 5U;
+            break;
+
+        case MDB_CASHLESS_VEND_SUCCESS:
+            /* Il codice del produttore invia VEND_SUCCESS con 0xFF 0xFF. */
+            payload[1] = 0xFFU;
+            payload[2] = 0xFFU;
+            payload_len = 3U;
+            break;
+
+        case MDB_CASHLESS_VEND_SESSION_COMPLETE:
+            payload_len = 1U;
+            break;
+
+        default:
+            payload_len = 1U;
+            break;
+    }
 
     return mdb_cashless_send_simple_command(device_address,
                                             MDB_CASHLESS_CMD_VEND,
                                             payload,
-                                            sizeof(payload),
+                                            payload_len,
                                             rx,
                                             rx_size,
                                             rx_len,
@@ -725,8 +741,12 @@ static esp_err_t mdb_cashless_send_simple_command(uint8_t device_address,
 
     err = mdb_receive_packet(rx, rx_size, rx_len, timeout_ms);
     if (err != ESP_OK) {
-        /* Il timeout durante il POLL idle è atteso: evitiamo flood nel log. */
-        if (!(command == MDB_CASHLESS_CMD_POLL && err == ESP_ERR_TIMEOUT)) {
+        /* Alcuni timeout in bootstrap o durante il POLL idle sono attesi. */
+        bool suppress_timeout_log = (err == ESP_ERR_TIMEOUT &&
+                                     (command == MDB_CASHLESS_CMD_POLL ||
+                                      command == MDB_CASHLESS_CMD_RESET ||
+                                      command == MDB_CASHLESS_CMD_EXPANSION));
+        if (!suppress_timeout_log) {
             ESP_LOGW(TAG_IO,
                      "[C] [mdb_cashless_send_simple_command] rx fallita addr=0x%02X cmd=0x%02X err=%s",
                      device_address,
@@ -844,7 +864,7 @@ static void mdb_cashless_sm(size_t device_index)
                          (unsigned)device_index,
                          (unsigned)s_cashless_reset_retries[device_index]);
             } else {
-                ESP_LOGW(TAG_CASH,
+                ESP_LOGI(TAG_CASH,
                          "[C] [mdb_cashless_sm] dev=%u reset retry=%u/%u",
                          (unsigned)device_index,
                          (unsigned)s_cashless_reset_retries[device_index],
@@ -1046,6 +1066,7 @@ static void mdb_cashless_sm(size_t device_index)
                 response_ok = (ret == ESP_OK && rx_len > 0U);
                 if (ret == ESP_OK) {
                     device_rw->session_complete_requested = false;
+                    (void)mdb_cashless_close_session_locally(device_index);
                     ESP_LOGI(TAG_CASH,
                              "[C] [mdb_cashless_sm] dev=%u richiesta chiusura sessione inviata",
                              (unsigned)device_index);
@@ -1145,6 +1166,15 @@ static void mdb_cashless_sm(size_t device_index)
  *  @return Nessun valore di ritorno.
  */
 void mdb_engine_run(void *arg) {
+    TickType_t period_ticks = pdMS_TO_TICKS(20);
+
+    if (arg) {
+        TickType_t configured_ticks = (TickType_t)(uintptr_t)arg;
+        if (configured_ticks > 0) {
+            period_ticks = configured_ticks;
+        }
+    }
+
     ESP_LOGI(TAG_ENGINE, "[C] [mdb_engine_run] motore di polling MDB avviato");
     while (1) {
         mdb_coin_sm();
@@ -1154,7 +1184,7 @@ void mdb_engine_run(void *arg) {
         mdb_cashless_dispatch_pending_credit();
         mdb_cashless_dispatch_pending_vend();
         // mdb_bill_sm(); // futuro
-        vTaskDelay(pdMS_TO_TICKS(500)); // Ciclo di polling
+        vTaskDelay((period_ticks > 0) ? period_ticks : 1);
     }
 }
 

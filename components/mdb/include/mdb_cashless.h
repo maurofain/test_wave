@@ -111,6 +111,7 @@ bool mdb_cashless_prepare_vend_success(size_t device_index, uint16_t amount_cent
 bool mdb_cashless_prepare_revalue(size_t device_index, uint16_t amount_cents);
 bool mdb_cashless_request_revalue_limit(size_t device_index);
 bool mdb_cashless_request_session_complete(size_t device_index);
+bool mdb_cashless_close_session_locally(size_t device_index);
 bool mdb_cashless_get_pending_credit_event(size_t *device_index, uint16_t *credit_cents);
 bool mdb_cashless_get_pending_vend_event(size_t *device_index, bool *approved, uint16_t *amount_cents);
 void mdb_cashless_ack_pending_credit_event(size_t device_index);

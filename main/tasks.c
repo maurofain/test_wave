@@ -2255,8 +2255,8 @@ static void fsm_task(void *arg)
             !fsm.card_vend_pending &&
             tasks_is_card_session_removed()) {
             if (fsm.card_session_complete_required) {
-                (void)tasks_request_card_session_complete();
                 fsm.card_session_complete_required = false;
+                ESP_LOGI(TAG, "[M] Sessione card gia' chiusa dal lettore: skip SESSION_COMPLETE tardivo");
             }
 
             fsm_input_event_t card_removed_event = {
@@ -3318,9 +3318,10 @@ static void cctalk_engine_wrapper(void *arg)
  */
 static void mdb_engine_wrapper(void *arg)
 {
+    TickType_t period_ticks = (arg != NULL) ? ((task_param_t *)arg)->period_ticks : pdMS_TO_TICKS(20);
     mdb_register_cashless_credit_callback(tasks_publish_card_credit_event);
     mdb_register_cashless_vend_callback(tasks_publish_card_vend_result_event);
-    mdb_engine_run(NULL);
+    mdb_engine_run((void *)(uintptr_t)period_ticks);
 }
 
 /* Wrapper SD monitor: non richiede init hardware preventivo (il task configura
@@ -3331,7 +3332,7 @@ static void mdb_engine_wrapper(void *arg)
  *
  * Questa funzione agisce come un wrapper per la funzione di monitoraggio,
  * permettendo di passare un argomento generico a una funzione di monitoraggio.
- *
+        .period_ticks = pdMS_TO_TICKS(20),
  * @param arg Puntatore a un argomento generico da passare alla funzione di monitoraggio.
  * @return Nessun valore di ritorno.
  */

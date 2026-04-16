@@ -242,6 +242,7 @@ static void mdb_cashless_parse_request_id(mdb_cashless_device_t *device, const u
 static void mdb_cashless_parse_begin_session(mdb_cashless_device_t *device, const uint8_t *data, size_t len)
 {
     bool was_session_open = false;
+    bool was_session_ending = false;
     uint16_t new_credit_cents = 0;
 
     if (!device || !data || len < 3U) {
@@ -249,21 +250,33 @@ static void mdb_cashless_parse_begin_session(mdb_cashless_device_t *device, cons
     }
 
     was_session_open = device->session_open;
+    was_session_ending = (device->session_state == MDB_CASHLESS_SESSION_ENDING);
     new_credit_cents = ((uint16_t)data[1] << 8) | data[2];
 
     device->session_open = true;
     device->session_state = MDB_CASHLESS_SESSION_OPEN;
+    device->session_complete_requested = false;
+    device->vend_success_requested = false;
     device->credit_cents = new_credit_cents;
     device->key_number = 0xFFFFFFFFUL;
     device->key_type = MDB_CASHLESS_KEY_CREDIT_CARD;
     device->key_price_group = 0;
 
-    if (!was_session_open) {
+    if (was_session_ending) {
+        device->vend_status = MDB_VEND_IDLE;
+        device->request_price_cents = 0U;
+        device->approved_price_cents = 0U;
+        device->vend_result_pending = false;
+        device->vend_result_approved = false;
+        device->vend_result_cents = 0U;
+    }
+
+    if (!was_session_open || was_session_ending) {
         mdb_cashless_log_tag_event(device->address == MDB_CASHLESS_DEVICE_ADDR_1 ? 0 : 0,
                                    "INSERITO",
                                    device);
     }
-    if (!was_session_open || device->last_synced_credit_cents != new_credit_cents) {
+    if (!was_session_open || was_session_ending || device->last_synced_credit_cents != new_credit_cents) {
         device->credit_sync_pending = (new_credit_cents > 0U);
     }
 
@@ -287,13 +300,46 @@ static void mdb_cashless_parse_begin_session(mdb_cashless_device_t *device, cons
     }
 
     ESP_LOGI(TAG_CASH_EVT,
-             "[C] [mdb_cashless_parse_begin_session] addr=0x%02X credit=%u key_type=%s key=%lu price_group=%u was_open=%d",
+             "[C] [mdb_cashless_parse_begin_session] addr=0x%02X credit=%u key_type=%s key=%lu price_group=%u was_open=%d was_ending=%d",
              device->address,
              (unsigned)device->credit_cents,
              mdb_cashless_key_type_to_string(device->key_type),
              device->key_number,
              (unsigned)device->key_price_group,
-             was_session_open ? 1 : 0);
+             was_session_open ? 1 : 0,
+             was_session_ending ? 1 : 0);
+}
+
+static void mdb_cashless_finalize_session_close(size_t device_index,
+                                                mdb_cashless_device_t *device,
+                                                bool synthetic_close)
+{
+    if (!device) {
+        return;
+    }
+
+    device->session_open = false;
+    device->session_state = MDB_CASHLESS_SESSION_IDLE;
+    device->vend_status = MDB_VEND_IDLE;
+    device->revalue_status = MDB_REVALUE_IDLE;
+    device->request_price_cents = 0U;
+    device->approved_price_cents = 0U;
+    device->vend_result_cents = 0U;
+    device->vend_success_requested = false;
+    device->session_complete_requested = false;
+    device->last_response_code = MDB_CASHLESS_RESP_END_SESSION;
+
+    mdb_cashless_log_tag_event(device_index, "RIMOSSO", device);
+    if (synthetic_close) {
+        ESP_LOGI(TAG_CASH_EVT,
+                 "[C] [mdb_cashless_finalize_session_close] dev=%u chiusura locale dopo SESSION_COMPLETE",
+                 (unsigned)device_index);
+    } else {
+        ESP_LOGI(TAG_CASH_EVT,
+                 "[C] [mdb_cashless_handle_poll_response] dev=%u end_session session_open=%d",
+                 (unsigned)device_index,
+                 device->session_open ? 1 : 0);
+    }
 }
 
 bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data, size_t len)
@@ -370,9 +416,9 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             MDB_VEND_STATUS previous_vend_status = device->vend_status;
             mdb_cashless_session_state_t previous_session_state = device->session_state;
 
-            device->session_open = false;
-            device->session_state = MDB_CASHLESS_SESSION_IDLE;
-            device->session_complete_requested = false;
+            device->session_open = true;
+            device->session_state = MDB_CASHLESS_SESSION_ENDING;
+            device->session_complete_requested = true;
             device->vend_success_requested = false;
 
             mdb_cashless_log_tag_event(device_index, "RIMOSSO", device);
@@ -398,6 +444,9 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
                          "[C] [mdb_cashless_handle_poll_response] dev=%u session_cancel senza vendita attiva",
                          (unsigned)device_index);
             }
+              ESP_LOGI(TAG_CASH_EVT,
+                     "[C] [mdb_cashless_handle_poll_response] dev=%u session_cancel -> richiesta SESSION_COMPLETE",
+                     (unsigned)device_index);
             return true;
             }
 
@@ -419,6 +468,7 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
         case MDB_CASHLESS_RESP_VEND_DENIED:
             device->vend_status = MDB_VEND_DENIED;
             device->session_state = MDB_CASHLESS_SESSION_ENDING;
+            device->session_complete_requested = true;
             device->vend_result_pending = true;
             device->vend_result_approved = false;
             device->vend_result_cents = 0U;
@@ -428,20 +478,7 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             return true;
 
         case MDB_CASHLESS_RESP_END_SESSION:
-            device->session_open = false;
-            device->session_state = MDB_CASHLESS_SESSION_IDLE;
-            device->vend_status = MDB_VEND_IDLE;
-            device->revalue_status = MDB_REVALUE_IDLE;
-            device->request_price_cents = 0U;
-            device->approved_price_cents = 0U;
-            device->vend_result_cents = 0U;
-            device->vend_success_requested = false;
-            device->session_complete_requested = false;
-            mdb_cashless_log_tag_event(device_index, "RIMOSSO", device);
-            ESP_LOGI(TAG_CASH_EVT,
-                     "[C] [mdb_cashless_handle_poll_response] dev=%u end_session session_open=%d",
-                     (unsigned)device_index,
-                     device->session_open ? 1 : 0);
+            mdb_cashless_finalize_session_close(device_index, device, false);
             return true;
 
         case MDB_CASHLESS_RESP_REQUEST_ID:
@@ -601,12 +638,34 @@ bool mdb_cashless_request_session_complete(size_t device_index)
         return false;
     }
 
+    if (!s_cashless_devices[device_index].session_open) {
+        ESP_LOGI(TAG_CASH_CTL,
+                 "[C] [mdb_cashless_request_session_complete] dev=%u sessione gia' chiusa, nessuna richiesta inviata",
+                 (unsigned)device_index);
+        return false;
+    }
+
     s_cashless_devices[device_index].session_complete_requested = true;
     s_cashless_devices[device_index].session_state = MDB_CASHLESS_SESSION_ENDING;
     ESP_LOGI(TAG_CASH_CTL,
              "[C] [mdb_cashless_request_session_complete] dev=%u session_state=%s",
              (unsigned)device_index,
              mdb_cashless_session_state_to_string(s_cashless_devices[device_index].session_state));
+    return true;
+}
+
+bool mdb_cashless_close_session_locally(size_t device_index)
+{
+    if (!mdb_cashless_valid_index(device_index)) {
+        return false;
+    }
+
+    mdb_cashless_device_t *device = &s_cashless_devices[device_index];
+    if (!device->session_open && device->session_state != MDB_CASHLESS_SESSION_ENDING) {
+        return false;
+    }
+
+    mdb_cashless_finalize_session_close(device_index, device, true);
     return true;
 }
 

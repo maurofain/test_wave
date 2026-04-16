@@ -1194,8 +1194,8 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 fsm_reset_card_vend_pending(ctx);
             }
             if (event->aux_u32 == 1U && ctx->session_source == FSM_SESSION_SOURCE_CARD) {
-                (void)tasks_request_card_session_complete();
-                ESP_LOGI(TAG, "[M] Reset MDB sessione dopo rimozione gettone e uscita da programmi");
+                ctx->card_session_complete_required = false;
+                ESP_LOGI(TAG, "[M] Sessione MDB gia' chiusa dal lettore dopo rimozione gettone");
             }
             if (event->aux_u32 == 1U) {
                 ctx->vcd_coins = 0;
