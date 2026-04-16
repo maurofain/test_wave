@@ -7411,6 +7411,66 @@
           "de": "runTest error",
           "es": "runTest error"
         }
+      },
+      "132": {
+        "label": "test.text.132",
+        "text": {
+          "it": "Credito attuale",
+          "en": "Current credit",
+          "fr": "Credit actuel",
+          "de": "Aktuelles Guthaben",
+          "es": "Credito actual"
+        }
+      },
+      "133": {
+        "label": "test.text.133",
+        "text": {
+          "it": "Limite ricarica",
+          "en": "Recharge limit",
+          "fr": "Limite de recharge",
+          "de": "Aufladelimit",
+          "es": "Limite de recarga"
+        }
+      },
+      "134": {
+        "label": "test.text.134",
+        "text": {
+          "it": "Importo ricarica",
+          "en": "Recharge amount",
+          "fr": "Montant de recharge",
+          "de": "Aufladebetrag",
+          "es": "Importe de recarga"
+        }
+      },
+      "135": {
+        "label": "test.text.135",
+        "text": {
+          "it": "Leggi limite",
+          "en": "Read limit",
+          "fr": "Lire la limite",
+          "de": "Limit lesen",
+          "es": "Leer limite"
+        }
+      },
+      "136": {
+        "label": "test.text.136",
+        "text": {
+          "it": "Importo non valido",
+          "en": "Invalid amount",
+          "fr": "Montant non valide",
+          "de": "Ungueltiger Betrag",
+          "es": "Importe no valido"
+        }
+      },
+      "137": {
+        "label": "test.text.137",
+        "text": {
+          "it": "Lettore cashless offline",
+          "en": "Cashless reader offline",
+          "fr": "Lecteur cashless hors ligne",
+          "de": "Cashless-Leser offline",
+          "es": "Lector cashless fuera de linea"
+        }
       }
     }
   },
