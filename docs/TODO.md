@@ -12,7 +12,7 @@
    - Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenendo in memoria gli eventuali frazionari (es. 50 cent).
    - Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile: prima ECD e poi VCD.
    - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
-4. Quandoviene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
+4. Quando viene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
 
 7. Verifica la gestione generale dei componenti hardware
    - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:

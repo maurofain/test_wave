@@ -1125,7 +1125,7 @@ static void log_peripherals_from_config(const device_config_t *cfg)
   ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════════════════════════╝");
   
   /* Rete e comunicazione */
-  ESP_LOGI(TAG, "[M] │ RETE E COMUNICAZIONE │");
+  ESP_LOGI(TAG, "[M] │ RETE E COMUNICAZIONE ----------------------------------------- │");
   ESP_LOGI(TAG, "[M]  - ethernet:        %s", enabled_text(cfg->eth.enabled));
   ESP_LOGI(TAG, "[M]  - wifi_sta:        %s", enabled_text(cfg->wifi.sta_enabled));
   ESP_LOGI(TAG, "[M]  - ntp:             %s", enabled_text(cfg->ntp_enabled));
@@ -1135,13 +1135,13 @@ static void log_peripherals_from_config(const device_config_t *cfg)
   ESP_LOGI(TAG, "[M]  - log su SD:       %s", enabled_text(cfg->remote_log.write_to_sd));
   
   /* Display e interfaccia utente */
-  ESP_LOGI(TAG, "[M] │ DISPLAY E INTERFACCIA UTENTE │");
+  ESP_LOGI(TAG, "[M] │ DISPLAY E INTERFACCIA UTENTE --------------------------------- │");
   ESP_LOGI(TAG, "[M]  - display:        %s", enabled_text(cfg->display.enabled));
   ESP_LOGI(TAG, "[M]  - ads:            %s", enabled_text(cfg->display.ads_enabled));
   ESP_LOGI(TAG, "[M]  - audio:          %s", enabled_text(cfg->audio.enabled));
   
   /* Periferiche di input/output */
-  ESP_LOGI(TAG, "[M] │ PERIFERICHE I/O │");
+  ESP_LOGI(TAG, "[M] │ PERIFERICHE I/O ---------------------------------------------- │");
   ESP_LOGI(TAG, "[M]  - scanner_usb:    %s", enabled_text(cfg->scanner.enabled));
   ESP_LOGI(TAG, "[M]  - io_expander:    %s", enabled_text(cfg->sensors.io_expander_enabled));
   ESP_LOGI(TAG, "[M]  - rs232:          %s", enabled_text(cfg->sensors.rs232_enabled));
@@ -1150,14 +1150,14 @@ static void log_peripherals_from_config(const device_config_t *cfg)
   ESP_LOGI(TAG, "[M]  - cctalk:         %s", enabled_text(cfg->sensors.cctalk_enabled));
   
   /* Sensori e attuatori */
-  ESP_LOGI(TAG, "[M] │ SENSORI E ATTUATORI │");
+  ESP_LOGI(TAG, "[M] │ SENSORI E ATTUATORI ------------------------------------------ │");
   ESP_LOGI(TAG, "[M]  - temperatura:    %s", enabled_text(cfg->sensors.temperature_enabled));
   ESP_LOGI(TAG, "[M]  - led_strip:      %s", enabled_text(cfg->sensors.led_enabled));
   ESP_LOGI(TAG, "[M]  - pwm1:           %s", enabled_text(cfg->sensors.pwm1_enabled));
   ESP_LOGI(TAG, "[M]  - pwm2:           %s", enabled_text(cfg->sensors.pwm2_enabled));
   
   /* Storage e memoria */
-  ESP_LOGI(TAG, "[M] │ STORAGE │");
+  ESP_LOGI(TAG, "[M] │ STORAGE ------------------------------------------------------ │");
   ESP_LOGI(TAG, "[M]  - sd_card:        %s", enabled_text(cfg->sensors.sd_card_enabled));
   ESP_LOGI(TAG, "[M]  - eeprom:         %s", enabled_text(cfg->sensors.eeprom_enabled));
   
