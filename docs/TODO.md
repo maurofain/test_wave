@@ -68,10 +68,13 @@
 19. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
 20. manca la vode FTP nello Stato Servizi
 21.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' conun altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 aal 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2
-22.  Togliamo 'test loopback' e 'invia stringa' da /test -> MDB
+22. in /test -> mdb Togliamo 'test loopback' e 'invia stringa'
+   - aggiungiamo una label 'Credito attuale' seguito da un testbox non editabile con il valore del credito del TAG se inserito
+   - aggiungiamo una label 'Ricarica' seguito da un editbox che accetta valori 1-100 (default 10) e poi un tasto ricarica che effettua la ricarica - (in centesimi) del TAG e rilegge il nuovo valore aggiornando il campo precedente
 
 
 ---
+
 
 ## ⏸️ RITARDATI
 
@@ -521,3 +524,30 @@ I (114738) MDB_CASH:*****************************
 I (114738) MDB_CASH:*NFC TAG RIMOSSO : Credito 3799 cent
 I (114738) MDB_CASH:*****************************
 I (114738) MDB: TERMINALE RESETTATO E PRONTO 
+
+
+I (20429) TASKS: [M] Avvio differito task mdb_engine (stack=4096 words)...
+I (20429) MDB_ENGINE: [C] [mdb_engine_run] motore di polling MDB avviato
+I (20439) MDB_CASH: [C] [mdb_cashless_sm] dev=0 addr=0x10 state=inactive -> init_reset
+I (20469) MDB_CASH: [C] [mdb_cashless_sm] dev=0 addr=0x10 invio RESET PK4
+I (20569) MDB_CASH: [C] [mdb_cashless_sm] dev=0 reset retry=1/5
+I (20589) MDB_CASH: [C] [mdb_cashless_sm] dev=0 addr=0x10 invio RESET PK4
+I (20599) MDB_CASH: [C] [mdb_cashless_sm] dev=0 addr=0x10 POLL dopo RESET
+I (20619) MDB_CEVT: [C] [mdb_cashless_handle_poll_response] dev=0 addr=0x10 resp=just_reset(0x00) len=2
+W (20619) MDB_CEVT: [C] [mdb_cashless_handle_poll_response] dev=0 lettore appena resettato
+I (20629) MDB_CASH: [C] [mdb_cashless_sm] dev=0 -> init_setup
+W (20629) MDB_CASH: [C] [mdb_cashless_sm] dev=0 lettore ha segnalato JUST_RESET -> init_setup
+I (20659) MDB_CASH: [C] [mdb_cashless_sm] dev=0 addr=0x10 invio SETUP capacita VMC
+I (20689) MDB_CASH: [C] [mdb_cashless_sm] dev=0 setup#1 ok level=1 cash_sale=0
+I (20709) MDB_CASH: [C] [mdb_cashless_sm] dev=0 addr=0x10 invio SETUP max/min price
+I (20729) MDB_CASH: [C] [mdb_cashless_sm] dev=0 setup#2 ok -> init_expansion
+I (20749) MDB_CASH: [C] [mdb_cashless_sm] dev=0 richiedo REQUEST_ID PK4
+I (20829) MDB_CEVT: [C] [mdb_cashless_handle_poll_response] dev=0 addr=0x10 resp=request_id(0x09) len=31
+I (20829) MDB_CEVT: [C] [mdb_cashless_parse_request_id] addr=0x10 manuf=MHD model=000000000001 version=0x0200 type=3
+I (20859) MDB_CASH: [C] [mdb_cashless_sm] dev=0 -> init_enable
+I (20879) MDB_CASH: [C] [mdb_cashless_sm] dev=0 invio ENABLE
+I (20889) MDB_CASH: [C] [mdb_cashless_sm] dev=0 cashless abilitato -> idle_polling
+I (21179) MDB_CEVT: [C] [mdb_cashless_handle_poll_response] dev=0 addr=0x10 resp=begin_session(0x03) len=11
+I (21179) MDB_CEVT: ****************************************
+I (21179) MDB_CEVT: [C] NFC TAG INSERITO: dev=0 addr=0x10 present=1 session_open=1 credit=3499
+I (21189) MDB_CEVT: ****************************************

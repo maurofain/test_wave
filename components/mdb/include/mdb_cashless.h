@@ -68,6 +68,7 @@ typedef struct {
     bool vend_failure_requested;
     bool vend_abort_requested;
     bool vend_success_requested;
+    bool revalue_limit_requested;
     bool credit_sync_pending;
     bool vend_result_pending;
     bool vend_result_approved;

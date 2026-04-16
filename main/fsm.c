@@ -309,6 +309,25 @@ static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
     return true;
 }
 
+static void fsm_log_program_cycle_start(const fsm_ctx_t *ctx, bool is_autorenew)
+{
+    if (!ctx) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "****************************************");
+    if (is_autorenew) {
+        ESP_LOGI(TAG, "[M] AVVIO PROGRAMMA (AUTO_RENEW): %s",
+                 ctx->running_program_name[0] ? ctx->running_program_name : "<nome non disponibile>");
+    } else {
+        ESP_LOGI(TAG, "[M] AVVIO PROGRAMMA: %s",
+                 ctx->running_program_name[0] ? ctx->running_program_name : "<nome non disponibile>");
+    }
+    ESP_LOGI(TAG, "[M] Credito residuo dopo avvio: %ld coin", (long)ctx->credit_cents);
+    ESP_LOGI(TAG, "[M] Stato FSM dopo avvio: %s", fsm_state_to_string(ctx->state));
+    ESP_LOGI(TAG, "****************************************");
+}
+
 static void fsm_publish_autorenew_payment_event(const fsm_ctx_t *ctx)
 {
     if (!ctx || ctx->running_price_units <= 0) {
@@ -354,6 +373,13 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
         return false;
     }
 
+    ESP_LOGI(TAG,
+             "[M] AUTO_RENEW tentato: programma=%s cost=%ld credit_before=%ld state=%s",
+             ctx->running_program_name[0] ? ctx->running_program_name : "<nome non disponibile>",
+             (long)ctx->running_price_units,
+             (long)ctx->credit_cents,
+             fsm_state_to_string(ctx->state));
+
     if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
         fsm_append_message("Rinnovo automatico disabilitato su sessione card");
         return false;
@@ -379,6 +405,7 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
     ctx->pause_limit_reached = false;
     ctx->program_running = true;
     ctx->pre_fine_ciclo_active = false;
+    fsm_log_program_cycle_start(ctx, true);
     fsm_append_message("Rinnovo automatico programma");
     return true;
 }

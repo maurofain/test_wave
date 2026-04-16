@@ -116,6 +116,7 @@ static void mdb_cashless_zero_dynamic_state(mdb_cashless_device_t *device)
     device->vend_failure_requested = false;
     device->vend_abort_requested = false;
     device->vend_success_requested = false;
+    device->revalue_limit_requested = false;
     device->credit_sync_pending = false;
     device->vend_result_pending = false;
     device->vend_result_approved = false;
@@ -374,6 +375,10 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             device->session_state = MDB_CASHLESS_SESSION_IDLE;
             device->session_complete_requested = false;
             device->vend_success_requested = false;
+            device->revalue_limit_requested = false;
+            device->revalue_status = MDB_REVALUE_IDLE;
+            device->revalue_price_cents = 0U;
+            device->approved_revalue_cents = 0U;
 
             mdb_cashless_log_tag_event(device_index, "RIMOSSO", device);
 
@@ -432,9 +437,12 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             device->session_state = MDB_CASHLESS_SESSION_IDLE;
             device->vend_status = MDB_VEND_IDLE;
             device->revalue_status = MDB_REVALUE_IDLE;
+            device->revalue_limit_requested = false;
             device->request_price_cents = 0U;
             device->approved_price_cents = 0U;
             device->vend_result_cents = 0U;
+            device->revalue_price_cents = 0U;
+            device->approved_revalue_cents = 0U;
             device->vend_success_requested = false;
             device->session_complete_requested = false;
             mdb_cashless_log_tag_event(device_index, "RIMOSSO", device);
@@ -460,12 +468,17 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             device->session_open = false;
             device->session_state = MDB_CASHLESS_SESSION_IDLE;
             device->vend_status = MDB_VEND_IDLE;
+            device->revalue_status = MDB_REVALUE_IDLE;
+            device->revalue_limit_requested = false;
+            device->revalue_price_cents = 0U;
+            device->approved_revalue_cents = 0U;
             ESP_LOGW(TAG_CASH_EVT,
                      "[C] [mdb_cashless_handle_poll_response] dev=%u out_of_sequence, sessione invalidata",
                      (unsigned)device_index);
             return true;
 
         case MDB_CASHLESS_RESP_REVALUE_APPROVED:
+            device->revalue_limit_requested = false;
             device->revalue_status = MDB_REVALUE_APPROVED;
             device->approved_revalue_cents = device->revalue_price_cents;
             device->revalue_price_cents = 0U;
@@ -477,6 +490,7 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             return true;
 
         case MDB_CASHLESS_RESP_REVALUE_DENIED:
+            device->revalue_limit_requested = false;
             device->revalue_status = MDB_REVALUE_DENIED;
             device->approved_revalue_cents = 0U;
             device->revalue_price_cents = 0U;
@@ -490,8 +504,12 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             if (len >= 3U) {
                 device->revalue_limit_cents = ((uint16_t)data[1] << 8) | data[2];
             }
-            if (device->revalue_status == MDB_REVALUE_REQUEST_PENDING) {
-                device->revalue_status = MDB_REVALUE_IN_PROGRESS;
+            if (device->revalue_limit_requested) {
+                device->revalue_limit_requested = false;
+                if (device->revalue_price_cents == 0U &&
+                    device->revalue_status == MDB_REVALUE_REQUEST_PENDING) {
+                    device->revalue_status = MDB_REVALUE_IDLE;
+                }
             }
             ESP_LOGI(TAG_CASH_EVT,
                      "[C] [mdb_cashless_handle_poll_response] dev=%u revalue_limit=%u status=%s",
@@ -520,6 +538,16 @@ bool mdb_cashless_prepare_vend_request(size_t device_index, uint16_t amount_cent
     }
 
     mdb_cashless_device_t *device = &s_cashless_devices[device_index];
+    if (device->revalue_limit_requested ||
+        device->revalue_status == MDB_REVALUE_REQUEST_PENDING ||
+        device->revalue_status == MDB_REVALUE_IN_PROGRESS) {
+        ESP_LOGW(TAG_CASH_CTL,
+                 "[C] [mdb_cashless_prepare_vend_request] dev=%u vend rifiutata: ricarica in corso status=%s",
+                 (unsigned)device_index,
+                 mdb_cashless_revalue_status_to_string(device->revalue_status));
+        return false;
+    }
+
     device->request_price_cents = amount_cents;
     device->cash_sale_item_number = item_number;
     device->vend_status = MDB_VEND_PENDING;
@@ -564,7 +592,19 @@ bool mdb_cashless_prepare_revalue(size_t device_index, uint16_t amount_cents)
     }
 
     mdb_cashless_device_t *device = &s_cashless_devices[device_index];
+    if (device->revalue_limit_requested ||
+        device->revalue_status == MDB_REVALUE_REQUEST_PENDING ||
+        device->revalue_status == MDB_REVALUE_IN_PROGRESS) {
+        ESP_LOGW(TAG_CASH_CTL,
+                 "[C] [mdb_cashless_prepare_revalue] dev=%u richiesta ignorata: operazione precedente ancora attiva status=%s",
+                 (unsigned)device_index,
+                 mdb_cashless_revalue_status_to_string(device->revalue_status));
+        return false;
+    }
+
     device->revalue_price_cents = amount_cents;
+    device->approved_revalue_cents = 0U;
+    device->revalue_limit_requested = false;
     device->revalue_status = MDB_REVALUE_REQUEST_PENDING;
     device->session_state = MDB_CASHLESS_SESSION_REVALUE_REQUESTED;
     ESP_LOGI(TAG_CASH_CTL,
@@ -584,6 +624,25 @@ bool mdb_cashless_request_revalue_limit(size_t device_index)
         return false;
     }
 
+    if (s_cashless_devices[device_index].revalue_limit_requested) {
+        ESP_LOGI(TAG_CASH_CTL,
+                 "[C] [mdb_cashless_request_revalue_limit] dev=%u richiesta limite gia' in corso",
+                 (unsigned)device_index);
+        return true;
+    }
+
+    if (s_cashless_devices[device_index].revalue_status == MDB_REVALUE_REQUEST_PENDING ||
+        s_cashless_devices[device_index].revalue_status == MDB_REVALUE_IN_PROGRESS) {
+        ESP_LOGW(TAG_CASH_CTL,
+                 "[C] [mdb_cashless_request_revalue_limit] dev=%u richiesta rifiutata: ricarica attiva status=%s",
+                 (unsigned)device_index,
+                 mdb_cashless_revalue_status_to_string(s_cashless_devices[device_index].revalue_status));
+        return false;
+    }
+
+    s_cashless_devices[device_index].revalue_price_cents = 0U;
+    s_cashless_devices[device_index].approved_revalue_cents = 0U;
+    s_cashless_devices[device_index].revalue_limit_requested = true;
     s_cashless_devices[device_index].revalue_status = MDB_REVALUE_REQUEST_PENDING;
     ESP_LOGI(TAG_CASH_CTL,
              "[C] [mdb_cashless_request_revalue_limit] dev=%u revalue_status=%s",

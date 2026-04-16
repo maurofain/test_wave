@@ -7382,6 +7382,26 @@
           "es": "🔘 GPIO Ausiliari (GPIO33)"
         }
       },
+      "100": {
+        "label": "test.text.100",
+        "text": {
+          "it": "Credito attuale",
+          "en": "Current credit",
+          "fr": "Crédit actuel",
+          "de": "Aktuelles Guthaben",
+          "es": "Crédito actual"
+        }
+      },
+      "101": {
+        "label": "test.text.101",
+        "text": {
+          "it": "Ricarica",
+          "en": "Recharge",
+          "fr": "Recharge",
+          "de": "Aufladung",
+          "es": "Recarga"
+        }
+      },
       "036": {
         "label": "test.js.036",
         "text": {

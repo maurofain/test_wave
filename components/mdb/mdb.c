@@ -27,6 +27,8 @@ static const char *TAG_ENGINE = "MDB_ENGINE";
 #define MDB_RX_GPIO     CONFIG_APP_MDB_RX_GPIO
 #define MDB_COIN_SETUP_MAX_RETRIES 5
 #define MDB_CASHLESS_SETUP_MAX_RETRIES 5
+#define MDB_CASHLESS_SESSION_COMPLETE_MAX_RETRIES 3
+#define MDB_CASHLESS_SESSION_COMPLETE_RETRY_MS 120U
 
 #define MDB_CASHLESS_CMD_RESET      0x00
 #define MDB_CASHLESS_CMD_SETUP      0x01
@@ -48,6 +50,10 @@ static mdb_status_t s_mdb_status = {0};
 static uint8_t s_coin_setup_retries = 0;
 static uint8_t s_cashless_reset_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static uint8_t s_cashless_setup_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static uint8_t s_cashless_expansion_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static uint8_t s_cashless_session_complete_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static uint32_t s_cashless_session_complete_next_retry_ms[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static bool s_cashless_session_complete_active[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static bool s_mdb_driver_initialized = false;
 static bool s_mdb_init_failed = false;
 static bool s_mdb_runtime_fault = false;
@@ -726,7 +732,11 @@ static esp_err_t mdb_cashless_send_simple_command(uint8_t device_address,
     err = mdb_receive_packet(rx, rx_size, rx_len, timeout_ms);
     if (err != ESP_OK) {
         /* Il timeout durante il POLL idle è atteso: evitiamo flood nel log. */
-        if (!(command == MDB_CASHLESS_CMD_POLL && err == ESP_ERR_TIMEOUT)) {
+        bool suppress_timeout_log = (err == ESP_ERR_TIMEOUT &&
+                                     (command == MDB_CASHLESS_CMD_POLL ||
+                                      command == MDB_CASHLESS_CMD_RESET ||
+                                      command == MDB_CASHLESS_CMD_EXPANSION));
+        if (!suppress_timeout_log) {
             ESP_LOGW(TAG_IO,
                      "[C] [mdb_cashless_send_simple_command] rx fallita addr=0x%02X cmd=0x%02X err=%s",
                      device_address,
@@ -765,6 +775,10 @@ static void mdb_cashless_sm(size_t device_index)
     if (!cfg->mdb.cashless_en) {
         s_cashless_reset_retries[device_index] = 0;
         s_cashless_setup_retries[device_index] = 0;
+        s_cashless_expansion_retries[device_index] = 0;
+        s_cashless_session_complete_retries[device_index] = 0;
+        s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+        s_cashless_session_complete_active[device_index] = false;
         if (device->poll_state != MDB_STATE_INACTIVE || device->present) {
             ESP_LOGI(TAG_CASH,
                      "[C] [mdb_cashless_sm] dev=%u cashless disabilitato da config, reset stato runtime",
@@ -785,6 +799,10 @@ static void mdb_cashless_sm(size_t device_index)
                      mdb_state_to_string(MDB_STATE_INIT_RESET));
             s_cashless_reset_retries[device_index] = 0;
             s_cashless_setup_retries[device_index] = 0;
+            s_cashless_expansion_retries[device_index] = 0;
+            s_cashless_session_complete_retries[device_index] = 0;
+            s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+            s_cashless_session_complete_active[device_index] = false;
             device_rw->last_response_code = 0;
             device_rw->poll_state = MDB_STATE_INIT_RESET;
             break;
@@ -831,6 +849,10 @@ static void mdb_cashless_sm(size_t device_index)
 
                 s_cashless_reset_retries[device_index] = 0;
                 s_cashless_setup_retries[device_index] = 0;
+                s_cashless_expansion_retries[device_index] = 0;
+                s_cashless_session_complete_retries[device_index] = 0;
+                s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+                s_cashless_session_complete_active[device_index] = false;
                 device_rw->last_response_code = 0;
                 device_rw->poll_state = MDB_STATE_INIT_SETUP;
                 ESP_LOGI(TAG_CASH,
@@ -844,7 +866,7 @@ static void mdb_cashless_sm(size_t device_index)
                          (unsigned)device_index,
                          (unsigned)s_cashless_reset_retries[device_index]);
             } else {
-                ESP_LOGW(TAG_CASH,
+                ESP_LOGI(TAG_CASH,
                          "[C] [mdb_cashless_sm] dev=%u reset retry=%u/%u",
                          (unsigned)device_index,
                          (unsigned)s_cashless_reset_retries[device_index],
@@ -945,9 +967,16 @@ static void mdb_cashless_sm(size_t device_index)
                                                        &rx_len,
                                                        120);
                 if (ret == ESP_OK) {
+                    s_cashless_expansion_retries[device_index] = 0;
                     response_ok = (rx_len > 0U);
                     parsed_response = response_ok;
                     mdb_cashless_handle_poll_response(device_index, rx, rx_len);
+                } else if (ret == ESP_ERR_TIMEOUT) {
+                    ++s_cashless_expansion_retries[device_index];
+                    ESP_LOGI(TAG_CASH,
+                             "[C] [mdb_cashless_sm] dev=%u request_id retry=%u",
+                             (unsigned)device_index,
+                             (unsigned)s_cashless_expansion_retries[device_index]);
                 }
                 break;
             }
@@ -1021,17 +1050,42 @@ static void mdb_cashless_sm(size_t device_index)
                                                      &rx_len,
                                                      120);
                 response_ok = (ret == ESP_OK && rx_len > 0U);
-                if (ret == ESP_OK) {
+                if (ret == ESP_OK || ret == ESP_ERR_TIMEOUT) {
                     device_rw->vend_success_requested = false;
                     device_rw->session_state = MDB_CASHLESS_SESSION_OPEN;
-                    ESP_LOGI(TAG_CASH,
-                             "[C] [mdb_cashless_sm] dev=%u VEND_SUCCESS confermato al lettore",
-                             (unsigned)device_index);
+                    if (ret == ESP_OK) {
+                        ESP_LOGI(TAG_CASH,
+                                 "[C] [mdb_cashless_sm] dev=%u VEND_SUCCESS confermato al lettore",
+                                 (unsigned)device_index);
+                    } else {
+                        ESP_LOGW(TAG_CASH,
+                                 "[C] [mdb_cashless_sm] dev=%u VEND_SUCCESS senza risposta: nessun retry, sessione mantenuta aperta",
+                                 (unsigned)device_index);
+                    }
                 }
                 break;
             }
 
+            if (!device->session_complete_requested) {
+                s_cashless_session_complete_retries[device_index] = 0;
+                s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+                s_cashless_session_complete_active[device_index] = false;
+            }
+
             if (device->session_complete_requested) {
+                uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+
+                if (!s_cashless_session_complete_active[device_index]) {
+                    s_cashless_session_complete_retries[device_index] = 0;
+                    s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+                    s_cashless_session_complete_active[device_index] = true;
+                }
+
+                if (s_cashless_session_complete_next_retry_ms[device_index] != 0U &&
+                    (int32_t)(now_ms - s_cashless_session_complete_next_retry_ms[device_index]) < 0) {
+                    break;
+                }
+
                 ESP_LOGI(TAG_CASH,
                          "[C] [mdb_cashless_sm] dev=%u invio SESSION_COMPLETE",
                          (unsigned)device_index);
@@ -1044,11 +1098,34 @@ static void mdb_cashless_sm(size_t device_index)
                                                      &rx_len,
                                                      120);
                 response_ok = (ret == ESP_OK && rx_len > 0U);
-                if (ret == ESP_OK) {
-                    device_rw->session_complete_requested = false;
-                    ESP_LOGI(TAG_CASH,
-                             "[C] [mdb_cashless_sm] dev=%u richiesta chiusura sessione inviata",
-                             (unsigned)device_index);
+                if (ret == ESP_OK || ret == ESP_ERR_TIMEOUT) {
+                    if (ret == ESP_OK) {
+                        device_rw->session_complete_requested = false;
+                        s_cashless_session_complete_retries[device_index] = 0;
+                        s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+                        s_cashless_session_complete_active[device_index] = false;
+                        ESP_LOGI(TAG_CASH,
+                                 "[C] [mdb_cashless_sm] dev=%u richiesta chiusura sessione inviata",
+                                 (unsigned)device_index);
+                    } else {
+                        ++s_cashless_session_complete_retries[device_index];
+                        if (s_cashless_session_complete_retries[device_index] < MDB_CASHLESS_SESSION_COMPLETE_MAX_RETRIES) {
+                            s_cashless_session_complete_next_retry_ms[device_index] = now_ms + MDB_CASHLESS_SESSION_COMPLETE_RETRY_MS;
+                            ESP_LOGI(TAG_CASH,
+                                     "[C] [mdb_cashless_sm] dev=%u SESSION_COMPLETE timeout: retry=%u/%u",
+                                     (unsigned)device_index,
+                                     (unsigned)(s_cashless_session_complete_retries[device_index] + 1U),
+                                     (unsigned)MDB_CASHLESS_SESSION_COMPLETE_MAX_RETRIES);
+                        } else {
+                            device_rw->session_complete_requested = false;
+                            s_cashless_session_complete_retries[device_index] = 0;
+                            s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+                            s_cashless_session_complete_active[device_index] = false;
+                            ESP_LOGW(TAG_CASH,
+                                     "[C] [mdb_cashless_sm] dev=%u SESSION_COMPLETE senza risposta: retry esauriti, attendo END_SESSION/SESSION_CANCEL",
+                                     (unsigned)device_index);
+                        }
+                    }
                 }
                 break;
             }
@@ -1129,6 +1206,10 @@ static void mdb_cashless_sm(size_t device_index)
         device_rw->enabled_status = false;
         s_cashless_reset_retries[device_index] = 0;
         s_cashless_setup_retries[device_index] = 0;
+        s_cashless_expansion_retries[device_index] = 0;
+        s_cashless_session_complete_retries[device_index] = 0;
+        s_cashless_session_complete_next_retry_ms[device_index] = 0U;
+        s_cashless_session_complete_active[device_index] = false;
         ESP_LOGW(TAG_CASH,
                  "[C] [mdb_cashless_sm] dev=%u OUT_OF_SEQUENCE -> init_reset",
                  (unsigned)device_index);
@@ -1145,6 +1226,15 @@ static void mdb_cashless_sm(size_t device_index)
  *  @return Nessun valore di ritorno.
  */
 void mdb_engine_run(void *arg) {
+    TickType_t period_ticks = pdMS_TO_TICKS(20);
+
+    if (arg) {
+        TickType_t configured_ticks = (TickType_t)(uintptr_t)arg;
+        if (configured_ticks > 0) {
+            period_ticks = configured_ticks;
+        }
+    }
+
     ESP_LOGI(TAG_ENGINE, "[C] [mdb_engine_run] motore di polling MDB avviato");
     while (1) {
         mdb_coin_sm();
@@ -1154,7 +1244,7 @@ void mdb_engine_run(void *arg) {
         mdb_cashless_dispatch_pending_credit();
         mdb_cashless_dispatch_pending_vend();
         // mdb_bill_sm(); // futuro
-        vTaskDelay(pdMS_TO_TICKS(500)); // Ciclo di polling
+        vTaskDelay((period_ticks > 0) ? period_ticks : 1);
     }
 }
 

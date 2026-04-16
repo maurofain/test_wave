@@ -3318,9 +3318,10 @@ static void cctalk_engine_wrapper(void *arg)
  */
 static void mdb_engine_wrapper(void *arg)
 {
+    TickType_t period_ticks = (arg != NULL) ? ((task_param_t *)arg)->period_ticks : pdMS_TO_TICKS(20);
     mdb_register_cashless_credit_callback(tasks_publish_card_credit_event);
     mdb_register_cashless_vend_callback(tasks_publish_card_vend_result_event);
-    mdb_engine_run(NULL);
+    mdb_engine_run((void *)(uintptr_t)period_ticks);
 }
 
 /* Wrapper SD monitor: non richiede init hardware preventivo (il task configura
@@ -3580,7 +3581,7 @@ static task_param_t s_tasks[] = {
         .state = TASK_STATE_IDLE,
         .priority = 5,
         .core_id = 0,
-        .period_ticks = pdMS_TO_TICKS(500),
+        .period_ticks = pdMS_TO_TICKS(20),
         .task_fn = mdb_engine_wrapper,
         .stack_words = 4096,                  /* RISC-V: 4KB; polling state-machine MDB */
         .stack_caps = MALLOC_CAP_SPIRAM,
