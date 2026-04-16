@@ -231,6 +231,14 @@ static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source
     }
 }
 
+static bool fsm_has_virtual_locked_session(const fsm_ctx_t *ctx)
+{
+    return ctx &&
+           ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED &&
+           (ctx->session_source == FSM_SESSION_SOURCE_CARD ||
+            ctx->session_source == FSM_SESSION_SOURCE_QR);
+}
+
 static bool fsm_can_replace_touch_only_session_with_qr(const fsm_ctx_t *ctx)
 {
     if (!ctx) {
@@ -262,6 +270,9 @@ static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_sourc
     ctx->session_source = source;
     ctx->session_mode = FSM_SESSION_MODE_VIRTUAL_LOCKED;
     ctx->allow_additional_payments = false;
+    if (source == FSM_SESSION_SOURCE_CARD) {
+        ctx->card_session_removed_during_run = false;
+    }
     if (ctx->state == FSM_STATE_IDLE || ctx->state == FSM_STATE_ADS) {
         ctx->state = FSM_STATE_CREDIT;
         ctx->inactivity_ms = 0;
@@ -354,7 +365,9 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
         return false;
     }
 
-    if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
+    if (ctx->session_source == FSM_SESSION_SOURCE_CARD ||
+        ctx->payment_credit_source == FSM_SESSION_SOURCE_CARD ||
+        ctx->card_session_removed_during_run) {
         fsm_append_message("Rinnovo automatico disabilitato su sessione card");
         return false;
     }
@@ -558,6 +571,7 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->allow_additional_payments = false;
     ctx->card_vend_pending = false;
     ctx->card_session_complete_required = false;
+    ctx->card_session_removed_during_run = false;
     ctx->stop_after_cycle_requested = false;
     ctx->pre_fine_ciclo_active = false;
     ctx->out_of_service_agent = (int32_t)AGN_ID_NONE;
@@ -673,7 +687,9 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ESP_LOGI(TAG, "****************************************");
                 bool has_credit = (ctx->credit_cents > 0) ||
                                   ((ctx->ecd_coins + ctx->vcd_coins) > 0);
-                bool stay_in_credit = has_credit || (ctx->session_source == FSM_SESSION_SOURCE_CARD);
+                bool stay_in_credit = has_credit ||
+                                      (ctx->session_source == FSM_SESSION_SOURCE_CARD &&
+                                       !ctx->card_session_removed_during_run);
                 fsm_reset_runtime_locked(ctx);
                 if (stay_in_credit) {
                     ctx->state = FSM_STATE_CREDIT;
@@ -686,6 +702,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                     ctx->allow_additional_payments = false;
                     ctx->customer_code[0] = '\0';
                     ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->card_session_removed_during_run = false;
                     ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
                 }
                 ctx->inactivity_ms = 0;
@@ -704,6 +721,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->allow_additional_payments = false;
                 ctx->customer_code[0] = '\0';
                 ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                ctx->card_session_removed_during_run = false;
                 ctx->state = FSM_STATE_IDLE;
                 ctx->inactivity_ms = 0;
             }
@@ -727,7 +745,9 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ESP_LOGI(TAG, "****************************************");
                 bool has_credit = (ctx->credit_cents > 0) ||
                                   ((ctx->ecd_coins + ctx->vcd_coins) > 0);
-                bool stay_in_credit = has_credit || (ctx->session_source == FSM_SESSION_SOURCE_CARD);
+                bool stay_in_credit = has_credit ||
+                                      (ctx->session_source == FSM_SESSION_SOURCE_CARD &&
+                                       !ctx->card_session_removed_during_run);
                 fsm_reset_runtime_locked(ctx);
                 if (stay_in_credit) {
                     ctx->state = FSM_STATE_CREDIT;
@@ -740,6 +760,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                     ctx->allow_additional_payments = false;
                     ctx->customer_code[0] = '\0';
                     ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->card_session_removed_during_run = false;
                     ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
                 }
                 ctx->inactivity_ms = 0;
@@ -750,6 +771,7 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 ctx->allow_additional_payments = false;
                 ctx->customer_code[0] = '\0';
                 ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                ctx->card_session_removed_during_run = false;
                 ctx->state = FSM_STATE_IDLE;
                 ctx->inactivity_ms = 0;
             }
@@ -848,11 +870,15 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
     switch (etype) {
         case FSM_INPUT_EVENT_USER_ACTIVITY:
         case FSM_INPUT_EVENT_TOUCH:
-            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_TOUCH);
+            if (!fsm_has_virtual_locked_session(ctx)) {
+                fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_TOUCH);
+            }
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_KEY:
-            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_KEY);
+            if (!fsm_has_virtual_locked_session(ctx)) {
+                fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_KEY);
+            }
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_QR_SCANNED:
@@ -943,6 +969,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
             fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_CARD);
+            ctx->card_session_removed_during_run = false;
             /* [C] Memorizza il codice cliente da Card per successiva api/payment */
             snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s",
                      (event->text[0] != '\0') ? event->text : "");
@@ -953,6 +980,14 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                                           (event->text[0] != '\0') ? event->text : "card_vcd");
                 ctx->payment_credit_source = FSM_SESSION_SOURCE_CARD;
             }
+            ESP_LOGI(TAG,
+                     "[M] [CARD_FLOW] CARD_CREDIT ricevuto: session_source=%s payment_source=%s credit=%ld ecd=%ld vcd=%ld residual_vcd=%ld",
+                     fsm_session_source_to_string(ctx->session_source),
+                     fsm_session_source_to_string(ctx->payment_credit_source),
+                     (long)ctx->credit_cents,
+                     (long)ctx->ecd_coins,
+                     (long)ctx->vcd_coins,
+                     (long)ctx->vcd_cents_residual);
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
         }
 
@@ -985,6 +1020,16 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 return false;
             }
 
+            ESP_LOGI(TAG,
+                     "[M] [CARD_FLOW] PROGRAM_SELECTED service=%s session_source=%s payment_source=%s credit=%ld ecd=%ld vcd=%ld vend_pending=%d",
+                     event->text[0] ? event->text : "programma",
+                     fsm_session_source_to_string(ctx->session_source),
+                     fsm_session_source_to_string(ctx->payment_credit_source),
+                     (long)ctx->credit_cents,
+                     (long)ctx->ecd_coins,
+                     (long)ctx->vcd_coins,
+                     ctx->card_vend_pending ? 1 : 0);
+
             if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
                 int32_t vend_amount_units = (event->value_i32 > 0) ? event->value_i32 : 0;
                 int32_t vend_amount_cents = 0;
@@ -1013,9 +1058,12 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                          event->text[0] ? event->text : "programma");
 
                 ESP_LOGI(TAG,
-                         "[M] [CARD_VEND] richiesta avvio ciclo %ld crediti -> %ld cent",
+                         "[M] [CARD_VEND] richiesta avvio ciclo %ld crediti -> %ld cent (credit=%ld vcd=%ld ecd=%ld)",
                          (long)vend_amount_units,
-                         (long)vend_amount_cents);
+                         (long)vend_amount_cents,
+                         (long)ctx->credit_cents,
+                         (long)ctx->vcd_coins,
+                         (long)ctx->ecd_coins);
 
                 if (!tasks_request_card_vend(vend_amount_cents, 0xFFFFU)) {
                     fsm_reset_card_vend_pending(ctx);
@@ -1024,8 +1072,18 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 }
 
                 ctx->card_vend_pending = true;
+                ESP_LOGI(TAG,
+                         "[M] [CARD_VEND] attesa approvazione MDB: pending_price=%ld pending_program=%s",
+                         (long)ctx->pending_program_price_units,
+                         ctx->pending_program_name[0] ? ctx->pending_program_name : "programma");
                 fsm_append_message("Richiesta VEND MDB inviata: attesa conferma");
                 return true;
+            }
+
+            if (ctx->payment_credit_source == FSM_SESSION_SOURCE_CARD) {
+                ESP_LOGW(TAG,
+                         "[M] [CARD_FLOW] incoerenza: payment_source=CARD ma session_source=%s, uso ramo standard",
+                         fsm_session_source_to_string(ctx->session_source));
             }
 
             if (event->value_u32 > 0) {
@@ -1079,6 +1137,15 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             int32_t requested_amount_units = ctx->pending_program_price_units;
             int32_t requested_amount_cents = 0;
             int32_t approved_amount_cents = (event->value_i32 > 0) ? event->value_i32 : 0;
+
+            ESP_LOGI(TAG,
+                     "[M] [CARD_VEND] CARD_VEND_APPROVED ricevuto: approved=%ld pending=%ld state=%s credit=%ld ecd=%ld vcd=%ld",
+                     (long)approved_amount_cents,
+                     (long)requested_amount_units,
+                     fsm_state_to_string(ctx->state),
+                     (long)ctx->credit_cents,
+                     (long)ctx->ecd_coins,
+                     (long)ctx->vcd_coins);
 
             if (!ctx->card_vend_pending ||
                 ctx->session_source != FSM_SESSION_SOURCE_CARD ||
@@ -1134,12 +1201,28 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                      "%s",
                      ctx->pending_program_name[0] ? ctx->pending_program_name : "programma");
 
+            ESP_LOGI(TAG,
+                     "[M] [CARD_VEND] prima di USE_CREDIT: requested=%ld approved=%ld credit=%ld ecd=%ld vcd=%ld",
+                     (long)requested_amount_units,
+                     (long)approved_amount_cents,
+                     (long)ctx->credit_cents,
+                     (long)ctx->ecd_coins,
+                     (long)ctx->vcd_coins);
+
             if (!fsm_try_charge_program_cycle(ctx, requested_amount_units)) {
                 (void)tasks_request_card_session_complete();
                 fsm_reset_card_vend_pending(ctx);
                 fsm_append_message("Credito locale incoerente dopo VEND_APPROVED");
                 return false;
             }
+
+            ESP_LOGI(TAG,
+                     "[M] [CARD_VEND] dopo USE_CREDIT: credit=%ld ecd=%ld vcd=%ld ecd_used=%ld vcd_used=%ld",
+                     (long)ctx->credit_cents,
+                     (long)ctx->ecd_coins,
+                     (long)ctx->vcd_coins,
+                     (long)ctx->ecd_used,
+                     (long)ctx->vcd_used);
 
             if (!fsm_handle_event(ctx, FSM_EVENT_PROGRAM_SELECTED)) {
                 ctx->credit_cents += requested_amount_units;
@@ -1160,6 +1243,12 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             if (!ctx->card_vend_pending || ctx->session_source != FSM_SESSION_SOURCE_CARD) {
                 return false;
             }
+
+            ESP_LOGW(TAG,
+                     "[M] [CARD_VEND] CARD_VEND_DENIED: credit=%ld ecd=%ld vcd=%ld",
+                     (long)ctx->credit_cents,
+                     (long)ctx->ecd_coins,
+                     (long)ctx->vcd_coins);
 
             (void)tasks_request_card_session_complete();
             fsm_reset_card_vend_pending(ctx);
@@ -1195,6 +1284,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             if (event->aux_u32 == 1U && ctx->session_source == FSM_SESSION_SOURCE_CARD) {
                 ctx->card_session_complete_required = false;
+                ctx->card_session_removed_during_run = false;
                 ESP_LOGI(TAG, "[M] Sessione MDB gia' chiusa dal lettore dopo rimozione gettone");
             }
             if (event->aux_u32 == 1U) {
@@ -1342,9 +1432,16 @@ bool fsm_tick(fsm_ctx_t *ctx, uint32_t elapsed_ms)
 
                 ctx->credit_cents = 0;
                 fsm_reset_runtime_locked(ctx);
-                if (ctx->session_source == FSM_SESSION_SOURCE_CARD) {
+                if (ctx->session_source == FSM_SESSION_SOURCE_CARD &&
+                    !ctx->card_session_removed_during_run) {
                     ctx->state = FSM_STATE_CREDIT;  /* [M] CREDIT per mantenere la sessione CARD aperta e dopo timeout andare in ADS */
                 } else {
+                    ctx->session_mode = FSM_SESSION_MODE_NONE;
+                    ctx->session_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->allow_additional_payments = false;
+                    ctx->customer_code[0] = '\0';
+                    ctx->payment_credit_source = FSM_SESSION_SOURCE_NONE;
+                    ctx->card_session_removed_during_run = false;
                     ctx->state = ctx->ads_enabled ? FSM_STATE_ADS : FSM_STATE_IDLE;
                 }
                 ctx->inactivity_ms = 0;

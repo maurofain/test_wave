@@ -268,6 +268,7 @@ typedef struct {
     bool allow_additional_payments;
     bool card_vend_pending;
     bool card_session_complete_required;
+    bool card_session_removed_during_run;
     bool stop_after_cycle_requested; /* true se richiesto stop al termine del ciclo corrente */
     bool pre_fine_ciclo_active;  /* true quando la soglia PreFineCiclo è stata raggiunta */
     int32_t out_of_service_agent; /* AGN_ID_* che ha causato lo stato OOS */

@@ -1467,10 +1467,15 @@ static bool tasks_is_card_session_removed(void)
         return false;
     }
 
-    /* Il campo present indica la presenza del lettore cashless sul bus MDB,
-       non la presenza del tag NFC. La chiusura della sessione viene
-       rilevata da session_open == false. */
-    return (device->present && !device->session_open);
+     /* Il campo present indica la presenza del lettore cashless sul bus MDB,
+         non la presenza del tag NFC. Dopo la rimozione del tag il lettore può
+         entrare prima in stato ENDING (SESSION_CANCEL) e solo dopo chiudere
+         formalmente la sessione con session_open == false. */
+     return device->present &&
+              (!device->session_open ||
+                device->session_state == MDB_CASHLESS_SESSION_ENDING ||
+                device->last_response_code == MDB_CASHLESS_RESP_SESSION_CANCEL ||
+                device->last_response_code == MDB_CASHLESS_RESP_END_SESSION);
 }
 
 esp_err_t tasks_publish_play_audio(const char *audio_path, agn_id_t sender)
@@ -2250,6 +2255,22 @@ static void fsm_task(void *arg)
             tasks_set_out_of_service_runtime(false);
         }
 
+        if ((fsm.state == FSM_STATE_RUNNING || fsm.state == FSM_STATE_PAUSED) &&
+            fsm.session_source == FSM_SESSION_SOURCE_CARD &&
+            !fsm.card_vend_pending &&
+            tasks_is_card_session_removed()) {
+            if (!fsm.card_session_removed_during_run) {
+                fsm.card_session_removed_during_run = true;
+                fsm.card_session_complete_required = false;
+                fsm.vcd_coins = 0;
+                fsm.vcd_cents_residual = 0;
+                fsm.credit_cents = fsm.ecd_coins;
+                changed = true;
+                ESP_LOGI(TAG,
+                         "[M] Tag card rimosso durante programma: VCD residuo azzerato, fine ciclo senza autorepeat");
+            }
+        }
+
         if (fsm.state == FSM_STATE_CREDIT &&
             fsm.session_source == FSM_SESSION_SOURCE_CARD &&
             !fsm.card_vend_pending &&
@@ -2258,6 +2279,8 @@ static void fsm_task(void *arg)
                 fsm.card_session_complete_required = false;
                 ESP_LOGI(TAG, "[M] Sessione card gia' chiusa dal lettore: skip SESSION_COMPLETE tardivo");
             }
+
+            fsm.card_session_removed_during_run = false;
 
             fsm_input_event_t card_removed_event = {
                 .from = AGN_ID_MDB,
