@@ -81,7 +81,7 @@
   - Va inibito QRCODE se si è ricevuto VDC dallo MDB e riattivato quando viene sottratto l'ultimo credito MDB
 26. MDR va sempre mostrato al termine della sessione , sia che avvenga per fine del credito che per interruzione forzata con STOP
 27. nell pagine /test aggiungiamo una sezione Audio dove mettiamo un controllo di volume e un tasto per riprodurre il messaggio in SPIFFS /audio/test.wav
-28. 
+28. al touch dello schermo in ADS riproduci buongiorno.wav se il credito ECS+VCS è 0 oppure seleziona.wav se credito > 0, alla presentazione di MDR riproduci grazie.wav, all'avvio della ripetizione automatica del programma riproduci ripetizione.wav
 
 
 

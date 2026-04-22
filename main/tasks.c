@@ -3307,9 +3307,14 @@ static void audio_task(void *arg)
         }
 
         device_config_t *cfg = device_config_get();
-        if (cfg && !cfg->audio.enabled) {
+        bool web_ui_test_request = (event.from == AGN_ID_WEB_UI);
+        bool critical_ui_prompt = (event.from == AGN_ID_LVGL || event.from == AGN_ID_FSM);
+        if (cfg && !cfg->audio.enabled && !web_ui_test_request && !critical_ui_prompt) {
             ESP_LOGI(TAG, "[M] PLAY_AUDIO ignorato: audio disabilitato in config");
             continue;
+        }
+        if (cfg && !cfg->audio.enabled && (web_ui_test_request || critical_ui_prompt)) {
+            ESP_LOGI(TAG, "[M] PLAY_AUDIO bypass audio disabilitato (from=%d)", (int)event.from);
         }
 
         uint8_t volume = (cfg != NULL) ? cfg->audio.volume : 75U;
@@ -3537,7 +3542,7 @@ static task_param_t s_tasks[] = {
         .period_ticks = pdMS_TO_TICKS(100),
         .task_fn = audio_task,
         .stack_words = 12288,                 /* RISC-V: 12KB; parsing WAV + streaming I2S */
-        .stack_caps = MALLOC_CAP_SPIRAM,
+        .stack_caps = MALLOC_CAP_INTERNAL,
         .arg = NULL,
         .handle = NULL,
     },

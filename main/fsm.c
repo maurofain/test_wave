@@ -4,6 +4,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_log.h"
+#include "esp_err.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -386,6 +387,12 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx)
     if (!fsm_try_charge_program_cycle(ctx, ctx->running_price_units)) {
         return false;
     }
+
+    esp_err_t audio_err = tasks_publish_play_audio("/spiffs/audio/ripetizione.wav", AGN_ID_FSM);
+    if (audio_err != ESP_OK) {
+        ESP_LOGW(TAG, "[M] Play audio ripetizione fallito: %s", esp_err_to_name(audio_err));
+    }
+
     fsm_publish_autorenew_payment_event(ctx);
     ctx->running_elapsed_ms = 0;
     ctx->pause_elapsed_ms = 0;

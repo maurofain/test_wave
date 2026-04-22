@@ -426,6 +426,62 @@ esp_err_t api_test_handler(httpd_req_t *req)
         }
     }
 
+    else if (strcmp(test_name, "audio_volume") == 0) {
+        if (req->content_len <= 0 || req->content_len >= 128) {
+            snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"payload non valido\"}");
+            httpd_resp_set_status(req, "400 Bad Request");
+        } else {
+            char body[128] = {0};
+            int recv_len = httpd_req_recv(req, body, sizeof(body) - 1);
+            if (recv_len <= 0) {
+                snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"lettura payload fallita\"}");
+                httpd_resp_set_status(req, "400 Bad Request");
+            } else {
+                cJSON *root = cJSON_Parse(body);
+                cJSON *volume_obj = NULL;
+                if (root) {
+                    volume_obj = cJSON_GetObjectItem(root, "volume");
+                    if (!volume_obj) {
+                        volume_obj = cJSON_GetObjectItem(root, "vol");
+                    }
+                }
+
+                if (!root || !volume_obj || !cJSON_IsNumber(volume_obj)) {
+                    if (root) {
+                        cJSON_Delete(root);
+                    }
+                    snprintf(response, sizeof(response), "{\"status\":\"error\",\"error\":\"volume non valido\"}");
+                    httpd_resp_set_status(req, "400 Bad Request");
+                } else {
+                    uint8_t volume = clamp_u8_value(volume_obj->valueint, 0U, 100U);
+                    cJSON_Delete(root);
+
+                    device_config_t *cfg = device_config_get();
+                    if (cfg) {
+                        cfg->audio.volume = volume;
+                        cfg->updated = true;
+                        (void)device_config_save(cfg);
+                        (void)device_config_write_to_spiffs(cfg);
+                    }
+
+                    esp_err_t set_err = audio_player_set_volume(volume);
+                    if (set_err == ESP_OK) {
+                        snprintf(response,
+                                 sizeof(response),
+                                 "{\"status\":\"ok\",\"message\":\"Volume impostato\",\"volume\":%u}",
+                                 (unsigned)volume);
+                    } else {
+                        snprintf(response,
+                                 sizeof(response),
+                                 "{\"status\":\"error\",\"error\":\"set volume fallito\",\"err\":\"%s\"}",
+                                 esp_err_to_name(set_err));
+                        httpd_resp_set_status(req, "500 Internal Server Error");
+                    }
+                }
+            }
+        }
+    }
+
     else if (strcmp(test_name, "scanner_setup") == 0) {
         esp_err_t err = usb_cdc_scanner_send_setup_command();
         if (err == ESP_OK) {

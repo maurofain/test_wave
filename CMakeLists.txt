@@ -30,7 +30,7 @@ set(F_RS485           0)
 set(F_MDB             0)
 set(F_SHT40           0)
 set(F_CCTALK          0)
-set(F_AUDIO           1)
+set(F_AUDIO           0)
 set(F_REMOTE_LOGGING  0)
 set(F_ERROR_DUMP      1)
 # not implemented

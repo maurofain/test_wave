@@ -1576,6 +1576,11 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", display);
 
+    cJSON *audio = cJSON_CreateObject();
+    cJSON_AddBoolToObject(audio, "en", cfg->audio.enabled);
+    cJSON_AddNumberToObject(audio, "vol", cfg->audio.volume);
+    cJSON_AddItemToObject(root, "audio", audio);
+
     // RS232
     cJSON *rs232 = cJSON_CreateObject();
     cJSON_AddNumberToObject(rs232, "baud", cfg->rs232.baud_rate);
@@ -1848,6 +1853,11 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddBoolToObject(display, "backlight", cfg->display.backlight);
     cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
     cJSON_AddItemToObject(root, "display", display);
+
+    cJSON *audio = cJSON_CreateObject();
+    cJSON_AddBoolToObject(audio, "en", cfg->audio.enabled);
+    cJSON_AddNumberToObject(audio, "vol", cfg->audio.volume);
+    cJSON_AddItemToObject(root, "audio", audio);
 
     // RS232
     cJSON *rs232 = cJSON_CreateObject();
@@ -2353,6 +2363,24 @@ esp_err_t api_config_save(httpd_req_t *req)
         }
     }
 
+    cJSON *audio_obj = cJSON_GetObjectItem(root, "audio");
+    if (audio_obj) {
+        cJSON *enabled = cJSON_GetObjectItem(audio_obj, "en");
+        if (!enabled) enabled = cJSON_GetObjectItem(audio_obj, "enabled");
+        if (enabled) {
+            cfg->audio.enabled = cJSON_IsTrue(enabled);
+        }
+
+        cJSON *volume = cJSON_GetObjectItem(audio_obj, "vol");
+        if (!volume) volume = cJSON_GetObjectItem(audio_obj, "volume");
+        if (volume && cJSON_IsNumber(volume)) {
+            int val = volume->valueint;
+            if (val < 0) val = 0;
+            if (val > 100) val = 100;
+            cfg->audio.volume = (uint8_t)val;
+        }
+    }
+
     cJSON *gpios_obj = cJSON_GetObjectItem(root, "gpios");
     if (gpios_obj) {
         cJSON *g33 = cJSON_GetObjectItem(gpios_obj, "gpio33");
@@ -2781,6 +2809,24 @@ esp_err_t api_config_load_from_sd(httpd_req_t *req)
             if (cfg->display.enabled) {
                 bsp_display_brightness_set(cfg->display.lcd_brightness);
             }
+        }
+    }
+
+    cJSON *audio_obj = cJSON_GetObjectItem(root, "audio");
+    if (audio_obj) {
+        cJSON *enabled = cJSON_GetObjectItem(audio_obj, "en");
+        if (!enabled) enabled = cJSON_GetObjectItem(audio_obj, "enabled");
+        if (enabled) {
+            cfg->audio.enabled = cJSON_IsTrue(enabled);
+        }
+
+        cJSON *volume = cJSON_GetObjectItem(audio_obj, "vol");
+        if (!volume) volume = cJSON_GetObjectItem(audio_obj, "volume");
+        if (volume && cJSON_IsNumber(volume)) {
+            int val = volume->valueint;
+            if (val < 0) val = 0;
+            if (val > 100) val = 100;
+            cfg->audio.volume = (uint8_t)val;
         }
     }
 

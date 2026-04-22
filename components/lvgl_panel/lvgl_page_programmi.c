@@ -208,6 +208,11 @@ static void show_program_end_effect(int32_t residual_credit)
     lv_label_set_text(s_program_end_credit_lbl, credit_line);
     lv_label_set_text(s_program_end_msg_lbl, s_tr_program_end_msg);
 
+    esp_err_t audio_err = tasks_publish_play_audio("/spiffs/audio/grazie.wav", AGN_ID_LVGL);
+    if (audio_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Audio MDR non pubblicato: %s", esp_err_to_name(audio_err));
+    }
+
     lv_obj_clear_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(s_program_end_overlay);
     lv_obj_invalidate(s_program_end_overlay);

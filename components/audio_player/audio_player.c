@@ -179,6 +179,11 @@ static esp_err_t play_mp3_file(const char *path)
         return ESP_FAIL;
     }
 
+    int vol_res = esp_codec_dev_set_out_vol(s_speaker, s_volume);
+    if (vol_res != ESP_CODEC_DEV_OK) {
+        ESP_LOGW(TAG, "[C] Applicazione volume MP3 fallita: %d", vol_res);
+    }
+
     mp3d_sample_t pcm_samples[MP3_SAMPLE_BUFFER_SAMPLES] = {0};
     esp_err_t result = ESP_OK;
 
@@ -244,6 +249,12 @@ esp_err_t audio_player_set_volume(uint8_t volume)
     esp_err_t init_err = audio_player_init();
     if (init_err != ESP_OK) {
         return init_err;
+    }
+
+    /* Evita chiamate al codec a canale idle: il volume viene applicato in play_file dopo esp_codec_dev_open. */
+    if (!s_is_playing) {
+        ESP_LOGI(TAG, "[C] Volume audio memorizzato: %u", (unsigned)s_volume);
+        return ESP_OK;
     }
 
     int vol_res = esp_codec_dev_set_out_vol(s_speaker, s_volume);
@@ -361,6 +372,11 @@ esp_err_t audio_player_play_file(const char *path)
         fclose(f);
         s_is_playing = false;
         return ESP_FAIL;
+    }
+
+    int vol_res = esp_codec_dev_set_out_vol(s_speaker, s_volume);
+    if (vol_res != ESP_CODEC_DEV_OK) {
+        ESP_LOGW(TAG, "[C] Applicazione volume WAV fallita: %d", vol_res);
     }
 
     uint8_t buffer[AUDIO_COPY_BUFFER_SIZE] = {0};

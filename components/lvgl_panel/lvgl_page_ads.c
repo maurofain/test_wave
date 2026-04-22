@@ -3,9 +3,11 @@
 #include "lvgl_i18n.h"
 #include "lvgl.h"
 #include "esp_log.h"
+#include "esp_err.h"
 #include "device_config.h"
 #include "sd_card.h"
 #include "lvgl_panel.h"
+#include "tasks.h"
 #include <dirent.h>
 #include <string.h>
 #include <stdlib.h>
@@ -348,7 +350,21 @@ static void switch_from_ads_async(void *arg)
     (void)arg;
 
     fsm_ctx_t snap = {0};
-    if (fsm_runtime_snapshot(&snap)) {
+    bool has_snap = fsm_runtime_snapshot(&snap);
+
+    int32_t total_credit = 0;
+    if (has_snap) {
+        total_credit = snap.ecd_coins + snap.vcd_coins;
+    }
+
+    const char *audio_path = (total_credit > 0) ? "/spiffs/audio/seleziona.wav"
+                                                : "/spiffs/audio/buongiorno.wav";
+    esp_err_t audio_err = tasks_publish_play_audio(audio_path, AGN_ID_LVGL);
+    if (audio_err != ESP_OK) {
+        ESP_LOGW(TAG, "[C] Audio touch ADS non pubblicato: %s", esp_err_to_name(audio_err));
+    }
+
+    if (has_snap) {
         if (snap.state == FSM_STATE_CREDIT ||
             snap.state == FSM_STATE_RUNNING ||
             snap.state == FSM_STATE_PAUSED) {
