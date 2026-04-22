@@ -843,10 +843,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
     }
 
     if ((ctx->state == FSM_STATE_RUNNING || ctx->state == FSM_STATE_PAUSED) &&
-        (etype == FSM_INPUT_EVENT_COIN ||
-         etype == FSM_INPUT_EVENT_TOKEN ||
-         etype == FSM_INPUT_EVENT_CARD_CREDIT ||
-         etype == FSM_INPUT_EVENT_QR_CREDIT ||
+        (etype == FSM_INPUT_EVENT_QR_CREDIT ||
          etype == FSM_INPUT_EVENT_QR_SCANNED)) {
         ESP_LOGW(TAG, "[M] Ignorato evento acqusizione durante programma attivo: %s",
                  fsm_input_event_type_to_string(etype));
@@ -959,6 +956,29 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_CARD_CREDIT: {
             ctx->qr_credit_pending = false;
+
+            if (ctx->state == FSM_STATE_RUNNING || ctx->state == FSM_STATE_PAUSED) {
+                if (event->value_i32 > 0) {
+                    /* [M] Durante programma attivo accettiamo ricariche TAG come VCD aggiuntivo. */
+                    fsm_add_credit_from_cents(ctx,
+                                              event->value_i32,
+                                              false,
+                                              (event->text[0] != '\0') ? event->text : "card_vcd_running");
+                    ctx->payment_credit_source = FSM_SESSION_SOURCE_CARD;
+                    if (event->text[0] != '\0') {
+                        snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s", event->text);
+                    }
+                    ESP_LOGI(TAG,
+                             "[M] [CARD_FLOW] CARD_CREDIT in RUNNING/PAUSED: +%ld cent (credit=%ld ecd=%ld vcd=%ld)",
+                             (long)event->value_i32,
+                             (long)ctx->credit_cents,
+                             (long)ctx->ecd_coins,
+                             (long)ctx->vcd_coins);
+                    return true;
+                }
+                return false;
+            }
+
             if (ctx->card_vend_pending) {
                 fsm_append_message("Vend card in corso: credito aggiuntivo ignorato");
                 return false;
@@ -1201,6 +1221,12 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                      "%s",
                      ctx->pending_program_name[0] ? ctx->pending_program_name : "programma");
 
+            int32_t prev_credit_cents = ctx->credit_cents;
+            int32_t prev_ecd_coins = ctx->ecd_coins;
+            int32_t prev_vcd_coins = ctx->vcd_coins;
+            int32_t prev_ecd_used = ctx->ecd_used;
+            int32_t prev_vcd_used = ctx->vcd_used;
+
             ESP_LOGI(TAG,
                      "[M] [CARD_VEND] prima di USE_CREDIT: requested=%ld approved=%ld credit=%ld ecd=%ld vcd=%ld",
                      (long)requested_amount_units,
@@ -1225,9 +1251,11 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                      (long)ctx->vcd_used);
 
             if (!fsm_handle_event(ctx, FSM_EVENT_PROGRAM_SELECTED)) {
-                ctx->credit_cents += requested_amount_units;
-                ctx->vcd_coins += requested_amount_units;
-                ctx->vcd_used -= requested_amount_units;
+                ctx->credit_cents = prev_credit_cents;
+                ctx->ecd_coins = prev_ecd_coins;
+                ctx->vcd_coins = prev_vcd_coins;
+                ctx->ecd_used = prev_ecd_used;
+                ctx->vcd_used = prev_vcd_used;
                 (void)tasks_request_card_session_complete();
                 fsm_reset_card_vend_pending(ctx);
                 fsm_append_message("Avvio programma fallito dopo VEND_APPROVED");

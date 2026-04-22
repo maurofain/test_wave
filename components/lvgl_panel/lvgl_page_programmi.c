@@ -123,6 +123,10 @@ static char s_prog_label_cache_lang[8] = "";
 static uint32_t s_program_popup_until_ms = 0U;
 static bool s_program_popup_running_seen = false;
 static uint32_t s_program_end_effect_until_ms = 0U;
+static bool s_program_end_message_shown = false;  /* [C] Evita la riapertura del popup al rientro da ADS */
+static bool s_program_end_nav_pending = false;
+static bool s_program_end_nav_to_ads = false;
+static bool s_program_end_nav_to_main = false;
 
 static prog_btn_ud_t s_prog_ud[PROG_COUNT];
 
@@ -142,6 +146,8 @@ static bool s_btn_last_prefine[PROG_COUNT] = {0};
 static bool s_btn_state_valid[PROG_COUNT] = {0};
 static bool s_prog_suspended[PROG_COUNT] = {0};
 static fsm_state_t s_last_fsm_state = FSM_STATE_IDLE;  /* Track last FSM state for credit reset */
+static fsm_ctx_t s_prev_panel_snap = {0};  /* [C] Snapshot precedente usato dal timer pannello */
+static bool s_prev_panel_snap_valid = false;
 static uint32_t s_last_user_interaction_ms = 0;
 static uint32_t s_last_ads_disabled_log_ms = 0;
 static uint32_t s_last_program_timeout_log_ms = 0;
@@ -180,6 +186,7 @@ static void hide_program_end_effect(void)
     }
     lv_obj_add_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
     s_program_end_effect_until_ms = 0U;
+    s_program_end_message_shown = false;
 }
 
 static void show_program_end_effect(int32_t residual_credit)
@@ -583,11 +590,17 @@ static bool program_is_clickable_for_snapshot(const web_ui_program_entry_t *entr
         return false;
     }
 
+    /* [C] Il programma attivo deve restare sempre cliccabile per pausa/ripresa. */
+    if (program_is_active_for_snapshot(entry, snap)) {
+        return true;
+    }
+
     if (snap->state == FSM_STATE_RUNNING || snap->state == FSM_STATE_PAUSED) {
-        if (snap->running_price_units <= 0) {
+        int32_t effective_credit = panel_effective_credit_cents(snap);
+        if (effective_credit <= 0) {
             return false;
         }
-        return ((int32_t)entry->price_units <= snap->running_price_units);
+        return (effective_credit >= (int32_t)entry->price_units);
     }
 
     if (snap->state == FSM_STATE_CREDIT) {
@@ -638,6 +651,12 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
     {
         lv_obj_t *btn = s_prog_btns[i];
         if (!btn) continue;
+        if (!lv_obj_is_valid(btn)) {
+            s_prog_btns[i] = NULL;
+            s_prog_lbls[i] = NULL;
+            s_btn_state_valid[i] = false;
+            continue;
+        }
 
         const web_ui_program_entry_t *entry = find_program_entry((uint8_t)(i + 1));
 
@@ -653,7 +672,9 @@ static void refresh_prog_buttons(const fsm_ctx_t *snap)
             s_btn_last_prefine[i] != prefine_active)
         {
             lv_color_t btn_color;
-            if (prefine_active) {
+            if (prefine_active && !can_click) {
+                btn_color = COL_PROG_DIS;
+            } else if (prefine_active) {
                 btn_color = COL_TIMER_WARN;
             } else if (is_paused) {
                 btn_color = COL_PROG_PAUSED_BG;
@@ -1009,6 +1030,9 @@ static void update_state(const fsm_ctx_t *snap)
 
     /* [C] Gestione pulsante ESCI (opzionale, azzera VCD) */
     if (s_exit_btn) {
+        if (!lv_obj_is_valid(s_exit_btn)) {
+            s_exit_btn = NULL;
+        } else {
         const device_config_t *cfg = device_config_get();
         bool exit_enabled = cfg && cfg->timeouts.allow_exit_programs_clears_vcd;
         bool vcd_present = (snap->vcd_coins > 0 || snap->vcd_cents_residual > 0);
@@ -1020,6 +1044,7 @@ static void update_state(const fsm_ctx_t *snap)
         } else {
             lv_obj_add_flag(s_exit_btn, LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_flag(s_exit_btn, LV_OBJ_FLAG_CLICKABLE);
+        }
         }
     }
 
@@ -1331,6 +1356,14 @@ static void on_stop_btn(lv_event_t *e)
         }
 
         s_stop_pressed = true;
+
+        if (has_snap) {
+            /* [C] Su STOP manuale il messaggio MDR deve apparire sempre, anche se il flag anti-duplicazione era rimasto attivo. */
+            show_program_end_effect(panel_effective_credit_cents(&snap));
+            s_program_end_message_shown = true;
+            ESP_LOGI(TAG, "[C] MDR mostrato su STOP manuale (credito=%ld)",
+                     (long)panel_effective_credit_cents(&snap));
+        }
         
         /* [M] Invia STOP IMMEDIATO (aux_u32=0 per stop immediato, non a fine ciclo) */
         /* [M] Il popup di ringraziamento verrà mostrato dal ciclo UI quando vede la transizione RUNNING->CREDIT */
@@ -1929,6 +1962,9 @@ static void panel_timer_cb(lv_timer_t *t)
     {
         uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
         device_config_t *cfg = device_config_get();
+        bool mdr_active = (s_program_end_effect_until_ms > 0U) &&
+                          s_program_end_overlay &&
+                          !lv_obj_has_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
 
         if (snap.state == FSM_STATE_CREDIT) {
             uint32_t idle_ms = snap.inactivity_ms;
@@ -1952,7 +1988,7 @@ static void panel_timer_cb(lv_timer_t *t)
                 s_last_program_timeout_log_ms = now_ms;
             }
 
-            if (idle_ms >= idle_to_ads_ms) {
+            if (!mdr_active && idle_ms >= idle_to_ads_ms) {
                 // Verifica se ADS è abilitato prima di tornare alla slideshow
                 bool ads_enabled = cfg ? cfg->display.ads_enabled : snap.ads_enabled;
                 if (ads_enabled) {
@@ -1970,12 +2006,33 @@ static void panel_timer_cb(lv_timer_t *t)
 
         /* [C] Auto-restart: se il programma termina e c'è credito sufficiente,
            ripubblica la selezione dello stesso programma (salvo STOP manuale). */
-        static fsm_ctx_t last_snap = {0};
-        bool was_running = (last_snap.state == FSM_STATE_RUNNING || last_snap.state == FSM_STATE_PAUSED);
-        bool is_now_idle = (snap.state == FSM_STATE_CREDIT);
+        bool was_running = s_prev_panel_snap_valid &&
+                   (s_prev_panel_snap.state == FSM_STATE_RUNNING || s_prev_panel_snap.state == FSM_STATE_PAUSED);
+        bool is_now_program_state = (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED);
+        bool session_ended = was_running && !is_now_program_state;
+        bool is_now_credit = (snap.state == FSM_STATE_CREDIT);
 
-        if (was_running && is_now_idle) {
-            show_program_end_effect(panel_effective_credit_cents(&snap));
+        if (session_ended) {
+            if (!s_program_end_message_shown) {
+                show_program_end_effect(panel_effective_credit_cents(&snap));
+                s_program_end_message_shown = true;
+                ESP_LOGI(TAG,
+                         "[C] MDR mostrato a fine sessione programma (prev=%d now=%d credito=%ld)",
+                         (int)s_prev_panel_snap.state,
+                         (int)snap.state,
+                         (long)panel_effective_credit_cents(&snap));
+            }
+
+            if (snap.state == FSM_STATE_ADS) {
+                s_program_end_nav_pending = true;
+                s_program_end_nav_to_ads = true;
+                s_program_end_nav_to_main = false;
+            } else if (snap.state == FSM_STATE_IDLE) {
+                bool ads_enabled = cfg ? cfg->display.ads_enabled : snap.ads_enabled;
+                s_program_end_nav_pending = true;
+                s_program_end_nav_to_ads = ads_enabled;
+                s_program_end_nav_to_main = !ads_enabled;
+            }
             
             /* [M] Forza il refresh del credito resettando il cache quando il programma termina */
             s_last_credit_text[0] = '\0';
@@ -1987,7 +2044,27 @@ static void panel_timer_cb(lv_timer_t *t)
                                  !lv_obj_has_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
         int32_t effective_credit_cents = panel_effective_credit_cents(&snap);
 
-        if (was_running && is_now_idle && s_active_prog > 0 && !s_stop_pressed && !s_stop_confirm && effective_credit_cents > 0 && !end_effect_active)
+        if (s_program_end_nav_pending && !end_effect_active) {
+            bool go_ads = s_program_end_nav_to_ads;
+            bool go_main = s_program_end_nav_to_main;
+            s_program_end_nav_pending = false;
+            s_program_end_nav_to_ads = false;
+            s_program_end_nav_to_main = false;
+
+            if (go_ads) {
+                ESP_LOGI(TAG, "[C] Richiesta ADS eseguita alla chiusura MDR");
+                lvgl_page_ads_show();
+                return;
+            }
+
+            if (go_main) {
+                ESP_LOGI(TAG, "[C] Richiesta Main eseguita alla chiusura MDR");
+                lvgl_page_main_show();
+                return;
+            }
+        }
+
+        if (was_running && is_now_credit && s_active_prog > 0 && !s_stop_pressed && !s_stop_confirm && effective_credit_cents > 0 && !end_effect_active)
         {
             const web_ui_program_entry_t *entry = find_program_entry(s_active_prog);
             if (entry && entry->enabled && effective_credit_cents >= (int32_t)entry->price_units) {
@@ -2017,8 +2094,13 @@ static void panel_timer_cb(lv_timer_t *t)
             ESP_LOGI(TAG, "[C] Ripristino stato STOP dopo ripresa programma");
         }
 
+        if (s_last_fsm_state == FSM_STATE_CREDIT && snap.state != FSM_STATE_CREDIT) {
+            s_program_end_message_shown = false;
+        }
+
         s_last_fsm_state = snap.state;
-        last_snap = snap;
+        s_prev_panel_snap = snap;
+        s_prev_panel_snap_valid = true;
 
         const mdb_status_t *mdb_status = mdb_get_status();
         bool mdb_online = mdb_status && mdb_status->coin.is_online;
@@ -2053,6 +2135,10 @@ void lvgl_page_main_deactivate(void)
 
     clear_panel_handles();
     s_active_prog = 0;
+    s_prev_panel_snap_valid = false;
+    s_program_end_nav_pending = false;
+    s_program_end_nav_to_ads = false;
+    s_program_end_nav_to_main = false;
 }
 
 /** @brief Mostra la pagina principale dell'interfaccia grafica LVGL.
@@ -2143,6 +2229,11 @@ void lvgl_page_main_show(void)
     s_last_pause_text[0] = '\0';
     s_last_residual_credit_text[0] = '\0';
     s_last_gauge_pct = -1;
+    s_program_end_message_shown = false;
+    s_program_end_nav_pending = false;
+    s_program_end_nav_to_ads = false;
+    s_program_end_nav_to_main = false;
+    s_prev_panel_snap_valid = false;
     invalidate_program_label_cache();
     ESP_LOGI(TAG, "[C] lvgl_page_main_show: cache etichette resettato");
 
@@ -2151,6 +2242,8 @@ void lvgl_page_main_show(void)
     {
         update_state(&snap);
         refresh_prog_buttons(&snap);
+        s_prev_panel_snap = snap;
+        s_prev_panel_snap_valid = true;
     }
 
     /* Log finale con riepilogo dei pulsanti creati */

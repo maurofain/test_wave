@@ -139,7 +139,7 @@
     normalizeRequestedTitles(sections);
 
     var patterns = [
-      ['identita dispositivo', 'identita'],
+      ['configurazione dispositivo', 'identita dispositivo', 'identita'],
       ['password boot/emulatore', 'password emulatore'],
       ['periferiche hardware', 'periferiche'],
       ['ethernet'],

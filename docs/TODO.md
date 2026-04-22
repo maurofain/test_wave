@@ -66,9 +66,23 @@
 17. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
 18. Permangono del glimps sullo schermo MIPI
 19. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
-20. manca la vode FTP nello Stato Servizi
-21.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' conun altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 al 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2. L'aggiornamento dei dati va fatto alla lettura del sensore SHT40. Va rimosso il task PWM dall'elenco dei task in quanto gestito insieme a SHT40. in /testuniamo  la sezione 'Sensore SHT40' e 'PWM' rinominandola 'SHT40 / PWM',mantenuiamo la visualizzazione di temperaturasportiamo i controlli ora in 'PWM' aggiungerndo uno switch  AUTO/MANUAL che su AUTO disabilita tutti i comandi PWM e su MANUAL permette di testare i canali PWM
-22.  Togliamo 'test loopback' e 'invia stringa' da /test -> MDB
+20. manca la voce FTP nello Stato Servizi : mettila dopo NTP e riorganizza la griglia 
+21.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' con un altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 al 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2. L'aggiornamento dei dati va fatto alla lettura del sensore SHT40. Va rimosso il task PWM dall'elenco dei task in quanto gestito insieme a SHT40. in /testuniamo  la sezione 'Sensore SHT40' e 'PWM' rinominandola 'SHT40 / PWM',mantenuiamo la visualizzazione di temperaturasportiamo i controlli ora in 'PWM' aggiungerndo uno switch  AUTO/MANUAL che su AUTO disabilita tutti i comandi PWM e su MANUAL permette di testare i canali PWM
+23.  va implemetato un nuovo device associato alla porta RS232 che è il display epaper utilizzato in alternativa al dispaly touch e descritto in /home/mauro/1P/MicroHard/test_epaper_bw . Va letto il documento /home/mauro/1P/MicroHard/test_epaper_bw/TODO.md dal punto 5 al punto 9 e vanno creati gli eventi da gestire tramnte la FSM principale per gestire questa interfaccia al posto del diasplay touch. Va creato il DNA per questo device verificando che sia disattivato (0) solo se il DNA di TOUCHSCREEN è attivo (1), con priorità a TOUCHCREEN. Verrà creato un documento Epaper_logic.md con la descrizione di come integrare il nuovo pannello nel flusso.
+24.  mostra in questo format tutti gli ingressi e le uscite di credito :
+[0;32mI (41869) FSM_MB: [M] ╔════════════════════════════════════════════╗[0m
+[0;32mI (41889) FSM_MB: [M] ║ CREDITI RICEVUTI - PAGAMENTO               ║[0m
+[0;32mI (41889) FSM_MB: [M] ║ Importo: 4700 cent                         ║[0m
+[0;32mI (41899) FSM_MB: [M] ║ ECD dopo: 0 | VCD dopo: 47                 ║[0m
+[0;32mI (41909) FSM_MB: [M] ║ Credito totale: 47 coin                    ║[0m
+[0;32mI (41909) FSM_MB: [M] ╚════════════════════════════════════════════╝[0m
+25. la gettoniera non va mai disabilitata . se esiste un credito 
+  - Va inibito MDB se si è ricevuto VDC da QRCODE e riattivato quando viene sottratto l'ultimo credito QRCODE
+  - Va inibito QRCODE se si è ricevuto VDC dallo MDB e riattivato quando viene sottratto l'ultimo credito MDB
+26. MDR va sempre mostrato al termine della sessione , sia che avvenga per fine del credito che per interruzione forzata con STOP
+27. nell pagine /test aggiungiamo una sezione Audio dove mettiamo un controllo di volume e un tasto per riprodurre il messaggio in SPIFFS /audio/test.wav
+28. 
+
 
 
 ---

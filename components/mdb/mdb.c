@@ -48,6 +48,9 @@ static mdb_status_t s_mdb_status = {0};
 static uint8_t s_coin_setup_retries = 0;
 static uint8_t s_cashless_reset_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static uint8_t s_cashless_setup_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static uint32_t s_cashless_idle_poll_timeout_count[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static uint32_t s_cashless_idle_poll_ack_only_count[MDB_CASHLESS_DEVICE_COUNT] = {0};
+static uint32_t s_cashless_idle_poll_error_count[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static bool s_mdb_driver_initialized = false;
 static bool s_mdb_init_failed = false;
 static bool s_mdb_runtime_fault = false;
@@ -210,6 +213,42 @@ void mdb_register_cashless_credit_callback(mdb_cashless_credit_callback_t callba
 void mdb_register_cashless_vend_callback(mdb_cashless_vend_callback_t callback)
 {
     s_mdb_cashless_vend_callback = callback;
+}
+
+static void mdb_cashless_log_idle_poll_diagnostics(size_t device_index,
+                                                   const mdb_cashless_device_t *device)
+{
+    if (!device || device_index >= MDB_CASHLESS_DEVICE_COUNT) {
+        return;
+    }
+
+    if (s_cashless_idle_poll_timeout_count[device_index] > 0U &&
+        (s_cashless_idle_poll_timeout_count[device_index] % 250U) == 0U) {
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_sm] dev=%u idle polling: %lu timeout consecutivi (addr=0x%02X state=%s present=%d session_open=%d)",
+                 (unsigned)device_index,
+                 (unsigned long)s_cashless_idle_poll_timeout_count[device_index],
+                 device->address,
+                 mdb_state_to_string(device->poll_state),
+                 device->present ? 1 : 0,
+                 device->session_open ? 1 : 0);
+    }
+
+    if (s_cashless_idle_poll_ack_only_count[device_index] > 0U &&
+        (s_cashless_idle_poll_ack_only_count[device_index] % 250U) == 0U) {
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_sm] dev=%u idle polling: %lu ACK consecutivi senza eventi TAG/sessione",
+                 (unsigned)device_index,
+                 (unsigned long)s_cashless_idle_poll_ack_only_count[device_index]);
+    }
+
+    if (s_cashless_idle_poll_error_count[device_index] > 0U &&
+        (s_cashless_idle_poll_error_count[device_index] % 100U) == 0U) {
+        ESP_LOGW(TAG_CASH,
+                 "[C] [mdb_cashless_sm] dev=%u idle polling: %lu errori consecutivi non-timeout",
+                 (unsigned)device_index,
+                 (unsigned long)s_cashless_idle_poll_error_count[device_index]);
+    }
 }
 
 bool mdb_cashless_request_program_vend(uint16_t amount_cents, uint16_t item_number)
@@ -806,6 +845,9 @@ static void mdb_cashless_sm(size_t device_index)
             s_cashless_reset_retries[device_index] = 0;
             s_cashless_setup_retries[device_index] = 0;
             device_rw->last_response_code = 0;
+            s_cashless_idle_poll_timeout_count[device_index] = 0;
+            s_cashless_idle_poll_ack_only_count[device_index] = 0;
+            s_cashless_idle_poll_error_count[device_index] = 0;
             device_rw->poll_state = MDB_STATE_INIT_RESET;
             break;
 
@@ -1123,6 +1165,27 @@ static void mdb_cashless_sm(size_t device_index)
                 if (!(rx_len == 1U && rx[0] == MDB_ACK)) {
                     mdb_cashless_handle_poll_response(device_index, rx, rx_len);
                 }
+
+                if (parsed_response) {
+                    s_cashless_idle_poll_timeout_count[device_index] = 0;
+                    s_cashless_idle_poll_ack_only_count[device_index] = 0;
+                    s_cashless_idle_poll_error_count[device_index] = 0;
+                } else {
+                    s_cashless_idle_poll_timeout_count[device_index] = 0;
+                    s_cashless_idle_poll_ack_only_count[device_index]++;
+                    s_cashless_idle_poll_error_count[device_index] = 0;
+                    mdb_cashless_log_idle_poll_diagnostics(device_index, device);
+                }
+            } else if (ret == ESP_ERR_TIMEOUT) {
+                s_cashless_idle_poll_timeout_count[device_index]++;
+                s_cashless_idle_poll_ack_only_count[device_index] = 0;
+                s_cashless_idle_poll_error_count[device_index] = 0;
+                mdb_cashless_log_idle_poll_diagnostics(device_index, device);
+            } else {
+                s_cashless_idle_poll_timeout_count[device_index] = 0;
+                s_cashless_idle_poll_ack_only_count[device_index] = 0;
+                s_cashless_idle_poll_error_count[device_index]++;
+                mdb_cashless_log_idle_poll_diagnostics(device_index, device);
             }
             break;
 
@@ -1167,6 +1230,8 @@ static void mdb_cashless_sm(size_t device_index)
  */
 void mdb_engine_run(void *arg) {
     TickType_t period_ticks = pdMS_TO_TICKS(20);
+    TickType_t heartbeat_ticks = pdMS_TO_TICKS(5000);
+    TickType_t last_heartbeat = xTaskGetTickCount();
 
     if (arg) {
         TickType_t configured_ticks = (TickType_t)(uintptr_t)arg;
@@ -1183,6 +1248,30 @@ void mdb_engine_run(void *arg) {
         }
         mdb_cashless_dispatch_pending_credit();
         mdb_cashless_dispatch_pending_vend();
+
+        {
+            TickType_t now_ticks = xTaskGetTickCount();
+            if ((now_ticks - last_heartbeat) >= heartbeat_ticks) {
+                const mdb_cashless_device_t *dev0 = NULL;
+                last_heartbeat = now_ticks;
+                if (mdb_cashless_get_device_count() > 0U) {
+                    dev0 = mdb_cashless_get_device(0);
+                }
+
+                if (dev0) {
+                    ESP_LOGI(TAG_ENGINE,
+                             "[C] [mdb_engine_run] hb dev0 state=%s present=%d session_open=%d last_resp=0x%02X credit=%u",
+                             mdb_state_to_string(dev0->poll_state),
+                             dev0->present ? 1 : 0,
+                             dev0->session_open ? 1 : 0,
+                             dev0->last_response_code,
+                             (unsigned)dev0->credit_cents);
+                } else {
+                    ESP_LOGI(TAG_ENGINE, "[C] [mdb_engine_run] hb nessun device cashless registrato");
+                }
+            }
+        }
+
         // mdb_bill_sm(); // futuro
         vTaskDelay((period_ticks > 0) ? period_ticks : 1);
     }

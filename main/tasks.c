@@ -8,6 +8,7 @@
 #include "digital_io.h"
 #include "audio_player.h"
 #include "sht40.h"
+#include "pwm.h"
 #include "esp_lcd_touch.h"
 #include "web_ui.h"
 #include "web_ui_programs.h"
@@ -276,7 +277,7 @@ static bool tasks_probe_modbus_bootstrap(const device_config_t *cfg)
         input_count = MODBUS_RELAY_MAX_POINTS;
     }
 
-    ESP_LOGI(TAG,
+    ESP_LOGD(TAG,
              "[M] Health Modbus probe: slave=%u relay_count=%u input_count=%u",
              (unsigned)cfg->modbus.slave_id,
              (unsigned)relay_count,
@@ -290,7 +291,7 @@ static bool tasks_probe_modbus_bootstrap(const device_config_t *cfg)
                                     sizeof(bits)) != ESP_OK) {
             goto done;
         }
-        ESP_LOGI(TAG,
+        ESP_LOGD(TAG,
                  "[M] Health Modbus lettura relay OK (start=%u count=%u)",
                  (unsigned)cfg->modbus.relay_start,
                  (unsigned)relay_count);
@@ -304,7 +305,7 @@ static bool tasks_probe_modbus_bootstrap(const device_config_t *cfg)
                                               sizeof(bits)) != ESP_OK) {
             goto done;
         }
-        ESP_LOGI(TAG,
+        ESP_LOGD(TAG,
                  "[M] Health Modbus lettura input OK (start=%u count=%u)",
                  (unsigned)cfg->modbus.input_start,
                  (unsigned)input_count);
@@ -618,6 +619,9 @@ esp_err_t tasks_publish_program_button_action(uint8_t program_id, agn_id_t sende
     bool is_active_program = is_running_or_paused &&
                              entry->name[0] != '\0' &&
                              strcmp(entry->name, snap.running_program_name) == 0;
+    int32_t effective_credit = (snap.credit_cents > 0)
+                                   ? snap.credit_cents
+                                   : (snap.ecd_coins + snap.vcd_coins);
 
     if (is_active_program) {
         event.action = ACTION_ID_PROGRAM_PAUSE_TOGGLE;
@@ -627,8 +631,8 @@ esp_err_t tasks_publish_program_button_action(uint8_t program_id, agn_id_t sende
         if (snap.state != FSM_STATE_CREDIT && !is_running_or_paused) {
             return TASKS_ERR_PROGRAM_STATE_CONFLICT;
         }
-        if (snap.state == FSM_STATE_CREDIT &&
-            snap.credit_cents < (int32_t)entry->price_units) {
+        if ((snap.state == FSM_STATE_CREDIT || is_running_or_paused) &&
+            effective_credit < (int32_t)entry->price_units) {
             return TASKS_ERR_PROGRAM_CREDIT_INSUFFICIENT;
         }
 
@@ -1847,6 +1851,32 @@ static void sht40_task(void *arg)
                 s_temperature = t;
                 s_humidity = h;
                 ESP_LOGD(TAG, "SHT40: T=%.1f C, RH=%.1f %%", t, h);
+
+                const device_config_t *cfg = device_config_get();
+                bool pwm1_active = false;
+                bool pwm2_active = false;
+
+                if (h > cfg->sensors.pwm1_humidity_threshold) {
+                    pwm1_active = cfg->sensors.pwm1_enabled;
+                    pwm2_active = cfg->sensors.pwm2_enabled;
+                } else {
+                    if (cfg->sensors.pwm2_enabled) {
+                        if (t >= cfg->sensors.pwm2_fan_threshold || t < cfg->sensors.pwm1_heater_threshold) {
+                            pwm2_active = true;
+                        }
+                    }
+                }
+
+                if (cfg->sensors.pwm1_enabled) {
+                    pwm_set_duty(0, pwm1_active ? 100 : 0);
+                } else {
+                    pwm_set_duty(0, 0);
+                }
+                if (cfg->sensors.pwm2_enabled) {
+                    pwm_set_duty(1, pwm2_active ? 100 : 0);
+                } else {
+                    pwm_set_duty(1, 0);
+                }
             }
         }
         vTaskDelayUntil(&last_wake, param->period_ticks);
@@ -2028,24 +2058,6 @@ static void rs485_task(void *arg)
  * @param arg Puntatore a dati aggiuntivi passati al task.
  */
 static void mdb_task(void *arg)
-{
-    task_param_t *param = (task_param_t *)arg;
-    TickType_t last_wake = xTaskGetTickCount();
-    while (true) {
-        vTaskDelayUntil(&last_wake, param->period_ticks);
-    }
-}
-
-
-/**
- * @brief Gestisce il task PWM.
- * 
- * Questa funzione viene eseguita come task e si occupa di gestire il controllo PWM.
- * 
- * @param arg Puntatore a dati di input utilizzati dal task.
- * @return Nessun valore di ritorno.
- */
-static void pwm_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
     TickType_t last_wake = xTaskGetTickCount();
@@ -2315,7 +2327,9 @@ static void fsm_task(void *arg)
             (fsm.state == FSM_STATE_RUNNING || fsm.state == FSM_STATE_PAUSED);
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->sensors.cctalk_enabled) {
-            bool cctalk_stop_needed = vcd_locked_session || active_program_session;
+            /* [M] La gettoniera CCtalk deve rimanere attiva durante RUN/PAUSE.
+               La disabilitiamo solo in sessione VCD bloccata. */
+            bool cctalk_stop_needed = vcd_locked_session;
 
             if (cctalk_stop_needed && !cctalk_forced_stop_for_vcd && !cctalk_forced_stop_for_program) {
                 if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_STOP)) {
@@ -2327,16 +2341,16 @@ static void fsm_task(void *arg)
                         ESP_LOGI(TAG, "[M] Gettoniera CCTALK disabilitata durante sessione VCD");
                     }
                 } else {
-                    ESP_LOGW(TAG, "[M] Richiesta stop gettoniera CCTALK non pubblicata (sessione VCD o programma attivo)");
+                    ESP_LOGW(TAG, "[M] Richiesta stop gettoniera CCTALK non pubblicata (sessione VCD)");
                 }
             } else if (!cctalk_stop_needed && (cctalk_forced_stop_for_vcd || cctalk_forced_stop_for_program) &&
                        (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
                 if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_START)) {
                     cctalk_forced_stop_for_vcd = false;
                     cctalk_forced_stop_for_program = false;
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo fine programma/sessione VCD");
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo sessione VCD");
                 } else {
-                    ESP_LOGW(TAG, "[M] Richiesta start gettoniera CCTALK non pubblicata (fine programma/sessione VCD)");
+                    ESP_LOGW(TAG, "[M] Richiesta start gettoniera CCTALK non pubblicata (sessione VCD)");
                 }
             }
         } else {
@@ -2464,7 +2478,15 @@ static void fsm_task(void *arg)
         }
 
         if ((state_before != fsm.state) && cfg && cfg->display.enabled) {
-            if (fsm.state == FSM_STATE_ADS) {
+            bool defer_page_switch_after_program_end =
+                ((state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) &&
+                 (fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE));
+
+            if (defer_page_switch_after_program_end) {
+                ESP_LOGI(TAG,
+                         "[M] Rimando cambio pagina LVGL (%s) per mostrare MDR a fine ciclo",
+                         (fsm.state == FSM_STATE_ADS) ? "ADS" : "IDLE");
+            } else if (fsm.state == FSM_STATE_ADS) {
                 lvgl_panel_show_ads_page();
             } else if (fsm.state == FSM_STATE_IDLE) {
                 if (cfg->display.ads_enabled) {
@@ -2474,9 +2496,7 @@ static void fsm_task(void *arg)
                 }
             } else if (fsm.state == FSM_STATE_CREDIT &&
                        (state_before == FSM_STATE_ADS ||
-                        state_before == FSM_STATE_OUT_OF_SERVICE ||
-                        state_before == FSM_STATE_RUNNING ||
-                        state_before == FSM_STATE_PAUSED)) {
+                        state_before == FSM_STATE_OUT_OF_SERVICE)) {
                 lvgl_panel_show_main_page();
             } else if (fsm.state == FSM_STATE_OUT_OF_SERVICE) {
                 const char *agent_name = tasks_agent_name((agn_id_t)fsm.out_of_service_agent);
@@ -3445,18 +3465,6 @@ static task_param_t s_tasks[] = {
         .period_ticks = pdMS_TO_TICKS(10),
         .task_fn = mdb_task,
         .stack_words = 4096,                  /* RISC-V: 4KB; skeleton con margine */
-        .stack_caps = MALLOC_CAP_SPIRAM,
-        .arg = NULL,
-        .handle = NULL,
-    },
-    {
-        .name = "pwm",
-        .state = TASK_STATE_IDLE,
-        .priority = 4,
-        .core_id = 0,
-        .period_ticks = pdMS_TO_TICKS(20),
-        .task_fn = pwm_task,
-        .stack_words = 2048,                  /* RISC-V: StackType_t=1B; ~2KB reali */
         .stack_caps = MALLOC_CAP_SPIRAM,
         .arg = NULL,
         .handle = NULL,

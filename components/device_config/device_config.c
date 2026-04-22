@@ -1011,7 +1011,10 @@ static void _set_defaults(device_config_t *config)
     config->sensors.cctalk_enabled = true; /* CCtalk enabled by default */
     config->sensors.eeprom_enabled = true;
     config->sensors.pwm1_enabled = true;
+    config->sensors.pwm1_heater_threshold = -100;
+    config->sensors.pwm1_humidity_threshold = 100;
     config->sensors.pwm2_enabled = true;
+    config->sensors.pwm2_fan_threshold = 100;
     config->sensors.sd_card_enabled = true;
 
     // Default MDB: nel progetto MicroHard la gettoniera lavora su CCTalk,
@@ -1701,11 +1704,28 @@ esp_err_t device_config_load(device_config_t *config)
                         "pwm1_enabled",
                         config->sensors.pwm1_enabled);
 
+                    int tmp_int = 0;
+                    if (_json_read_int(sensors_obj, "pwm1_heater_threshold", "heater", &tmp_int)) {
+                        if (tmp_int < -100) tmp_int = -100;
+                        if (tmp_int > 100) tmp_int = 100;
+                        config->sensors.pwm1_heater_threshold = (int8_t)tmp_int;
+                    }
+                    if (_json_read_int(sensors_obj, "pwm1_humidity_threshold", "humid", &tmp_int)) {
+                        if (tmp_int < 0) tmp_int = 0;
+                        if (tmp_int > 100) tmp_int = 100;
+                        config->sensors.pwm1_humidity_threshold = (uint8_t)tmp_int;
+                    }
+
                     config->sensors.pwm2_enabled = _json_read_bool(
                         sensors_obj,
                         "pwm2",
                         "pwm2_enabled",
                         config->sensors.pwm2_enabled);
+                    if (_json_read_int(sensors_obj, "pwm2_fan_threshold", "fan", &tmp_int)) {
+                        if (tmp_int < 0) tmp_int = 0;
+                        if (tmp_int > 100) tmp_int = 100;
+                        config->sensors.pwm2_fan_threshold = (uint8_t)tmp_int;
+                    }
 
                     config->sensors.sd_card_enabled = _json_read_bool(
                         sensors_obj,
@@ -2131,7 +2151,10 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddBoolToObject(sensors_obj, "cctalk_enabled", config->sensors.cctalk_enabled);
     cJSON_AddBoolToObject(sensors_obj, "eeprom_enabled", config->sensors.eeprom_enabled);
     cJSON_AddBoolToObject(sensors_obj, "pwm1_enabled", config->sensors.pwm1_enabled);
+    cJSON_AddNumberToObject(sensors_obj, "pwm1_heater_threshold", config->sensors.pwm1_heater_threshold);
+    cJSON_AddNumberToObject(sensors_obj, "pwm1_humidity_threshold", config->sensors.pwm1_humidity_threshold);
     cJSON_AddBoolToObject(sensors_obj, "pwm2_enabled", config->sensors.pwm2_enabled);
+    cJSON_AddNumberToObject(sensors_obj, "pwm2_fan_threshold", config->sensors.pwm2_fan_threshold);
     cJSON_AddBoolToObject(sensors_obj, "sd_card_enabled", config->sensors.sd_card_enabled);
     cJSON_AddItemToObject(root, "sensors", sensors_obj);
 

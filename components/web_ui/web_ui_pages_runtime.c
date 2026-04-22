@@ -13,6 +13,8 @@
 #include "http_services.h"
 #include "modbus_relay.h"
 #include "usb_cdc_scanner.h"
+#include "pwm.h"
+#include "pwm.h"
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -109,6 +111,9 @@ esp_err_t status_get_handler(httpd_req_t *req)
     char board_time_str[32];
     strftime(board_time_str, sizeof(board_time_str), "%Y-%m-%d %H:%M:%S", &board_tm);
 
+    int pwm1_duty = pwm_get_duty(0);
+    int pwm2_duty = pwm_get_duty(1);
+
     const size_t resp_cap = 5120;
     char *resp = malloc(resp_cap);
     if (!resp) {
@@ -135,8 +140,7 @@ esp_err_t status_get_handler(httpd_req_t *req)
                  "\"io_expander\":%d,\"led_strip\":%d,\"rs232\":%d,\"rs485\":%d,\"mdb\":%d,"
                  "\"temperature\":%d,\"cctalk\":%d,\"sd_card\":%d,\"eeprom\":%d,"
                  "\"pwm1\":%d,\"pwm2\":%d,\"remote_logging\":%d"
-             "},"
-             "\"cctalk\":{\"enabled\":%s,\"online\":%s,\"status\":\"%s\"},"
+             "},"             "\"pwm\":{\"pwm1_duty\":%d,\"pwm2_duty\":%d},"             "\"cctalk\":{\"enabled\":%s,\"online\":%s,\"status\":\"%s\"},"
              "\"scanner\":{\"enabled\":%s,\"connected\":%s,\"status\":\"%s\"},"
              "\"audio\":{\"enabled\":%s,\"playing\":%s,\"status\":\"%s\"},"
              "\"board_time\":\"%s\","
@@ -176,6 +180,7 @@ esp_err_t status_get_handler(httpd_req_t *req)
              cfg->sensors.io_expander_enabled, cfg->sensors.led_enabled, cfg->sensors.rs232_enabled, cfg->sensors.rs485_enabled, cfg->sensors.mdb_enabled,
              cfg->sensors.temperature_enabled, cfg->sensors.cctalk_enabled, cfg->sensors.sd_card_enabled, cfg->sensors.eeprom_enabled,
              cfg->sensors.pwm1_enabled, cfg->sensors.pwm2_enabled, cfg->remote_log.use_broadcast,
+             pwm1_duty, pwm2_duty,
              cfg->sensors.cctalk_enabled ? "true" : "false",
              cctalk_driver_is_acceptor_online() ? "true" : "false",
              device_component_status_to_string(cctalk_component_status),

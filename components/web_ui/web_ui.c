@@ -2263,8 +2263,32 @@ esp_err_t api_config_save(httpd_req_t *req)
         }
         cfg->sensors.pwm1_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1")) ||
             cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm1_enabled")); /* compat */
+        cJSON *pwm1_heater = cJSON_GetObjectItem(sensors_obj, "pwm1_heater_threshold");
+        if (!pwm1_heater) pwm1_heater = cJSON_GetObjectItem(sensors_obj, "heater"); /* compat */
+        if (pwm1_heater && cJSON_IsNumber(pwm1_heater)) {
+            int val = pwm1_heater->valueint;
+            if (val < -100) val = -100;
+            if (val > 100) val = 100;
+            cfg->sensors.pwm1_heater_threshold = (int8_t)val;
+        }
+        cJSON *pwm1_humid = cJSON_GetObjectItem(sensors_obj, "pwm1_humidity_threshold");
+        if (!pwm1_humid) pwm1_humid = cJSON_GetObjectItem(sensors_obj, "humid"); /* compat */
+        if (pwm1_humid && cJSON_IsNumber(pwm1_humid)) {
+            int val = pwm1_humid->valueint;
+            if (val < 0) val = 0;
+            if (val > 100) val = 100;
+            cfg->sensors.pwm1_humidity_threshold = (uint8_t)val;
+        }
         cfg->sensors.pwm2_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2")) ||
             cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "pwm2_enabled")); /* compat */
+        cJSON *pwm2_fan = cJSON_GetObjectItem(sensors_obj, "pwm2_fan_threshold");
+        if (!pwm2_fan) pwm2_fan = cJSON_GetObjectItem(sensors_obj, "fan"); /* compat */
+        if (pwm2_fan && cJSON_IsNumber(pwm2_fan)) {
+            int val = pwm2_fan->valueint;
+            if (val < 0) val = 0;
+            if (val > 100) val = 100;
+            cfg->sensors.pwm2_fan_threshold = (uint8_t)val;
+        }
         cfg->sensors.sd_card_enabled = cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd")) ||
             cJSON_IsTrue(cJSON_GetObjectItem(sensors_obj, "sd_card_enabled")); /* compat */
 

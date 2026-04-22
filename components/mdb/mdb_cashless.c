@@ -325,6 +325,9 @@ static void mdb_cashless_finalize_session_close(size_t device_index,
     device->request_price_cents = 0U;
     device->approved_price_cents = 0U;
     device->vend_result_cents = 0U;
+    device->credit_cents = 0U;
+    device->last_synced_credit_cents = 0U;
+    device->credit_sync_pending = false;
     device->vend_success_requested = false;
     device->session_complete_requested = false;
     device->last_response_code = MDB_CASHLESS_RESP_END_SESSION;
@@ -416,7 +419,10 @@ bool mdb_cashless_handle_poll_response(size_t device_index, const uint8_t *data,
             MDB_VEND_STATUS previous_vend_status = device->vend_status;
             mdb_cashless_session_state_t previous_session_state = device->session_state;
 
-            device->session_open = true;
+            /* Il lettore ha segnalato rimozione TAG: chiudiamo subito la sessione locale
+             * per evitare stato "aperto" residuo con credito stale (es. 4700) e
+             * consentire la successiva begin_session come nuova sincronizzazione credito. */
+            device->session_open = false;
             device->session_state = MDB_CASHLESS_SESSION_ENDING;
             device->session_complete_requested = true;
             device->vend_success_requested = false;

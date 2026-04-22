@@ -3,6 +3,7 @@
 #include "esp_err.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // Forward declaration per evitare dipendenze circolari
 typedef struct cJSON cJSON;
@@ -69,7 +70,10 @@ typedef struct {
     bool cctalk_enabled;        ///< CCtalk (uses same UART as RS232)
     bool eeprom_enabled;        ///< EEPROM 24LC16 (visibilità UI/test)
     bool pwm1_enabled;          ///< PWM1
+    int8_t pwm1_heater_threshold;///< Soglia temperature Heater (-100..100)
+    uint8_t pwm1_humidity_threshold;///< Soglia umidità Humid (0..100)
     bool pwm2_enabled;          ///< PWM2
+    uint8_t pwm2_fan_threshold; ///< Soglia temperatura Fan (0..100)
     bool sd_card_enabled;       ///< SD Card
 } device_sensors_config_t;
 

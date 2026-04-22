@@ -20,7 +20,7 @@ extern bool send_http_log;
 #include <unistd.h>
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
-#define HTTP_SERVICES_LOG_TO_UI
+// #define HTTP_SERVICES_LOG_TO_UI
 
 /* web_ui_add_log is used only when HTTP_SERVICES_LOG_TO_UI is enabled; declare here to
    avoid adding a component dependency (web_ui already depends on http_services). */
@@ -1622,18 +1622,18 @@ static esp_err_t remote_post(const char *remote_path, const char *body, const ch
                       post_body);
         {
             /* log the Date value actually sent */
-            ESP_LOGI(TAG, "OUT Header: Date: %s", date_hdr);
+            ESP_LOGD(TAG, "OUT Header: Date: %s", date_hdr);
 #ifdef HTTP_SERVICES_LOG_TO_UI
             web_ui_add_log("INFO", TAG, date_hdr);
 #endif
         }
         if (hdr_authorization) {
-            ESP_LOGI(TAG, "OUT Header: Authorization: %s", hdr_authorization);
+            ESP_LOGD(TAG, "OUT Header: Authorization: %s", hdr_authorization);
             ESP_LOGI(TAG, "[C] OUT Authorization length=%u", (unsigned)strlen(hdr_authorization));
         }
-        ESP_LOGI(TAG, "OUT Header: Accept: %s", hdr_accept);
-        ESP_LOGI(TAG, "OUT Header: User-Agent: %s", hdr_user_agent);
-        ESP_LOGI(TAG, "OUT Header: Content-Type: %s", hdr_content_type);
+        ESP_LOGD(TAG, "OUT Header: Accept: %s", hdr_accept);
+        ESP_LOGD(TAG, "OUT Header: User-Agent: %s", hdr_user_agent);
+        ESP_LOGD(TAG, "OUT Header: Content-Type: %s", hdr_content_type);
 
 #ifdef HTTP_SERVICES_LOG_TO_UI
         if (hdr_authorization) webui_log_chunked("INFO", TAG, "OUT Authorization", hdr_authorization);

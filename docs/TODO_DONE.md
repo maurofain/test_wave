@@ -33,3 +33,8 @@
    - In standby visualizzare sequenza di immagini (da SPIFFS o SD)
    - Supporto formati JPEG; cambio immagine configurabile (intervallo in secondi)
    - Uscita dallo slideshow al primo evento (credito, touch, tasto)
+- [x] 22. Togliamo 'test loopback' e 'invia stringa' da /test -> MDB (sezione MDB già vuota, nulla da rimuovere)
+- [x] 24. Al termine del programma la app passa direttamente a ADS ma se poi si rientra nella pagina programmi da ADS il messaggio di ringraziamento non riappare più
+   - Aggiunto flag `s_program_end_message_shown` per tracciare se il messaggio è già stato mostrato
+   - Messaggio mostrato una sola volta per ciclo di programma
+   - Flag resettato quando: messaggio nascosto, pagina inizializzata, o stato cambia da CREDIT
