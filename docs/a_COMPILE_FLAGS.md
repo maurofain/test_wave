@@ -187,11 +187,15 @@ Questi simboli arrivano da `sdkconfig`/Kconfig e abilitano percorsi compilati co
 - `CONFIG_BSP_LCD_TYPE_720_1280_7_INCH_A`
 - `CONFIG_BSP_LCD_COLOR_FORMAT_RGB565`
 - `CONFIG_BSP_LCD_MIPI_DSI_LANE_BITRATE_MBPS`
+- `BSP_LCD_DRAW_BUFF_SIZE` (define BSP)
+- `BSP_LCD_DRAW_BUFF_DOUBLE` (define BSP)
 
 Impatto runtime associato:
 - per il pannello MIPI 7" A, `CONFIG_BSP_LCD_DPI_BUFFER_NUMS=2` consente al BSP di creare due framebuffer DPI completi, prerequisito per attivare l'anti-tearing LVGL;
 - `CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR=y` abilita nel porting LVGL-DSI la modalita di aggiornamento che evita tearing/glitch visibili durante refresh e animazioni;
 - `CONFIG_BSP_DISPLAY_LVGL_FULL_REFRESH=y` forza il buffer mode coerente con l'anti-tearing del BSP;
+- con anti-tearing attivo, il BSP usa un draw buffer LVGL piu ampio (`BSP_LCD_DRAW_BUFF_SIZE=1280*64`) per ridurre frammentazione dei flush su DSI;
+- con anti-tearing attivo, il BSP abilita il doppio draw buffer LVGL (`BSP_LCD_DRAW_BUFF_DOUBLE=1`) per limitare micro-glitch durante aggiornamenti rapidi;
 - il build corrente mantiene `RGB565` e lane bitrate MIPI a `1500 Mbps` lato Kconfig, mentre il BSP applica il mapping del pannello selezionato a runtime.
 
 Impatto runtime associato:

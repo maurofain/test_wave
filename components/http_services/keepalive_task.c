@@ -21,6 +21,31 @@ static uint32_t s_keepalive_count = 0;
 // Keepalive statistics
 static keepalive_stats_t s_stats = {0};
 
+/**
+ * @brief Restituisce un suggerimento sintetico per errori snapshot digital_io.
+ */
+static const char *keepalive_digital_io_err_hint(esp_err_t err)
+{
+    switch (err) {
+        case DIGITAL_IO_ERR_CONFIG_NOT_READY:
+            return "config_non_pronta";
+        case DIGITAL_IO_ERR_LOCAL_IO_DISABLED:
+            return "io_expander_disabilitato";
+        case DIGITAL_IO_ERR_MODBUS_DISABLED:
+            return "modbus_disabilitato_o_non_permesso";
+        case ESP_ERR_TIMEOUT:
+            return "timeout_lock_o_bus";
+        case ESP_ERR_INVALID_STATE:
+            return "stato_non_valido";
+        case ESP_ERR_INVALID_ARG:
+            return "argomento_non_valido";
+        case ESP_ERR_NO_MEM:
+            return "memoria_insufficiente";
+        default:
+            return "causa_non_classificata";
+    }
+}
+
 static void keepalive_build_bit_string(uint16_t mask, uint8_t count, char *out, size_t out_len)
 {
     if (!out || out_len == 0) {
@@ -58,8 +83,11 @@ static esp_err_t keepalive_send_message(void)
 
     esp_err_t snapshot_err = digital_io_get_snapshot(&snapshot);
     if (snapshot_err != ESP_OK) {
-        ESP_LOGW(TAG, "[C] Snapshot digital_io non disponibile per keepalive: %s",
-                 esp_err_to_name(snapshot_err));
+        ESP_LOGW(TAG,
+                 "[C] Snapshot digital_io non disponibile per keepalive: %s (0x%04x, %s)",
+                 esp_err_to_name(snapshot_err),
+                 (unsigned)(uint32_t)snapshot_err,
+                 keepalive_digital_io_err_hint(snapshot_err));
         snapshot.inputs_mask = 0;
         snapshot.outputs_mask = 0;
     }

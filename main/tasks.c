@@ -1520,8 +1520,25 @@ esp_err_t tasks_publish_play_audio(const char *audio_path, agn_id_t sender)
     };
 
     strncpy(event.text, normalized_path, sizeof(event.text) - 1);
-    if (!fsm_event_publish(&event, pdMS_TO_TICKS(20))) {
-        ESP_LOGW(TAG, "[M] PLAY_AUDIO publish fallito: %s", normalized_path);
+    /* [M] In alcuni passaggi UI la mailbox puo' essere temporaneamente contesa:
+     * eseguiamo pochi retry brevi per non perdere prompt critici. */
+    bool published = false;
+    for (int attempt = 1; attempt <= 3; ++attempt) {
+        if (fsm_event_publish(&event, pdMS_TO_TICKS(100))) {
+            published = true;
+            break;
+        }
+        ESP_LOGW(TAG,
+                 "[M] PLAY_AUDIO publish fallito (tentativo %d/3): %s",
+                 attempt,
+                 normalized_path);
+        if (attempt < 3) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+    }
+
+    if (!published) {
+        ESP_LOGW(TAG, "[M] PLAY_AUDIO scartato dopo retry: %s", normalized_path);
         return ESP_FAIL;
     }
 
@@ -3307,14 +3324,21 @@ static void audio_task(void *arg)
         }
 
         device_config_t *cfg = device_config_get();
-        bool web_ui_test_request = (event.from == AGN_ID_WEB_UI);
-        bool critical_ui_prompt = (event.from == AGN_ID_LVGL || event.from == AGN_ID_FSM);
-        if (cfg && !cfg->audio.enabled && !web_ui_test_request && !critical_ui_prompt) {
-            ESP_LOGI(TAG, "[M] PLAY_AUDIO ignorato: audio disabilitato in config");
+        const char *test_suffix = "/test.wav";
+        size_t path_len = strlen(event.text);
+        size_t test_suffix_len = strlen(test_suffix);
+        bool is_test_wav = (path_len >= test_suffix_len) &&
+                           (strcmp(event.text + (path_len - test_suffix_len), test_suffix) == 0);
+
+        /* [M] Con audio disabilitato consentiamo solo il file di test. */
+        if (cfg && !cfg->audio.enabled && !is_test_wav) {
+            ESP_LOGI(TAG,
+                     "[M] PLAY_AUDIO ignorato: audio disabilitato in config (%s)",
+                     event.text);
             continue;
         }
-        if (cfg && !cfg->audio.enabled && (web_ui_test_request || critical_ui_prompt)) {
-            ESP_LOGI(TAG, "[M] PLAY_AUDIO bypass audio disabilitato (from=%d)", (int)event.from);
+        if (cfg && !cfg->audio.enabled && is_test_wav) {
+            ESP_LOGI(TAG, "[M] PLAY_AUDIO consentito con audio disabilitato (solo test.wav)");
         }
 
         uint8_t volume = (cfg != NULL) ? cfg->audio.volume : 75U;

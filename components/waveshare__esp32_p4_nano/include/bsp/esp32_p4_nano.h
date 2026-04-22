@@ -239,12 +239,19 @@ esp_err_t bsp_sdcard_unmount(void);
  *
  * Display's backlight must be enabled explicitly by calling bsp_display_backlight_on()
  **************************************************************************************************/
-#define BSP_LCD_PIXEL_CLOCK_MHZ     (80)
+#define BSP_LCD_PIXEL_CLOCK_MHZ     (90)
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
 
-#define BSP_LCD_DRAW_BUFF_SIZE     (1280 * 50) // Buffer ridotto per evitare errori cache
+#if CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR
+/* In modalita anti-tearing aumentiamo il buffer e abilitiamo il doppio draw buffer
+ * per ridurre frammentazione degli aggiornamenti e micro-glitch visivi sul MIPI. */
+#define BSP_LCD_DRAW_BUFF_SIZE     (1280 * 64)
+#define BSP_LCD_DRAW_BUFF_DOUBLE   (1)
+#else
+#define BSP_LCD_DRAW_BUFF_SIZE     (1280 * 50)
 #define BSP_LCD_DRAW_BUFF_DOUBLE   (0)
+#endif
 
 /**
  * @brief BSP display configuration structure

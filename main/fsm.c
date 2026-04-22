@@ -874,6 +874,29 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
     switch (etype) {
         case FSM_INPUT_EVENT_USER_ACTIVITY:
         case FSM_INPUT_EVENT_TOUCH:
+            /* [M] Fallback audio ADS: se il touch arriva dal task touch hardware
+             * (senza passare dal callback LVGL ADS), riproduciamo qui il prompt.
+             * Evita il caso in cui la transizione ADS->CREDIT avviene senza audio. */
+            if (etype == FSM_INPUT_EVENT_TOUCH &&
+                event->from == AGN_ID_TOUCH &&
+                ctx->state == FSM_STATE_ADS) {
+                int32_t total_credit = ctx->ecd_coins + ctx->vcd_coins;
+                const char *audio_path = (total_credit > 0)
+                                           ? "/spiffs/audio/seleziona.wav"
+                                           : "/spiffs/audio/buongiorno.wav";
+                esp_err_t ads_audio_err = tasks_publish_play_audio(audio_path, AGN_ID_FSM);
+                if (ads_audio_err != ESP_OK) {
+                    ESP_LOGW(TAG,
+                             "[M] Audio ADS touch fallback non pubblicato (%s): %s",
+                             audio_path,
+                             esp_err_to_name(ads_audio_err));
+                } else {
+                    ESP_LOGI(TAG,
+                             "[M] Audio ADS touch fallback pubblicato: %s (credit=%ld)",
+                             audio_path,
+                             (long)total_credit);
+                }
+            }
             if (!fsm_has_virtual_locked_session(ctx)) {
                 fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_TOUCH);
             }

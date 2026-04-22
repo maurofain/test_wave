@@ -359,6 +359,12 @@ static void switch_from_ads_async(void *arg)
 
     const char *audio_path = (total_credit > 0) ? "/spiffs/audio/seleziona.wav"
                                                 : "/spiffs/audio/buongiorno.wav";
+    ESP_LOGI(TAG,
+             "[C] ADS touch: credit=%ld (ecd=%ld vcd=%ld) -> audio=%s",
+             (long)total_credit,
+             (long)(has_snap ? snap.ecd_coins : 0),
+             (long)(has_snap ? snap.vcd_coins : 0),
+             audio_path);
     esp_err_t audio_err = tasks_publish_play_audio(audio_path, AGN_ID_LVGL);
     if (audio_err != ESP_OK) {
         ESP_LOGW(TAG, "[C] Audio touch ADS non pubblicato: %s", esp_err_to_name(audio_err));
@@ -403,9 +409,11 @@ static void on_select_btn(lv_event_t *e)
 {
     (void)e;
     if (s_ad_exit_pending) {
+        ESP_LOGI(TAG, "[C] ADS touch ignorato: uscita gia' in corso");
         return;
     }
     s_ad_exit_pending = true;
+    ESP_LOGI(TAG, "[C] ADS touch ricevuto: avvio transizione da ADS");
     ESP_LOGI(TAG, "[C] Pulsante 'Seleziona lavaggio' premuto");
     if (s_ad_carousel_timer) {
         lv_timer_delete(s_ad_carousel_timer);
@@ -419,6 +427,7 @@ static void on_ad_touch(lv_event_t *e)
     if (lv_event_get_code(e) != LV_EVENT_PRESSED) {
         return;
     }
+    ESP_LOGI(TAG, "[C] ADS touch su immagine");
     /* Tocco sull'immagine: va alla selezione lingua (stessa destinazione del btn) */
     on_select_btn(e);
 }

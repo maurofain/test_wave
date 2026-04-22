@@ -1211,6 +1211,13 @@ static void on_prog_btn(lv_event_t *e)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "[C] Azione programma pid=%u non pubblicata: %s", (unsigned)pid, tasks_err_to_name(err));
     } else {
+        /* [C] Audio avvio solo su pressione manuale del pulsante programma.
+           L'autorepeat usa altri percorsi FSM e non passa da questo callback. */
+        esp_err_t audio_err = tasks_publish_play_audio("/spiffs/audio/avvio.wav", AGN_ID_LVGL);
+        if (audio_err != ESP_OK) {
+            ESP_LOGW(TAG, "[C] Audio avvio programma non pubblicato: %s", esp_err_to_name(audio_err));
+        }
+
         s_active_prog = pid;
         s_stop_pressed = false;
         s_stop_confirm = false;
