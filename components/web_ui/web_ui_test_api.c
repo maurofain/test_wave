@@ -456,20 +456,35 @@ esp_err_t api_test_handler(httpd_req_t *req)
                     uint8_t volume = clamp_u8_value(volume_obj->valueint, 0U, 100U);
                     cJSON_Delete(root);
 
+                    esp_err_t save_err = ESP_OK;
+                    esp_err_t spiffs_err = ESP_OK;
                     device_config_t *cfg = device_config_get();
                     if (cfg) {
                         cfg->audio.volume = volume;
                         cfg->updated = true;
-                        (void)device_config_save(cfg);
-                        (void)device_config_write_to_spiffs(cfg);
+                        save_err = device_config_save(cfg);
+                        spiffs_err = device_config_write_to_spiffs(cfg);
                     }
 
                     esp_err_t set_err = audio_player_set_volume(volume);
                     if (set_err == ESP_OK) {
-                        snprintf(response,
-                                 sizeof(response),
-                                 "{\"status\":\"ok\",\"message\":\"Volume impostato\",\"volume\":%u}",
-                                 (unsigned)volume);
+                        if (save_err != ESP_OK || spiffs_err != ESP_OK) {
+                            ESP_LOGW(TAG,
+                                     "[C] Persistenza volume non completa: save=%s spiffs=%s",
+                                     esp_err_to_name(save_err),
+                                     esp_err_to_name(spiffs_err));
+                            snprintf(response,
+                                     sizeof(response),
+                                     "{\"status\":\"ok\",\"message\":\"Volume impostato (persistenza parziale)\",\"volume\":%u,\"persist_save\":\"%s\",\"persist_spiffs\":\"%s\"}",
+                                     (unsigned)volume,
+                                     esp_err_to_name(save_err),
+                                     esp_err_to_name(spiffs_err));
+                        } else {
+                            snprintf(response,
+                                     sizeof(response),
+                                     "{\"status\":\"ok\",\"message\":\"Volume impostato\",\"volume\":%u}",
+                                     (unsigned)volume);
+                        }
                     } else {
                         snprintf(response,
                                  sizeof(response),
