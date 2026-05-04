@@ -15,6 +15,8 @@
 #include "fsm.h"
 #include "lvgl_panel.h"
 #include "usb_cdc_scanner.h" // Scanner QR
+#include "rs232.h"
+#include "rs232_epaper.h"
 #include "cctalk.h"          // cctalk_driver_init + cctalk_task_run
 #include "mdb.h"             // mdb_init + mdb_engine_run
 #include "mdb_cashless.h"
@@ -557,6 +559,9 @@ static uint8_t tasks_find_program_id_for_input(uint8_t input_id)
     return matched_program_id;
 }
 
+static void tasks_display_epaper_program_status(const web_ui_program_entry_t *entry,
+                                               bool is_active_program);
+
 static void tasks_process_other_digital_input_rising(uint8_t input_id)
 {
     char input_code[24] = {0};
@@ -646,6 +651,10 @@ esp_err_t tasks_publish_program_button_action(uint8_t program_id, agn_id_t sende
 
     if (!fsm_event_publish(&event, pdMS_TO_TICKS(20))) {
         return ESP_ERR_TIMEOUT;
+    }
+
+    if (device_config_get()->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+        tasks_display_epaper_program_status(entry, is_active_program);
     }
 
     return ESP_OK;
@@ -1335,6 +1344,8 @@ bool tasks_publish_key_event(void)
  * @return true se l'evento è stato accodato correttamente.
  * @return false se input non valido o coda non disponibile.
  */
+static void tasks_display_credit_if_epaper(int32_t credit_cents);
+
 bool tasks_publish_card_credit_event(int32_t vcd_amount_cents, const char *source_tag)
 {
     if (vcd_amount_cents <= 0) {
@@ -1371,6 +1382,9 @@ bool tasks_publish_card_credit_event(int32_t vcd_amount_cents, const char *sourc
     }
 
     ESP_LOGI(TAG, "[M] Hook card: CARD_CREDIT pubblicato (%ld)", (long)vcd_amount_cents);
+
+    tasks_display_credit_if_epaper(vcd_amount_cents);
+
     return true;
 }
 
@@ -1900,20 +1914,74 @@ static void sht40_task(void *arg)
     }
 }
 
+static void scanner_on_barcode_cb(const char *barcode);
+static void normalize_barcode_text(const char *input, char *output, size_t output_len);
+
+/** @brief Procesa una singola linea ricevuta da RS232 e la inoltra come barcode scanner.
+ *
+ *  @param line Linea di testo ricevuta da RS232.
+ */
+static void rs232_process_scanner_line(const char *line)
+{
+    if (!line || line[0] == '\0') {
+        return;
+    }
+
+    char normalized[FSM_EVENT_TEXT_MAX_LEN] = {0};
+    normalize_barcode_text(line, normalized, sizeof(normalized));
+    if (normalized[0] == '\0') {
+        return;
+    }
+
+    ESP_LOGI(TAG, "[M] RS232 scanner line: %s", normalized);
+    scanner_on_barcode_cb(normalized);
+}
 
 /** @brief Gestisce il task per la comunicazione RS232.
- *  
- *  Questa funzione si occupa di gestire il task per la comunicazione RS232. 
- *  Legge i dati ricevuti e li invia, gestendo eventuali errori.
- *  
- *  @param arg Puntatore a dati aggiuntivi (non utilizzato in questa implementazione).
- *  @return Nessun valore di ritorno.
+ *
+ *  Questa funzione legge i dati ricevuti sulla porta RS232 e interpreta le
+ *  stringhe ricevute come codici scanner provenienti dal modulo E-Paper/QR.
+ *
+ *  @param arg Puntatore a dati aggiuntivi (task_param_t*).
  */
 static void rs232_task(void *arg)
 {
     task_param_t *param = (task_param_t *)arg;
     TickType_t last_wake = xTaskGetTickCount();
+    uint8_t buf[128];
+    char line_buf[FSM_EVENT_TEXT_MAX_LEN];
+    size_t line_idx = 0;
+
     while (true) {
+        if (rs232_epaper_is_enabled()) {
+            int read_len = rs232_receive(buf, sizeof(buf), 20);
+            if (read_len > 0) {
+                for (int i = 0; i < read_len; ++i) {
+                    uint8_t c = buf[i];
+                    if (c == '\r' || c == '\n') {
+                        if (line_idx > 0) {
+                            line_buf[line_idx] = '\0';
+                            rs232_process_scanner_line(line_buf);
+                            line_idx = 0;
+                        }
+                        continue;
+                    }
+                    if (line_idx + 1 < sizeof(line_buf)) {
+                        line_buf[line_idx++] = (char)c;
+                    } else {
+                        ESP_LOGW(TAG, "[M] RS232 linea troppo lunga: scarto dati fino al prossimo terminatore");
+                        line_idx = 0;
+                    }
+                }
+            } else if (read_len < 0) {
+                ESP_LOGW(TAG, "[M] Errore lettura RS232: %d", read_len);
+                line_idx = 0;
+            }
+        } else {
+            if (line_idx > 0) {
+                line_idx = 0;
+            }
+        }
         vTaskDelayUntil(&last_wake, param->period_ticks);
     }
 }
@@ -3052,8 +3120,45 @@ static void publish_qr_credit_event(const char *customer_code, int32_t ecd_amoun
     ESP_LOGI(TAG, "[M] QR_CREDIT pubblicato (customer_code=%s ecd=%ld)",
              customer_code ? customer_code : "",
              (long)ecd_amount);
+
+    tasks_display_credit_if_epaper(ecd_amount);
 }
 
+static void tasks_display_credit_if_epaper(int32_t credit_cents)
+{
+    const device_config_t *cfg = device_config_get();
+    if (cfg && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+        esp_err_t text_err = rs232_epaper_display_credit_big(credit_cents);
+        if (text_err != ESP_OK) {
+            ESP_LOGW(TAG, "[M] E-Paper RS232 display credit failed: %s", esp_err_to_name(text_err));
+        }
+    }
+}
+
+static void tasks_display_epaper_program_status(const web_ui_program_entry_t *entry,
+                                               bool is_active_program)
+{
+    if (!entry) {
+        return;
+    }
+
+    const device_config_t *cfg = device_config_get();
+    if (!cfg || cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+        return;
+    }
+
+    char message[128];
+    if (is_active_program) {
+        snprintf(message, sizeof(message), "§Programma %s\rPausa attiva", entry->name);
+    } else {
+        snprintf(message, sizeof(message), "§Avvio %s\rCosto %u", entry->name, (unsigned)entry->price_units);
+    }
+
+    esp_err_t text_err = rs232_epaper_display_text(message);
+    if (text_err != ESP_OK) {
+        ESP_LOGW(TAG, "[M] E-Paper RS232 display program status failed: %s", esp_err_to_name(text_err));
+    }
+}
 
 /**
  * @brief Pubblica verso HTTP_SERVICES l'evento di pagamento all'attivazione programma.
@@ -3900,13 +4005,25 @@ void tasks_start_all(void)
         task_param_t *t = &s_tasks[i];
 
         if (cfg && strcmp(t->name, "usb_scanner") == 0) {
-            t->state = cfg->scanner.enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
+            if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 && cfg->sensors.rs232_enabled) {
+                t->state = TASK_STATE_IDLE;
+                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (EPAPER_RS232 usa scanner RS232)", t->name);
+            } else {
+                t->state = cfg->scanner.enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
+            }
         }
 
         if (cfg && strcmp(t->name, "cctalk_task") == 0) {
             t->state = cfg->sensors.cctalk_enabled
                            ? TASK_STATE_RUN
                            : TASK_STATE_IDLE;
+        }
+
+        if (cfg && strcmp(t->name, "rs232") == 0 &&
+            cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 &&
+            cfg->sensors.rs232_enabled) {
+            t->state = TASK_STATE_RUN;
+            ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_RS232 attivo)", t->name);
         }
 
         if (cfg && strcmp(t->name, "mdb_engine") == 0) {
@@ -3931,10 +4048,13 @@ void tasks_start_all(void)
             ESP_LOGI(TAG, "[M] Task saltato %s (avvio differito alla comparsa schermata ADS/Programmi)", t->name);
             continue;
         }
-        // Rispetta la configurazione di display: se headless salta lvgl/touchscreen
-        if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0) && !device_config_get()->display.enabled) {
-            ESP_LOGI(TAG, "[M] Task saltato %s (display disabilitato da config)", t->name);
-            continue;
+        // Rispetta la configurazione di display: se headless o EPAPER_RS232 salta lvgl/touchscreen
+        if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0)) {
+            device_config_t *cfg = device_config_get();
+            if (!cfg || !cfg->display.enabled || cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+                ESP_LOGI(TAG, "[M] Task saltato %s (display non compatibile con LVGL/touch)", t->name);
+                continue;
+            }
         }
         // Salta il task io_expander se il dispositivo non è abilitato in config
         if (strcmp(t->name, "io_expander") == 0 && !device_config_get()->sensors.io_expander_enabled) {
@@ -4038,13 +4158,13 @@ void tasks_apply_n_run(void)
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
 
-        // Forza IDLE sui task display solo se headless; altrimenti rispetta il CSV
+        // Forza IDLE sui task display solo se headless o EPAPER_RS232; altrimenti rispetta il CSV
         if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0)) {
-            if (!cfg->display.enabled) {
-                t->state = TASK_STATE_IDLE; // headless: garantiamo che siano disabilitati
-                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (display.enabled=false)", t->name);
+            if (!cfg->display.enabled || cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+                t->state = TASK_STATE_IDLE; // headless/EPAPER: garantiamo che siano disabilitati
+                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (display non compatibile con LVGL/touch)", t->name);
             }
-            // display abilitato: stato gestito dal CSV, nessun override
+            // display abilitato e non EPAPER: stato gestito dal CSV, nessun override
         }
         // Forza stato idle su io_expander se il sensore è disabilitato
         if (strcmp(t->name, "io_expander") == 0 && !cfg->sensors.io_expander_enabled) {
@@ -4052,8 +4172,18 @@ void tasks_apply_n_run(void)
         }
         
         // Forza stato idle/running su usb_scanner in base alla configurazione
+        if (strcmp(t->name, "rs232") == 0 &&
+            cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 &&
+            cfg->sensors.rs232_enabled) {
+            t->state = TASK_STATE_RUN;
+            ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_RS232 attivo)", t->name);
+        }
+
         if (strcmp(t->name, "usb_scanner") == 0) {
-            if (cfg->scanner.enabled) {
+            if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 && cfg->sensors.rs232_enabled) {
+                t->state = TASK_STATE_IDLE;
+                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (EPAPER_RS232 usa scanner RS232)", t->name);
+            } else if (cfg->scanner.enabled) {
                 t->state = TASK_STATE_RUN;
                 ESP_LOGI(TAG, "[M] Task %s forzato RUN (scanner.enabled=true)", t->name);
             } else {
