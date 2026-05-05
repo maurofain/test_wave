@@ -1027,6 +1027,7 @@ static void _set_defaults(device_config_t *config)
     config->display.enabled = true; // display abilitato di default
     config->display.lcd_brightness = 80;
     config->display.backlight = true; // backlight acceso di default
+    config->display.type = DEVICE_DISPLAY_TYPE_DSI7_TOUCH; // seleziona display 7" DSI Touch A di default
     config->audio.enabled = true;
     config->audio.volume = 75;
 
@@ -1843,6 +1844,13 @@ esp_err_t device_config_load(device_config_t *config)
                     if (backlight) config->display.backlight = cJSON_IsTrue(backlight);
                     cJSON *ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_en"); if (!ads_enabled) ads_enabled = cJSON_GetObjectItem(disp_obj, "ads_enabled");
                     if (ads_enabled) config->display.ads_enabled = cJSON_IsTrue(ads_enabled);
+                    cJSON *type = cJSON_GetObjectItem(disp_obj, "type"); if (!type) type = cJSON_GetObjectItem(disp_obj, "display_type");
+                    if (type && cJSON_IsNumber(type)) {
+                        int val = type->valueint;
+                        if (val < DEVICE_DISPLAY_TYPE_NONE) val = DEVICE_DISPLAY_TYPE_NONE;
+                        if (val > DEVICE_DISPLAY_TYPE_EPAPER_RS232) val = DEVICE_DISPLAY_TYPE_EPAPER_RS232;
+                        config->display.type = (device_display_type_t)val;
+                    }
                 }
 
                 // Analisi config Audio
@@ -2192,6 +2200,7 @@ char* device_config_to_json(const device_config_t *config)
     cJSON_AddNumberToObject(disp_obj, "brt", config->display.lcd_brightness);
     cJSON_AddBoolToObject(disp_obj, "backlight", config->display.backlight);
     cJSON_AddBoolToObject(disp_obj, "ads_en", config->display.ads_enabled);
+    cJSON_AddNumberToObject(disp_obj, "type", config->display.type);
     cJSON_AddItemToObject(root, "display", disp_obj);
 
     // Audio

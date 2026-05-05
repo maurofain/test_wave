@@ -1156,6 +1156,11 @@ static void digital_io_task(void *arg)
             continue;
         }
 
+        if ((rising_mask & (1U << (DIGITAL_IO_INPUT_SERVICE_SWITCH - 1U))) != 0U) {
+            ESP_LOGI(TAG, "[M] IN04 release rilevata: boot FACTORY");
+            device_config_reboot_factory();
+        }
+
         for (uint8_t input_id = DIGITAL_IO_FIRST_CHANNEL_ID; input_id <= DIGITAL_IO_LOCAL_INPUT_COUNT; ++input_id) {
             uint16_t input_mask = (uint16_t)(1U << (input_id - 1U));
             if ((rising_mask & input_mask) == 0U) {

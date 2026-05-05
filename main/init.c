@@ -62,6 +62,7 @@
 #include "pwm.h"
 #include "remote_logging.h"
 #include "rs232.h"
+#include "rs232_epaper.h"
 #include "rs485.h"
 #include "sd_card.h"
 #include "sdkconfig.h"
@@ -89,6 +90,8 @@ static const char *TAG = "INIT";
  * Impostare a 0 per comportamento normale basato su cfg->display.enabled.
  */
 #define FORCE_VIDEO_DISABLED 0
+
+static bool s_display_lvgl_ready = false;
 
 void main_cctalk_send_initialization_sequence(void)
 {
@@ -1165,12 +1168,50 @@ static void log_peripherals_from_config(const device_config_t *cfg)
 }
 
 /**
- * @brief Applica override display in base allo stato DIP1.
+ * @brief Applica override display in base allo stato dei DIP switch al boot.
  *
  * Regola richiesta:
- * - DIP1 LOW (switch ON) => forza display disabilitato.
- * - DIP1 HIGH (switch OFF) => nessun forcing (usa stato da config).
+ * - DIP1/DIP2 letti una sola volta all'avvio.
+ * - La selezione valida del display è quella al boot, i DIP switch
+ *   cambiati successivamente non vengono ri-letti per la scelta display.
  */
+static device_display_type_t display_type_from_dip_mask(uint16_t inputs_mask)
+{
+  bool in01 = (inputs_mask & (1U << (DIGITAL_IO_INPUT_DIP1 - 1U))) != 0U;
+  bool in02 = (inputs_mask & (1U << (DIGITAL_IO_INPUT_DIP2 - 1U))) != 0U;
+
+  if (!in01 && !in02)
+  {
+    return DEVICE_DISPLAY_TYPE_NONE;
+  }
+  if (in01 && !in02)
+  {
+    return DEVICE_DISPLAY_TYPE_DSI7_TOUCH;
+  }
+  if (!in01 && in02)
+  {
+    return DEVICE_DISPLAY_TYPE_DSI101_TOUCH;
+  }
+  return DEVICE_DISPLAY_TYPE_EPAPER_RS232;
+}
+
+static const char *display_type_to_string(device_display_type_t type)
+{
+  switch (type)
+  {
+    case DEVICE_DISPLAY_TYPE_NONE:
+      return "NONE";
+    case DEVICE_DISPLAY_TYPE_DSI7_TOUCH:
+      return "DSI7_TOUCH";
+    case DEVICE_DISPLAY_TYPE_DSI101_TOUCH:
+      return "DSI101_TOUCH";
+    case DEVICE_DISPLAY_TYPE_EPAPER_RS232:
+      return "EPAPER_RS232";
+    default:
+      return "UNKNOWN";
+  }
+}
+
 static void apply_display_override_from_dip1(device_config_t *cfg)
 {
   if (!cfg)
@@ -1182,21 +1223,43 @@ static void apply_display_override_from_dip1(device_config_t *cfg)
   if (io_ret != ESP_OK)
   {
     ESP_LOGW(TAG,
-             "[M] DIP1 override non disponibile: IO expander non pronto (%s)",
+             "[M] Override display da DIP non disponibile: IO expander non pronto (%s)",
              esp_err_to_name(io_ret));
     return;
   }
 
-  bool dip1_high = io_get_pin((int)(DIGITAL_IO_INPUT_DIP1 - 1U));
-  if (!dip1_high)
+  bool dip1 = io_get_pin((int)(DIGITAL_IO_INPUT_DIP1 - 1U));
+  bool dip2 = io_get_pin((int)(DIGITAL_IO_INPUT_DIP2 - 1U));
+  uint16_t inputs_mask = 0;
+  if (dip1)
+  {
+    inputs_mask |= (1U << (DIGITAL_IO_INPUT_DIP1 - 1U));
+  }
+  if (dip2)
+  {
+    inputs_mask |= (1U << (DIGITAL_IO_INPUT_DIP2 - 1U));
+  }
+
+  device_display_type_t selected = display_type_from_dip_mask(inputs_mask);
+  if (selected == DEVICE_DISPLAY_TYPE_NONE)
   {
     cfg->display.enabled = false;
+    cfg->display.type = DEVICE_DISPLAY_TYPE_NONE;
     ESP_LOGW(TAG,
-             "[M] =========================================================");
-    ESP_LOGW(TAG,
-             "[M] MIPI DISPLAY FORCED DISALED (DIP1=ON)");
-    ESP_LOGW(TAG,
-             "[M] =========================================================");
+             "[M] Display forced disabled by DIP boot: type=%s (DIP1=%d DIP2=%d)",
+             display_type_to_string(selected),
+             dip1 ? 1 : 0,
+             dip2 ? 1 : 0);
+  }
+  else
+  {
+    cfg->display.enabled = true;
+    cfg->display.type = selected;
+    ESP_LOGI(TAG,
+             "[M] Display override from DIP boot: type=%s enabled=1 (DIP1=%d DIP2=%d)",
+             display_type_to_string(selected),
+             dip1 ? 1 : 0,
+             dip2 ? 1 : 0);
   }
 }
 
@@ -1463,7 +1526,7 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "[M] [NTP] NTP disabilitato da config");
       }
 
-      if (bsp_display_lock(0))
+      if (s_display_lvgl_ready && bsp_display_lock(0))
       {
         lvgl_page_chrome_set_status_icon_state(LVGL_CHROME_STATUS_ICON_CLOUD, true);
         bsp_display_unlock();
@@ -1544,7 +1607,7 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
     {
       http_services_notify_network_available(false, "eth_link_down");
     }
-    if (bsp_display_lock(0))
+    if (s_display_lvgl_ready && bsp_display_lock(0))
     {
       lvgl_page_chrome_set_status_icon_state(LVGL_CHROME_STATUS_ICON_CLOUD, false);
       bsp_display_unlock();
@@ -1824,6 +1887,9 @@ static esp_err_t init_display_lvgl_minimal(void)
       TAG, "  SPIRAM caps alloc free (8bit): %u",
       (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
 
+  const bool use_10_1_rotation =
+      (device_cfg->display.type == DEVICE_DISPLAY_TYPE_DSI101_TOUCH);
+
   bsp_display_cfg_t cfg = {
       .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
       .buffer_size = BSP_LCD_DRAW_BUFF_SIZE / 2,
@@ -1832,7 +1898,7 @@ static esp_err_t init_display_lvgl_minimal(void)
           {
               .buff_dma = true,
               .buff_spiram = false,
-              .sw_rotate = false,
+              .sw_rotate = use_10_1_rotation,
           },
   };
   /* Compromesso stabilità/memoria: evitare pressione eccessiva su DRAM interna
@@ -1845,8 +1911,16 @@ static esp_err_t init_display_lvgl_minimal(void)
     return ESP_FAIL;
   }
 
-  // Forza orientamento verticale (portrait)
-  bsp_display_rotate(disp, LV_DISPLAY_ROTATION_0);
+  // if (use_10_1_rotation)
+  // {
+  //   ESP_LOGI(TAG, "[M] Display 10.1\" selezionato: applico rotazione 90°");
+  //   bsp_display_rotate(disp, LV_DISPLAY_ROTATION_90);
+  // }
+  // else
+  // {
+    // Forza orientamento verticale (portrait)
+    bsp_display_rotate(disp, LV_DISPLAY_ROTATION_0);
+  // }
 
   ESP_LOGI(TAG, "Heap after LVGL init:");
   ESP_LOGI(
@@ -1910,6 +1984,33 @@ static esp_err_t init_display_lvgl_minimal(void)
   }
 
   lvgl_panel_show();
+  s_display_lvgl_ready = true;
+  return ESP_OK;
+}
+
+static esp_err_t init_display_epaper_rs232(void)
+{
+  device_config_t *device_cfg = device_config_get();
+  if (!device_cfg || device_cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+    return ESP_ERR_INVALID_ARG;
+  }
+  if (!device_cfg->sensors.rs232_enabled) {
+    ESP_LOGW(TAG, "E-Paper RS232 selezionato ma RS232 disabilitato");
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  ESP_LOGI(TAG, "Display EPAPER RS232 selezionato: inizializzo connessione e invio messaggio di benvenuto");
+  esp_err_t ret = rs232_epaper_init();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Inizializzazione E-Paper RS232 fallita: %s", esp_err_to_name(ret));
+    return ret;
+  }
+
+  ret = rs232_epaper_display_welcome();
+  if (ret != ESP_OK) {
+    ESP_LOGW(TAG, "Invio messaggio benvenuto E-Paper RS232 fallito: %s", esp_err_to_name(ret));
+  }
+  tasks_set_touchscreen_handle(NULL);
   return ESP_OK;
 }
 
@@ -1953,6 +2054,7 @@ esp_err_t init_run_display_only(void)
     return ESP_FAIL;
   }
   bsp_display_rotate(disp, LV_DISPLAY_ROTATION_0);
+  s_display_lvgl_ready = true;
   if (bsp_display_brightness_init() == ESP_OK)
   {
     bsp_display_brightness_set(cfg->display.lcd_brightness);
@@ -2191,7 +2293,29 @@ esp_err_t init_run_factory(void)
 
   s_display_ready = false;
 
-  if (cfg->display.enabled)
+  if (cfg->display.enabled && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232)
+  {
+    esp_err_t disp_ret = init_display_epaper_rs232();
+    if (disp_ret != ESP_OK)
+    {
+      ESP_LOGW(TAG, "[M] Display EPAPER RS232 init failed: %s",
+               esp_err_to_name(disp_ret));
+      init_agent_status_set(AGN_ID_LVGL, 0, INIT_AGENT_ERR_INIT_FAILED);
+      init_agent_status_set(AGN_ID_WAVESHARE_LCD, 0,
+                            INIT_AGENT_ERR_INIT_FAILED);
+      init_agent_status_set(AGN_ID_TOUCH, 0, INIT_AGENT_ERR_INIT_FAILED);
+    }
+    else
+    {
+      init_agent_status_set(AGN_ID_LVGL, 0, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+      init_agent_status_set(AGN_ID_WAVESHARE_LCD, 0,
+                            INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+      init_agent_status_set(AGN_ID_TOUCH, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
+      s_display_ready = true;
+      init_lvgl_status_log("Init: E-Paper RS232 pronto");
+    }
+  }
+  else if (cfg->display.enabled)
   {
     esp_err_t disp_ret = init_display_lvgl_minimal();
     if (disp_ret != ESP_OK)
@@ -2316,6 +2440,21 @@ esp_err_t init_run_factory(void)
     if (exp_ret == ESP_OK)
     {
       init_agent_status_set(AGN_ID_IO_EXPANDER, 1, INIT_AGENT_ERR_NONE);
+
+      bool service_switch_state = false;
+      if (digital_io_get_input(DIGITAL_IO_INPUT_SERVICE_SWITCH, &service_switch_state) == ESP_OK && !service_switch_state)
+      {
+        const esp_partition_t *running = esp_ota_get_running_partition();
+        if (running == NULL || running->subtype != ESP_PARTITION_SUBTYPE_APP_FACTORY)
+        {
+          ESP_LOGI(TAG, "[M] IN04 premuto all'avvio: forzo boot su FACTORY");
+          device_config_reboot_factory();
+        }
+        else
+        {
+          ESP_LOGI(TAG, "[M] IN04 premuto all'avvio ma già in partizione FACTORY");
+        }
+      }
     }
   }
   else

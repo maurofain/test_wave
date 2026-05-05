@@ -87,6 +87,16 @@ typedef struct {
 } device_mdb_config_t;
 
 /**
+ * @brief Enumerazione dei tipi di dispositivo display disponibili.
+ */
+typedef enum {
+    DEVICE_DISPLAY_TYPE_NONE = 0,            ///< Nessun display selezionato
+    DEVICE_DISPLAY_TYPE_DSI7_TOUCH = 1,      ///< Display DSI 7" con touch (A)
+    DEVICE_DISPLAY_TYPE_DSI101_TOUCH = 2,    ///< Display DSI 10.1" con touch (B)
+    DEVICE_DISPLAY_TYPE_EPAPER_RS232 = 3,    ///< E-Paper via modulo RS232
+} device_display_type_t;
+
+/**
  * @brief Struttura di configurazione Display
  */
 typedef struct {
@@ -94,6 +104,7 @@ typedef struct {
     uint8_t lcd_brightness;     ///< Luminosità LCD (0-100)
     bool backlight;            ///< Backlight acceso/spento (true = on, false = off)
     bool ads_enabled;           ///< Abilita schermata ADS nel flusso cliente
+    device_display_type_t type; ///< Tipo di display selezionato
 } device_display_config_t;
 
 /**

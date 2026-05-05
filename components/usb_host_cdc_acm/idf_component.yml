@@ -15,7 +15,6 @@ issues: https://github.com/espressif/esp-usb/issues
 repository: git://github.com/espressif/esp-usb.git
 repository_info:
   commit_sha: ae25ee8b9219152cae43936563ffbb4d02d95025
-  path: host/class/cdc/usb_host_cdc_acm
 tags:
 - usb
 - usb_host

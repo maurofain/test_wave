@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST_DIR="$(cd "${SRC_DIR}/.." && pwd)/mh1001"
+DEST_DIR="$(cd "${SRC_DIR}/.." && pwd)/mh1001/ESP32P4"
 
 DRY_RUN=0
 if [[ "${1:-}" == "--dry-run" || "${1:-}" == "-n" ]]; then
@@ -18,33 +18,6 @@ elif [[ $# -gt 0 ]]; then
 fi
 
 mkdir -p "${DEST_DIR}"
-
-EXCLUDE_FILE="$(mktemp)"
-cleanup() {
-  rm -f "${EXCLUDE_FILE}"
-}
-trap cleanup EXIT
-
-cat > "${EXCLUDE_FILE}" <<'EOF'
-.git/
-mh1001/
-report/
-versions/
-.github/
-.windsurf/
-crash/
-scripts/
-doxygen/markdown/doxygen/
-index.html
-log/
-logs/
-*.log
-**/*.log
-EOF
-
-if command -v git >/dev/null 2>&1 && git -C "${SRC_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C "${SRC_DIR}" ls-files --others --ignored --exclude-standard --directory >> "${EXCLUDE_FILE}" || true
-fi
 
 RSYNC_FLAGS=(-a --delete --prune-empty-dirs --stats)
 # include statistics so we can report total files and transferred/updated files
@@ -69,7 +42,20 @@ RSYNC_OUTPUT=$(
     --include='main/***' \
     --include='partition_table/' \
     --include='partition_table/***' \
-    --exclude-from="${EXCLUDE_FILE}" \
+    --exclude='.git' \
+    --exclude='mh1001' \
+    --exclude='report' \
+    --exclude='versions' \
+    --exclude='.github' \
+    --exclude='.windsurf' \
+    --exclude='crash' \
+    --exclude='scripts' \
+    --exclude='doxygen/markdown/doxygen' \
+    --exclude='index.html' \
+    --exclude='log' \
+    --exclude='logs' \
+    --exclude='*.log' \
+    --exclude='**/*.log' \
     "${SRC_DIR}/" "${DEST_DIR}/" 2>&1
 )
 

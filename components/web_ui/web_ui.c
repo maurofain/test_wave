@@ -1574,6 +1574,7 @@ esp_err_t api_config_get(httpd_req_t *req)
     cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
     cJSON_AddBoolToObject(display, "backlight", cfg->display.backlight);
     cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
+    cJSON_AddNumberToObject(display, "type", cfg->display.type);
     cJSON_AddItemToObject(root, "display", display);
 
     cJSON *audio = cJSON_CreateObject();
@@ -1852,6 +1853,7 @@ esp_err_t api_config_backup(httpd_req_t *req)
     cJSON_AddNumberToObject(display, "brt", cfg->display.lcd_brightness);
     cJSON_AddBoolToObject(display, "backlight", cfg->display.backlight);
     cJSON_AddBoolToObject(display, "ads_en", cfg->display.ads_enabled);
+    cJSON_AddNumberToObject(display, "type", cfg->display.type);
     cJSON_AddItemToObject(root, "display", display);
 
     cJSON *audio = cJSON_CreateObject();
@@ -2360,6 +2362,14 @@ esp_err_t api_config_save(httpd_req_t *req)
         if (!ads_enabled) ads_enabled = cJSON_GetObjectItem(display_obj, "ads_enabled");
         if (ads_enabled) {
             cfg->display.ads_enabled = cJSON_IsTrue(ads_enabled);
+        }
+        cJSON *type = cJSON_GetObjectItem(display_obj, "type");
+        if (!type) type = cJSON_GetObjectItem(display_obj, "display_type");
+        if (type && cJSON_IsNumber(type)) {
+            int val = type->valueint;
+            if (val < DEVICE_DISPLAY_TYPE_NONE) val = DEVICE_DISPLAY_TYPE_NONE;
+            if (val > DEVICE_DISPLAY_TYPE_EPAPER_RS232) val = DEVICE_DISPLAY_TYPE_EPAPER_RS232;
+            cfg->display.type = (device_display_type_t)val;
         }
     }
 

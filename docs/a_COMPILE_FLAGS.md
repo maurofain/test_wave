@@ -185,10 +185,17 @@ Questi simboli arrivano da `sdkconfig`/Kconfig e abilitano percorsi compilati co
 - `CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR`
 - `CONFIG_BSP_DISPLAY_LVGL_FULL_REFRESH`
 - `CONFIG_BSP_LCD_TYPE_720_1280_7_INCH_A`
+- `CONFIG_BSP_LCD_TYPE_720_1280_10_1_INCH_B`
 - `CONFIG_BSP_LCD_COLOR_FORMAT_RGB565`
 - `CONFIG_BSP_LCD_MIPI_DSI_LANE_BITRATE_MBPS`
 - `BSP_LCD_DRAW_BUFF_SIZE` (define BSP)
 - `BSP_LCD_DRAW_BUFF_DOUBLE` (define BSP)
+
+### `CONFIG_BSP_LCD_TYPE_720_1280_10_1_INCH_B`
+- **File:** `components/waveshare__esp32_p4_nano/Kconfig`, `components/waveshare__esp32_p4_nano/esp32_p4_nano.c`
+- **Valori:** `y` = Waveshare 10.1-DSI-TOUCH-B display
+- **Impatto:** abilita la configurazione runtime del pannello 10.1" B con driver `waveshare/esp_lcd_jd9365`; compatibile con `CONFIG_BSP_LCD_COLOR_FORMAT_RGB565` o `CONFIG_BSP_LCD_COLOR_FORMAT_RGB888` e rispetta il mapping pin/MIPI DSI del BSP.
+
 
 Impatto runtime associato:
 - per il pannello MIPI 7" A, `CONFIG_BSP_LCD_DPI_BUFFER_NUMS=2` consente al BSP di creare due framebuffer DPI completi, prerequisito per attivare l'anti-tearing LVGL;

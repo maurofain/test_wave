@@ -40,7 +40,7 @@ dependencies:
       type: service
     version: 1.2.1
   espressif/esp_lcd_touch_gt911:
-    component_hash: be02e243d18b9a661bc13b0d22c0a5cfa3f708cf04d6eb059772276c8c8a4d76
+    component_hash: 6029febef66eefd0910d527d7f30292779ccbf22a8dedd2bd69466acf0068a7b
     dependencies:
     - name: espressif/esp_lcd_touch
       registry_url: https://components.espressif.com
@@ -48,11 +48,11 @@ dependencies:
       version: ^1.2.0
     - name: idf
       require: private
-      version: '>=4.4.2'
+      version: '>=5.2'
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.2.0~1
+    version: 1.2.0~2
   espressif/esp_lvgl_port:
     component_hash: b6360960f47b6776462e7092861b3ea66477ffb762a01baa0aecbb3d74cd50f4
     dependencies:
@@ -68,7 +68,7 @@ dependencies:
       type: service
     version: 2.7.2
   espressif/i2c_bus:
-    component_hash: 4e990dc11734316186b489b362c61d41f23f79d58bc169795cec215e528cba14
+    component_hash: 804ec068d163570fd367b279a310ca383484630d2310c586b50def0bcf21de13
     dependencies:
     - name: espressif/cmake_utilities
       registry_url: https://components.espressif.com
@@ -80,7 +80,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.5.0
+    version: 1.5.1
   espressif/led_strip:
     component_hash: 28c6509a727ef74925b372ed404772aeedf11cce10b78c3f69b3c66799095e2d
     dependencies:
@@ -105,7 +105,7 @@ dependencies:
   waveshare/esp32_p4_nano:
     dependencies: []
     source:
-      path: /media/mauro/code/Progetti/0.Clienti/MicroHard/test_wave/components/waveshare__esp32_p4_nano
+      path: /media/mauro/code/Progetti/0.Clienti/MicroHard/fw_esp32p4/components/waveshare__esp32_p4_nano
       type: local
     version: 1.2.0
   waveshare/esp_lcd_dsi:
@@ -151,7 +151,7 @@ dependencies:
   waveshare/esp_lcd_ili9881c:
     dependencies: []
     source:
-      path: /media/mauro/code/Progetti/0.Clienti/MicroHard/test_wave/components/waveshare__esp_lcd_ili9881c
+      path: /media/mauro/code/Progetti/0.Clienti/MicroHard/fw_esp32p4/components/waveshare__esp_lcd_ili9881c
       type: local
     version: 1.0.4
   waveshare/esp_lcd_jd9365:
@@ -189,6 +189,6 @@ direct_dependencies:
 - waveshare/esp_lcd_hx8394
 - waveshare/esp_lcd_ili9881c
 - waveshare/esp_lcd_jd9365
-manifest_hash: 459daa2a6f8489a6c9626ffa1d559ab57135334fc99d3fa53b8d53dd68259351
+manifest_hash: fa06ad168b33730ec40a3b2c22e377b17a7a521360688a3dfedaa09523b99be5
 target: esp32p4
 version: 2.0.0

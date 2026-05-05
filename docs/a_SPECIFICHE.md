@@ -9,7 +9,7 @@
 - creiamo un task per ognuna delle seguenti funzioni:
 
   - gestione della EEPROM
-  - gestione degli i/o expander
+  - gestione degli i/o expanderfactory
   - gestione del sensore temperatura e umidità
   - gestione della striscia led
   - gestore linea rs232

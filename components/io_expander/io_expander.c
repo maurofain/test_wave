@@ -248,8 +248,10 @@ if (!s_io_expander_config_enabled) {
         io_expander_reset_handles();
         return ret;
     }
-    // Abilita Pull-up su tutti i pin di input per stabilizzare bit flottanti (come il bit 4)
-    write_reg(io_in_dev, REG_PULL_SELECT, 0xFF); // 1 = Pull-up
+    // Imposta i pin di input del FXL6408.
+    // - GPIO0/GPIO1/GPIO2 usati dai DIP switch devono essere pull-down.
+    // - Gli altri ingressi locali rimangono pull-up per stabilizzare bit flottanti.
+    write_reg(io_in_dev, REG_PULL_SELECT, 0xF8); // 0 = Pull-down su pin 0-2, 1 = Pull-up su pin 3-7
     write_reg(io_in_dev, REG_PULL_ENABLE, 0xFF); // 1 = Abilitato
 
     s_io_exp_ready = true;

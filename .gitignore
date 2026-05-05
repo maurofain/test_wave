@@ -1,5 +1,10 @@
 # Build directories
 build/
+**/build/
+!**/build/
+**/build/**
+!**/build/*.bin
+!**/build/**/*.bin
 *.o
 *.a
 *.lib
