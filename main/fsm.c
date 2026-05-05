@@ -851,7 +851,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
     if ((ctx->state == FSM_STATE_RUNNING || ctx->state == FSM_STATE_PAUSED) &&
         (etype == FSM_INPUT_EVENT_QR_CREDIT ||
-         etype == FSM_INPUT_EVENT_QR_SCANNED)) {
+         etype == FSM_INPUT_EVENT_QR_SCANNED ||
+         etype == FSM_INPUT_EVENT_COIN ||
+         etype == FSM_INPUT_EVENT_TOKEN ||
+         etype == FSM_INPUT_EVENT_CARD_CREDIT)) {
         ESP_LOGW(TAG, "[M] Ignorato evento acqusizione durante programma attivo: %s",
                  fsm_input_event_type_to_string(etype));
         return false;

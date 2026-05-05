@@ -58,10 +58,19 @@
 static const char *TAG = "USB_CDC_SCANNER";
 static usb_cdc_scanner_callback_t s_on_barcode = NULL;
 static volatile bool s_scanner_connected = false;
+static TaskHandle_t s_usb_open_task = NULL;
 
 __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
 {
     return true;
+}
+
+static void usb_cdc_scanner_notify_open_task(void)
+{
+    if (s_usb_open_task == NULL) {
+        return;
+    }
+    xTaskNotifyGive(s_usb_open_task);
 }
 
 static bool s_usb_host_initialized = false;
@@ -84,7 +93,6 @@ device_component_status_t usb_cdc_scanner_get_component_status(void)
 }
 
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
-static TaskHandle_t s_usb_open_task = NULL;
 static cdc_acm_dev_hdl_t s_cdc_dev = NULL;
 static QueueHandle_t s_cdc_data_queue = NULL;
 static bool s_cdc_acm_installed = false;
@@ -323,6 +331,7 @@ static esp_err_t usb_cdc_scanner_send_framed_command(const char *payload)
 
     cdc_acm_dev_hdl_t cdc_hdl = s_cdc_dev;
     if (cdc_hdl == NULL) {
+        usb_cdc_scanner_notify_open_task();
         return ESP_ERR_INVALID_STATE;
     }
 

@@ -20,24 +20,24 @@
      | 0    | 0    | Nessun device di output grafico |
      | 1    | 0    | Display 7"                      |
      | 0    | 1    | Display 10.1"                   |
-     | 1    | 1    | Modulo epaper                   |
+     | 1    | 1    | Modulo epaper                   
+5. dopo aver inserito la moneta i crediti da DB non vengono somma, come se il token non fossa presentato
+6. sul display 10" le lingue non sono si aprono con il touch della bandiera
+7. DA COMPLETARE URGENTE : 
 
-     
-
-5. DA COMPLETARE URGENTE : 
    1. verifica funzionamento MH1001 con tasti
    2. 
-6. Caricamento remoto artefatti
+8. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
-7. File da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
-8. Verifica su gestione del credito
+9. File da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
+10. Verifica su gestione del credito
    - Il credito viene gestito in 2 modi: per l'esecuzione dei programmi usiamo il concetto di COIN (costo base del ciclo). Per la gestione dell'ammontare in denaro usiamo il centesimo di valuta (normalmente EURO).
    - Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenendo in memoria gli eventuali frazionari (es. 50 cent).
    - Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile: prima ECD e poi VCD.
    - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
-9. Quando viene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
+11. Quando viene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
 
-10. Verifica la gestione generale dei componenti hardware
+12. Verifica la gestione generale dei componenti hardware
    - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:
      1. `init`
      2. `activate`
@@ -49,7 +49,7 @@
        - `CCTalk`: esegue polling periodico, rileva la perdita del device, passa `offline` e tenta la reinizializzazione automatica con ritorno a `online` quando il device risponde di nuovo.
        - `Scanner USB`: esegue monitoraggio periodico del bus e tenta la riapertura del device; in caso di disconnessione passa `offline`. La riconnessione fisica è gestita, ma il ciclo completo di `setup` dopo reconnect non è ancora robusto quanto CCTalk.
        - `HttpServices`: esegue controllo periodico logico del servizio remoto, passa `offline` su errore/token invalido e gestisce recovery con relogin, keepalive e retry/backoff fino al ritorno `online`.
-11. Piano test endpoint e funzioni
+13. Piano test endpoint e funzioni
    - Strutturare i test in 4 livelli:
      - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
      - **Contract**: campi obbligatori e tipi minimi della risposta
@@ -67,24 +67,24 @@
      - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
      - 3 flow critici: SD, seriale unificato, backup config su SD
      - Report `junit.xml` + riepilogo markdown
-12. Config: valore per metodo di pagamento
+14. Config: valore per metodo di pagamento
    - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
    - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
-13. Ricezione config da server (`api/getconfig`)
+15. Ricezione config da server (`api/getconfig`)
    - L'API server `POST /api/getconfig` è definita ma il device non applica la configurazione ricevuta
    - Implementare il parsing della risposta e aggiornamento della config locale
 
-14. Implementazione della scheda Esp32Cam
+16. Implementazione della scheda Esp32Cam
    - prevedere la connessione tramite porta USB di un modulo erp32S3 con cam e software IA per le seguenti funzioni:
      - Rilevamento movimento per prossimità persone
      - Riconoscimento facciale per identificazione uomo/donna
      - Valutazione eta dal volto
      - salvataggio dell'immagine per sicurezza vandalica
-15. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
-16. Crea la funzione status per i component SHT40, NTP, PWM, RS232
-17. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
+16. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
+17. Crea la funzione status per i component SHT40, NTP, PWM, RS232
+18. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
 18. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
 19. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
 20. Permangono del glimps sullo schermo MIPI

@@ -10,6 +10,7 @@
 #include "main.h"
 #include "tasks.h"
 #include "usb_cdc_scanner.h"
+#include "cctalk.h"
 #include "mdb.h"
 #include "web_ui_programs.h"
 
@@ -153,6 +154,7 @@ static uint32_t s_last_ads_disabled_log_ms = 0;
 static uint32_t s_last_program_timeout_log_ms = 0;
 static lv_obj_t *s_touch_reset_bound_scr = NULL;
 
+static void panel_enable_payment_devices_on_programs_open(void);
 static int32_t panel_effective_credit_cents(const fsm_ctx_t *snap);
 
 static char s_tr_credit[32] = "Credito";
@@ -216,6 +218,7 @@ static void show_program_end_effect(int32_t residual_credit)
     lv_obj_clear_flag(s_program_end_overlay, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(s_program_end_overlay);
     lv_obj_invalidate(s_program_end_overlay);
+    panel_enable_payment_devices_on_programs_open();
     s_program_end_effect_until_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()) + effect_ms;
 }
 
@@ -439,6 +442,16 @@ static void panel_enable_payment_devices_on_programs_open(void)
     }
 
     if (cfg->sensors.cctalk_enabled) {
+        if (cctalk_driver_init() == ESP_OK) {
+            const uint8_t dest_addr = CCTALK_DEFAULT_DEVICE_ADDR;
+            if (cctalk_reset_device(dest_addr, 1000U)) {
+                ESP_LOGI(TAG, "[C] Reset CCTalk eseguito con successo");
+            } else {
+                ESP_LOGW(TAG, "[C] Reset CCTalk fallito");
+            }
+        } else {
+            ESP_LOGW(TAG, "[C] cctalk_driver_init fallito durante il reinit");
+        }
         main_cctalk_send_initialization_sequence_async();
     }
 

@@ -4,6 +4,7 @@
 
 #include "cctalk.h"
 #include "device_config.h"
+#include "fsm.h"
 #include "http_services.h"
 #include "mdb.h"
 #include "modbus_relay.h"
@@ -20,21 +21,16 @@ extern const lv_font_t GoogleSans35;
 static lv_obj_t      *s_chrome_time_lbl   = NULL;
 static lv_timer_t    *s_chrome_time_timer  = NULL;
 static lv_obj_t      *s_chrome_status_icons[LVGL_CHROME_STATUS_ICON_COUNT] = {NULL, NULL, NULL, NULL, NULL};
-static bool           s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_COUNT] = {true, true, true, true, true};
+static device_component_status_t s_chrome_status[LVGL_CHROME_STATUS_ICON_COUNT] = {
+    DEVICE_COMPONENT_STATUS_DISABLED,
+    DEVICE_COMPONENT_STATUS_DISABLED,
+    DEVICE_COMPONENT_STATUS_DISABLED,
+    DEVICE_COMPONENT_STATUS_DISABLED,
+    DEVICE_COMPONENT_STATUS_DISABLED,
+};
 static lv_event_cb_t  s_flag_cb            = NULL;  /* callback per click bandiera */
 static void          *s_flag_ud            = NULL;
 static const uint8_t  s_chrome_embedded_icon_map[LVGL_CHROME_STATUS_ICON_COUNT] = {4, 0, 1, 2, 3};
-
-static bool chrome_component_is_online(device_component_status_t status)
-{
-    return status == DEVICE_COMPONENT_STATUS_ONLINE;
-}
-
-static bool chrome_component_is_ready(device_component_status_t status)
-{
-    return status == DEVICE_COMPONENT_STATUS_ONLINE ||
-           status == DEVICE_COMPONENT_STATUS_ACTIVE;
-}
 
 static device_component_status_t chrome_modbus_component_status(void)
 {
@@ -61,13 +57,39 @@ static device_component_status_t chrome_modbus_component_status(void)
     return DEVICE_COMPONENT_STATUS_OFFLINE;
 }
 
+static bool chrome_is_payment_status_icon(int index)
+{
+    return index == LVGL_CHROME_STATUS_ICON_CARD ||
+           index == LVGL_CHROME_STATUS_ICON_COIN ||
+           index == LVGL_CHROME_STATUS_ICON_QR;
+}
+
+static bool chrome_is_program_payments_disabled(void)
+{
+    fsm_ctx_t snap = {0};
+    if (!fsm_runtime_snapshot(&snap)) {
+        return false;
+    }
+
+    return (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED);
+}
+
 static void chrome_sync_component_status(void)
 {
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_MODBUS] = chrome_component_is_ready(chrome_modbus_component_status());
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CLOUD] = chrome_component_is_online(http_services_get_component_status());
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CARD] = chrome_component_is_online(mdb_get_component_status());
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_COIN] = chrome_component_is_online(cctalk_driver_get_component_status());
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_QR] = chrome_component_is_online(usb_cdc_scanner_get_component_status());
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_MODBUS] = chrome_modbus_component_status();
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_CLOUD] = http_services_get_component_status();
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_CARD] = mdb_get_component_status();
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_COIN] = cctalk_driver_get_component_status();
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_QR] = usb_cdc_scanner_get_component_status();
+}
+
+static bool chrome_status_uses_ok_icon(int index)
+{
+    if (index < 0 || index >= LVGL_CHROME_STATUS_ICON_COUNT) {
+        return false;
+    }
+
+    return s_chrome_status[index] != DEVICE_COMPONENT_STATUS_OFFLINE;
 }
 
 static const void *chrome_get_status_icon_src(int index)
@@ -76,12 +98,45 @@ static const void *chrome_get_status_icon_src(int index)
         return NULL;
     }
 
-    const void *emb = get_embedded_icon_src(s_chrome_embedded_icon_map[index], s_chrome_status_ok[index]);
+    const void *emb = get_embedded_icon_src(s_chrome_embedded_icon_map[index], chrome_status_uses_ok_icon(index));
     if (!emb) {
         ESP_LOGW("lvgl_page_chrome", "[C] Icona chrome %d embedded non disponibile", index);
     }
 
     return emb;
+}
+
+static lv_color_t chrome_get_status_icon_color(int index)
+{
+    if (index < 0 || index >= LVGL_CHROME_STATUS_ICON_COUNT) {
+        return lv_color_hex(0xFFFFFF);
+    }
+
+    if (!chrome_status_uses_ok_icon(index)) {
+        return lv_color_hex(0xFFFFFF);
+    }
+
+    if (chrome_is_payment_status_icon(index) && chrome_is_program_payments_disabled()) {
+        return lv_color_hex(0xFF0000);
+    }
+
+    return lv_color_hex(0xFFFFFF);
+}
+
+static void chrome_apply_status_icon_style(lv_obj_t *icon, int index)
+{
+    if (!icon || !lv_obj_is_valid(icon)) {
+        return;
+    }
+
+    if (!chrome_status_uses_ok_icon(index)) {
+        lv_obj_set_style_img_recolor_opa(icon, LV_OPA_TRANSP, LV_PART_MAIN);
+        return;
+    }
+
+    lv_color_t color = chrome_get_status_icon_color(index);
+    lv_obj_set_style_img_recolor(icon, color, LV_PART_MAIN);
+    lv_obj_set_style_img_recolor_opa(icon, LV_OPA_COVER, LV_PART_MAIN);
 }
 
 static void chrome_update_status_icons(void)
@@ -96,6 +151,7 @@ static void chrome_update_status_icons(void)
         if (src) {
             lv_image_set_src(s_chrome_status_icons[i], src);
         }
+        chrome_apply_status_icon_style(s_chrome_status_icons[i], i);
     }
 }
 
@@ -178,6 +234,7 @@ void lvgl_page_chrome_add(lv_obj_t *scr)
         lv_obj_set_style_pad_all(s_chrome_status_icons[i], 0, LV_PART_MAIN);
         lv_obj_set_style_border_width(s_chrome_status_icons[i], 0, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(s_chrome_status_icons[i], LV_OPA_TRANSP, LV_PART_MAIN);
+        chrome_apply_status_icon_style(s_chrome_status_icons[i], i);
         lv_obj_align(s_chrome_status_icons[i], LV_ALIGN_TOP_RIGHT,
                      -(right_margin + ((LVGL_CHROME_STATUS_ICON_COUNT - 1) - i) * (icon_size + gap)),
                      icons_top);
@@ -219,21 +276,27 @@ void lvgl_page_chrome_set_flag_callback(lv_event_cb_t cb, void *user_data)
     s_flag_ud = user_data;
 }
 
+static device_component_status_t chrome_status_from_bool(bool ok)
+{
+    return ok ? DEVICE_COMPONENT_STATUS_ONLINE : DEVICE_COMPONENT_STATUS_OFFLINE;
+}
+
 void lvgl_page_chrome_set_status_icon_state(uint8_t idx, bool ok)
 {
     if (idx >= LVGL_CHROME_STATUS_ICON_COUNT) {
         return;
     }
-    s_chrome_status_ok[idx] = ok;
+
+    s_chrome_status[idx] = chrome_status_from_bool(ok);
     chrome_update_status_icons();
 }
 
 void lvgl_page_chrome_set_status_icons(bool modbus_ok, bool cloud_ok, bool card_ok, bool coin_ok, bool qr_ok)
 {
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_MODBUS] = modbus_ok;
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CLOUD] = cloud_ok;
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_CARD] = card_ok;
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_COIN] = coin_ok;
-    s_chrome_status_ok[LVGL_CHROME_STATUS_ICON_QR] = qr_ok;
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_MODBUS] = chrome_status_from_bool(modbus_ok);
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_CLOUD] = chrome_status_from_bool(cloud_ok);
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_CARD] = chrome_status_from_bool(card_ok);
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_COIN] = chrome_status_from_bool(coin_ok);
+    s_chrome_status[LVGL_CHROME_STATUS_ICON_QR] = chrome_status_from_bool(qr_ok);
     chrome_update_status_icons();
 }
