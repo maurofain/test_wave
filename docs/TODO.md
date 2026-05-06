@@ -7,7 +7,8 @@
 1. logica pannello epaper: questo pannello ha una funzionameno molto ridotto rispetto agli LCD. All'avvio mostra un messaggio di benvenuto . Al ricevimento del credito nelle stesse modalità già esistenti mostra il credito disponibile .La scelta dei programmi avviene solo tramite pulsantiera. alla scelta di un programma inizia l'esecuzione e mantiene la logica di autorepeat già esistente , con countdown che ninvece di camiare colore passa in reverse, e con  sospensione e cambi programma da pulsantiera. al termine ci sarà un messaggio di ringraziamento . Nonsono previsti cambi di lingua, solo Italiano. Il modulo epapre comprende anche uno scanner QR che opera tramite la stessa porta rs232: dal modulo escono solo codici a barre/qrcode letti dalloscanner, e riceve invece i candi per la gestione del display e dei led di segnalazione (i led li vediamo per ultimi)
 2. per i testi devi utilizzare il metodo 0x01 0x01 per il countdown , il messaggio di benvenuto e il messaggio di ringraziamento , mentre per i crediti vanno usati 2 messaggi tipi 0x01 0xFF con il credito in carattere 100pt bold  e la scritta Credito messa sotto il numero in carattere 70 bold.
 3. NON IMPLEMENTARE QUESTA RIGA : Per il countdown stesso schema dei crediti ma con il nome del programma scelto in basso e considerando di fare un refresh parziale per il numero 
-4. Funzioni input i2c
+4. Operazioni di pagamento
+5. Funzioni input i2c
 
    - pin IN04 : se premuto all'avvio o al rilascio durante l'esecusione del firmware deve modificare la partizione di boot a FACTORY ed eseguire il reboot
 
@@ -21,23 +22,23 @@
      | 1    | 0    | Display 7"                      |
      | 0    | 1    | Display 10.1"                   |
      | 1    | 1    | Modulo epaper                   
-5. dopo aver inserito la moneta i crediti da DB non vengono somma, come se il token non fossa presentato
-6. sul display 10" le lingue non sono si aprono con il touch della bandiera
-7. DA COMPLETARE URGENTE : 
+6. dopo aver inserito la moneta i crediti da DB non vengono somma, come se il token non fossa presentato
+7. sul display 10" le lingue non sono si aprono con il touch della bandiera
+8. DA COMPLETARE URGENTE : 
 
    1. verifica funzionamento MH1001 con tasti
    2. 
-8. Caricamento remoto artefatti
+9. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
-9. File da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
-10. Verifica su gestione del credito
+10. File da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
+11. Verifica su gestione del credito
    - Il credito viene gestito in 2 modi: per l'esecuzione dei programmi usiamo il concetto di COIN (costo base del ciclo). Per la gestione dell'ammontare in denaro usiamo il centesimo di valuta (normalmente EURO).
    - Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenendo in memoria gli eventuali frazionari (es. 50 cent).
    - Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile: prima ECD e poi VCD.
    - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
-11. Quando viene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
+12. Quando viene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
 
-12. Verifica la gestione generale dei componenti hardware
+13. Verifica la gestione generale dei componenti hardware
    - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:
      1. `init`
      2. `activate`
@@ -49,7 +50,7 @@
        - `CCTalk`: esegue polling periodico, rileva la perdita del device, passa `offline` e tenta la reinizializzazione automatica con ritorno a `online` quando il device risponde di nuovo.
        - `Scanner USB`: esegue monitoraggio periodico del bus e tenta la riapertura del device; in caso di disconnessione passa `offline`. La riconnessione fisica è gestita, ma il ciclo completo di `setup` dopo reconnect non è ancora robusto quanto CCTalk.
        - `HttpServices`: esegue controllo periodico logico del servizio remoto, passa `offline` su errore/token invalido e gestisce recovery con relogin, keepalive e retry/backoff fino al ritorno `online`.
-13. Piano test endpoint e funzioni
+14. Piano test endpoint e funzioni
    - Strutturare i test in 4 livelli:
      - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
      - **Contract**: campi obbligatori e tipi minimi della risposta
@@ -67,32 +68,32 @@
      - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
      - 3 flow critici: SD, seriale unificato, backup config su SD
      - Report `junit.xml` + riepilogo markdown
-14. Config: valore per metodo di pagamento
+15. Config: valore per metodo di pagamento
    - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
    - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
-15. Ricezione config da server (`api/getconfig`)
+16. Ricezione config da server (`api/getconfig`)
    - L'API server `POST /api/getconfig` è definita ma il device non applica la configurazione ricevuta
    - Implementare il parsing della risposta e aggiornamento della config locale
 
-16. Implementazione della scheda Esp32Cam
+17. Implementazione della scheda Esp32Cam
    - prevedere la connessione tramite porta USB di un modulo erp32S3 con cam e software IA per le seguenti funzioni:
      - Rilevamento movimento per prossimità persone
      - Riconoscimento facciale per identificazione uomo/donna
      - Valutazione eta dal volto
      - salvataggio dell'immagine per sicurezza vandalica
-16. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
-17. Crea la funzione status per i component SHT40, NTP, PWM, RS232
-18. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
-18. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
-19. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
-20. Permangono del glimps sullo schermo MIPI
-21. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
-22. manca la voce FTP nello Stato Servizi : mettila dopo NTP e riorganizza la griglia 
-23.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' con un altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 al 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2. L'aggiornamento dei dati va fatto alla lettura del sensore SHT40. Va rimosso il task PWM dall'elenco dei task in quanto gestito insieme a SHT40. in /testuniamo  la sezione 'Sensore SHT40' e 'PWM' rinominandola 'SHT40 / PWM',mantenuiamo la visualizzazione di temperaturasportiamo i controlli ora in 'PWM' aggiungerndo uno switch  AUTO/MANUAL che su AUTO disabilita tutti i comandi PWM e su MANUAL permette di testare i canali PWM
-24.  va implemetato un nuovo device associato alla porta RS232 che è il display epaper utilizzato in alternativa al dispaly touch e descritto in /home/mauro/1P/MicroHard/test_epaper_bw . Va letto il documento /home/mauro/1P/MicroHard/test_epaper_bw/TODO.md dal punto 5 al punto 9 e vanno creati gli eventi da gestire tramnte la FSM principale per gestire questa interfaccia al posto del diasplay touch. Va creato il DNA per questo device verificando che sia disattivato (0) solo se il DNA di TOUCHSCREEN è attivo (1), con priorità a TOUCHCREEN. Verrà creato un documento Epaper_logic.md con la descrizione di come integrare il nuovo pannello nel flusso.
-25.  mostra in questo format tutti gli ingressi e le uscite di credito :
+18. L'interfaccia RS485 è utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
+19. Crea la funzione status per i component SHT40, NTP, PWM, RS232
+20. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
+21. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
+22. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
+23. Permangono del glimps sullo schermo MIPI
+24. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali più eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
+25. manca la voce FTP nello Stato Servizi : mettila dopo NTP e riorganizza la griglia 
+26.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' con un altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 al 100%, se il valore umidità letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2. L'aggiornamento dei dati va fatto alla lettura del sensore SHT40. Va rimosso il task PWM dall'elenco dei task in quanto gestito insieme a SHT40. in /testuniamo  la sezione 'Sensore SHT40' e 'PWM' rinominandola 'SHT40 / PWM',mantenuiamo la visualizzazione di temperaturasportiamo i controlli ora in 'PWM' aggiungerndo uno switch  AUTO/MANUAL che su AUTO disabilita tutti i comandi PWM e su MANUAL permette di testare i canali PWM
+27.  va implemetato un nuovo device associato alla porta RS232 che è il display epaper utilizzato in alternativa al dispaly touch e descritto in /home/mauro/1P/MicroHard/test_epaper_bw . Va letto il documento /home/mauro/1P/MicroHard/test_epaper_bw/TODO.md dal punto 5 al punto 9 e vanno creati gli eventi da gestire tramnte la FSM principale per gestire questa interfaccia al posto del diasplay touch. Va creato il DNA per questo device verificando che sia disattivato (0) solo se il DNA di TOUCHSCREEN è attivo (1), con priorità a TOUCHCREEN. Verrà creato un documento Epaper_logic.md con la descrizione di come integrare il nuovo pannello nel flusso.
+28.  mostra in questo format tutti gli ingressi e le uscite di credito :
 [0;32mI (41869) FSM_MB: [M] ╔════════════════════════════════════════════╗[0m
 [0;32mI (41889) FSM_MB: [M] ║ CREDITI RICEVUTI - PAGAMENTO               ║[0m
 [0;32mI (41889) FSM_MB: [M] ║ Importo: 4700 cent                         ║[0m

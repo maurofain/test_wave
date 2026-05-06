@@ -921,16 +921,16 @@ static void _set_defaults(device_config_t *config)
     // Numero pulsanti programma e coordinate geografiche
     config->num_programs = 10;   /* default: 10 programmi (2 colonne x 5 righe) */
     static const uint8_t s_default_touch_inputs[DEVICE_TOUCH_BUTTON_MAX] = {
-        DEVICE_TOUCH_INPUT_OPTO1,
-        DEVICE_TOUCH_INPUT_OPTO2,
-        DEVICE_TOUCH_INPUT_OPTO3,
-        DEVICE_TOUCH_INPUT_OPTO4,
-        DEVICE_TOUCH_BUTTON_UNASSIGNED,
-        DEVICE_TOUCH_BUTTON_UNASSIGNED,
-        DEVICE_TOUCH_BUTTON_UNASSIGNED,
-        DEVICE_TOUCH_BUTTON_UNASSIGNED,
-        DEVICE_TOUCH_BUTTON_UNASSIGNED,
-        DEVICE_TOUCH_BUTTON_UNASSIGNED,
+        DEVICE_TOUCH_INPUT_OPTO1, /* P1  → IN06 (OPTO1) */
+        DEVICE_TOUCH_INPUT_OPTO2, /* P2  → IN05 (OPTO2) */
+        DEVICE_TOUCH_INPUT_OPTO3, /* P3  → IN08 (OPTO3) */
+        DEVICE_TOUCH_INPUT_OPTO4, /* P4  → IN07 (OPTO4) */
+        9U,                       /* P5  → IN09 (Modbus DI1) */
+        10U,                      /* P6  → IN10 (Modbus DI2) */
+        11U,                      /* P7  → IN11 (Modbus DI3) */
+        12U,                      /* P8  → IN12 (Modbus DI4) */
+        13U,                      /* P9  → IN13 (Modbus DI5) */
+        14U,                      /* P10 → IN14 (Modbus DI6) */
     };
     for (size_t button_index = 0; button_index < DEVICE_TOUCH_BUTTON_MAX; ++button_index) {
         uint8_t default_input = s_default_touch_inputs[button_index];

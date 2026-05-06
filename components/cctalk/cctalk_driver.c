@@ -35,6 +35,7 @@ static uint8_t s_last_event_counter = 0;
 static uint32_t s_poll_error_streak = 0;
 static char s_coin_id_cache[16][16] = {{0}};
 static bool s_coin_id_cache_valid[16] = {0};
+static volatile cctalk_driver_state_t s_logical_state = CCTALK_DRIVER_STATE_ACTIVE;
 
 device_component_status_t cctalk_driver_get_component_status(void)
 {
@@ -49,6 +50,16 @@ device_component_status_t cctalk_driver_get_component_status(void)
     }
 
     if (!s_driver_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    // Stato logico OOS → sempre offline
+    if (s_logical_state == CCTALK_DRIVER_STATE_OOS) {
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
+    }
+
+    // Stato logico SUSPENDED → sospeso volontariamente, icona non in errore
+    if (s_logical_state == CCTALK_DRIVER_STATE_SUSPENDED) {
         return DEVICE_COMPONENT_STATUS_ACTIVE;
     }
 
@@ -887,6 +898,45 @@ bool cctalk_driver_is_acceptor_online(void)
     return online;
 }
 
+cctalk_driver_state_t cctalk_driver_get_state(void)
+{
+    return s_logical_state;
+}
+
+esp_err_t cctalk_driver_set_state(cctalk_driver_state_t state)
+{
+    // Aggiorna lo stato logico immediatamente
+    s_logical_state = state;
+
+    // Pubblica l'evento asincrono al task CCTalk
+    action_id_t action = (state == CCTALK_DRIVER_STATE_ACTIVE)
+                         ? ACTION_ID_CCTALK_START
+                         : ACTION_ID_CCTALK_STOP;
+
+    fsm_input_event_t ev = {
+        .from = AGN_ID_NONE,
+        .to = {AGN_ID_CCTALK},
+        .action = action,
+        .type = FSM_INPUT_EVENT_NONE,
+        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
+        .value_i32 = 0,
+        .value_u32 = 0,
+        .aux_u32 = 0,
+        .data_ptr = NULL,
+        .text = {0},
+    };
+
+    if (!fsm_event_publish(&ev, pdMS_TO_TICKS(50))) {
+        ESP_LOGW(TAG, "[C] cctalk_driver_set_state(%d): coda evento piena", (int)state);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "[C] cctalk_driver_set_state → %s",
+             (state == CCTALK_DRIVER_STATE_ACTIVE) ? "ACTIVE" :
+             (state == CCTALK_DRIVER_STATE_SUSPENDED) ? "SUSPENDED" : "OOS");
+    return ESP_OK;
+}
+
 #endif /* DNA_CCTALK == 0 */
 
 /*
@@ -897,6 +947,7 @@ bool cctalk_driver_is_acceptor_online(void)
 
 static bool s_mock_acceptor_enabled = false;
 static bool s_mock_driver_initialized = false;
+static volatile cctalk_driver_state_t s_mock_logical_state = CCTALK_DRIVER_STATE_ACTIVE;
 
 device_component_status_t cctalk_driver_get_component_status(void)
 {
@@ -907,6 +958,10 @@ device_component_status_t cctalk_driver_get_component_status(void)
     }
 
     if (!s_mock_driver_initialized) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    if (s_mock_logical_state == CCTALK_DRIVER_STATE_SUSPENDED) {
         return DEVICE_COMPONENT_STATUS_ACTIVE;
     }
 
@@ -977,6 +1032,18 @@ esp_err_t cctalk_driver_stop_acceptor(void)
 bool cctalk_driver_is_acceptor_enabled(void)
 {
     return s_mock_acceptor_enabled;
+}
+
+cctalk_driver_state_t cctalk_driver_get_state(void)
+{
+    return s_mock_logical_state;
+}
+
+esp_err_t cctalk_driver_set_state(cctalk_driver_state_t state)
+{
+    s_mock_logical_state = state;
+    ESP_LOGI(TAG, "[C] [MOCK] cctalk_driver_set_state(%d)", (int)state);
+    return ESP_OK;
 }
 
 

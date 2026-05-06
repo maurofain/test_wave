@@ -145,9 +145,13 @@ static bool tasks_is_program_active(void)
 
 static bool tasks_is_modbus_runtime_blocked(void)
 {
+    /* Nota: tasks_is_program_active() è stato rimosso intenzionalmente.
+     * Bloccare il Modbus durante l'esecuzione di un programma impedisce
+     * l'attivazione delle uscite R5-R12 (outputId 9-16), che sono appunto
+     * quelle Modbus. Le uscite devono poter essere settate anche a programma
+     * in corso. Il blocco per OOS e hard-inhibit rimane. */
     return tasks_is_out_of_service_state() ||
-           tasks_is_modbus_hard_inhibited() ||
-           tasks_is_program_active();
+           tasks_is_modbus_hard_inhibited();
 }
 
 bool digital_io_modbus_runtime_allowed(void)
@@ -499,31 +503,6 @@ static bool tasks_publish_io_process_event(agn_id_t sender,
     return fsm_event_publish(&event, pdMS_TO_TICKS(20));
 }
 
-static bool tasks_publish_cctalk_control_event(action_id_t action)
-{
-    if (action != ACTION_ID_CCTALK_START && action != ACTION_ID_CCTALK_STOP) {
-        return false;
-    }
-
-    if (!fsm_event_queue_init(0)) {
-        return false;
-    }
-
-    fsm_input_event_t event = {
-        .from = AGN_ID_FSM,
-        .to = {AGN_ID_CCTALK},
-        .action = action,
-        .type = FSM_INPUT_EVENT_NONE,
-        .timestamp_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount()),
-        .value_i32 = 0,
-        .value_u32 = 0,
-        .aux_u32 = 0,
-        .data_ptr = NULL,
-        .text = {0},
-    };
-
-    return fsm_event_publish(&event, pdMS_TO_TICKS(30));
-}
 
 static uint8_t tasks_find_program_id_for_input(uint8_t input_id)
 {
@@ -2008,6 +1987,9 @@ static void rs485_task(void *arg)
     esp_err_t last_init_err = ESP_OK;
     esp_err_t last_poll_err = ESP_OK;
     bool bootstrap_probe_done = false;
+    /* Stato precedente degli input Modbus per rilevare i fronti 0→1 */
+    uint8_t prev_input_bits[MODBUS_RELAY_MAX_BYTES] = {0};
+    bool prev_input_valid = false;
 
     while (true) {
         bool modbus_hard_inhibit = tasks_is_modbus_hard_inhibited();
@@ -2021,6 +2003,7 @@ static void rs485_task(void *arg)
             last_init_err = ESP_OK;
             last_poll_err = ESP_OK;
             bootstrap_probe_done = false;
+            prev_input_valid = false;
             vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(200));
             continue;
         }
@@ -2033,6 +2016,7 @@ static void rs485_task(void *arg)
             last_init_err = ESP_OK;
             last_poll_err = ESP_OK;
             bootstrap_probe_done = false;
+            prev_input_valid = false;
             vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(200));
             continue;
         }
@@ -2123,8 +2107,71 @@ static void rs485_task(void *arg)
                 if (poll_err != ESP_OK && poll_err != last_poll_err) {
                     ESP_LOGW(TAG, "[M] Modbus poll RS485 fallita: %s", esp_err_to_name(poll_err));
                     last_poll_err = poll_err;
+                    prev_input_valid = false;
                 } else if (poll_err == ESP_OK) {
                     last_poll_err = ESP_OK;
+
+                    /* Rilevamento fronti 0→1 sugli input Modbus */
+                    modbus_relay_status_t mb_status = {0};
+                    if (modbus_relay_get_status(&mb_status) == ESP_OK) {
+                        uint16_t input_count = mb_status.input_count;
+                        if (input_count > DIGITAL_IO_MODBUS_INPUT_COUNT) {
+                            input_count = DIGITAL_IO_MODBUS_INPUT_COUNT;
+                        }
+
+                        if (!prev_input_valid) {
+                            memcpy(prev_input_bits, mb_status.input_bits, sizeof(prev_input_bits));
+                            prev_input_valid = true;
+                        } else {
+                            for (uint16_t bit = 0; bit < input_count; ++bit) {
+                                uint8_t byte_idx = (uint8_t)(bit / 8U);
+                                uint8_t bit_mask = (uint8_t)(1U << (bit % 8U));
+                                bool was_on = (prev_input_bits[byte_idx] & bit_mask) != 0U;
+                                bool is_on  = (mb_status.input_bits[byte_idx] & bit_mask) != 0U;
+
+                                if (!was_on && is_on) {
+                                    /* Fronte 0→1: pubblica evento identico agli input locali */
+                                    uint8_t input_id = (uint8_t)(DIGITAL_IO_FIRST_MODBUS_INPUT + bit);
+                                    char input_code[24] = {0};
+                                    (void)digital_io_input_get_code(input_id, input_code, sizeof(input_code));
+
+                                    uint8_t program_id = tasks_find_program_id_for_input(input_id);
+                                    if (program_id != 0U) {
+                                        esp_err_t pub_err = tasks_publish_program_button_action(program_id, AGN_ID_RS485);
+                                        if (pub_err != ESP_OK) {
+                                            ESP_LOGW(TAG,
+                                                     "[M] IN_MB%02u -> programma %u non pubblicato: %s",
+                                                     (unsigned)(bit + 1U),
+                                                     (unsigned)program_id,
+                                                     tasks_err_to_name(pub_err));
+                                        } else {
+                                            ESP_LOGI(TAG,
+                                                     "[M] IN_MB%02u -> programma %u: fronte 0→1 Modbus, azione equivalente al touch",
+                                                     (unsigned)(bit + 1U),
+                                                     (unsigned)program_id);
+                                        }
+                                    } else {
+                                        /* Input non mappato a programma: invia a io_process */
+                                        if (!tasks_publish_io_process_event(AGN_ID_RS485,
+                                                                            ACTION_ID_DIGITAL_IO_INPUT_RISING,
+                                                                            (uint32_t)input_id,
+                                                                            0U,
+                                                                            input_code)) {
+                                            ESP_LOGW(TAG,
+                                                     "[M] Publish verso io_process fallito per IN_MB%02u",
+                                                     (unsigned)(bit + 1U));
+                                        } else {
+                                            ESP_LOGI(TAG,
+                                                     "[M] IN_MB%02u (%s): fronte 0→1 Modbus pubblicato verso io_process",
+                                                     (unsigned)(bit + 1U),
+                                                     input_code[0] != '\0' ? input_code : "?");
+                                        }
+                                    }
+                                }
+                            }
+                            memcpy(prev_input_bits, mb_status.input_bits, sizeof(prev_input_bits));
+                        }
+                    }
                 }
             }
         } else if (modbus_relay_is_running()) {
@@ -2132,6 +2179,7 @@ static void rs485_task(void *arg)
             last_init_err = ESP_OK;
             last_poll_err = ESP_OK;
             bootstrap_probe_done = false;
+            prev_input_valid = false;
         }
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(delay_ms));
@@ -2206,8 +2254,6 @@ static void fsm_task(void *arg)
     /* contatore per il log "alive" ogni 10 secondi */
     uint32_t alive_ms = 0;
     static const uint32_t ALIVE_INTERVAL_MS = 10000;
-    bool cctalk_forced_stop_for_vcd = false;
-    bool cctalk_forced_stop_for_program = false;
     bool scanner_forced_off_for_program = false;
     bool mdb_forced_reset_for_program = false;
     TickType_t next_health_check = xTaskGetTickCount();
@@ -2299,11 +2345,8 @@ static void fsm_task(void *arg)
                         tasks_set_out_of_service_runtime(false);
 
                         if (cfg && cfg->sensors.cctalk_enabled) {
-                            if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_START)) {
-                                ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo uscita OUT_OF_SERVICE");
-                            } else {
-                                ESP_LOGW(TAG, "[M] Riabilitazione gettoniera CCTALK fallita dopo uscita OUT_OF_SERVICE");
-                            }
+                            cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+                            ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo uscita OUT_OF_SERVICE");
                         }
 
                         if (cfg && cfg->scanner.enabled) {
@@ -2414,31 +2457,22 @@ static void fsm_task(void *arg)
                La disabilitiamo solo in sessione VCD bloccata. */
             bool cctalk_stop_needed = vcd_locked_session;
 
-            if (cctalk_stop_needed && !cctalk_forced_stop_for_vcd && !cctalk_forced_stop_for_program) {
-                if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_STOP)) {
-                    cctalk_forced_stop_for_program = active_program_session;
-                    if (active_program_session) {
-                        ESP_LOGI(TAG, "[M] Gettoniera CCTALK disabilitata durante programma attivo");
-                    } else {
-                        cctalk_forced_stop_for_vcd = true;
-                        ESP_LOGI(TAG, "[M] Gettoniera CCTALK disabilitata durante sessione VCD");
-                    }
+            if (cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_ACTIVE) {
+                cctalk_driver_set_state(CCTALK_DRIVER_STATE_SUSPENDED);
+                if (active_program_session) {
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK sospesa durante programma attivo");
                 } else {
-                    ESP_LOGW(TAG, "[M] Richiesta stop gettoniera CCTALK non pubblicata (sessione VCD)");
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK sospesa durante sessione VCD");
                 }
-            } else if (!cctalk_stop_needed && (cctalk_forced_stop_for_vcd || cctalk_forced_stop_for_program) &&
+            } else if (!cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED &&
                        (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
-                if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_START)) {
-                    cctalk_forced_stop_for_vcd = false;
-                    cctalk_forced_stop_for_program = false;
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo sessione VCD");
-                } else {
-                    ESP_LOGW(TAG, "[M] Richiesta start gettoniera CCTALK non pubblicata (sessione VCD)");
-                }
+                cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+                ESP_LOGI(TAG, "[M] Gettoniera CCTALK riattivata dopo sessione VCD/programma");
             }
         } else {
-            cctalk_forced_stop_for_vcd = false;
-            cctalk_forced_stop_for_program = false;
+            if (cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED) {
+                cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+            }
         }
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->scanner.enabled) {
@@ -2515,8 +2549,13 @@ static void fsm_task(void *arg)
                      (unsigned long)esp_get_free_heap_size());
         }
 
+        /* Copre anche FSM_STATE_ADS: con ads_enabled=true la FSM passa
+         * RUNNING/PAUSED -> ADS senza toccare IDLE o CREDIT, ma i relay
+         * devono essere resettati ugualmente. */
         bool left_program_state = (state_before == FSM_STATE_RUNNING || state_before == FSM_STATE_PAUSED) &&
-                                  (fsm.state == FSM_STATE_IDLE || fsm.state == FSM_STATE_CREDIT);
+                                  (fsm.state == FSM_STATE_IDLE ||
+                                   fsm.state == FSM_STATE_CREDIT ||
+                                   fsm.state == FSM_STATE_ADS);
         bool forced_stop_requested = event_received &&
                                      event.type == FSM_INPUT_EVENT_PROGRAM_STOP &&
                                      event.aux_u32 == 0U;
@@ -2528,14 +2567,9 @@ static void fsm_task(void *arg)
             tasks_apply_n_run();
 
             if (cfg && cfg->sensors.cctalk_enabled &&
-                (cctalk_forced_stop_for_program || cctalk_forced_stop_for_vcd)) {
-                if (tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_START)) {
-                    cctalk_forced_stop_for_program = false;
-                    cctalk_forced_stop_for_vcd = false;
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata al termine del programma");
-                } else {
-                    ESP_LOGW(TAG, "[M] Richiesta start CCTALK non pubblicata al termine del programma");
-                }
+                cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED) {
+                cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+                ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata al termine del programma");
             }
 
             if (cfg && cfg->scanner.enabled && scanner_forced_off_for_program) {
@@ -2589,7 +2623,7 @@ static void fsm_task(void *arg)
 
         if ((state_before != fsm.state) && fsm.state == FSM_STATE_OUT_OF_SERVICE && cfg) {
             if (cfg->sensors.cctalk_enabled) {
-                (void)tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_STOP);
+                cctalk_driver_set_state(CCTALK_DRIVER_STATE_OOS);
             }
             if (cfg->scanner.enabled) {
                 usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_OOS);

@@ -1338,6 +1338,24 @@ modbus_read_end:
             esp_err_t err_di = modbus_relay_read_discrete_inputs(slave_id, input_start, input_count,
                                                                   input_bits, sizeof(input_bits));
 
+            /* Se FC02 fallisce, prova fallback con FC01 (alcuni moduli non supportano FC02) */
+            bool used_di_fallback = false;
+            if (err_di != ESP_OK) {
+                ESP_LOGW(TAG, "[C] modbus/poll: FC02 fallita (%s), provo fallback FC01",
+                         esp_err_to_name(err_di));
+                memset(input_bits, 0, sizeof(input_bits));
+                esp_err_t fb_err = modbus_relay_read_coils(slave_id, input_start, input_count,
+                                                           input_bits, sizeof(input_bits));
+                if (fb_err == ESP_OK) {
+                    err_di = ESP_OK;
+                    used_di_fallback = true;
+                    ESP_LOGI(TAG, "[C] modbus/poll: fallback FC01 riuscito per input");
+                } else {
+                    ESP_LOGW(TAG, "[C] modbus/poll: fallback FC01 fallito: %s",
+                             esp_err_to_name(fb_err));
+                }
+            }
+
             const size_t poll_cap = 1024;
             char *poll_out = malloc(poll_cap);
             if (!poll_out) {
@@ -1366,8 +1384,9 @@ modbus_read_end:
                 }
 
                 pos += snprintf(poll_out + pos, poll_cap - pos,
-                                "],\"err_co\":\"%s\",\"err_di\":\"%s\"}",
-                                esp_err_to_name(err_co), esp_err_to_name(err_di));
+                                "],\"err_co\":\"%s\",\"err_di\":\"%s\",\"di_src\":\"%s\"}",
+                                esp_err_to_name(err_co), esp_err_to_name(err_di),
+                                used_di_fallback ? "FC01" : "FC02");
 
                 httpd_resp_set_type(req, "application/json");
                 esp_err_t ret = httpd_resp_send(req, poll_out, strlen(poll_out));

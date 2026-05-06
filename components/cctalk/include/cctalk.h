@@ -75,6 +75,13 @@ bool cctalk_read_buffered_credit(uint8_t dest_addr, cctalk_buffer_t *buffer, uin
 bool cctalk_request_insertion_status(uint8_t dest_addr, uint8_t *status, uint32_t timeout_ms);
 bool cctalk_reset_device(uint8_t dest_addr, uint32_t timeout_ms);
 
+// Stato logico del driver CCTalk
+typedef enum {
+    CCTALK_DRIVER_STATE_ACTIVE = 0,   // accetta monete (acceptor abilitato)
+    CCTALK_DRIVER_STATE_SUSPENDED,    // sospesa temporaneamente (VCD/programma)
+    CCTALK_DRIVER_STATE_OOS,          // fuori servizio (errore critico)
+} cctalk_driver_state_t;
+
 // Inizializza il driver CCtalk (installa UART).
 // Il task di ricezione va avviato separatamente chiamando cctalk_task_run().
 esp_err_t cctalk_driver_init(void);
@@ -85,6 +92,10 @@ esp_err_t cctalk_driver_stop_acceptor(void);
 bool cctalk_driver_is_acceptor_enabled(void);
 bool cctalk_driver_is_acceptor_online(void);
 device_component_status_t cctalk_driver_get_component_status(void);
+
+// Gestione stato logico: set_state pubblica un evento asincrono al task CCTalk.
+esp_err_t             cctalk_driver_set_state(cctalk_driver_state_t state);
+cctalk_driver_state_t cctalk_driver_get_state(void);
 
 // Entry point del task di ricezione CCtalk. Da chiamare dopo cctalk_driver_init().
 void cctalk_task_run(void *arg);
