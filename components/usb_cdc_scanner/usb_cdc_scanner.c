@@ -60,6 +60,9 @@ static usb_cdc_scanner_callback_t s_on_barcode = NULL;
 static volatile bool s_scanner_connected = false;
 static TaskHandle_t s_usb_open_task = NULL;
 
+// Stato logico del dispositivo scanner (ACTIVE / SUSPENDED / OOS)
+static volatile usb_cdc_scanner_state_t s_scanner_logical_state = USB_CDC_SCANNER_STATE_ACTIVE;
+
 __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
 {
     return true;
@@ -84,10 +87,21 @@ device_component_status_t usb_cdc_scanner_get_component_status(void)
         return DEVICE_COMPONENT_STATUS_DISABLED;
     }
 
+    // Stato OOS: icona errore
+    if (s_scanner_logical_state == USB_CDC_SCANNER_STATE_OOS) {
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
+    }
+
     if (!s_usb_host_initialized) {
         return DEVICE_COMPONENT_STATUS_ACTIVE;
     }
 
+    // Stato SUSPENDED: scanner operativo ma temporaneamente disabilitato (icona ok)
+    if (s_scanner_logical_state == USB_CDC_SCANNER_STATE_SUSPENDED) {
+        return DEVICE_COMPONENT_STATUS_ACTIVE;
+    }
+
+    // Stato ACTIVE: riflette connessione fisica
     return s_scanner_connected ? DEVICE_COMPONENT_STATUS_ONLINE
                                : DEVICE_COMPONENT_STATUS_OFFLINE;
 }
@@ -818,6 +832,61 @@ bool usb_cdc_scanner_is_connected(void)
     return s_scanner_connected;
 }
 
+usb_cdc_scanner_state_t usb_cdc_scanner_get_state(void)
+{
+    return s_scanner_logical_state;
+}
+
+/**
+ * @brief Imposta lo stato logico dello scanner e invia i comandi HW corrispondenti.
+ *
+ * ACTIVE     → setup + on (scanner abilitato e pronto)
+ * SUSPENDED  → off (scanner disabilitato temporaneamente, es. durante un programma)
+ * OOS        → off (scanner fuori servizio)
+ *
+ * @param state Nuovo stato logico desiderato.
+ * @return esp_err_t ESP_OK se il comando HW è andato a buon fine o se non necessario.
+ */
+esp_err_t usb_cdc_scanner_set_state(usb_cdc_scanner_state_t state)
+{
+    s_scanner_logical_state = state;
+
+    switch (state) {
+    case USB_CDC_SCANNER_STATE_ACTIVE: {
+        esp_err_t err_setup = usb_cdc_scanner_send_setup_command();
+        esp_err_t err_on    = usb_cdc_scanner_send_on_command();
+        if (err_setup == ESP_OK && err_on == ESP_OK) {
+            ESP_LOGI(TAG, "[C] Scanner → ACTIVE (setup+on OK)");
+        } else {
+            ESP_LOGW(TAG, "[C] Scanner → ACTIVE fallito (setup=%s on=%s)",
+                     esp_err_to_name(err_setup), esp_err_to_name(err_on));
+            return (err_on != ESP_OK) ? err_on : err_setup;
+        }
+        return ESP_OK;
+    }
+    case USB_CDC_SCANNER_STATE_SUSPENDED: {
+        esp_err_t err = usb_cdc_scanner_send_off_command();
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "[C] Scanner → SUSPENDED (off OK)");
+        } else {
+            ESP_LOGW(TAG, "[C] Scanner → SUSPENDED fallito (off=%s)", esp_err_to_name(err));
+        }
+        return err;
+    }
+    case USB_CDC_SCANNER_STATE_OOS: {
+        esp_err_t err = usb_cdc_scanner_send_off_command();
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "[C] Scanner → OOS (off OK)");
+        } else {
+            ESP_LOGW(TAG, "[C] Scanner → OOS fallito (off=%s)", esp_err_to_name(err));
+        }
+        return err;
+    }
+    default:
+        return ESP_ERR_INVALID_ARG;
+    }
+}
+
 #endif /* DNA_USB_SCANNER == 0 */
 
 /*
@@ -947,6 +1016,17 @@ esp_err_t usb_cdc_scanner_send_off_command(void)
 bool usb_cdc_scanner_is_connected(void)
 {
     return false;
+}
+
+usb_cdc_scanner_state_t usb_cdc_scanner_get_state(void)
+{
+    return USB_CDC_SCANNER_STATE_ACTIVE;
+}
+
+esp_err_t usb_cdc_scanner_set_state(usb_cdc_scanner_state_t state)
+{
+    ESP_LOGI(TAG_MOCK, "[C] [MOCK] usb_cdc_scanner_set_state(%d)", (int)state);
+    return ESP_OK;
 }
 
 #endif /* DNA_USB_SCANNER == 1 */

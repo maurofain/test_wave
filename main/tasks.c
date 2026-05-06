@@ -2307,16 +2307,8 @@ static void fsm_task(void *arg)
                         }
 
                         if (cfg && cfg->scanner.enabled) {
-                            esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
-                            esp_err_t on_err = usb_cdc_scanner_send_on_command();
-                            if (setup_err == ESP_OK && on_err == ESP_OK) {
-                                ESP_LOGI(TAG, "[M] Scanner riabilitato dopo uscita OUT_OF_SERVICE");
-                            } else {
-                                ESP_LOGW(TAG,
-                                         "[M] Riabilitazione scanner fallita dopo uscita OUT_OF_SERVICE (setup=%s on=%s)",
-                                         esp_err_to_name(setup_err),
-                                         esp_err_to_name(on_err));
-                            }
+                            usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+                            ESP_LOGI(TAG, "[M] Scanner impostato ACTIVE dopo uscita OUT_OF_SERVICE");
                         }
 
                         memset(&active_oos, 0, sizeof(active_oos));
@@ -2451,26 +2443,14 @@ static void fsm_task(void *arg)
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->scanner.enabled) {
             if (active_program_session && !scanner_forced_off_for_program) {
-                esp_err_t off_err = usb_cdc_scanner_send_off_command();
-                if (off_err == ESP_OK) {
-                    scanner_forced_off_for_program = true;
-                    ESP_LOGI(TAG, "[M] Scanner QR disabilitato durante programma attivo");
-                } else {
-                    ESP_LOGW(TAG, "[M] Richiesta off scanner non pubblicata durante programma attivo: %s", esp_err_to_name(off_err));
-                }
+                usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_SUSPENDED);
+                scanner_forced_off_for_program = true;
+                ESP_LOGI(TAG, "[M] Scanner QR sospeso durante programma attivo");
             } else if (!active_program_session && scanner_forced_off_for_program &&
                        (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
-                esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
-                esp_err_t on_err = usb_cdc_scanner_send_on_command();
-                if (setup_err == ESP_OK && on_err == ESP_OK) {
-                    scanner_forced_off_for_program = false;
-                    ESP_LOGI(TAG, "[M] Scanner QR riabilitato dopo fine programma");
-                } else {
-                    ESP_LOGW(TAG,
-                             "[M] Riabilitazione scanner fallita dopo fine programma (setup=%s on=%s)",
-                             esp_err_to_name(setup_err),
-                             esp_err_to_name(on_err));
-                }
+                usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+                scanner_forced_off_for_program = false;
+                ESP_LOGI(TAG, "[M] Scanner QR riattivato dopo fine programma");
             }
         } else {
             scanner_forced_off_for_program = false;
@@ -2559,17 +2539,9 @@ static void fsm_task(void *arg)
             }
 
             if (cfg && cfg->scanner.enabled && scanner_forced_off_for_program) {
-                esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
-                esp_err_t on_err = usb_cdc_scanner_send_on_command();
-                if (setup_err == ESP_OK && on_err == ESP_OK) {
-                    scanner_forced_off_for_program = false;
-                    ESP_LOGI(TAG, "[M] Scanner QR riabilitato al termine del programma");
-                } else {
-                    ESP_LOGW(TAG,
-                             "[M] Riabilitazione scanner al termine del programma fallita (setup=%s on=%s)",
-                             esp_err_to_name(setup_err),
-                             esp_err_to_name(on_err));
-                }
+                usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+                scanner_forced_off_for_program = false;
+                ESP_LOGI(TAG, "[M] Scanner QR riattivato al termine del programma");
             }
 
             bool hardware_session_open = false;
@@ -2620,7 +2592,7 @@ static void fsm_task(void *arg)
                 (void)tasks_publish_cctalk_control_event(ACTION_ID_CCTALK_STOP);
             }
             if (cfg->scanner.enabled) {
-                (void)usb_cdc_scanner_send_off_command();
+                usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_OOS);
             }
         }
 
@@ -2875,7 +2847,7 @@ static bool scanner_cooldown_is_active(TickType_t now)
 static void scanner_cooldown_tick(void)
 {
     if (tasks_is_out_of_service_state()) {
-        (void)usb_cdc_scanner_send_off_command();
+        usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_OOS);
         s_scanner_reenable_pending = false;
         s_scanner_cooldown_active = false;
         s_scanner_reenable_attempts = 0;
@@ -2891,8 +2863,8 @@ static void scanner_cooldown_tick(void)
         return;
     }
 
-    esp_err_t on_err = usb_cdc_scanner_send_on_command();
-    if (on_err == ESP_OK) {
+    esp_err_t err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+    if (err == ESP_OK) {
         s_scanner_reenable_pending = false;
         s_scanner_cooldown_active = false;
         s_scanner_reenable_attempts = 0;
@@ -2904,27 +2876,7 @@ static void scanner_cooldown_tick(void)
         if ((s_scanner_reenable_attempts % 10U) == 1U) {
             ESP_LOGW("SCANNER", "[M] Riattivazione scanner fallita (tentativo=%lu): %s",
                      (unsigned long)s_scanner_reenable_attempts,
-                     esp_err_to_name(on_err));
-        }
-
-        if (s_scanner_reenable_attempts >= 5U) {
-            esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
-            if (setup_err == ESP_OK) {
-                on_err = usb_cdc_scanner_send_on_command();
-                if (on_err == ESP_OK) {
-                    s_scanner_reenable_pending = false;
-                    s_scanner_cooldown_active = false;
-                    s_scanner_reenable_attempts = 0;
-                    ESP_LOGI("SCANNER", "[M] Scanner riattivato con fallback setup+on");
-                    return;
-                }
-            }
-
-            if ((s_scanner_reenable_attempts % 10U) == 1U) {
-                ESP_LOGW("SCANNER", "[M] Fallback setup+on fallito (setup=%s on=%s)",
-                         esp_err_to_name(setup_err),
-                         esp_err_to_name(on_err));
-            }
+                     esp_err_to_name(err));
         }
 
         s_scanner_cooldown_until = now + pdMS_TO_TICKS(500);
@@ -3087,14 +3039,9 @@ static void scanner_on_barcode_cb(const char *barcode)
     s_scanner_cooldown_active_ms = cooldown_ms;
     s_scanner_cooldown_until = now + pdMS_TO_TICKS(cooldown_ms);
 
-    esp_err_t off_err = usb_cdc_scanner_send_off_command();
-    if (off_err == ESP_OK) {
-        ESP_LOGI("SCANNER", "[M] Scanner spento per %lu ms dopo lettura QR",
-                 (unsigned long)cooldown_ms);
-    } else {
-        ESP_LOGW("SCANNER", "[M] Spegnimento scanner fallito: %s",
-                 esp_err_to_name(off_err));
-    }
+    usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_SUSPENDED);
+    ESP_LOGI("SCANNER", "[M] Scanner sospeso per %lu ms dopo lettura QR",
+             (unsigned long)cooldown_ms);
 
     ESP_LOGI("SCANNER", "[M] Barcode clean: %s", clean_barcode);
     /* Barcode readings: use distinct tag so UI can display readings separately */

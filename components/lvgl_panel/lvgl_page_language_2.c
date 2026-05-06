@@ -108,28 +108,11 @@ static void panel_reenable_scanner_async(void *arg)
 
 static void panel_reenable_scanner(const char *context)
 {
-    esp_err_t on_err = usb_cdc_scanner_send_on_command();
-    if (on_err == ESP_OK) {
-        ESP_LOGI(TAG, "[C] Riattivazione scanner %s: ON inviato", context ? context : "");
-        return;
-    }
-
-    ESP_LOGI(TAG, "[C] Riattivazione scanner FALLITA");
-    esp_err_t setup_err = usb_cdc_scanner_send_setup_command();
-    esp_err_t retry_on_err = ESP_FAIL;
-    if (setup_err == ESP_OK) {
-        retry_on_err = usb_cdc_scanner_send_on_command();
-    }
-
-    if (setup_err == ESP_OK && retry_on_err == ESP_OK) {
-        ESP_LOGI(TAG, "[C] Riattivazione scanner %s: fallback setup+on riuscito", context ? context : "");
+    esp_err_t err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "[C] Riattivazione scanner %s: OK", context ? context : "");
     } else {
-        ESP_LOGW(TAG,
-                 "[C] Riattivazione scanner %s fallita (on=%s setup=%s retry_on=%s)",
-                 context ? context : "",
-                 esp_err_to_name(on_err),
-                 esp_err_to_name(setup_err),
-                 esp_err_to_name(retry_on_err));
+        ESP_LOGW(TAG, "[C] Riattivazione scanner %s fallita (%s)", context ? context : "", esp_err_to_name(err));
     }
 }
 
