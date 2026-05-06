@@ -93,7 +93,7 @@ typedef enum {
     DEVICE_DISPLAY_TYPE_NONE = 0,            ///< Nessun display selezionato
     DEVICE_DISPLAY_TYPE_DSI7_TOUCH = 1,      ///< Display DSI 7" con touch (A)
     DEVICE_DISPLAY_TYPE_DSI101_TOUCH = 2,    ///< Display DSI 10.1" con touch (B)
-    DEVICE_DISPLAY_TYPE_EPAPER_RS232 = 3,    ///< E-Paper via modulo RS232
+    DEVICE_DISPLAY_TYPE_EPAPER_USB = 3,      ///< Modulo E-Paper via USB CDC
 } device_display_type_t;
 
 /**

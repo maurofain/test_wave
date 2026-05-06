@@ -1,26 +1,26 @@
-# Piano di implementazione: supporto ingressi seriali STRL_PROTOCOL per `DEVICE_DISPLAY_TYPE_EPAPER_RS232`
+# Piano di implementazione: supporto ingressi seriali STRL_PROTOCOL per `DEVICE_DISPLAY_TYPE_EPAPER_USB`
 
 ## Obiettivo
-Supportare due possibili sorgenti di input/output seriale per il protocollo `STRL_PROTOCOL` quando il display è impostato su `DEVICE_DISPLAY_TYPE_EPAPER_RS232`:
+Supportare due possibili sorgenti di input/output seriale per il protocollo `STRL_PROTOCOL` quando il display è impostato su `DEVICE_DISPLAY_TYPE_EPAPER_USB`:
 - porta RS232 fisica su GPIO36/RX e GPIO46/TX
 - porta USB CDC sulla porta USB
 
-Questa scelta deve essere configurabile e gestita correttamente a runtime, mantenendo l'attuale logica `EPAPER_RS232` per l'output display via RS232.
+Questa scelta deve essere configurabile e gestita correttamente a runtime, mantenendo l'attuale logica `EPAPER_USB` per l'output display via USB CDC.
 
 ## Contesto attuale
-- `DEVICE_DISPLAY_TYPE_EPAPER_RS232` è già definito in `components/device_config/include/device_config.h`.
+- `DEVICE_DISPLAY_TYPE_EPAPER_USB` è già definito in `components/device_config/include/device_config.h`.
 - Il display e-paper viene inizializzato da `main/init.c` usando `rs232_epaper_init()` e `rs232_epaper_display_welcome()`.
-- La logica di avvio task forza `usb_scanner` IDLE e `rs232` RUN quando `cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 && cfg->sensors.rs232_enabled`.
+- La logica di avvio task deve garantire `usb_scanner` RUN quando `cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB`.
 - Il componente `components/usb_cdc_scanner` gestisce l'interfaccia scanner USB CDC.
 - Il componente `components/rs232/rs232_epaper.c` gestisce la scrittura verso il display e-paper via RS232.
 
 ## Requisiti funzionali
-1. Quando `display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232`, il sistema deve poter scegliere tra due canali dati:
+1. Quando `display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB`, il sistema deve poter scegliere tra due canali dati:
    - `SERIAL_SOURCE_RS232` → usare la porta RS232 fisica su GPIO36/46
    - `SERIAL_SOURCE_USBCDC` → usare la porta USB CDC per ricevere i dati scanner
 2. L'output verso l'e-paper rimane su RS232 fisico in ogni caso, perché il display e-paper è fisicamente collegato a RS232.
 3. Il canale scanner `STRL_PROTOCOL` deve poter ricevere input dal canale selezionato e consegnarlo al flusso parser/scanner esistente.
-4. Quando è selezionata `USBCDC`, il task `usb_scanner` deve poter restare abilitato anche in `EPAPER_RS232` e il task `rs232` deve continuare a fornire il display.
+4. In `EPAPER_USB`, il task `usb_scanner` deve restare abilitato e fornire sia display che barcode via USB CDC.
 5. Quando è selezionata `RS232`, la porta RS232 fisica deve essere condivisa con l'e-paper secondo le regole HW e SW previste, e `usb_scanner` deve restare `IDLE` se non necessario.
 6. Deve essere possibile cambiare l'impostazione tramite configurazione persistente (`device_config`) e in fase di avvio/runtime al boot.
 
@@ -34,8 +34,8 @@ Aggiungere in `device_display_config_t` o nella configurazione scanner un nuovo 
 
 ### 2) Comportamento dei task
 Modificare `main/tasks.c`:
-- `usb_scanner`: non forzare IDLE se `display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232` ma `serial_source == DEVICE_SERIAL_SOURCE_USBCDC`.
-- `rs232`: continuare a forzare RUN per il display e-paper se `display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232`.
+- `usb_scanner`: deve rimanere RUN in `EPAPER_USB`.
+- `rs232`: non è usato per il modulo ePaper in `EPAPER_USB`.
 - aggiungere una condizione runtime che selezioni il canale scanner corretto.
 
 ### 3) Inizializzazione display e parser
@@ -60,8 +60,8 @@ Modificare `main/tasks.c`:
 3. Aggiornare `data/i18n_v2.json` per le nuove etichette UI e eventuale descrizione.
 
 ### Fase 2: Runtime task management
-1. Modificare `main/tasks.c` per gestire il nuovo flag `serial_source` quando `EPAPER_RS232` è attivo.
-2. Documentare chiaramente che `EPAPER_RS232 + USBCDC` abilita `usb_scanner`, mentre `EPAPER_RS232 + RS232` forza `usb_scanner` idle.
+1. Modificare `main/tasks.c` per rendere `EPAPER_USB` coerente (usb_scanner sempre RUN).
+2. Aggiornare documentazione e naming (EPAPER_RS232 -> EPAPER_USB).
 
 ### Fase 3: Integrazione input STRL_PROTOCOL
 1. Identificare il parser/gestore `STRL_PROTOCOL` esistente.
@@ -69,11 +69,11 @@ Modificare `main/tasks.c`:
 3. Collegare l'adapter al task scanner e al task RS232, in base alla selezione.
 
 ### Fase 4: Test e validazione
-1. Verificare boot con `display.type == EPAPER_RS232` e `serial_source == RS232`:
+1. Verificare boot con `display.type == EPAPER_USB`:
    - display e-paper inizializza correttamente
    - `usb_scanner` resta IDLE
    - i dati scanner arrivano dalla RS232 fisica se supportato
-2. Verificare boot con `display.type == EPAPER_RS232` e `serial_source == USBCDC`:
+2. Verificare lettura barcode e comandi display su USB CDC in `EPAPER_USB`:
    - display e-paper inizializza su RS232
    - `usb_scanner` si avvia
    - i dati scanner arrivano via USB CDC
@@ -84,7 +84,7 @@ Modificare `main/tasks.c`:
 
 ## Documento consigliato
 Creare una pagina interna di design e specifica come questa:
-- `docs/Internal/EPAPER_RS232_USBCDC_SCANNER_PLAN.md`
+- `docs/Internal/EPAPER_RS232_USBCDC_SCANNER_PLAN.md` (da rinominare in follow-up)
 
 ## Note aggiuntive
 - Il display E-Paper non deve essere mandato su USB CDC: l'output display resta sempre su RS232 fisico.

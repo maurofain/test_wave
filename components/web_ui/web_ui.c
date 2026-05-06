@@ -2368,7 +2368,7 @@ esp_err_t api_config_save(httpd_req_t *req)
         if (type && cJSON_IsNumber(type)) {
             int val = type->valueint;
             if (val < DEVICE_DISPLAY_TYPE_NONE) val = DEVICE_DISPLAY_TYPE_NONE;
-            if (val > DEVICE_DISPLAY_TYPE_EPAPER_RS232) val = DEVICE_DISPLAY_TYPE_EPAPER_RS232;
+            if (val > DEVICE_DISPLAY_TYPE_EPAPER_USB) val = DEVICE_DISPLAY_TYPE_EPAPER_USB;
             cfg->display.type = (device_display_type_t)val;
         }
     }

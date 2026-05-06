@@ -32,6 +32,10 @@ esp_err_t usb_cdc_scanner_send_off_command(void);
 bool usb_cdc_scanner_is_connected(void);
 device_component_status_t usb_cdc_scanner_get_component_status(void);
 
+/* EPAPER_USB protocol TX: invia payload grezzo su CDC (no framing Newland).
+ * Usare per pacchetti 0x00/0x01/0x02 del modulo ePaper. */
+esp_err_t usb_cdc_scanner_epaper_send_raw(const uint8_t *data, size_t len);
+
 // Gestione stato logico con aggiornamento hw integrato
 esp_err_t usb_cdc_scanner_set_state(usb_cdc_scanner_state_t state);
 usb_cdc_scanner_state_t usb_cdc_scanner_get_state(void);

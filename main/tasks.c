@@ -192,15 +192,6 @@ static void tasks_set_modbus_recovery_test_active(bool active)
     portEXIT_CRITICAL(&s_oos_lock);
 }
 
-static bool tasks_is_program_active(void)
-{
-    fsm_ctx_t snap = {0};
-    if (!fsm_runtime_snapshot(&snap)) {
-        return false;
-    }
-    return (snap.state == FSM_STATE_RUNNING || snap.state == FSM_STATE_PAUSED);
-}
-
 static bool tasks_is_modbus_runtime_blocked(void)
 {
     /* Nota: tasks_is_program_active() è stato rimosso intenzionalmente.
@@ -219,8 +210,15 @@ bool digital_io_modbus_runtime_allowed(void)
 
 bool usb_cdc_scanner_runtime_allowed(void)
 {
-    return !tasks_is_out_of_service_state() &&
-           !tasks_is_program_active();
+    /* Lo scanner deve poter restare enumerato/collegato indipendentemente
+     * dai pagamenti e dallo stato RUN. L'abilitazione/disabilitazione della
+     * lettura (ACTIVE/SUSPENDED) viene gestita dalla policy nel fsm_task. */
+    return !tasks_is_out_of_service_state();
+}
+
+static bool tasks_usb_scanner_allowed_by_display(const device_config_t *cfg)
+{
+    return cfg && cfg->scanner.enabled;
 }
 
 static const char *tasks_agent_name(agn_id_t agent)
@@ -409,7 +407,7 @@ static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_caus
 
     if ((focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_CCTALK || focus_agent == AGN_ID_USB_CDC_SCANNER)) {
         bool cctalk_ok = cfg->sensors.cctalk_enabled && cctalk_driver_is_acceptor_enabled() && cctalk_driver_is_acceptor_online();
-        bool scanner_ok = cfg->scanner.enabled && usb_cdc_scanner_is_connected();
+        bool scanner_ok = tasks_usb_scanner_allowed_by_display(cfg) && usb_cdc_scanner_is_connected();
         if (!cctalk_ok && !scanner_ok) {
             init_agent_status_set(AGN_ID_CCTALK, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
             init_agent_status_set(AGN_ID_USB_CDC_SCANNER, 0, INIT_AGENT_ERR_RUNTIME_FAILED);
@@ -428,7 +426,7 @@ static bool tasks_health_check(agn_id_t focus_agent, tasks_oos_cause_t *out_caus
                                   cctalk_ok ? INIT_AGENT_ERR_NONE : INIT_AGENT_ERR_RUNTIME_FAILED);
         }
 
-        if (!cfg->scanner.enabled) {
+        if (!tasks_usb_scanner_allowed_by_display(cfg)) {
             init_agent_status_set(AGN_ID_USB_CDC_SCANNER, 1, INIT_AGENT_ERR_DISABLED_BY_CONFIG);
         } else {
             init_agent_status_set(AGN_ID_USB_CDC_SCANNER,
@@ -690,7 +688,7 @@ esp_err_t tasks_publish_program_button_action(uint8_t program_id, agn_id_t sende
         return ESP_ERR_TIMEOUT;
     }
 
-    if (device_config_get()->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+    if (device_config_get()->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
         tasks_display_epaper_program_status(entry, is_active_program);
     }
 
@@ -2633,7 +2631,7 @@ static void fsm_task(void *arg)
 
             /* Permetti QRCODE [RESET] anche a schermo rosso:
              * assicura che lo scanner non resti sospeso (es. se OOS arriva durante RUN). */
-            if (cfg && cfg->scanner.enabled) {
+            if (tasks_usb_scanner_allowed_by_display(cfg)) {
                 if (scanner_forced_off_for_program || usb_cdc_scanner_get_state() != USB_CDC_SCANNER_STATE_ACTIVE) {
                     esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
                     if (sc_err != ESP_OK) {
@@ -2691,7 +2689,7 @@ static void fsm_task(void *arg)
                             }
                         }
 
-                        if (cfg && cfg->scanner.enabled) {
+                        if (tasks_usb_scanner_allowed_by_display(cfg)) {
                             esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
                             if (sc_err == ESP_OK) {
                                 ESP_LOGI(TAG, "[M] Scanner impostato ACTIVE dopo uscita OUT_OF_SERVICE");
@@ -2821,7 +2819,7 @@ static void fsm_task(void *arg)
             }
         }
 
-        if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->scanner.enabled) {
+        if (fsm.state != FSM_STATE_OUT_OF_SERVICE && tasks_usb_scanner_allowed_by_display(cfg)) {
             /* Regola: lo scanner NON è legato ai sistemi di pagamento.
              * Deve essere ACTIVE al boot e in IDLE/ADS/CREDIT.
              * Va sospeso solo durante RUN/PAUSE o se raggiunto il credito massimo (99). */
@@ -2830,7 +2828,13 @@ static void fsm_task(void *arg)
                 (active_program_session || credit_at_cap) ? USB_CDC_SCANNER_STATE_SUSPENDED
                                                           : USB_CDC_SCANNER_STATE_ACTIVE;
 
-            if (usb_cdc_scanner_get_state() != desired_sc) {
+            /* Evita spam: non inviare comandi finché il CDC non è connesso/aperto */
+            if (!usb_cdc_scanner_is_connected()) {
+                /* lascia pending: quando il device si connette, il driver verrà portato allo stato desiderato */
+                scanner_retry.pending = true;
+                scanner_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
+                scanner_retry.desired_u8 = (uint8_t)desired_sc;
+            } else if (usb_cdc_scanner_get_state() != desired_sc) {
                 esp_err_t sc_err = usb_cdc_scanner_set_state(desired_sc);
                 if (sc_err != ESP_OK) {
                     ESP_LOGW(TAG,
@@ -2941,7 +2945,7 @@ static void fsm_task(void *arg)
                 ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata al termine del programma");
             }
 
-            if (cfg && cfg->scanner.enabled && scanner_forced_off_for_program) {
+            if (tasks_usb_scanner_allowed_by_display(cfg) && scanner_forced_off_for_program) {
                 usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
                 scanner_forced_off_for_program = false;
                 ESP_LOGI(TAG, "[M] Scanner QR riattivato al termine del programma");
@@ -3074,7 +3078,7 @@ static void fsm_task(void *arg)
             if (cfg->sensors.cctalk_enabled) {
                 cctalk_driver_set_state(CCTALK_DRIVER_STATE_OOS);
             }
-            if (cfg->scanner.enabled) {
+            if (tasks_usb_scanner_allowed_by_display(cfg)) {
                 usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_OOS);
             }
         }
@@ -3548,6 +3552,25 @@ static void scanner_on_barcode_cb(const char *barcode)
         return;
     }
 
+    /* Se lo scanner restituisce comandi o stringhe non-QR (es. ';'), non deve
+     * mai sospendersi: prima logghiamo e poi usciamo. */
+    /* Ulteriore filtro anti-rumore: alcuni scanner restituiscono delimitatori vuoti
+     * o stringhe senza caratteri utili. Non deve innescare cooldown/suspend. */
+    {
+        bool has_payload = false;
+        for (size_t i = 0; clean_barcode[i] != '\0'; ++i) {
+            unsigned char c = (unsigned char)clean_barcode[i];
+            if (isalnum(c)) {
+                has_payload = true;
+                break;
+            }
+        }
+        if (!has_payload) {
+            ESP_LOGI("SCANNER", "[M] Ignorato barcode vuoto/solo delimitatori (clean=%s)", clean_barcode);
+            return;
+        }
+    }
+
     if (tasks_is_out_of_service_state()) {
         ESP_LOGW("SCANNER", "[M] Lettura scanner ignorata: stato OUT_OF_SERVICE");
         return;
@@ -3566,8 +3589,9 @@ static void scanner_on_barcode_cb(const char *barcode)
     s_scanner_cooldown_active_ms = cooldown_ms;
     s_scanner_cooldown_until = now + pdMS_TO_TICKS(cooldown_ms);
 
-    usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_SUSPENDED);
-    ESP_LOGI("SCANNER", "[M] Scanner sospeso per %lu ms dopo lettura QR",
+    /* Non sospendere lo scanner in ADS/IDLE/CREDIT: il firmware deve tenerlo
+     * sempre attivo; eventuale filtro accettazione codici è logico, non HW. */
+    ESP_LOGI("SCANNER", "[M] Barcode ricevuto (cooldown logico=%lu ms): non sospendo scanner",
              (unsigned long)cooldown_ms);
 
     ESP_LOGI("SCANNER", "[M] Barcode clean: %s", clean_barcode);
@@ -3663,7 +3687,7 @@ static void publish_qr_credit_event(const char *customer_code, int32_t ecd_amoun
 static void tasks_display_credit_if_epaper(int32_t credit_cents)
 {
     const device_config_t *cfg = device_config_get();
-    if (cfg && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+    if (cfg && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
         esp_err_t text_err = rs232_epaper_display_credit_big(credit_cents);
         if (text_err != ESP_OK) {
             ESP_LOGW(TAG, "[M] E-Paper RS232 display credit failed: %s", esp_err_to_name(text_err));
@@ -3679,7 +3703,7 @@ static void tasks_display_epaper_program_status(const web_ui_program_entry_t *en
     }
 
     const device_config_t *cfg = device_config_get();
-    if (!cfg || cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+    if (!cfg || cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_USB) {
         return;
     }
 
@@ -4541,9 +4565,9 @@ void tasks_start_all(void)
         task_param_t *t = &s_tasks[i];
 
         if (cfg && strcmp(t->name, "usb_scanner") == 0) {
-            if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 && cfg->sensors.rs232_enabled) {
+            if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB && cfg->sensors.rs232_enabled) {
                 t->state = TASK_STATE_IDLE;
-                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (EPAPER_RS232 usa scanner RS232)", t->name);
+                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (EPAPER_USB usa scanner USB CDC)", t->name);
             } else {
                 t->state = cfg->scanner.enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
             }
@@ -4571,10 +4595,10 @@ void tasks_start_all(void)
         }
 
         if (cfg && strcmp(t->name, "rs232") == 0 &&
-            cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 &&
+            cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB &&
             cfg->sensors.rs232_enabled) {
             t->state = TASK_STATE_RUN;
-            ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_RS232 attivo)", t->name);
+            ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_USB attivo)", t->name);
         }
 
         if (cfg && strcmp(t->name, "mdb_engine") == 0) {
@@ -4599,10 +4623,10 @@ void tasks_start_all(void)
             ESP_LOGI(TAG, "[M] Task saltato %s (avvio differito alla comparsa schermata ADS/Programmi)", t->name);
             continue;
         }
-        // Rispetta la configurazione di display: se headless o EPAPER_RS232 salta lvgl/touchscreen
+        // Rispetta la configurazione di display: se headless o EPAPER_USB salta lvgl/touchscreen
         if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0)) {
             device_config_t *cfg = device_config_get();
-            if (!cfg || !cfg->display.enabled || cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+            if (!cfg || !cfg->display.enabled || cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
                 ESP_LOGI(TAG, "[M] Task saltato %s (display non compatibile con LVGL/touch)", t->name);
                 continue;
             }
@@ -4709,9 +4733,9 @@ void tasks_apply_n_run(void)
     for (size_t i = 0; i < sizeof(s_tasks) / sizeof(s_tasks[0]); ++i) {
         task_param_t *t = &s_tasks[i];
 
-        // Forza IDLE sui task display solo se headless o EPAPER_RS232; altrimenti rispetta il CSV
+        // Forza IDLE sui task display solo se headless o EPAPER_USB; altrimenti rispetta il CSV
         if ((strcmp(t->name, "lvgl") == 0 || strcmp(t->name, "touchscreen") == 0)) {
-            if (!cfg->display.enabled || cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+            if (!cfg->display.enabled || cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
                 t->state = TASK_STATE_IDLE; // headless/EPAPER: garantiamo che siano disabilitati
                 ESP_LOGI(TAG, "[M] Task %s forzato IDLE (display non compatibile con LVGL/touch)", t->name);
             }
@@ -4724,17 +4748,14 @@ void tasks_apply_n_run(void)
         
         // Forza stato idle/running su usb_scanner in base alla configurazione
         if (strcmp(t->name, "rs232") == 0 &&
-            cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 &&
+            cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB &&
             cfg->sensors.rs232_enabled) {
             t->state = TASK_STATE_RUN;
-            ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_RS232 attivo)", t->name);
+            ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_USB attivo)", t->name);
         }
 
         if (strcmp(t->name, "usb_scanner") == 0) {
-            if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 && cfg->sensors.rs232_enabled) {
-                t->state = TASK_STATE_IDLE;
-                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (EPAPER_RS232 usa scanner RS232)", t->name);
-            } else if (cfg->scanner.enabled) {
+            if (cfg->scanner.enabled) {
                 t->state = TASK_STATE_RUN;
                 ESP_LOGI(TAG, "[M] Task %s forzato RUN (scanner.enabled=true)", t->name);
             } else {

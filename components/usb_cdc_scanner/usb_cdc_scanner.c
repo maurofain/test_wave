@@ -55,6 +55,14 @@
 #define SCANNER_DEFAULT_PID  0x0006  /* PID: 0006 */
 #define SCANNER_DEFAULT_CLASS 0x02   /* Device class */
 
+/* EPAPER_USB module (ESP32-S2 CDC ACM) defaults from host logs */
+#define EPAPER_USB_DEFAULT_VID 0x303A
+#define EPAPER_USB_DEFAULT_PID 0x0002
+
+/* EPAPER_USB timing rules */
+#define EPAPER_USB_DELAY_AFTER_WRITE_MS        (500)
+#define EPAPER_USB_DELAY_AFTER_FULL_REFRESH_MS (2000)
+
 static const char *TAG = "USB_CDC_SCANNER";
 static usb_cdc_scanner_callback_t s_on_barcode = NULL;
 static volatile bool s_scanner_connected = false;
@@ -62,6 +70,7 @@ static TaskHandle_t s_usb_open_task = NULL;
 
 // Stato logico del dispositivo scanner (ACTIVE / SUSPENDED / OOS)
 static volatile usb_cdc_scanner_state_t s_scanner_logical_state = USB_CDC_SCANNER_STATE_ACTIVE;
+static volatile bool s_is_epaper_mode = false;
 
 __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
 {
@@ -131,6 +140,15 @@ static const char *SCN_CMD_OFF = "0000#SCNENA0;";
  */
 static bool cdc_data_cb(const uint8_t *data, size_t data_len, void *arg)
 {
+    /* Diagnostica minimale RX: logga ogni ~2s se arrivano dati (non stampa payload). */
+    static uint32_t s_last_rx_log_ms = 0;
+    uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+    if ((int32_t)(now_ms - s_last_rx_log_ms) > 2000) {
+        s_last_rx_log_ms = now_ms;
+        ESP_LOGI(TAG, "CDC RX data_len=%u (queue=%s)", (unsigned)data_len,
+                 (s_cdc_data_queue != NULL) ? "ok" : "null");
+    }
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     for (size_t i = 0; i < data_len; ++i) {
         uint8_t byte = data[i];
@@ -186,10 +204,22 @@ static void cdc_event_cb(const cdc_acm_host_dev_event_data_t *event, void *user_
  * We log the basic device descriptor (VID/PID, device class) for diagnostics. */
 static void cdc_new_device_cb(usb_device_handle_t usb_dev)
 {
+    static uint16_t s_last_vid = 0;
+    static uint16_t s_last_pid = 0;
     const usb_device_desc_t *device_desc = NULL;
     if (usb_host_get_device_descriptor(usb_dev, &device_desc) == ESP_OK && device_desc) {
         ESP_LOGI(TAG, "New USB device connected: VID:%04X PID:%04X class:%02X",
                  device_desc->idVendor, device_desc->idProduct, device_desc->bDeviceClass);
+
+        /* TODO.md punto 5: log in init USB con VID/PID device rilevato */
+        if (device_desc->idVendor != s_last_vid || device_desc->idProduct != s_last_pid) {
+            s_last_vid = device_desc->idVendor;
+            s_last_pid = device_desc->idProduct;
+            ESP_LOGI("INIT", "[M] [USB] *****************************************");
+            ESP_LOGI("INIT", "[M] [USB] Device rilevato su porta USB: VID=%04X PID=%04X class=%02X",
+                     device_desc->idVendor, device_desc->idProduct, device_desc->bDeviceClass);
+            ESP_LOGI("INIT", "[M] [USB] *****************************************");
+        }
     } else {
         ESP_LOGI(TAG, "New USB device connected: failed to read device descriptor");
     }
@@ -364,6 +394,30 @@ static esp_err_t usb_cdc_scanner_send_framed_command(const char *payload)
     return err;
 }
 
+static esp_err_t usb_cdc_scanner_epaper_send_raw_internal(const uint8_t *data, size_t len)
+{
+#if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+    if (!data || len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    cdc_acm_dev_hdl_t cdc_hdl = s_cdc_dev;
+    if (cdc_hdl == NULL) {
+        usb_cdc_scanner_notify_open_task();
+        return ESP_ERR_INVALID_STATE;
+    }
+    return cdc_acm_host_data_tx_blocking(cdc_hdl, data, len, 1000);
+#else
+    (void)data;
+    (void)len;
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t usb_cdc_scanner_epaper_send_raw(const uint8_t *data, size_t len)
+{
+    return usb_cdc_scanner_epaper_send_raw_internal(data, len);
+}
+
 
 /**
  * @brief Gestisce la funzione di apertura del task scanner USB CDC.
@@ -394,7 +448,21 @@ static void usb_cdc_scanner_open_task(void *arg)
         runtime_enabled = d_cfg->scanner.enabled;
     }
 
+    /* EPAPER_USB: se selezionato, usa default VID/PID modulo ePaper (ESP32-S2) se non configurati. */
+    if (d_cfg && d_cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
+        s_is_epaper_mode = true;
+        if (d_cfg->scanner.vid == 0 || d_cfg->scanner.pid == 0) {
+            vid = EPAPER_USB_DEFAULT_VID;
+            pid = EPAPER_USB_DEFAULT_PID;
+        }
+    } else {
+        s_is_epaper_mode = false;
+    }
+
     ESP_LOGI(TAG, "Configured scanner VID:PID %04X:%04X (dual %04X), runtime enabled=%d", vid, pid, dual_pid, runtime_enabled);
+    /* Log “in evidenza” richiesto: sempre visibile a boot */
+    ESP_LOGI("INIT", "[M] [USB] Scanner config runtime: VID=%04X PID=%04X (enabled=%d)",
+             vid, pid, runtime_enabled ? 1 : 0);
 
     cdc_acm_host_device_config_t dev_config = {
         .connection_timeout_ms = 1000,
@@ -442,6 +510,7 @@ static void usb_cdc_scanner_open_task(void *arg)
 
         cdc_acm_dev_hdl_t cdc_dev = NULL;
         ESP_LOGI(TAG, "Trying to open CDC device %04X:%04X", vid, pid);
+        ESP_LOGI("INIT", "[M] [USB] Provo apertura CDC: VID=%04X PID=%04X", vid, pid);
         esp_err_t err = cdc_acm_host_open(vid, pid, 0, &dev_config, &cdc_dev);
         /* dual PID logic removed – scanner usa un solo PID */
         /*
@@ -452,16 +521,42 @@ static void usb_cdc_scanner_open_task(void *arg)
         */
         if (err == ESP_OK) {
             ESP_LOGI(TAG, "CDC device opened");
+            ESP_LOGI("INIT", "[M] [USB] CDC aperto: VID=%04X PID=%04X", vid, pid);
             s_cdc_dev = cdc_dev;
             s_scanner_connected = true;
             serial_test_push_monitor_action("SCANNER", "CDC device connected");
 
             vTaskDelay(pdMS_TO_TICKS(100));
-            esp_err_t on_err = usb_cdc_scanner_send_on_command();
-            if (on_err == ESP_OK) {
-                ESP_LOGI(TAG, "Scanner ON command sent after CDC open");
+            if (!s_is_epaper_mode) {
+                esp_err_t on_err = usb_cdc_scanner_send_on_command();
+                if (on_err == ESP_OK) {
+                    ESP_LOGI(TAG, "Scanner ON command sent after CDC open");
+                } else {
+                    ESP_LOGW(TAG, "Scanner ON command after open failed: %s", esp_err_to_name(on_err));
+                }
             } else {
-                ESP_LOGW(TAG, "Scanner ON command after open failed: %s", esp_err_to_name(on_err));
+                ESP_LOGI(TAG, "[EPAPER_USB] CDC aperto: nessun comando Newland inviato");
+
+                /* Avvio protocollo EPAPER_USB: init + testi di test */
+                const uint8_t ep_init[] = {0x00, 0xAA};
+                (void)usb_cdc_scanner_epaper_send_raw_internal(ep_init, sizeof(ep_init));
+                vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
+
+                /* Refresh totale dopo init (regola) */
+                const uint8_t ep_full_refresh[] = {0x00, 0x00};
+                (void)usb_cdc_scanner_epaper_send_raw_internal(ep_full_refresh, sizeof(ep_full_refresh));
+                vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_FULL_REFRESH_MS));
+
+                /* “rotazione 0”: non è definita nel documento del protocollo;
+                 * assumiamo default 0 (nessun comando). */
+
+                /* Testi font 60px (GoogleSans 60pt → font#9): "SCAN" @ (50,100), "CODE" @ (150,100) */
+                uint8_t pkt1[] = {0x01, 0xFF, 9, 50, 100, 'S','C','A','N', 0x00};
+                uint8_t pkt2[] = {0x01, 0xFF, 9, 150, 100, 'C','O','D','E', 0x00};
+                (void)usb_cdc_scanner_epaper_send_raw_internal(pkt1, sizeof(pkt1));
+                vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
+                (void)usb_cdc_scanner_epaper_send_raw_internal(pkt2, sizeof(pkt2));
+                vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
             }
 
             // wait until disconnect; the event callback will handle closing
@@ -777,6 +872,9 @@ void usb_cdc_scanner_task(void *param) {
 esp_err_t usb_cdc_scanner_send_setup_command(void)
 {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+    if (s_is_epaper_mode) {
+        return ESP_OK;
+    }
     return usb_cdc_scanner_send_framed_command(SCN_CMD_SETUP);
 #else
     return ESP_ERR_NOT_SUPPORTED;
@@ -817,6 +915,9 @@ esp_err_t usb_cdc_scanner_send_state_command(void)
 esp_err_t usb_cdc_scanner_send_on_command(void)
 {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+    if (s_is_epaper_mode) {
+        return ESP_OK;
+    }
     return usb_cdc_scanner_send_framed_command(SCN_CMD_ON);
 #else
     return ESP_ERR_NOT_SUPPORTED;
@@ -837,6 +938,9 @@ esp_err_t usb_cdc_scanner_send_on_command(void)
 esp_err_t usb_cdc_scanner_send_off_command(void)
 {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+    if (s_is_epaper_mode) {
+        return ESP_OK;
+    }
     return usb_cdc_scanner_send_framed_command(SCN_CMD_OFF);
 #else
     return ESP_ERR_NOT_SUPPORTED;
@@ -874,8 +978,18 @@ esp_err_t usb_cdc_scanner_set_state(usb_cdc_scanner_state_t state)
         if (err_setup == ESP_OK && err_on == ESP_OK) {
             ESP_LOGI(TAG, "[C] Scanner → ACTIVE (setup+on OK)");
         } else {
-            ESP_LOGW(TAG, "[C] Scanner → ACTIVE fallito (setup=%s on=%s)",
-                     esp_err_to_name(err_setup), esp_err_to_name(err_on));
+            /* Riduci spam se il CDC non è ancora aperto */
+            if (err_setup == ESP_ERR_INVALID_STATE && err_on == ESP_ERR_INVALID_STATE) {
+                static uint32_t s_last_log_ms = 0;
+                uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+                if ((int32_t)(now_ms - s_last_log_ms) > 2000) {
+                    s_last_log_ms = now_ms;
+                    ESP_LOGW(TAG, "[C] Scanner → ACTIVE non disponibile (CDC non aperto ancora)");
+                }
+            } else {
+                ESP_LOGW(TAG, "[C] Scanner → ACTIVE fallito (setup=%s on=%s)",
+                         esp_err_to_name(err_setup), esp_err_to_name(err_on));
+            }
             return (err_on != ESP_OK) ? err_on : err_setup;
         }
         return ESP_OK;

@@ -1149,6 +1149,12 @@ void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
  */
 bool bsp_display_lock(uint32_t timeout_ms)
 {
+    /* EPAPER/headless safety: lvgl_port_lock() assert-a se lvgl_port_init()
+     * non è mai stato chiamato. In modalità EPAPER_USB (senza LVGL) il
+     * display LVGL non esiste: rendiamo il lock un no-op sicuro. */
+    if (!lv_display_get_default()) {
+        return false;
+    }
     return lvgl_port_lock(timeout_ms);
 }
 
@@ -1161,6 +1167,10 @@ bool bsp_display_lock(uint32_t timeout_ms)
  */
 void bsp_display_unlock(void)
 {
+    /* EPAPER/headless safety: evita assert se LVGL non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     lvgl_port_unlock();
 }
 

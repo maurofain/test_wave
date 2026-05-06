@@ -258,6 +258,10 @@ void lvgl_panel_show(void)
  */
 void lvgl_panel_show_boot_logo(void)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(pdMS_TO_TICKS(500))) {
         ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_boot_logo, provo re-init display");
         if (init_run_display_only() != ESP_OK) {
@@ -286,6 +290,10 @@ void lvgl_panel_show_boot_logo(void)
  */
 void lvgl_panel_show_language_select(void)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(pdMS_TO_TICKS(1500))) {
         ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_language_select, provo re-init display");
         if (init_run_display_only() != ESP_OK) {
@@ -318,6 +326,10 @@ void lvgl_panel_show_language_select(void)
  */
 void lvgl_panel_refresh_texts(void)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(100)) {
         return;
     }
@@ -358,6 +370,10 @@ void lvgl_panel_refresh_texts(void)
  */
 void lvgl_panel_show_out_of_service(uint32_t reboots)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(pdMS_TO_TICKS(200))) {
         ESP_LOGW(TAG, "[C] Display non attivo, init forzata per schermata errore");
         if (init_run_display_only() != ESP_OK) {
@@ -380,6 +396,10 @@ void lvgl_panel_show_out_of_service(uint32_t reboots)
 
 void lvgl_panel_show_out_of_service_message(const char *message_key, const char *fallback_message)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(pdMS_TO_TICKS(200))) {
         ESP_LOGW(TAG, "[C] Display non attivo, init forzata per schermata errore");
         if (init_run_display_only() != ESP_OK) {
@@ -404,6 +424,10 @@ void lvgl_panel_show_out_of_service_reason(const char *reason_key,
                                            const char *reason_fallback,
                                            const char *agent_name)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(pdMS_TO_TICKS(200))) {
         ESP_LOGW(TAG, "[C] Display non attivo, init forzata per schermata errore");
         if (init_run_display_only() != ESP_OK) {
@@ -426,6 +450,10 @@ void lvgl_panel_show_out_of_service_reason(const char *reason_key,
 
 void lvgl_panel_show_main_page(void)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(0)) {
         ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_main_page");
         return;
@@ -438,6 +466,10 @@ void lvgl_panel_show_main_page(void)
 
 void lvgl_panel_show_ads_page(void)
 {
+    /* EPAPER/Headless: non usare LVGL se non inizializzato */
+    if (!lv_display_get_default()) {
+        return;
+    }
     if (!bsp_display_lock(0)) {
         ESP_LOGW(TAG, "[C] LVGL lock fallito in lvgl_panel_show_ads_page");
         return;
@@ -453,6 +485,14 @@ void lvgl_panel_set_init_status(const char *text)
     if (!text || text[0] == '\0') {
         return;
     }
+
+    /* EPAPER/Headless safety: bsp_display_lock() chiama lvgl_port_lock(), che
+     * assert-a se lvgl_port_init() non è mai stato chiamato. In configurazioni
+     * senza LVGL (es. EPAPER_USB) ignoriamo semplicemente l'update. */
+    if (!lv_display_get_default()) {
+        return;
+    }
+
     if (!bsp_display_lock(pdMS_TO_TICKS(30))) {
         return;
     }

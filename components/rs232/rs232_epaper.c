@@ -30,7 +30,7 @@ static esp_err_t rs232_epaper_send_packet(const uint8_t *data, size_t len)
 bool rs232_epaper_is_enabled(void)
 {
     const device_config_t *cfg = device_config_get();
-    return cfg && cfg->display.enabled && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232 && cfg->sensors.rs232_enabled;
+    return cfg && cfg->display.enabled && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB && cfg->sensors.rs232_enabled;
 }
 
 esp_err_t rs232_epaper_send_command(uint8_t cmd)

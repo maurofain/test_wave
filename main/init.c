@@ -1192,7 +1192,7 @@ static device_display_type_t display_type_from_dip_mask(uint16_t inputs_mask)
   {
     return DEVICE_DISPLAY_TYPE_DSI101_TOUCH;
   }
-  return DEVICE_DISPLAY_TYPE_EPAPER_RS232;
+  return DEVICE_DISPLAY_TYPE_EPAPER_USB;
 }
 
 static const char *display_type_to_string(device_display_type_t type)
@@ -1205,8 +1205,8 @@ static const char *display_type_to_string(device_display_type_t type)
       return "DSI7_TOUCH";
     case DEVICE_DISPLAY_TYPE_DSI101_TOUCH:
       return "DSI101_TOUCH";
-    case DEVICE_DISPLAY_TYPE_EPAPER_RS232:
-      return "EPAPER_RS232";
+    case DEVICE_DISPLAY_TYPE_EPAPER_USB:
+      return "EPAPER_USB";
     default:
       return "UNKNOWN";
   }
@@ -1991,25 +1991,14 @@ static esp_err_t init_display_lvgl_minimal(void)
 static esp_err_t init_display_epaper_rs232(void)
 {
   device_config_t *device_cfg = device_config_get();
-  if (!device_cfg || device_cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+  if (!device_cfg || device_cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_USB) {
     return ESP_ERR_INVALID_ARG;
   }
-  if (!device_cfg->sensors.rs232_enabled) {
-    ESP_LOGW(TAG, "E-Paper RS232 selezionato ma RS232 disabilitato");
-    return ESP_ERR_INVALID_STATE;
-  }
 
-  ESP_LOGI(TAG, "Display EPAPER RS232 selezionato: inizializzo connessione e invio messaggio di benvenuto");
-  esp_err_t ret = rs232_epaper_init();
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Inizializzazione E-Paper RS232 fallita: %s", esp_err_to_name(ret));
-    return ret;
-  }
+  /* EPAPER_USB: il modulo ePaper usa USB CDC (non RS232).
+   * L'apertura del canale CDC e il TX/RX sono gestiti dal task usb_scanner/usb_cdc_scanner. */
+  ESP_LOGI(TAG, "Display EPAPER USB selezionato: interfaccia via USB CDC (skip init RS232)");
 
-  ret = rs232_epaper_display_welcome();
-  if (ret != ESP_OK) {
-    ESP_LOGW(TAG, "Invio messaggio benvenuto E-Paper RS232 fallito: %s", esp_err_to_name(ret));
-  }
   tasks_set_touchscreen_handle(NULL);
   return ESP_OK;
 }
@@ -2038,6 +2027,15 @@ esp_err_t init_run_display_only(void)
     ESP_LOGI(TAG, "[M] init_run_display_only: display disabilitato da config");
     return ESP_ERR_INVALID_STATE;
   }
+
+  /* EPAPER: in caso di ERROR_LOCK/OOS dobbiamo evitare l'init del pannello MIPI/LVGL,
+   * e mostrare (o almeno inizializzare) l'interfaccia RS232 epaper. */
+  if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB)
+  {
+    ESP_LOGI(TAG, "[M] init_run_display_only: EPAPER_USB selezionato, skip init LVGL/MIPI");
+    return init_display_epaper_rs232();
+  }
+
   bsp_display_cfg_t cfg_disp = {
       .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
       .buffer_size = BSP_LCD_DRAW_BUFF_SIZE / 2,
@@ -2255,6 +2253,7 @@ esp_err_t init_run_factory(void)
 
   if (cfg)
   {
+    /* EPAPER_USB: lo scanner è su USB CDC; non forziamo qui altre logiche. */
     if (!cfg->scanner.enabled)
     {
       ESP_LOGW(TAG, "[M] Scanner QR disabilitato in config: forzo abilitazione all'avvio");
@@ -2293,7 +2292,7 @@ esp_err_t init_run_factory(void)
 
   s_display_ready = false;
 
-  if (cfg->display.enabled && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232)
+  if (cfg->display.enabled && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB)
   {
     esp_err_t disp_ret = init_display_epaper_rs232();
     if (disp_ret != ESP_OK)

@@ -3,8 +3,6 @@ build/
 **/build/
 !**/build/
 **/build/**
-!**/build/*.bin
-!**/build/**/*.bin
 *.o
 *.a
 *.lib
@@ -17,6 +15,10 @@ sdkconfig.cmake
 *.img
 *.bin
 *.elf
+
+# Track ONLY build artifacts .bin (override global *.bin)
+!build/*.bin
+!build/**/*.bin
 
 # Editor
 .vscode/

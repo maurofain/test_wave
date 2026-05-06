@@ -2,7 +2,7 @@
 
 **Data:** 2026-05-06  
 **Stato:** BOZZA  
-**Riferimento enum condizionante:** `DEVICE_DISPLAY_TYPE_EPAPER_RS232`
+**Riferimento enum condizionante:** `DEVICE_DISPLAY_TYPE_EPAPER_USB`
 
 ---
 
@@ -169,14 +169,14 @@ impiegato dallo scanner Newland.
 
 | Configurazione display       | Porta USB CDC   | RS232               |
 |-----------------------------|-----------------|---------------------|
-| `EPAPER_RS232`               | ePaper TX/RX    | Libera (non usata)  |
+| `EPAPER_USB`                 | ePaper TX/RX    | Libera (non usata)  |
 | `DSI7_TOUCH` / `DSI101_TOUCH` | Scanner Newland | Non usata           |
 | `NONE` / headless            | Nessuno         | —                   |
 
 La condizione che abilita tutta la logica è:
 
 ```c
-cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232
+cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB
 ```
 
 ---
@@ -205,12 +205,12 @@ rs232_epaper_display_*() --> rs232_epaper_send_packet() --> rs232_send()
 
 ## 3. Architettura obiettivo (TO-BE)
 
-### Quando `DEVICE_DISPLAY_TYPE_EPAPER_RS232`
+### Quando `DEVICE_DISPLAY_TYPE_EPAPER_USB`
 
 #### Flusso ePaper ← FW (CTRL-PROTOCOL in uscita)
 ```
 rs232_epaper_display_*() --> rs232_epaper_send_packet()
-                               --> [if EPAPER_RS232] usb_cdc_epaper_send(data, len)
+                               --> [if EPAPER_USB] usb_cdc_epaper_send(data, len)
                                --> [else]            rs232_send(data, len)
 ```
 
@@ -247,7 +247,7 @@ nel driver CDC-ACM) o equivalente sul canale USB CDC aperto.
 Aggiungere una funzione helper `static bool s_is_epaper_mode` che viene
 impostata in `usb_cdc_scanner_init()` in base a:
 ```c
-s_is_epaper_mode = (device_config_get()->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232);
+s_is_epaper_mode = (device_config_get()->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB);
 ```
 
 #### 4.1.3 Sopprimere comandi Newland in modalità ePaper
@@ -275,7 +275,7 @@ bool usb_cdc_scanner_is_epaper_mode(void);
 int written = rs232_send(data, len);
 
 // Nuovo
-if (device_config_get()->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+if (device_config_get()->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
     return usb_cdc_scanner_epaper_send(data, len);
 }
 int written = rs232_send(data, len);
@@ -287,13 +287,13 @@ Include necessario: aggiungere `#include "usb_cdc_scanner.h"`.
 Attuale:
 ```c
 return cfg && cfg->display.enabled
-           && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232
+           && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB
            && cfg->sensors.rs232_enabled;  // <-- questo vincolo cade
 ```
 Nuovo:
 ```c
 return cfg && cfg->display.enabled
-           && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232;
+           && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB;
 ```
 La condizione `rs232_enabled` non serve più perché il TX avviene via CDC.
 
@@ -316,7 +316,7 @@ Aggiungere esclusione per modalità ePaper:
 bool usb_cdc_scanner_runtime_allowed(void)
 {
     const device_config_t *cfg = device_config_get();
-    if (cfg && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232) {
+    if (cfg && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
         return false;  // porta CDC riservata a ePaper
     }
     return !tasks_is_out_of_service_state() && !tasks_is_program_active();
@@ -332,7 +332,7 @@ if ((focus_agent == AGN_ID_NONE || focus_agent == AGN_ID_CCTALK
     bool scanner_ok = cfg->scanner.enabled && usb_cdc_scanner_is_connected();
 
     // NUOVO: in modalità ePaper lo scanner USB non è atteso → mai in OOS per mancanza scanner
-    bool epaper_cdc_mode = (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_RS232);
+    bool epaper_cdc_mode = (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB);
     if (epaper_cdc_mode) scanner_ok = true;  // considera scanner OK per non triggerare OOS
 
     if (!cctalk_ok && !scanner_ok) { ... }
@@ -418,7 +418,7 @@ static void rs232_task(void *arg)
 }
 ```
 > **Nota:** il task `rs232` viene già impostato a IDLE da `tasks.csv`/`tasks.json`
-> quando display è EPAPER_RS232 (riga nel CSV con state=IDLE). Verificare che
+> quando display è EPAPER_USB (riga nel CSV con state=IDLE). Verificare che
 > questa configurazione resti coerente.
 
 #### 4.3.5 Blocco OOS → uscita OOS: `send_setup_command` / `send_on_command`
@@ -437,7 +437,7 @@ il funzionamento USB CDC del display), nessuna modifica è necessaria qui.
 Altrimenti aggiungere:
 ```c
 bool scanner_hardware_active = cfg->scanner.enabled
-                               && (cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_RS232);
+                               && (cfg->display.type != DEVICE_DISPLAY_TYPE_EPAPER_USB);
 ```
 
 ---
@@ -468,13 +468,13 @@ Il modulo ePaper non richiede (presumibilmente) tali comandi: le funzioni in 4.1
 diventano no-op. Confermare con la specifica hardware del modulo ePaper.
 
 ### 5.4 Nome enum vs. trasporto
-L'enum `DEVICE_DISPLAY_TYPE_EPAPER_RS232` mantiene il nome originale per
+L'enum `DEVICE_DISPLAY_TYPE_EPAPER_USB` mantiene il nome originale per
 retrocompatibilità con configurazioni NVS già salvate. Il nome diventa in parte
 impreciso ma il costo di un migration path NVS sarebbe sproporzionato.
 
 ### 5.5 Rimozione del vincolo `rs232_enabled` per ePaper
 Dopo la modifica 4.2.2, impostare `sensors.rs232_enabled = false` in una
-configurazione con `EPAPER_RS232` non bloccherà più il display.  
+configurazione con `EPAPER_USB` non bloccherà più il display.  
 Aggiornare `docs/a_COMPILE_FLAGS.md` e la UI di configurazione web se espone
 questo campo.
 
@@ -495,25 +495,25 @@ questo campo.
 | 9    | Aggiornare `rs232_task()` (skip RX in modalità ePaper CDC)           | `main/tasks.c`                |
 | 10   | Verifica e aggiornamento `init.c`                                    | `main/init.c`                 |
 | 11   | Verifica coerenza `tasks.json`                                        | `data/tasks.json`             |
-| 12   | Build e test su device con config `EPAPER_RS232`                     | —                             |
+| 12   | Build e test su device con config `EPAPER_USB`                       | —                             |
 
 ---
 
 ## 7. Criteri di verifica
 
-- [ ] Build senza errori e warning per entrambe le modalità (EPAPER_RS232 e DSI7_TOUCH)
-- [ ] Con `EPAPER_RS232`: i pacchetti CTRL-PROTOCOL arrivano sul bus USB CDC (verificabile con analizzatore USB o log TX)
-- [ ] Con `EPAPER_RS232`: nessun comando Newland (`SCNMOD`, `SCNENA`) inviato sul CDC
-- [ ] Con `EPAPER_RS232`: barcode letti dal modulo ePaper via USB CDC → evento `QR_SCANNED` in FSM
+- [ ] Build senza errori e warning per entrambe le modalità (EPAPER_USB e DSI7_TOUCH)
+- [ ] Con `EPAPER_USB`: i pacchetti CTRL-PROTOCOL arrivano sul bus USB CDC (verificabile con analizzatore USB o log TX)
+- [ ] Con `EPAPER_USB`: nessun comando Newland (`SCNMOD`, `SCNENA`) inviato sul CDC
+- [ ] Con `EPAPER_USB`: barcode letti dal modulo ePaper via USB CDC → evento `QR_SCANNED` in FSM
 - [ ] Con `DSI7_TOUCH` / `DSI101_TOUCH`: scanner Newland funziona normalmente via USB CDC
 - [ ] Con `DSI7_TOUCH`: nessun codice ePaper attivato (rs232_epaper_is_enabled() = false)
 - [ ] Nessuna regressione sui task RS485 / MDB / CCTalk
-- [ ] Nessun OOS spurio in modalità EPAPER_RS232 dovuto a scanner USB "non connesso"
+- [ ] Nessun OOS spurio in modalità EPAPER_USB dovuto a scanner USB "non connesso"
 
 ---
 
 ## 8. File da NON modificare
 
-- `device_config.h` — l'enum `DEVICE_DISPLAY_TYPE_EPAPER_RS232` resta invariato
+- `device_config.h` — l'enum `DEVICE_DISPLAY_TYPE_EPAPER_USB` resta invariato
 - `components/rs232/rs232.c` — il driver RS232 base non viene toccato
 - `fsm.c` / `fsm.h` — nessuna logica FSM cambia

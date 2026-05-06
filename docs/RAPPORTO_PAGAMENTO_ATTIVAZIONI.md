@@ -204,7 +204,7 @@ in stato `DISABLED` e poi `ENABLED`. Se il tag NFC è ancora posato durante il
 reset, il lettore potrebbe emettere un bip o un'animazione di errore. Questo è
 documentato come comportamento noto e tollerato.
 
-### 5.4 Scanner in modalità ePaper (DEVICE_DISPLAY_TYPE_EPAPER_RS232)
+### 5.4 Scanner in modalità ePaper (DEVICE_DISPLAY_TYPE_EPAPER_USB)
 Vedi `docs/PIANO_EPAPER_USBCDC.md` § 4.3.3. In questa modalità:
 - I comandi `send_off/on/setup` diventano **no-op** (scanner non controllabile HW).
 - Il silenziamento durante programma avviene via **filtro software** su `scanner_on_barcode_cb()`.
