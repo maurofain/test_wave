@@ -707,6 +707,8 @@ void usb_cdc_scanner_task(void *param) {
 #if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
     char barcode[BARCODE_BUF_SIZE];
     int idx = 0;
+    TickType_t last_rx_tick = 0;
+    const TickType_t flush_timeout = pdMS_TO_TICKS(300); /* evita concatenazione di frame incompleti */
     if (s_cdc_data_queue == NULL) {
         s_cdc_data_queue = xQueueCreate(USB_CDC_SCANNER_RX_QUEUE_LEN, sizeof(uint8_t));
         if (s_cdc_data_queue == NULL) {
@@ -718,7 +720,21 @@ void usb_cdc_scanner_task(void *param) {
         uint8_t byte = 0;
         if (s_cdc_data_queue != NULL && xQueueReceive(s_cdc_data_queue, &byte, pdMS_TO_TICKS(500)) == pdTRUE) {
             char c = (char)byte;
+            TickType_t now = xTaskGetTickCount();
+            if (idx > 0 && last_rx_tick != 0 && (int32_t)(now - last_rx_tick) > (int32_t)flush_timeout) {
+                /* Se passa troppo tempo tra byte, considera la riga precedente corrotta/incompleta. */
+                idx = 0;
+            }
+            last_rx_tick = now;
+
             if (c == '\r' || c == '\n') {
+                if (idx > 0) {
+                    barcode[idx] = '\0';
+                    if (s_on_barcode) s_on_barcode(barcode);
+                    idx = 0;
+                }
+            } else if ((unsigned char)c < 32 || (unsigned char)c > 126) {
+                /* Separatore robusto: byte non stampabile → chiudi/flush riga */
                 if (idx > 0) {
                     barcode[idx] = '\0';
                     if (s_on_barcode) s_on_barcode(barcode);

@@ -58,9 +58,9 @@ device_component_status_t cctalk_driver_get_component_status(void)
         return DEVICE_COMPONENT_STATUS_OFFLINE;
     }
 
-    // Stato logico SUSPENDED → sospeso volontariamente, icona non in errore
+    // Stato logico SUSPENDED → non accetta monete: segnala offline in UI
     if (s_logical_state == CCTALK_DRIVER_STATE_SUSPENDED) {
-        return DEVICE_COMPONENT_STATUS_ACTIVE;
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
     }
 
     if (cctalk_driver_is_acceptor_enabled() && cctalk_driver_is_acceptor_online()) {
@@ -905,9 +905,6 @@ cctalk_driver_state_t cctalk_driver_get_state(void)
 
 esp_err_t cctalk_driver_set_state(cctalk_driver_state_t state)
 {
-    // Aggiorna lo stato logico immediatamente
-    s_logical_state = state;
-
     // Pubblica l'evento asincrono al task CCTalk
     action_id_t action = (state == CCTALK_DRIVER_STATE_ACTIVE)
                          ? ACTION_ID_CCTALK_START
@@ -930,6 +927,9 @@ esp_err_t cctalk_driver_set_state(cctalk_driver_state_t state)
         ESP_LOGW(TAG, "[C] cctalk_driver_set_state(%d): coda evento piena", (int)state);
         return ESP_FAIL;
     }
+
+    // Aggiorna lo stato logico solo dopo publish OK, per evitare mismatch logico/HW
+    s_logical_state = state;
 
     ESP_LOGI(TAG, "[C] cctalk_driver_set_state → %s",
              (state == CCTALK_DRIVER_STATE_ACTIVE) ? "ACTIVE" :
@@ -962,7 +962,7 @@ device_component_status_t cctalk_driver_get_component_status(void)
     }
 
     if (s_mock_logical_state == CCTALK_DRIVER_STATE_SUSPENDED) {
-        return DEVICE_COMPONENT_STATUS_ACTIVE;
+        return DEVICE_COMPONENT_STATUS_OFFLINE;
     }
 
     return s_mock_acceptor_enabled ? DEVICE_COMPONENT_STATUS_ONLINE

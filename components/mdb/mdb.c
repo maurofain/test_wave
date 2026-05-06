@@ -51,6 +51,10 @@ static uint8_t s_cashless_setup_retries[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static uint32_t s_cashless_idle_poll_timeout_count[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static uint32_t s_cashless_idle_poll_ack_only_count[MDB_CASHLESS_DEVICE_COUNT] = {0};
 static uint32_t s_cashless_idle_poll_error_count[MDB_CASHLESS_DEVICE_COUNT] = {0};
+/* [C] Timestamp (tick) in cui il dispositivo ha raggiunto MDB_STATE_ERROR,
+ * usato per il recovery automatico dopo MDB_ERROR_RECOVERY_MS. */
+static TickType_t s_cashless_error_since_tick[MDB_CASHLESS_DEVICE_COUNT] = {0};
+#define MDB_ERROR_RECOVERY_MS 20000U   /* tempo in error prima del reset automatico */
 static bool s_mdb_driver_initialized = false;
 static bool s_mdb_init_failed = false;
 static bool s_mdb_runtime_fault = false;
@@ -844,6 +848,7 @@ static void mdb_cashless_sm(size_t device_index)
                      mdb_state_to_string(MDB_STATE_INIT_RESET));
             s_cashless_reset_retries[device_index] = 0;
             s_cashless_setup_retries[device_index] = 0;
+            s_cashless_error_since_tick[device_index] = 0;  /* reset timer recovery */
             device_rw->last_response_code = 0;
             s_cashless_idle_poll_timeout_count[device_index] = 0;
             s_cashless_idle_poll_ack_only_count[device_index] = 0;
@@ -901,10 +906,12 @@ static void mdb_cashless_sm(size_t device_index)
                          mdb_state_to_string(device_rw->poll_state));
             } else if (++s_cashless_reset_retries[device_index] >= MDB_CASHLESS_SETUP_MAX_RETRIES) {
                 device_rw->poll_state = MDB_STATE_ERROR;
+                s_cashless_error_since_tick[device_index] = xTaskGetTickCount(); /* avvia timer recovery */
                 ESP_LOGE(TAG_CASH,
-                         "[C] [mdb_cashless_sm] dev=%u reset fallito %u volte -> error",
+                         "[C] [mdb_cashless_sm] dev=%u reset fallito %u volte -> error (recovery in %u ms)",
                          (unsigned)device_index,
-                         (unsigned)s_cashless_reset_retries[device_index]);
+                         (unsigned)s_cashless_reset_retries[device_index],
+                         (unsigned)MDB_ERROR_RECOVERY_MS);
             } else {
                 ESP_LOGI(TAG_CASH,
                          "[C] [mdb_cashless_sm] dev=%u reset retry=%u/%u",
@@ -1190,7 +1197,27 @@ static void mdb_cashless_sm(size_t device_index)
             break;
 
         case MDB_STATE_ERROR:
+        {
+            /* [C] Recovery automatico: se il lettore è in ERROR da più di
+             * MDB_ERROR_RECOVERY_MS e non ci sono sessioni aperte, esegui
+             * un reset e torna in INIT_RESET. */
+            TickType_t now = xTaskGetTickCount();
+            if (s_cashless_error_since_tick[device_index] == 0U) {
+                s_cashless_error_since_tick[device_index] = now;
+            } else if (!device->session_open &&
+                       (uint32_t)pdTICKS_TO_MS(now - s_cashless_error_since_tick[device_index]) >= MDB_ERROR_RECOVERY_MS) {
+                ESP_LOGW(TAG_CASH,
+                         "[C] [mdb_cashless_sm] dev=%u in ERROR da >%u ms, reset di recupero automatico",
+                         (unsigned)device_index,
+                         (unsigned)MDB_ERROR_RECOVERY_MS);
+                s_cashless_error_since_tick[device_index] = 0U;
+                s_cashless_reset_retries[device_index] = 0;
+                s_cashless_setup_retries[device_index] = 0;
+                mdb_cashless_reset_device(device_index);
+                device_rw->poll_state = MDB_STATE_INIT_RESET;
+            }
             break;
+        }
 
         default:
             ESP_LOGW(TAG_CASH,

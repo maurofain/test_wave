@@ -136,4 +136,18 @@ config APP_OTA_DEFAULT_URL
     string "Default OTA URL (optional)"
     default ""
 
+config APP_DEVICE_STATE_RETRY_DELAY_MS
+    int "Retry delay for device state changes (ms)"
+    range 200 60000
+    default 2000
+    help
+        Ritardo tra richiesta di cambio stato (scanner/cctalk/mdb) e verifica/ritentativo.
+
+config APP_DEVICE_STATE_MAX_RETRIES
+    int "Max retries before OUT_OF_SERVICE"
+    range 1 20
+    default 5
+    help
+        Numero massimo di tentativi (falliti) prima di mettere l'impianto in OUT_OF_SERVICE.
+
 endmenu

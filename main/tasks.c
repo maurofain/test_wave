@@ -1,5 +1,6 @@
 #include "tasks.h"
 #include "init.h"
+#include "sdkconfig.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "led_strip.h"
@@ -53,6 +54,19 @@ static volatile bool s_program_outputs_verify_error_active = false;
 #define SCANNER_QR_COOLDOWN_DEFAULT_MS 10000U
 #define SCANNER_QR_COOLDOWN_MIN_MS 500U
 #define SCANNER_QR_COOLDOWN_MAX_MS 60000U
+
+/* --- Controllo MDB cashless differito --- */
+/* Ritardo (ms) tra inizio programma e reset fisico del lettore:
+ * lascia il tempo a eventuali transazioni residue di completarsi. */
+#define MDB_INHIBIT_DEFER_MS 350U
+/* Intervallo (ms) tra i controlli anti-blocco: se il lettore resta in
+ * MDB_STATE_ERROR per più di questo tempo viene forzato in INIT_RESET. */
+#define MDB_RECOVERY_INTERVAL_MS 30000U
+
+static bool s_mdb_inhibit_pending  = false;  /* reset differito in attesa */
+static TickType_t s_mdb_inhibit_until_tick = 0; /* tick a cui eseguire il reset */
+static TickType_t s_mdb_recovery_next_tick = 0;  /* prossima verifica anti-blocco */
+
 #define FSM_LANGUAGE_RETURN_DEFAULT_MS 10000U
 #define FSM_LANGUAGE_RETURN_MIN_MS 1000U
 #define FSM_LANGUAGE_RETURN_MAX_MS 600000U
@@ -82,9 +96,53 @@ static volatile bool s_oos_runtime_active = false;
 static volatile bool s_modbus_hard_inhibit = false;
 static volatile bool s_oos_modbus_recovery_test_active = false;
 
+/* Snapshot input Modbus (per heartbeat unificato I1..I12). */
+static portMUX_TYPE s_mb_lock = portMUX_INITIALIZER_UNLOCKED;
+static bool s_mb_valid = false;
+static uint8_t s_mb_bits[MODBUS_RELAY_MAX_BYTES] = {0};
+static uint16_t s_mb_input_count = 0U;
+static uint16_t s_mb_input_start = 0U;
+static uint32_t s_mb_last_update_ms = 0U;
+
+static void tasks_mb_snapshot_update(const modbus_relay_status_t *st);
+
 static void publish_program_payment_event(const fsm_ctx_t *ctx, const fsm_input_event_t *source_event);
 static http_services_payment_type_t tasks_payment_type_from_session_source(fsm_session_source_t source);
 static bool tasks_publish_card_vend_result_event(bool approved, int32_t amount_cents, const char *source_tag);
+
+typedef struct {
+    bool pending;
+    uint32_t verify_after_ms;
+    uint8_t attempts;
+    uint32_t last_err_ms;
+    uint8_t desired_u8;
+} tasks_state_retry_t;
+
+static uint32_t tasks_state_retry_delay_ms(void)
+{
+    uint32_t ms =
+#ifdef CONFIG_APP_DEVICE_STATE_RETRY_DELAY_MS
+        (uint32_t)CONFIG_APP_DEVICE_STATE_RETRY_DELAY_MS;
+#else
+        2000U;
+#endif
+    if (ms < 200U) ms = 200U;
+    if (ms > 60000U) ms = 60000U;
+    return ms;
+}
+
+static uint8_t tasks_state_retry_max_attempts(void)
+{
+    uint32_t v =
+#ifdef CONFIG_APP_DEVICE_STATE_MAX_RETRIES
+        (uint32_t)CONFIG_APP_DEVICE_STATE_MAX_RETRIES;
+#else
+        5U;
+#endif
+    if (v < 1U) v = 1U;
+    if (v > 20U) v = 20U;
+    return (uint8_t)v;
+}
 
 static bool tasks_is_out_of_service_state(void)
 {
@@ -1085,14 +1143,19 @@ static void digital_io_task(void *arg)
                                 : pdMS_TO_TICKS(DIGITAL_IO_POLL_DEFAULT_MS);
     uint16_t previous_inputs_mask = 0U;
     bool previous_valid = false;
+    uint32_t last_heartbeat_ms = 0U;
+
+    /* Mappa I virtuali:
+     * - I1..I4  = ingressi locali IN05..IN08 (OPTO2,OPTO1,OPTO4,OPTO3)
+     * - I5..I12 = ingressi Modbus MB01..MB08 (bit 0..7) */
+    const uint8_t VIRT_LOCAL_FIRST_INPUT_ID = DIGITAL_IO_INPUT_OPTO2; /* 5 */
+    const uint8_t VIRT_LOCAL_COUNT = 4U;
+    const uint8_t VIRT_MODBUS_COUNT = DIGITAL_IO_MODBUS_INPUT_COUNT; /* 8 */
+    const uint8_t VIRT_TOTAL = (uint8_t)(VIRT_LOCAL_COUNT + VIRT_MODBUS_COUNT); /* 12 */
 
     while (true) {
         vTaskDelayUntil(&last_wake, period_ticks);
-
-        if (tasks_is_modbus_runtime_blocked()) {
-            previous_valid = false;
-            continue;
-        }
+        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
 
         esp_err_t init_err = digital_io_init();
         if (init_err != ESP_OK) {
@@ -1123,15 +1186,88 @@ static void digital_io_task(void *arg)
             continue;
         }
 
+        if ((now_ms - last_heartbeat_ms) >= 5000U) {
+            bool mb_valid = false;
+            uint8_t mb_bits_local[MODBUS_RELAY_MAX_BYTES] = {0};
+            uint16_t mb_count = 0U;
+            uint16_t mb_start = 0U;
+            uint32_t mb_age_ms = 0U;
+            portENTER_CRITICAL(&s_mb_lock);
+            mb_valid = s_mb_valid;
+            memcpy(mb_bits_local, s_mb_bits, sizeof(mb_bits_local));
+            mb_count = s_mb_input_count;
+            mb_start = s_mb_input_start;
+            mb_age_ms = (s_mb_last_update_ms > 0U) ? (now_ms - s_mb_last_update_ms) : 0U;
+            portEXIT_CRITICAL(&s_mb_lock);
+
+            char vbits[16] = {0};
+            for (uint8_t v = 1U; v <= VIRT_TOTAL; ++v) {
+                bool is_on = false;
+                bool known = false;
+
+                if (v <= VIRT_LOCAL_COUNT) {
+                    uint8_t input_id = (uint8_t)(VIRT_LOCAL_FIRST_INPUT_ID + (v - 1U));
+                    uint16_t input_mask = (uint16_t)(1U << (input_id - 1U));
+                    is_on = (inputs_mask & input_mask) != 0U;
+                    known = true;
+                } else {
+                    uint16_t mb_bit = (uint16_t)(v - VIRT_LOCAL_COUNT - 1U);
+                    if (mb_valid && mb_bit < mb_count) {
+                        uint8_t byte_idx = (uint8_t)(mb_bit / 8U);
+                        uint8_t bit_mask = (uint8_t)(1U << (mb_bit % 8U));
+                        is_on = (mb_bits_local[byte_idx] & bit_mask) != 0U;
+                        known = true;
+                    }
+                }
+
+                vbits[v - 1U] = known ? (is_on ? '1' : '0') : '?';
+            }
+            vbits[VIRT_TOTAL] = '\0';
+
+            ESP_LOGI(TAG,
+                     "[M] heartbeat ingressi I1..I%u=%s (I1..I4=IN05..IN08, I5..I12=MB01..MB08) local_mask=0x%04x mb_ok=%u mb_age=%ums mb_start=%u mb_count=%u",
+                     (unsigned)VIRT_TOTAL,
+                     vbits,
+                     (unsigned)inputs_mask,
+                     mb_valid ? 1U : 0U,
+                     (unsigned)mb_age_ms,
+                     (unsigned)mb_start,
+                     (unsigned)mb_count);
+            last_heartbeat_ms = now_ms;
+        }
+
         if (!previous_valid) {
             previous_inputs_mask = inputs_mask;
             previous_valid = true;
             continue;
         }
 
-        uint16_t rising_mask = (uint16_t)((~previous_inputs_mask) & inputs_mask);
+        uint16_t prev_mask = previous_inputs_mask;
+        uint16_t changed_mask = (uint16_t)(prev_mask ^ inputs_mask);
+        uint16_t rising_mask  = (uint16_t)((~prev_mask) & inputs_mask);
+        uint16_t falling_mask = (uint16_t)(prev_mask & (uint16_t)(~inputs_mask));
         previous_inputs_mask = inputs_mask;
-        if (rising_mask == 0U) {
+
+        /* Log di tracing: per la logica "I virtuali" contiamo solo IN05..IN08 => I1..I4 */
+        if (changed_mask != 0U) {
+            for (uint8_t i = 0; i < VIRT_LOCAL_COUNT; ++i) {
+                uint8_t input_id = (uint8_t)(VIRT_LOCAL_FIRST_INPUT_ID + i);
+                uint16_t input_mask = (uint16_t)(1U << (input_id - 1U));
+                if ((changed_mask & input_mask) == 0U) {
+                    continue;
+                }
+                bool is_on = (inputs_mask & input_mask) != 0U;
+                uint8_t virt = (uint8_t)(i + 1U); /* I1..I4 */
+                ESP_LOGI(TAG,
+                         "[M] INPUT I%u (locale IN%02u)=%u (%s)",
+                         (unsigned)virt,
+                         (unsigned)input_id,
+                         is_on ? 1U : 0U,
+                         is_on ? "0->1" : "1->0");
+            }
+        }
+
+        if (rising_mask == 0U && falling_mask == 0U) {
             continue;
         }
 
@@ -1986,12 +2122,15 @@ static void rs485_task(void *arg)
     TickType_t last_wake = xTaskGetTickCount();
     esp_err_t last_init_err = ESP_OK;
     esp_err_t last_poll_err = ESP_OK;
+    esp_err_t last_status_err = ESP_OK;
     bool bootstrap_probe_done = false;
+    uint32_t last_heartbeat_ms = 0U;
     /* Stato precedente degli input Modbus per rilevare i fronti 0→1 */
     uint8_t prev_input_bits[MODBUS_RELAY_MAX_BYTES] = {0};
     bool prev_input_valid = false;
 
     while (true) {
+        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
         bool modbus_hard_inhibit = tasks_is_modbus_hard_inhibited();
         bool modbus_recovery_test_active = tasks_is_modbus_recovery_test_active();
 
@@ -2002,8 +2141,16 @@ static void rs485_task(void *arg)
             }
             last_init_err = ESP_OK;
             last_poll_err = ESP_OK;
+            last_status_err = ESP_OK;
             bootstrap_probe_done = false;
             prev_input_valid = false;
+            portENTER_CRITICAL(&s_mb_lock);
+            s_mb_valid = false;
+            s_mb_input_count = 0U;
+            s_mb_input_start = 0U;
+            s_mb_last_update_ms = 0U;
+            memset(s_mb_bits, 0, sizeof(s_mb_bits));
+            portEXIT_CRITICAL(&s_mb_lock);
             vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(200));
             continue;
         }
@@ -2015,8 +2162,16 @@ static void rs485_task(void *arg)
             }
             last_init_err = ESP_OK;
             last_poll_err = ESP_OK;
+            last_status_err = ESP_OK;
             bootstrap_probe_done = false;
             prev_input_valid = false;
+            portENTER_CRITICAL(&s_mb_lock);
+            s_mb_valid = false;
+            s_mb_input_count = 0U;
+            s_mb_input_start = 0U;
+            s_mb_last_update_ms = 0U;
+            memset(s_mb_bits, 0, sizeof(s_mb_bits));
+            portEXIT_CRITICAL(&s_mb_lock);
             vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(200));
             continue;
         }
@@ -2034,6 +2189,23 @@ static void rs485_task(void *arg)
 
         if (delay_ms < 20U) {
             delay_ms = 20U;
+        }
+
+        if ((now_ms - last_heartbeat_ms) >= 5000U) {
+            bool cfg_rs485 = cfg ? cfg->sensors.rs485_enabled : false;
+            bool cfg_modbus = cfg ? cfg->modbus.enabled : false;
+            ESP_LOGI(TAG,
+                     "[M] rs485 tick: should_run_modbus=%u rs485_en=%u modbus_en=%u running=%u hard_inh=%u oos=%u last_init=%s last_poll=%s last_status=%s",
+                     should_run_modbus ? 1U : 0U,
+                     cfg_rs485 ? 1U : 0U,
+                     cfg_modbus ? 1U : 0U,
+                     modbus_relay_is_running() ? 1U : 0U,
+                     modbus_hard_inhibit ? 1U : 0U,
+                     tasks_is_out_of_service_state() ? 1U : 0U,
+                     esp_err_to_name(last_init_err),
+                     esp_err_to_name(last_poll_err),
+                     esp_err_to_name(last_status_err));
+            last_heartbeat_ms = now_ms;
         }
 
         if (should_run_modbus) {
@@ -2113,7 +2285,12 @@ static void rs485_task(void *arg)
 
                     /* Rilevamento fronti 0→1 sugli input Modbus */
                     modbus_relay_status_t mb_status = {0};
-                    if (modbus_relay_get_status(&mb_status) == ESP_OK) {
+                    esp_err_t st_err = modbus_relay_get_status(&mb_status);
+                    last_status_err = st_err;
+                    if (st_err == ESP_OK) {
+                        /* Pubblica snapshot Modbus per heartbeat unificato (I5..I12). */
+                        tasks_mb_snapshot_update(&mb_status);
+
                         uint16_t input_count = mb_status.input_count;
                         if (input_count > DIGITAL_IO_MODBUS_INPUT_COUNT) {
                             input_count = DIGITAL_IO_MODBUS_INPUT_COUNT;
@@ -2128,6 +2305,20 @@ static void rs485_task(void *arg)
                                 uint8_t bit_mask = (uint8_t)(1U << (bit % 8U));
                                 bool was_on = (prev_input_bits[byte_idx] & bit_mask) != 0U;
                                 bool is_on  = (mb_status.input_bits[byte_idx] & bit_mask) != 0U;
+
+                                    /* Log di tracing: stampa ogni cambio di stato input Modbus.
+                                     * Nel mapping "I virtuali": MB01..MB08 => I5..I12 */
+                                    if (was_on != is_on) {
+                                        uint8_t input_id = (uint8_t)(DIGITAL_IO_FIRST_MODBUS_INPUT + bit);
+                                        uint8_t virt = (uint8_t)(5U + bit); /* I5..I12 */
+                                        ESP_LOGI(TAG,
+                                                 "[M] INPUT I%u (Modbus MB%02u, IN%02u)=%u (%s)",
+                                                 (unsigned)virt,
+                                                 (unsigned)(bit + 1U),
+                                                 (unsigned)input_id,
+                                                 is_on ? 1U : 0U,
+                                                 is_on ? "0->1" : "1->0");
+                                    }
 
                                 if (!was_on && is_on) {
                                     /* Fronte 0→1: pubblica evento identico agli input locali */
@@ -2171,19 +2362,88 @@ static void rs485_task(void *arg)
                             }
                             memcpy(prev_input_bits, mb_status.input_bits, sizeof(prev_input_bits));
                         }
+                    } else if (st_err != ESP_OK && st_err != last_status_err) {
+                        ESP_LOGW(TAG, "[M] Modbus get_status fallita: %s", esp_err_to_name(st_err));
                     }
                 }
             }
-        } else if (modbus_relay_is_running()) {
+        } else {
+            /* Modbus non richiesto da config: invalida snapshot e ferma polling */
+            portENTER_CRITICAL(&s_mb_lock);
+            s_mb_valid = false;
+            s_mb_input_count = 0U;
+            s_mb_input_start = 0U;
+            s_mb_last_update_ms = 0U;
+            memset(s_mb_bits, 0, sizeof(s_mb_bits));
+            portEXIT_CRITICAL(&s_mb_lock);
+
+            if (modbus_relay_is_running()) {
             (void)modbus_relay_deinit();
             last_init_err = ESP_OK;
             last_poll_err = ESP_OK;
+            last_status_err = ESP_OK;
             bootstrap_probe_done = false;
             prev_input_valid = false;
+            }
         }
 
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(delay_ms));
     }
+}
+
+static void tasks_mb_snapshot_update(const modbus_relay_status_t *st)
+{
+    if (!st) {
+        return;
+    }
+
+    uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+
+    portENTER_CRITICAL(&s_mb_lock);
+    s_mb_valid = true;
+    memcpy(s_mb_bits, st->input_bits, sizeof(s_mb_bits));
+    s_mb_input_count = st->input_count;
+    s_mb_input_start = st->input_start;
+    s_mb_last_update_ms = now_ms;
+    portEXIT_CRITICAL(&s_mb_lock);
+}
+
+static bool tasks_scanner_verify_state(usb_cdc_scanner_state_t desired)
+{
+    if (!usb_cdc_scanner_is_connected()) {
+        return true;
+    }
+    return (usb_cdc_scanner_get_state() == desired);
+}
+
+static bool tasks_cctalk_verify_state(cctalk_driver_state_t desired)
+{
+    if (desired == CCTALK_DRIVER_STATE_ACTIVE) {
+        return cctalk_driver_is_acceptor_enabled();
+    }
+    if (desired == CCTALK_DRIVER_STATE_SUSPENDED) {
+        return !cctalk_driver_is_acceptor_enabled();
+    }
+    if (desired == CCTALK_DRIVER_STATE_OOS) {
+        return (cctalk_driver_get_state() == CCTALK_DRIVER_STATE_OOS);
+    }
+    return true;
+}
+
+static bool tasks_mdb_verify_ok(void)
+{
+    /* Consideriamo OK se il cashless non è in ERROR (quando presente). */
+    size_t count = mdb_cashless_get_device_count();
+    for (size_t i = 0; i < count; ++i) {
+        const mdb_cashless_device_t *dev = mdb_cashless_get_device(i);
+        if (!dev || !dev->present) {
+            continue;
+        }
+        if (dev->poll_state == MDB_STATE_ERROR) {
+            return false;
+        }
+    }
+    return true;
 }
 
 
@@ -2204,6 +2464,62 @@ static void mdb_task(void *arg)
     }
 }
 
+
+/* Esegue il reset MDB differito quando il timer scade e nessuna sessione è aperta.
+ * Chiamata a ogni tick della fsm_task. */
+static void tasks_mdb_inhibit_tick(TickType_t now_tick)
+{
+    if (!s_mdb_inhibit_pending) {
+        return;
+    }
+    if ((int32_t)(now_tick - s_mdb_inhibit_until_tick) < 0) {
+        return; /* timer non ancora scaduto */
+    }
+
+    /* Non resettare se una sessione hardware è ancora aperta */
+    size_t mdb_count = mdb_cashless_get_device_count();
+    for (size_t i = 0; i < mdb_count; ++i) {
+        const mdb_cashless_device_t *dev = mdb_cashless_get_device(i);
+        if (dev && dev->session_open) {
+            /* posticipa di 500 ms */
+            s_mdb_inhibit_until_tick = now_tick + pdMS_TO_TICKS(500U);
+            ESP_LOGD(TAG, "[M] MDB inibizione differita: sessione ancora aperta");
+            return;
+        }
+    }
+
+    for (size_t i = 0; i < mdb_count; ++i) {
+        mdb_cashless_reset_device(i);
+    }
+    s_mdb_inhibit_pending = false;
+    ESP_LOGI(TAG, "[M] MDB: reset inibizione eseguito (programma attivo senza sessione card)");
+}
+
+/* Verifica periodica: se il lettore è in MDB_STATE_ERROR o bloccato in fase
+ * di init oltre MDB_RECOVERY_INTERVAL_MS, forza un reset di recupero. */
+static void tasks_mdb_recovery_tick(TickType_t now_tick)
+{
+    if ((int32_t)(now_tick - s_mdb_recovery_next_tick) < 0) {
+        return;
+    }
+    s_mdb_recovery_next_tick = now_tick + pdMS_TO_TICKS(MDB_RECOVERY_INTERVAL_MS);
+
+    size_t mdb_count = mdb_cashless_get_device_count();
+    for (size_t i = 0; i < mdb_count; ++i) {
+        const mdb_cashless_device_t *dev = mdb_cashless_get_device(i);
+        if (!dev) {
+            continue;
+        }
+        /* Recupera solo se in ERROR e nessuna sessione aperta */
+        if (dev->poll_state == MDB_STATE_ERROR && !dev->session_open) {
+            ESP_LOGW(TAG,
+                     "[M] MDB: dev=%u in ERROR state, reset di recupero automatico (errors=%lu)",
+                     (unsigned)i,
+                     (unsigned long)dev->error_count);
+            mdb_cashless_reset_device(i);
+        }
+    }
+}
 
 /**
  * @brief Gestisce il task del Finite State Machine (FSM).
@@ -2253,6 +2569,9 @@ static void fsm_task(void *arg)
 
     /* contatore per il log "alive" ogni 10 secondi */
     uint32_t alive_ms = 0;
+    tasks_state_retry_t scanner_retry = {0};
+    tasks_state_retry_t cctalk_retry = {0};
+    tasks_state_retry_t mdb_retry = {0};
     static const uint32_t ALIVE_INTERVAL_MS = 10000;
     bool scanner_forced_off_for_program = false;
     bool mdb_forced_reset_for_program = false;
@@ -2345,13 +2664,25 @@ static void fsm_task(void *arg)
                         tasks_set_out_of_service_runtime(false);
 
                         if (cfg && cfg->sensors.cctalk_enabled) {
-                            cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
-                            ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo uscita OUT_OF_SERVICE");
+                            esp_err_t cc_err = cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+                            if (cc_err == ESP_OK) {
+                                ESP_LOGI(TAG, "[M] Gettoniera CCTALK riabilitata dopo uscita OUT_OF_SERVICE");
+                            } else {
+                                ESP_LOGW(TAG,
+                                         "[M] Gettoniera CCTALK non riabilitata (queue full?): %s",
+                                         esp_err_to_name(cc_err));
+                            }
                         }
 
                         if (cfg && cfg->scanner.enabled) {
-                            usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
-                            ESP_LOGI(TAG, "[M] Scanner impostato ACTIVE dopo uscita OUT_OF_SERVICE");
+                            esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+                            if (sc_err == ESP_OK) {
+                                ESP_LOGI(TAG, "[M] Scanner impostato ACTIVE dopo uscita OUT_OF_SERVICE");
+                            } else {
+                                ESP_LOGW(TAG,
+                                         "[M] Scanner non impostato ACTIVE dopo OOS: %s",
+                                         esp_err_to_name(sc_err));
+                            }
                         }
 
                         memset(&active_oos, 0, sizeof(active_oos));
@@ -2458,33 +2789,66 @@ static void fsm_task(void *arg)
             bool cctalk_stop_needed = vcd_locked_session;
 
             if (cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_ACTIVE) {
-                cctalk_driver_set_state(CCTALK_DRIVER_STATE_SUSPENDED);
+                esp_err_t cc_err = cctalk_driver_set_state(CCTALK_DRIVER_STATE_SUSPENDED);
+                if (cc_err != ESP_OK) {
+                    ESP_LOGW(TAG,
+                             "[M] Gettoniera CCTALK: sospensione richiesta ma non applicata: %s",
+                             esp_err_to_name(cc_err));
+                }
                 if (active_program_session) {
                     ESP_LOGI(TAG, "[M] Gettoniera CCTALK sospesa durante programma attivo");
                 } else {
                     ESP_LOGI(TAG, "[M] Gettoniera CCTALK sospesa durante sessione VCD");
                 }
+                cctalk_retry.pending = true;
+                cctalk_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
+                cctalk_retry.desired_u8 = (uint8_t)CCTALK_DRIVER_STATE_SUSPENDED;
             } else if (!cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED &&
                        (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
-                cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
-                ESP_LOGI(TAG, "[M] Gettoniera CCTALK riattivata dopo sessione VCD/programma");
+                esp_err_t cc_err = cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+                if (cc_err == ESP_OK) {
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riattivata dopo sessione VCD/programma");
+                } else {
+                    ESP_LOGW(TAG,
+                             "[M] Gettoniera CCTALK: riattivazione richiesta ma non applicata: %s",
+                             esp_err_to_name(cc_err));
+                }
+                cctalk_retry.pending = true;
+                cctalk_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
+                cctalk_retry.desired_u8 = (uint8_t)CCTALK_DRIVER_STATE_ACTIVE;
             }
         } else {
             if (cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED) {
-                cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+                (void)cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
             }
         }
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->scanner.enabled) {
             if (active_program_session && !scanner_forced_off_for_program) {
-                usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_SUSPENDED);
+                esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_SUSPENDED);
+                if (sc_err != ESP_OK) {
+                    ESP_LOGW(TAG,
+                             "[M] Scanner QR: sospensione richiesta ma fallita: %s",
+                             esp_err_to_name(sc_err));
+                }
                 scanner_forced_off_for_program = true;
                 ESP_LOGI(TAG, "[M] Scanner QR sospeso durante programma attivo");
+                scanner_retry.pending = true;
+                scanner_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
+                scanner_retry.desired_u8 = (uint8_t)USB_CDC_SCANNER_STATE_SUSPENDED;
             } else if (!active_program_session && scanner_forced_off_for_program &&
                        (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
-                usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+                esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+                if (sc_err != ESP_OK) {
+                    ESP_LOGW(TAG,
+                             "[M] Scanner QR: riattivazione richiesta ma fallita: %s",
+                             esp_err_to_name(sc_err));
+                }
                 scanner_forced_off_for_program = false;
                 ESP_LOGI(TAG, "[M] Scanner QR riattivato dopo fine programma");
+                scanner_retry.pending = true;
+                scanner_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
+                scanner_retry.desired_u8 = (uint8_t)USB_CDC_SCANNER_STATE_ACTIVE;
             }
         } else {
             scanner_forced_off_for_program = false;
@@ -2501,23 +2865,37 @@ static void fsm_task(void *arg)
                 }
             }
 
+            /* [M] mdb_stop_needed: programma attivo senza sessione card aperta.
+             * Pianifica un reset DIFFERITO (MDB_INHIBIT_DEFER_MS) per non interrompere
+             * transazioni residue che potrebbero essere ancora in chiusura. */
             bool mdb_stop_needed = active_program_session && !mdb_session_open;
             if (mdb_stop_needed && !mdb_forced_reset_for_program) {
-                for (size_t i = 0; i < mdb_count; ++i) {
-                    mdb_cashless_reset_device(i);
-                }
+                s_mdb_inhibit_pending = true;
+                s_mdb_inhibit_until_tick = now_tick + pdMS_TO_TICKS(MDB_INHIBIT_DEFER_MS);
                 mdb_forced_reset_for_program = true;
-                ESP_LOGI(TAG, "[M] MDB cashless disabilitato durante programma attivo");
+                ESP_LOGI(TAG,
+                         "[M] MDB cashless: inibizione pianificata tra %u ms (programma non-card attivo)",
+                         (unsigned)MDB_INHIBIT_DEFER_MS);
+                mdb_retry.pending = true;
+                mdb_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
             } else if (!mdb_stop_needed && mdb_forced_reset_for_program &&
                        (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
-                for (size_t i = 0; i < mdb_count; ++i) {
-                    mdb_cashless_reset_device(i);
-                }
+                /* [M] Fine programma: libera il flag e cancella eventuale reset non ancora eseguito.
+                 * NON inviare un secondo reset: il dispositivo è già in reinizializzazione
+                 * naturale dal reset pianificato a inizio programma. */
                 mdb_forced_reset_for_program = false;
-                ESP_LOGI(TAG, "[M] MDB cashless riabilitato dopo fine programma");
+                s_mdb_inhibit_pending = false;
+                ESP_LOGI(TAG, "[M] MDB cashless: flag inibizione liberato, lettore in reinizializzazione");
             }
+
+            /* Esegui reset differito se scaduto */
+            tasks_mdb_inhibit_tick(now_tick);
+
+            /* Verifica anti-blocco periodica (recovery da MDB_STATE_ERROR) */
+            tasks_mdb_recovery_tick(now_tick);
         } else {
             mdb_forced_reset_for_program = false;
+            s_mdb_inhibit_pending = false;
         }
 
         if (event_received &&
@@ -2576,6 +2954,9 @@ static void fsm_task(void *arg)
                 usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
                 scanner_forced_off_for_program = false;
                 ESP_LOGI(TAG, "[M] Scanner QR riattivato al termine del programma");
+                scanner_retry.pending = true;
+                scanner_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
+                scanner_retry.desired_u8 = (uint8_t)USB_CDC_SCANNER_STATE_ACTIVE;
             }
 
             bool hardware_session_open = false;
@@ -2592,13 +2973,14 @@ static void fsm_task(void *arg)
                                           hardware_session_open));
             if (cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en) {
                 if (keep_cashless_active) {
+                    /* Sessione CARD ancora valida: cancella eventuale inibizione pianificata */
+                    s_mdb_inhibit_pending = false;
                     ESP_LOGI(TAG, "[M] Mantengo cashless attivo: sessione CARD ancora valida o hardware session open");
                 } else {
-                    size_t mdb_count = mdb_cashless_get_device_count();
-                    for (size_t i = 0; i < mdb_count; ++i) {
-                        mdb_cashless_reset_device(i);
-                    }
-                    ESP_LOGI(TAG, "[M] MDB cashless reattivato dopo fine programma");
+                    /* [M] Non resettare una seconda volta: il dispositivo è già in reinizializzazione
+                     * naturale dal reset inibizione pianificato a inizio programma.
+                     * Il recovery periodico (tasks_mdb_recovery_tick) gestisce eventuali blocchi. */
+                    ESP_LOGI(TAG, "[M] MDB cashless: fine programma non-card, lettore in reinizializzazione naturale");
                 }
             }
 
@@ -2618,6 +3000,82 @@ static void fsm_task(void *arg)
                 ESP_LOGW(TAG,
                          "[M] Reset relay fallito in uscita da programma: %s",
                          esp_err_to_name(clear_err));
+            }
+        }
+
+        /* ------------------------------------------------------------------ */
+        /* Verifica+retry cambi stato (scanner/cctalk/mdb)                      */
+        /* ------------------------------------------------------------------ */
+        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(now_tick);
+        const uint8_t max_attempts = tasks_state_retry_max_attempts();
+
+        if (scanner_retry.pending && (int32_t)(now_ms - scanner_retry.verify_after_ms) >= 0) {
+            usb_cdc_scanner_state_t desired = (usb_cdc_scanner_state_t)scanner_retry.desired_u8;
+            if (tasks_scanner_verify_state(desired) || tasks_is_out_of_service_state()) {
+                scanner_retry.pending = false;
+                scanner_retry.attempts = 0;
+            } else {
+                scanner_retry.attempts++;
+                ESP_LOGW(TAG, "[M] Scanner verify FAIL (desired=%u attempt %u/%u): retry tra %ums",
+                         (unsigned)desired,
+                         (unsigned)scanner_retry.attempts, (unsigned)max_attempts,
+                         (unsigned)tasks_state_retry_delay_ms());
+                (void)usb_cdc_scanner_set_state(desired);
+                scanner_retry.verify_after_ms = now_ms + tasks_state_retry_delay_ms();
+                if (scanner_retry.attempts >= max_attempts && desired == USB_CDC_SCANNER_STATE_ACTIVE) {
+                    tasks_request_out_of_service(AGN_ID_USB_CDC_SCANNER,
+                                                 "out_of_service_reason_scanner",
+                                                 "Scanner non operativo");
+                    scanner_retry.pending = false;
+                    scanner_retry.attempts = 0;
+                }
+            }
+        }
+
+        if (cctalk_retry.pending && (int32_t)(now_ms - cctalk_retry.verify_after_ms) >= 0) {
+            cctalk_driver_state_t desired = (cctalk_driver_state_t)cctalk_retry.desired_u8;
+            if (tasks_cctalk_verify_state(desired) || tasks_is_out_of_service_state()) {
+                cctalk_retry.pending = false;
+                cctalk_retry.attempts = 0;
+            } else {
+                cctalk_retry.attempts++;
+                ESP_LOGW(TAG, "[M] CCTALK verify FAIL (desired=%u attempt %u/%u): retry tra %ums",
+                         (unsigned)desired,
+                         (unsigned)cctalk_retry.attempts, (unsigned)max_attempts,
+                         (unsigned)tasks_state_retry_delay_ms());
+                (void)cctalk_driver_set_state(desired);
+                cctalk_retry.verify_after_ms = now_ms + tasks_state_retry_delay_ms();
+                if (cctalk_retry.attempts >= max_attempts && desired == CCTALK_DRIVER_STATE_ACTIVE) {
+                    tasks_request_out_of_service(AGN_ID_CCTALK,
+                                                 "out_of_service_reason_cctalk",
+                                                 "Gettoniera non operativa");
+                    cctalk_retry.pending = false;
+                    cctalk_retry.attempts = 0;
+                }
+            }
+        }
+
+        if (mdb_retry.pending && (int32_t)(now_ms - mdb_retry.verify_after_ms) >= 0) {
+            if (tasks_mdb_verify_ok() || tasks_is_out_of_service_state()) {
+                mdb_retry.pending = false;
+                mdb_retry.attempts = 0;
+            } else {
+                mdb_retry.attempts++;
+                ESP_LOGW(TAG, "[M] MDB verify FAIL (attempt %u/%u): retry reset tra %ums",
+                         (unsigned)mdb_retry.attempts, (unsigned)max_attempts,
+                         (unsigned)tasks_state_retry_delay_ms());
+                size_t mdb_count = mdb_cashless_get_device_count();
+                for (size_t i = 0; i < mdb_count; ++i) {
+                    mdb_cashless_reset_device(i);
+                }
+                mdb_retry.verify_after_ms = now_ms + tasks_state_retry_delay_ms();
+                if (mdb_retry.attempts >= max_attempts) {
+                    tasks_request_out_of_service(AGN_ID_MDB,
+                                                 "out_of_service_reason_mdb",
+                                                 "MDB cashless non operativo");
+                    mdb_retry.pending = false;
+                    mdb_retry.attempts = 0;
+                }
             }
         }
 
@@ -2940,7 +3398,7 @@ static void scanner_cooldown_task(void *arg)
  * Questa funzione viene invocata dal sistema quando viene rilevato un barcode.
  * 
  * @param barcode [in] Il codice barcode rilevato.
- * @return void Non restituisce alcun valore.
+ * @return bool True se il barcode è stato riconosciuto e elaborato correttamente.
  */
 static bool scanner_extract_clean_barcode(const char *raw_barcode, char *clean_barcode, size_t clean_len)
 {
@@ -2980,6 +3438,12 @@ static bool scanner_extract_clean_barcode(const char *raw_barcode, char *clean_b
     }
     memcpy(trimmed, start, len);
     trimmed[len] = '\0';
+
+    /* Barcode riservato al comando di reset: scartato dall'elaborazione normale.
+     * Usa strstr per catturare anche barcode con prefissi/suffissi (es. "s[RESET]"). */
+    if (strstr(trimmed, "[RESET]") != NULL) {
+        return false;
+    }
 
     bool looks_like_scanner_frame = (strstr(trimmed, "SCNENA") != NULL) ||
                                     (strstr(trimmed, "SCNMOD") != NULL) ||
@@ -3045,18 +3509,32 @@ static bool scanner_extract_clean_barcode(const char *raw_barcode, char *clean_b
  */
 static void scanner_on_barcode_cb(const char *barcode)
 {
-    if (tasks_is_out_of_service_state()) {
-        ESP_LOGW("SCANNER", "[M] Lettura scanner ignorata: stato OUT_OF_SERVICE");
-        return;
-    }
-
     if (!barcode || barcode[0] == '\0') {
         return;
     }
 
+    /* Comando speciale: [RESET] → reboot immediato. Controlla sul raw normalizzato,
+     * prima di scanner_extract_clean_barcode che lo scarterebbe come non valido.
+     * Usa strstr per catturare anche barcode con prefissi/suffissi (es. "s[RESET]"). */
+    char raw_normalized[FSM_EVENT_TEXT_MAX_LEN] = {0};
+    normalize_barcode_text(barcode, raw_normalized, sizeof(raw_normalized));
+    if (strstr(raw_normalized, "[RESET]") != NULL) {
+        ESP_LOGW("SCANNER", "[M] Barcode [RESET] ricevuto (raw=%s): reboot device in corso...", raw_normalized);
+        vTaskDelay(pdMS_TO_TICKS(200)); /* breve attesa per flush log UART */
+        esp_restart();
+        return; /* mai raggiunto */
+    }
+
     char clean_barcode[FSM_EVENT_TEXT_MAX_LEN] = {0};
     if (!scanner_extract_clean_barcode(barcode, clean_barcode, sizeof(clean_barcode))) {
-        ESP_LOGW("SCANNER", "[M] Barcode scanner non valido/scartato");
+        char raw_norm[FSM_EVENT_TEXT_MAX_LEN] = {0};
+        normalize_barcode_text(barcode, raw_norm, sizeof(raw_norm));
+        ESP_LOGW("SCANNER", "[M] Barcode scanner non valido/scartato (raw=%s)", raw_norm);
+        return;
+    }
+
+    if (tasks_is_out_of_service_state()) {
+        ESP_LOGW("SCANNER", "[M] Lettura scanner ignorata: stato OUT_OF_SERVICE");
         return;
     }
 
@@ -4060,6 +4538,21 @@ void tasks_start_all(void)
             t->state = cfg->sensors.cctalk_enabled
                            ? TASK_STATE_RUN
                            : TASK_STATE_IDLE;
+        }
+
+        /* RS485/Modbus: avvia il task se abilitato in config.
+         * Nota: senza questo, l'interfaccia /test può usare Modbus "on-demand"
+         * ma non avremo polling continuo e log dei cambi di stato. */
+        if (cfg && strcmp(t->name, "rs485") == 0) {
+            t->state = (cfg->sensors.rs485_enabled && cfg->modbus.enabled)
+                           ? TASK_STATE_RUN
+                           : TASK_STATE_IDLE;
+            ESP_LOGI(TAG,
+                     "[M] Task %s forzato %s (rs485=%d modbus=%d)",
+                     t->name,
+                     (t->state == TASK_STATE_RUN) ? "RUN" : "IDLE",
+                     cfg->sensors.rs485_enabled ? 1 : 0,
+                     cfg->modbus.enabled ? 1 : 0);
         }
 
         if (cfg && strcmp(t->name, "rs232") == 0 &&

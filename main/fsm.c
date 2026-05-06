@@ -962,9 +962,13 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             ctx->vcd_cents_residual = 0;
             ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;  // Now vcd_coins=0, so credit = ecd only
             bool replace_touch_only_session = fsm_can_replace_touch_only_session_with_qr(ctx);
+            bool allow_open_payments_upgrade =
+                (ctx->session_mode == FSM_SESSION_MODE_OPEN_PAYMENTS) &&
+                ctx->allow_additional_payments;
             if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
                 ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED &&
-                !replace_touch_only_session) {
+                !replace_touch_only_session &&
+                !allow_open_payments_upgrade) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");
                 return false;
             }
@@ -1016,8 +1020,12 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 fsm_append_message("Vend card in corso: credito aggiuntivo ignorato");
                 return false;
             }
+            bool allow_open_payments_upgrade =
+                (ctx->session_mode == FSM_SESSION_MODE_OPEN_PAYMENTS) &&
+                ctx->allow_additional_payments;
             if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
-                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED) {
+                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED &&
+                !allow_open_payments_upgrade) {
                 fsm_append_message("Pagamento aggiuntivo non consentito");
                 return false;
             }
