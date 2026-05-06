@@ -71,6 +71,7 @@ static TaskHandle_t s_usb_open_task = NULL;
 // Stato logico del dispositivo scanner (ACTIVE / SUSPENDED / OOS)
 static volatile usb_cdc_scanner_state_t s_scanner_logical_state = USB_CDC_SCANNER_STATE_ACTIVE;
 static volatile bool s_is_epaper_mode = false;
+static volatile int s_epaper_cdc_ifnum = -1;
 
 __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
 {
@@ -220,6 +221,41 @@ static void cdc_new_device_cb(usb_device_handle_t usb_dev)
                      device_desc->idVendor, device_desc->idProduct, device_desc->bDeviceClass);
             ESP_LOGI("INIT", "[M] [USB] *****************************************");
         }
+
+        /* EPAPER_USB: prova a determinare il numero di interfaccia CDC dal configuration descriptor.
+         * cdc_acm_host_open() usa interface_idx come bInterfaceNumber (non come “index 0..N”). */
+        if (device_desc->idVendor == EPAPER_USB_DEFAULT_VID && device_desc->idProduct == EPAPER_USB_DEFAULT_PID) {
+            const usb_config_desc_t *cfg_desc = NULL;
+            if (usb_host_get_active_config_descriptor(usb_dev, &cfg_desc) == ESP_OK && cfg_desc) {
+                const uint8_t *p = (const uint8_t *)cfg_desc;
+                int len = (int)cfg_desc->wTotalLength;
+                int found = -1;
+                int found_data = -1;
+                while (len >= 2) {
+                    uint8_t desc_len = p[0];
+                    uint8_t desc_type = p[1];
+                    if (desc_len == 0 || desc_len > len) break;
+                    if (desc_type == 0x04 && desc_len >= 9) { /* interface descriptor */
+                        uint8_t ifnum = p[2];
+                        uint8_t cls = p[5];
+                        /* Prefer COMM (0x02), fallback DATA (0x0A) */
+                        if (cls == 0x02 && found < 0) found = ifnum;
+                        else if (cls == 0x0A && found_data < 0) found_data = ifnum;
+                    }
+                    p += desc_len;
+                    len -= desc_len;
+                }
+                if (found < 0) found = found_data;
+                if (found >= 0) {
+                    s_epaper_cdc_ifnum = found;
+                    ESP_LOGI("INIT", "#### EPAPER_USB detected CDC interface bInterfaceNumber=%d", found);
+                } else {
+                    ESP_LOGW("INIT", "#### EPAPER_USB could not detect CDC interface number");
+                }
+            } else {
+                ESP_LOGW("INIT", "#### EPAPER_USB could not read active config descriptor");
+            }
+        }
     } else {
         ESP_LOGI(TAG, "New USB device connected: failed to read device descriptor");
     }
@@ -231,12 +267,98 @@ static void cdc_new_device_cb(usb_device_handle_t usb_dev)
     }
 }
 
+#if CONFIG_USB_OTG_SUPPORTED && CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+static void usb_cdc_scanner_force_host_reenumeration(void)
+{
+    /* In alcuni casi (device già collegato a boot) lo stack host può non riportare device presenti.
+     * ATTENZIONE: NON fermiamo/riavviamo l'USB Host BSP qui: in alcune versioni BSP/IDF lo stop può
+     * andare in abort con ESP_ERR_INVALID_STATE (hub_uninstall). Facciamo un recovery “soft”:
+     * close handle + reinstall del driver CDC-ACM. */
+    ESP_LOGW("INIT", "#### EPAPER_USB forcing CDC-ACM soft reinit (no usb_host stop)");
+
+    if (s_cdc_dev != NULL) {
+        (void)cdc_acm_host_close(s_cdc_dev);
+        s_cdc_dev = NULL;
+    }
+
+    if (s_cdc_acm_installed) {
+        (void)cdc_acm_host_uninstall();
+        s_cdc_acm_installed = false;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    esp_err_t acm_err = cdc_acm_host_install(NULL);
+    ESP_LOGW("INIT", "#### EPAPER_USB cdc_acm_host_install err=%s", esp_err_to_name(acm_err));
+    if (acm_err == ESP_OK) {
+        s_cdc_acm_installed = true;
+        if (cdc_acm_host_register_new_dev_callback(cdc_new_device_cb) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to register new-device callback for CDC-ACM host");
+        }
+    }
+}
+#endif
+
 /*
  * Persistent USB Host client for diagnostics
  * - registers a client that receives attach/detach events
  * - on attach, opens the device and dumps basic descriptors
  */
 static usb_host_client_handle_t s_usb_client = NULL;
+#if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+static TaskHandle_t s_usb_client_evt_task = NULL;
+#endif
+
+#if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+/* Client callback stile “usb_host”: logga VID/PID per ogni addr visto.
+ * Serve soprattutto per capire se stiamo vedendo l'hub o il device EPAPER dietro hub. */
+static void usb_host_vidpid_event_cb(const usb_host_client_event_msg_t *event_msg, void *arg)
+{
+    (void)arg;
+    usb_host_client_handle_t client = s_usb_client;
+    if (!event_msg) return;
+
+    if (event_msg->event == USB_HOST_CLIENT_EVENT_NEW_DEV) {
+        int addr = event_msg->new_dev.address;
+        usb_device_handle_t dev_hdl = NULL;
+        if (client && usb_host_device_open(client, addr, &dev_hdl) == ESP_OK && dev_hdl) {
+            const usb_device_desc_t *dev_desc = NULL;
+            if (usb_host_get_device_descriptor(dev_hdl, &dev_desc) == ESP_OK && dev_desc) {
+                ESP_LOGI("INIT", "#### USB_ENUM NEW addr=%d VID=%04X PID=%04X class=%02X",
+                         addr, dev_desc->idVendor, dev_desc->idProduct, dev_desc->bDeviceClass);
+            } else {
+                ESP_LOGW("INIT", "#### USB_ENUM NEW addr=%d (no descriptor)", addr);
+            }
+            usb_host_device_close(client, dev_hdl);
+        } else {
+            ESP_LOGW("INIT", "#### USB_ENUM NEW addr=%d (open failed)", addr);
+        }
+
+        /* sveglia il task open: potrebbe ora essere disponibile EPAPER */
+        usb_cdc_scanner_notify_open_task();
+    } else if (event_msg->event == USB_HOST_CLIENT_EVENT_DEV_GONE) {
+        ESP_LOGI("INIT", "#### USB_ENUM GONE");
+        /* reset interfaccia EPAPER: verrà rideterminata al prossimo attach */
+        s_epaper_cdc_ifnum = -1;
+        usb_cdc_scanner_notify_open_task();
+    }
+}
+
+static void usb_host_client_events_task(void *arg)
+{
+    (void)arg;
+    while (1) {
+        usb_host_client_handle_t client = s_usb_client;
+        if (!client) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+        /* Questo call dispatcha gli eventi al callback usb_host_vidpid_event_cb().
+         * Non deve essere chiamato da più task contemporaneamente. */
+        (void)usb_host_client_handle_events(client, pdMS_TO_TICKS(200));
+    }
+}
+#endif
 
 #if USB_SCANNER_EXPERIMENTAL_DIAG
 /* Sperimentali: evento client host - dump più dettagliato e invio log alla Web UI */
@@ -405,7 +527,50 @@ static esp_err_t usb_cdc_scanner_epaper_send_raw_internal(const uint8_t *data, s
         usb_cdc_scanner_notify_open_task();
         return ESP_ERR_INVALID_STATE;
     }
-    return cdc_acm_host_data_tx_blocking(cdc_hdl, data, len, 1000);
+
+    /* #### Log “in evidenza” per ogni comando EPAPER inviato */
+    {
+        char hex[3 * 64 + 1] = {0};
+        size_t dump_len = (len > 64) ? 64 : len;
+        size_t o = 0;
+        for (size_t i = 0; i < dump_len && (o + 3) < sizeof(hex); ++i) {
+            o += (size_t)snprintf(&hex[o], sizeof(hex) - o, "%02X%s", data[i], (i + 1 < dump_len) ? " " : "");
+        }
+
+        if (data[0] == 0x00 && len >= 2) {
+            const uint8_t cmd = data[1];
+            const char *name = "CMD";
+            if (cmd == 0xAA) name = "INIT";
+            else if (cmd == 0x00) name = "FULL_REFRESH";
+            ESP_LOGI("INIT", "#### EPAPER_TX %s len=%u hex=%s%s", name, (unsigned)len, hex, (len > dump_len) ? " ..." : "");
+        } else if (data[0] == 0x01 && len >= 6) {
+            const uint8_t color = data[1];
+            const uint8_t font = data[2];
+            const uint8_t x = data[3];
+            const uint8_t y = data[4];
+            char text[48] = {0};
+            size_t ti = 0;
+            for (size_t i = 5; i < len && data[i] != 0x00 && ti + 1 < sizeof(text); ++i) {
+                char c = (char)data[i];
+                text[ti++] = (c >= 32 && c <= 126) ? c : '.';
+            }
+            text[ti] = 0;
+            ESP_LOGI("INIT", "#### EPAPER_TX TEXT len=%u color=%u font=%u x=%u y=%u txt=\"%s\" hex=%s%s",
+                     (unsigned)len, (unsigned)color, (unsigned)font, (unsigned)x, (unsigned)y,
+                     text, hex, (len > dump_len) ? " ..." : "");
+        } else if (data[0] == 0x02 && len >= 3) {
+            ESP_LOGI("INIT", "#### EPAPER_TX LED len=%u mask=0x%02X on=0x%02X hex=%s%s",
+                     (unsigned)len, data[1], data[2], hex, (len > dump_len) ? " ..." : "");
+        } else {
+            ESP_LOGI("INIT", "#### EPAPER_TX RAW len=%u hex=%s%s", (unsigned)len, hex, (len > dump_len) ? " ..." : "");
+        }
+    }
+
+    esp_err_t err = cdc_acm_host_data_tx_blocking(cdc_hdl, data, len, 1000);
+    if (err != ESP_OK) {
+        ESP_LOGW("INIT", "#### EPAPER_TX FAILED (%s) len=%u", esp_err_to_name(err), (unsigned)len);
+    }
+    return err;
 #else
     (void)data;
     (void)len;
@@ -448,13 +613,14 @@ static void usb_cdc_scanner_open_task(void *arg)
         runtime_enabled = d_cfg->scanner.enabled;
     }
 
-    /* EPAPER_USB: se selezionato, usa default VID/PID modulo ePaper (ESP32-S2) se non configurati. */
+    /* EPAPER_USB: il modulo ePaper è un device CDC diverso dallo scanner.
+     * In questa modalità forziamo sempre VID/PID EPAPER, evitando che vecchie config “scanner” (1EAB:0006)
+     * impediscano l’apertura della CDC. */
     if (d_cfg && d_cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
         s_is_epaper_mode = true;
-        if (d_cfg->scanner.vid == 0 || d_cfg->scanner.pid == 0) {
-            vid = EPAPER_USB_DEFAULT_VID;
-            pid = EPAPER_USB_DEFAULT_PID;
-        }
+        vid = EPAPER_USB_DEFAULT_VID;
+        pid = EPAPER_USB_DEFAULT_PID;
+        runtime_enabled = true; /* anche se scanner.enabled=0, EPAPER deve poter aprire la CDC */
     } else {
         s_is_epaper_mode = false;
     }
@@ -474,6 +640,7 @@ static void usb_cdc_scanner_open_task(void *arg)
     };
 
     bool runtime_block_logged = false;
+    uint32_t epaper_zero_dev_cycles = 0;
 
     while (1) {
         if (!usb_cdc_scanner_runtime_allowed()) {
@@ -496,10 +663,19 @@ static void usb_cdc_scanner_open_task(void *arg)
         // Refresh runtime config each iteration to allow dynamic changes
         device_config_t *cur = device_config_get();
         if (cur) {
-            vid = (uint16_t)cur->scanner.vid;
-            pid = (uint16_t)cur->scanner.pid;
-            dual_pid = (uint16_t)cur->scanner.dual_pid;
-            runtime_enabled = cur->scanner.enabled;
+            if (cur->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
+                s_is_epaper_mode = true;
+                vid = EPAPER_USB_DEFAULT_VID;
+                pid = EPAPER_USB_DEFAULT_PID;
+                dual_pid = 0;
+                runtime_enabled = true;
+            } else {
+                s_is_epaper_mode = false;
+                vid = (uint16_t)cur->scanner.vid;
+                pid = (uint16_t)cur->scanner.pid;
+                dual_pid = (uint16_t)cur->scanner.dual_pid;
+                runtime_enabled = cur->scanner.enabled;
+            }
         }
 
         if (!runtime_enabled) {
@@ -511,7 +687,23 @@ static void usb_cdc_scanner_open_task(void *arg)
         cdc_acm_dev_hdl_t cdc_dev = NULL;
         ESP_LOGI(TAG, "Trying to open CDC device %04X:%04X", vid, pid);
         ESP_LOGI("INIT", "[M] [USB] Provo apertura CDC: VID=%04X PID=%04X", vid, pid);
-        esp_err_t err = cdc_acm_host_open(vid, pid, 0, &dev_config, &cdc_dev);
+        ESP_LOGI("INIT", "#### USB_CDC_OPEN mode=%s VID=%04X PID=%04X",
+                 s_is_epaper_mode ? "EPAPER_USB" : "SCANNER",
+                 vid, pid);
+        uint8_t ifnum = 0;
+        if (s_is_epaper_mode && s_epaper_cdc_ifnum >= 0 && s_epaper_cdc_ifnum <= 255) {
+            ifnum = (uint8_t)s_epaper_cdc_ifnum;
+            ESP_LOGI("INIT", "#### EPAPER_USB open using bInterfaceNumber=%u", (unsigned)ifnum);
+        }
+        esp_err_t err = cdc_acm_host_open(vid, pid, ifnum, &dev_config, &cdc_dev);
+        if (err != ESP_OK && s_is_epaper_mode) {
+            /* EPAPER_USB (ESP32-S2) può presentarsi come composite (class EF) e l'interfaccia CDC non
+             * è necessariamente la #0. Prova alcune interfacce tipiche. */
+            for (uint8_t ifx = 1; ifx < 4 && err != ESP_OK; ++ifx) {
+                ESP_LOGI("INIT", "#### EPAPER_USB open retry interface_idx=%u", (unsigned)ifx);
+                err = cdc_acm_host_open(vid, pid, ifx, &dev_config, &cdc_dev);
+            }
+        }
         /* dual PID logic removed – scanner usa un solo PID */
         /*
         if (err != ESP_OK && dual_pid != 0 && dual_pid != pid) {
@@ -536,6 +728,23 @@ static void usb_cdc_scanner_open_task(void *arg)
                 }
             } else {
                 ESP_LOGI(TAG, "[EPAPER_USB] CDC aperto: nessun comando Newland inviato");
+
+                /* Allinea la “seriale” CDC ai parametri del tester Electron: 9600 8N1, nessun RTS/DTR */
+#if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+                {
+                    const cdc_acm_line_coding_t lc = {
+                        .dwDTERate = 9600,
+                        .bCharFormat = 0, /* 1 stop bit */
+                        .bParityType = 0, /* none */
+                        .bDataBits = 8,
+                    };
+                    esp_err_t lc_err = cdc_acm_host_line_coding_set(s_cdc_dev, &lc);
+                    ESP_LOGI("INIT", "#### EPAPER_USB LINE_CODING set 9600 8N1 err=%s", esp_err_to_name(lc_err));
+
+                    esp_err_t cls_err = cdc_acm_host_set_control_line_state(s_cdc_dev, false, false);
+                    ESP_LOGI("INIT", "#### EPAPER_USB CTRL_LINE dtr=0 rts=0 err=%s", esp_err_to_name(cls_err));
+                }
+#endif
 
                 /* Avvio protocollo EPAPER_USB: init + testi di test */
                 const uint8_t ep_init[] = {0x00, 0xAA};
@@ -577,8 +786,37 @@ static void usb_cdc_scanner_open_task(void *arg)
             esp_err_t lerr = usb_host_device_addr_list_fill(sizeof(addr_list), addr_list, &num_devs);
             if (lerr == ESP_OK) {
                 ESP_LOGI(TAG, "USB host reports %d device(s) connected", num_devs);
+                if (s_is_epaper_mode) {
+                    if (num_devs == 0) {
+                        epaper_zero_dev_cycles++;
+                    } else {
+                        epaper_zero_dev_cycles = 0;
+                    }
+                }
                 for (int i = 0; i < num_devs; ++i) {
                     ESP_LOGI(TAG, " - device address: %d", addr_list[i]);
+                }
+
+                /* EPAPER_USB: dump VID/PID/class di tutti i device enumerati (hub incluso) */
+                if (s_is_epaper_mode && s_usb_client != NULL) {
+                    for (int i = 0; i < num_devs; ++i) {
+                        usb_device_handle_t dev_hdl = NULL;
+                        if (usb_host_device_open(s_usb_client, addr_list[i], &dev_hdl) != ESP_OK || dev_hdl == NULL) {
+                            ESP_LOGW("INIT", "#### EPAPER_USB enum addr=%d: open failed", addr_list[i]);
+                            continue;
+                        }
+                        const usb_device_desc_t *device_desc = NULL;
+                        if (usb_host_get_device_descriptor(dev_hdl, &device_desc) == ESP_OK && device_desc) {
+                            ESP_LOGI("INIT", "#### EPAPER_USB enum addr=%d VID=%04X PID=%04X class=%02X",
+                                     addr_list[i],
+                                     device_desc->idVendor,
+                                     device_desc->idProduct,
+                                     device_desc->bDeviceClass);
+                        } else {
+                            ESP_LOGW("INIT", "#### EPAPER_USB enum addr=%d: no device descriptor", addr_list[i]);
+                        }
+                        usb_host_device_close(s_usb_client, dev_hdl);
+                    }
                 }
 
                 /*
@@ -682,6 +920,12 @@ static void usb_cdc_scanner_open_task(void *arg)
                 cdc_dev = NULL;
             } else {
                 ESP_LOGI(TAG, "Retrying in 5s");
+                if (s_is_epaper_mode && epaper_zero_dev_cycles >= 3) {
+                    epaper_zero_dev_cycles = 0;
+#if CONFIG_USB_OTG_SUPPORTED && CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+                    usb_cdc_scanner_force_host_reenumeration();
+#endif
+                }
             }
         }
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(USB_CDC_SCANNER_RETRY_DELAY_MS));
@@ -740,24 +984,28 @@ void usb_cdc_scanner_init(const usb_cdc_scanner_config_t *config) {
     esp_log_level_set("usb_host", ESP_LOG_WARN);
     esp_log_level_set("usb", ESP_LOG_WARN);
 
-    /* Client diagnostico opzionale (disabilitato di default per ridurre uso RAM USB). */
-#if USB_SCANNER_EXPERIMENTAL_DIAG
-    const usb_host_client_config_t client_config = {
-        .is_synchronous = false,
-        .max_num_event_msg = 5,
-        .async = {
-            .client_event_callback = usb_host_event_cb,
-            .callback_arg = NULL,
+    /* Client usb_host per log VID/PID (sempre utile in EPAPER_USB; leggero) */
+    if (s_usb_client == NULL) {
+        const usb_host_client_config_t client_config = {
+            .is_synchronous = false,
+            .max_num_event_msg = 5,
+            .async = {
+                .client_event_callback = usb_host_vidpid_event_cb,
+                .callback_arg = NULL,
+            }
+        };
+        if (usb_host_client_register(&client_config, &s_usb_client) == ESP_OK) {
+            ESP_LOGI(TAG, "Registered USB host client (VID/PID dump)");
+            if (s_usb_client_evt_task == NULL) {
+                if (xTaskCreate(usb_host_client_events_task, "usb_client_evt", 4096, NULL, 9, &s_usb_client_evt_task) != pdTRUE) {
+                    ESP_LOGW(TAG, "Failed to create usb_client_evt task");
+                    s_usb_client_evt_task = NULL;
+                }
+            }
+        } else {
+            ESP_LOGW(TAG, "Failed to register USB host client (VID/PID dump)");
         }
-    };
-    if (usb_host_client_register(&client_config, &s_usb_client) == ESP_OK) {
-        ESP_LOGI(TAG, "Registered USB host diagnostic client (Sperimentali)");
-    } else {
-        ESP_LOGW(TAG, "Failed to register USB host diagnostic client (Sperimentali)");
     }
-#else
-    s_usb_client = NULL;
-#endif
 
     /* Il loop usb_host_lib è già gestito dal BSP (bsp_usb_host_start). */
 

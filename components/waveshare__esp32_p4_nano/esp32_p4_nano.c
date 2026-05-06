@@ -1217,6 +1217,25 @@ static void usb_lib_task(void *arg)
     vTaskDelete(NULL);
 }
 
+#if CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK
+static bool bsp_usb_enum_filter_cb(const usb_device_desc_t *dev_desc, uint8_t *bConfigurationValue)
+{
+    /* Non filtriamo: logghiamo e accettiamo sempre.
+     * Nota: callback non bloccante, non deve inviare transfer USB. */
+    uint16_t vid = dev_desc ? dev_desc->idVendor : 0;
+    uint16_t pid = dev_desc ? dev_desc->idProduct : 0;
+    uint8_t cls = dev_desc ? dev_desc->bDeviceClass : 0xFF;
+    uint8_t cfg = 1;
+    if (bConfigurationValue) {
+        *bConfigurationValue = 1;
+        cfg = *bConfigurationValue;
+    }
+    ESP_LOGI("INIT", "#### USB_ENUM_FILTER accept VID=%04X PID=%04X class=%02X cfg=%u",
+             vid, pid, cls, (unsigned)cfg);
+    return true;
+}
+#endif
+
 /**
  * @brief Avvia il gestore USB host.
  *
@@ -1250,6 +1269,11 @@ esp_err_t bsp_usb_host_start(bsp_usb_host_power_mode_t mode, bool limit_500mA)
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
+#if CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK
+        .enum_filter_cb = bsp_usb_enum_filter_cb,
+#else
+        .enum_filter_cb = NULL,
+#endif
     };
     esp_err_t err = usb_host_install(&host_config);
     if (err == ESP_ERR_INVALID_STATE)

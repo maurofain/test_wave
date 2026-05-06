@@ -4565,9 +4565,10 @@ void tasks_start_all(void)
         task_param_t *t = &s_tasks[i];
 
         if (cfg && strcmp(t->name, "usb_scanner") == 0) {
-            if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB && cfg->sensors.rs232_enabled) {
-                t->state = TASK_STATE_IDLE;
-                ESP_LOGI(TAG, "[M] Task %s forzato IDLE (EPAPER_USB usa scanner USB CDC)", t->name);
+            if (cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
+                /* EPAPER_USB usa la stessa catena USB Host CDC-ACM del “usb_scanner” per parlare col modulo. */
+                t->state = TASK_STATE_RUN;
+                ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_USB usa USB CDC)", t->name);
             } else {
                 t->state = cfg->scanner.enabled ? TASK_STATE_RUN : TASK_STATE_IDLE;
             }
@@ -4597,8 +4598,9 @@ void tasks_start_all(void)
         if (cfg && strcmp(t->name, "rs232") == 0 &&
             cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB &&
             cfg->sensors.rs232_enabled) {
-            t->state = TASK_STATE_RUN;
-            ESP_LOGI(TAG, "[M] Task %s forzato RUN (EPAPER_USB attivo)", t->name);
+            /* EPAPER su USB: se rs232 era abilitata per vecchie config, non serve più per il display. */
+            t->state = TASK_STATE_IDLE;
+            ESP_LOGI(TAG, "[M] Task %s forzato IDLE (EPAPER_USB: display via USB CDC, non RS232)", t->name);
         }
 
         if (cfg && strcmp(t->name, "mdb_engine") == 0) {
