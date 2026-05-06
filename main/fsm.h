@@ -246,11 +246,17 @@ typedef struct {
     fsm_session_mode_t session_mode;
     int32_t credit_cents;       /* crediti totali disponibili (1 credito = 1 euro) */
     int32_t ecd_coins;          /* crediti ECD disponibili */
-    int32_t vcd_coins;          /* crediti VCD disponibili */
+    int32_t vcd_coins;          /* crediti VCD disponibili (totale) */
+    int32_t vcd_card_coins;     /* crediti VCD da NFC/CARD */
+    int32_t vcd_qr_coins;       /* crediti VCD da QR */
     int32_t ecd_used;           /* crediti ECD consumati nei cicli avviati */
-    int32_t vcd_used;           /* crediti VCD consumati nei cicli avviati */
+    int32_t vcd_used;           /* crediti VCD consumati nei cicli avviati (totale) */
+    int32_t vcd_card_used;      /* crediti VCD consumati da NFC/CARD */
+    int32_t vcd_qr_used;        /* crediti VCD consumati da QR */
     int32_t ecd_cents_residual; /* centesimi ECD non ancora convertiti in crediti */
-    int32_t vcd_cents_residual; /* centesimi VCD non ancora convertiti in crediti */
+    int32_t vcd_cents_residual; /* centesimi VCD non ancora convertiti in crediti (totale) */
+    int32_t vcd_card_cents_residual; /* residuo centesimi VCD da NFC/CARD */
+    int32_t vcd_qr_cents_residual;   /* residuo centesimi VCD da QR */
     bool program_running;
     uint32_t running_elapsed_ms;
     uint32_t pause_elapsed_ms;

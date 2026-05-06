@@ -2630,6 +2630,23 @@ static void fsm_task(void *arg)
 
         if (fsm.state == FSM_STATE_OUT_OF_SERVICE) {
             tasks_set_out_of_service_runtime(true);
+
+            /* Permetti QRCODE [RESET] anche a schermo rosso:
+             * assicura che lo scanner non resti sospeso (es. se OOS arriva durante RUN). */
+            if (cfg && cfg->scanner.enabled) {
+                if (scanner_forced_off_for_program || usb_cdc_scanner_get_state() != USB_CDC_SCANNER_STATE_ACTIVE) {
+                    esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
+                    if (sc_err != ESP_OK) {
+                        ESP_LOGW(TAG, "[M] Scanner: ACTIVE richiesto in OUT_OF_SERVICE ma fallito: %s",
+                                 esp_err_to_name(sc_err));
+                    }
+                    scanner_forced_off_for_program = false;
+                    scanner_retry.pending = true;
+                    scanner_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
+                    scanner_retry.desired_u8 = (uint8_t)USB_CDC_SCANNER_STATE_ACTIVE;
+                }
+            }
+
             if ((int32_t)(now_tick - next_oos_retry) >= 0) {
                 tasks_oos_cause_t retry_failure = {0};
                 agn_id_t focus = (agn_id_t)fsm.out_of_service_agent;
@@ -2775,47 +2792,28 @@ static void fsm_task(void *arg)
                reinserzione del tag senza bip di ripristino. */
         }
 
-        bool vcd_locked_session =
-            (fsm.session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) &&
-            (fsm.session_source == FSM_SESSION_SOURCE_QR ||
-             fsm.session_source == FSM_SESSION_SOURCE_CARD) &&
-            !fsm.allow_additional_payments;
         bool active_program_session =
             (fsm.state == FSM_STATE_RUNNING || fsm.state == FSM_STATE_PAUSED);
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->sensors.cctalk_enabled) {
-            /* [M] La gettoniera CCtalk deve rimanere attiva durante RUN/PAUSE.
-               La disabilitiamo solo in sessione VCD bloccata. */
-            bool cctalk_stop_needed = vcd_locked_session;
-
-            if (cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_ACTIVE) {
-                esp_err_t cc_err = cctalk_driver_set_state(CCTALK_DRIVER_STATE_SUSPENDED);
-                if (cc_err != ESP_OK) {
-                    ESP_LOGW(TAG,
-                             "[M] Gettoniera CCTALK: sospensione richiesta ma non applicata: %s",
-                             esp_err_to_name(cc_err));
-                }
-                if (active_program_session) {
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK sospesa durante programma attivo");
-                } else {
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK sospesa durante sessione VCD");
-                }
-                cctalk_retry.pending = true;
-                cctalk_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
-                cctalk_retry.desired_u8 = (uint8_t)CCTALK_DRIVER_STATE_SUSPENDED;
-            } else if (!cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED &&
-                       (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
-                esp_err_t cc_err = cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+            /* Regola: durante RUN/PAUSE scartiamo i pagamenti.
+               Quindi mettiamo la gettoniera in rifiuto (SUSPENDED). */
+            cctalk_driver_state_t desired_cc = active_program_session ? CCTALK_DRIVER_STATE_SUSPENDED
+                                                                     : CCTALK_DRIVER_STATE_ACTIVE;
+            if (cctalk_driver_get_state() != desired_cc) {
+                esp_err_t cc_err = cctalk_driver_set_state(desired_cc);
                 if (cc_err == ESP_OK) {
-                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riattivata dopo sessione VCD/programma");
+                    ESP_LOGI(TAG, "[M] Gettoniera CCTALK -> %s",
+                             desired_cc == CCTALK_DRIVER_STATE_SUSPENDED ? "SUSPENDED" : "ACTIVE");
                 } else {
                     ESP_LOGW(TAG,
-                             "[M] Gettoniera CCTALK: riattivazione richiesta ma non applicata: %s",
+                             "[M] Gettoniera CCTALK: %s richiesto ma non applicato: %s",
+                             desired_cc == CCTALK_DRIVER_STATE_SUSPENDED ? "SUSPENDED" : "ACTIVE",
                              esp_err_to_name(cc_err));
                 }
                 cctalk_retry.pending = true;
                 cctalk_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
-                cctalk_retry.desired_u8 = (uint8_t)CCTALK_DRIVER_STATE_ACTIVE;
+                cctalk_retry.desired_u8 = (uint8_t)desired_cc;
             }
         } else {
             if (cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED) {
@@ -2824,58 +2822,51 @@ static void fsm_task(void *arg)
         }
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->scanner.enabled) {
-            if (active_program_session && !scanner_forced_off_for_program) {
-                esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_SUSPENDED);
+            /* Regola: lo scanner NON è legato ai sistemi di pagamento.
+             * Deve essere ACTIVE al boot e in IDLE/ADS/CREDIT.
+             * Va sospeso solo durante RUN/PAUSE o se raggiunto il credito massimo (99). */
+            const bool credit_at_cap = (fsm.credit_cents >= 99);
+            usb_cdc_scanner_state_t desired_sc =
+                (active_program_session || credit_at_cap) ? USB_CDC_SCANNER_STATE_SUSPENDED
+                                                          : USB_CDC_SCANNER_STATE_ACTIVE;
+
+            if (usb_cdc_scanner_get_state() != desired_sc) {
+                esp_err_t sc_err = usb_cdc_scanner_set_state(desired_sc);
                 if (sc_err != ESP_OK) {
                     ESP_LOGW(TAG,
-                             "[M] Scanner QR: sospensione richiesta ma fallita: %s",
+                             "[M] Scanner QR: %s richiesto ma fallito: %s",
+                             desired_sc == USB_CDC_SCANNER_STATE_SUSPENDED ? "SUSPENDED" : "ACTIVE",
                              esp_err_to_name(sc_err));
+                } else {
+                    ESP_LOGI(TAG, "[M] Scanner QR -> %s (run=%d cap=%d credit=%ld)",
+                             desired_sc == USB_CDC_SCANNER_STATE_SUSPENDED ? "SUSPENDED" : "ACTIVE",
+                             active_program_session ? 1 : 0,
+                             credit_at_cap ? 1 : 0,
+                             (long)fsm.credit_cents);
                 }
-                scanner_forced_off_for_program = true;
-                ESP_LOGI(TAG, "[M] Scanner QR sospeso durante programma attivo");
                 scanner_retry.pending = true;
                 scanner_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
-                scanner_retry.desired_u8 = (uint8_t)USB_CDC_SCANNER_STATE_SUSPENDED;
-            } else if (!active_program_session && scanner_forced_off_for_program &&
-                       (fsm.state == FSM_STATE_CREDIT || fsm.state == FSM_STATE_ADS || fsm.state == FSM_STATE_IDLE)) {
-                esp_err_t sc_err = usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
-                if (sc_err != ESP_OK) {
-                    ESP_LOGW(TAG,
-                             "[M] Scanner QR: riattivazione richiesta ma fallita: %s",
-                             esp_err_to_name(sc_err));
-                }
-                scanner_forced_off_for_program = false;
-                ESP_LOGI(TAG, "[M] Scanner QR riattivato dopo fine programma");
-                scanner_retry.pending = true;
-                scanner_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
-                scanner_retry.desired_u8 = (uint8_t)USB_CDC_SCANNER_STATE_ACTIVE;
+                scanner_retry.desired_u8 = (uint8_t)desired_sc;
             }
+            /* compat: questo flag non deve più dipendere da NFC/pagamenti */
+            scanner_forced_off_for_program = (desired_sc == USB_CDC_SCANNER_STATE_SUSPENDED);
         } else {
             scanner_forced_off_for_program = false;
         }
 
         if (fsm.state != FSM_STATE_OUT_OF_SERVICE && cfg && cfg->sensors.mdb_enabled && cfg->mdb.cashless_en) {
-            bool mdb_session_open = false;
-            size_t mdb_count = mdb_cashless_get_device_count();
-            for (size_t i = 0; i < mdb_count; ++i) {
-                const mdb_cashless_device_t *device = mdb_cashless_get_device(i);
-                if (device && device->session_open) {
-                    mdb_session_open = true;
-                    break;
-                }
-            }
-
-            /* [M] mdb_stop_needed: programma attivo senza sessione card aperta.
-             * Pianifica un reset DIFFERITO (MDB_INHIBIT_DEFER_MS) per non interrompere
-             * transazioni residue che potrebbero essere ancora in chiusura. */
-            bool mdb_stop_needed = active_program_session && !mdb_session_open;
+            /* Durante RUN/PAUSE scartiamo nuovi pagamenti.
+             * Se la sessione è partita da CARD, NON inibire: serve per flussi card/vend.
+             * Negli altri casi, inibiamo MDB cashless durante il programma. */
+            bool mdb_stop_needed = active_program_session && (fsm.session_source != FSM_SESSION_SOURCE_CARD);
             if (mdb_stop_needed && !mdb_forced_reset_for_program) {
                 s_mdb_inhibit_pending = true;
                 s_mdb_inhibit_until_tick = now_tick + pdMS_TO_TICKS(MDB_INHIBIT_DEFER_MS);
                 mdb_forced_reset_for_program = true;
                 ESP_LOGI(TAG,
-                         "[M] MDB cashless: inibizione pianificata tra %u ms (programma non-card attivo)",
-                         (unsigned)MDB_INHIBIT_DEFER_MS);
+                         "[M] MDB cashless: inibizione pianificata tra %u ms (programma attivo, session_source=%s)",
+                         (unsigned)MDB_INHIBIT_DEFER_MS,
+                         (fsm.session_source == FSM_SESSION_SOURCE_CARD) ? "CARD" : "NON-CARD");
                 mdb_retry.pending = true;
                 mdb_retry.verify_after_ms = (uint32_t)pdTICKS_TO_MS(now_tick) + tasks_state_retry_delay_ms();
             } else if (!mdb_stop_needed && mdb_forced_reset_for_program &&
@@ -3339,7 +3330,9 @@ static bool scanner_cooldown_is_active(TickType_t now)
 static void scanner_cooldown_tick(void)
 {
     if (tasks_is_out_of_service_state()) {
-        usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_OOS);
+        /* In OUT_OF_SERVICE manteniamo lo scanner leggibile per permettere QR speciali
+         * come [RESET]. Non forzare stato OOS sul device. */
+        (void)usb_cdc_scanner_set_state(USB_CDC_SCANNER_STATE_ACTIVE);
         s_scanner_reenable_pending = false;
         s_scanner_cooldown_active = false;
         s_scanner_reenable_attempts = 0;
@@ -3518,6 +3511,28 @@ static void scanner_on_barcode_cb(const char *barcode)
      * Usa strstr per catturare anche barcode con prefissi/suffissi (es. "s[RESET]"). */
     char raw_normalized[FSM_EVENT_TEXT_MAX_LEN] = {0};
     normalize_barcode_text(barcode, raw_normalized, sizeof(raw_normalized));
+
+    /* Alcuni scanner CDC echo-ano i comandi di configurazione (es. "0000#SCNENA1;").
+     * Questi NON sono barcode e non devono innescare cooldown/suspend. */
+    if (raw_normalized[0] != '\0') {
+        bool is_scanner_cmd_echo = false;
+        if (strncmp(raw_normalized, "0000#", 5) == 0) {
+            is_scanner_cmd_echo = true;
+        }
+        if (strstr(raw_normalized, "#SCN") != NULL ||
+            strstr(raw_normalized, "SCNMOD") != NULL ||
+            strstr(raw_normalized, "SCNENA") != NULL ||
+            strstr(raw_normalized, "RRDENA") != NULL ||
+            strstr(raw_normalized, "CIDENA") != NULL ||
+            strstr(raw_normalized, "RRDDUR") != NULL) {
+            is_scanner_cmd_echo = true;
+        }
+        if (is_scanner_cmd_echo) {
+            ESP_LOGI("SCANNER", "[M] Ignorato echo comando scanner (raw=%s)", raw_normalized);
+            return;
+        }
+    }
+
     if (strstr(raw_normalized, "[RESET]") != NULL) {
         ESP_LOGW("SCANNER", "[M] Barcode [RESET] ricevuto (raw=%s): reboot device in corso...", raw_normalized);
         vTaskDelay(pdMS_TO_TICKS(200)); /* breve attesa per flush log UART */

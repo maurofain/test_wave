@@ -51,7 +51,6 @@ static uint32_t to_mask_from_event(const fsm_input_event_t *e);
 static const char *fsm_input_event_type_to_string(fsm_input_event_type_t type);
 static void fsm_reset_runtime_locked(fsm_ctx_t *ctx);
 static void fsm_prepare_open_session(fsm_ctx_t *ctx, fsm_session_source_t source);
-static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source);
 static void fsm_reset_card_vend_pending(fsm_ctx_t *ctx);
 static bool fsm_program_price_units_to_cents(int32_t price_units, int32_t *amount_cents);
 static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost);
@@ -59,9 +58,24 @@ static bool fsm_try_autorenew_running_program(fsm_ctx_t *ctx);
 static const char *fsm_source_tag_to_display_name(const char *source_tag);
 static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
                                       int32_t amount_cents,
-                                      bool is_ecd,
+                                      fsm_session_source_t source,
                                       const char *source_tag);
 static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms);
+
+typedef enum {
+    FSM_CREDIT_BUCKET_ECD = 0,
+    FSM_CREDIT_BUCKET_VCD_CARD,
+    FSM_CREDIT_BUCKET_VCD_QR,
+} fsm_credit_bucket_t;
+
+static void fsm_recalc_credit_totals(fsm_ctx_t *ctx);
+static void fsm_add_credit_from_cents_bucket(fsm_ctx_t *ctx,
+                                             int32_t amount_cents,
+                                             fsm_credit_bucket_t bucket,
+                                             const char *source_tag);
+
+/* Regole: cap credito totale massimo (in "coin", 1 coin = 1 euro) */
+#define FSM_MAX_CREDIT_COINS (99)
 
 /* Mappa source_tag a etichetta visualizzazione per il logging dei crediti ricevuti */
 static const char *fsm_source_tag_to_display_name(const char *source_tag)
@@ -86,6 +100,17 @@ static const char *fsm_session_source_to_string(fsm_session_source_t source)
         case FSM_SESSION_SOURCE_CARD:  return "CARD";
         default:                      return "UNKNOWN";
     }
+}
+
+static void fsm_recalc_credit_totals(fsm_ctx_t *ctx)
+{
+    if (!ctx) {
+        return;
+    }
+    ctx->vcd_coins = ctx->vcd_card_coins + ctx->vcd_qr_coins;
+    ctx->vcd_used  = ctx->vcd_card_used + ctx->vcd_qr_used;
+    ctx->vcd_cents_residual = ctx->vcd_card_cents_residual + ctx->vcd_qr_cents_residual;
+    ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;
 }
 
 static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms)
@@ -122,29 +147,78 @@ static size_t fsm_mailbox_drop_expired_locked(uint32_t now_ms)
 
 static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
                                       int32_t amount_cents,
-                                      bool is_ecd,
+                                      fsm_session_source_t source,
                                       const char *source_tag)
 {
     if (!ctx || amount_cents <= 0) {
         return;
     }
 
-    int32_t *bucket_credits = is_ecd ? &ctx->ecd_coins : &ctx->vcd_coins;
-    int32_t *bucket_residual = is_ecd ? &ctx->ecd_cents_residual : &ctx->vcd_cents_residual;
-    const char *bucket_name = is_ecd ? "ecd" : "vcd";
+    fsm_credit_bucket_t bucket = FSM_CREDIT_BUCKET_ECD;
+    switch (source) {
+        case FSM_SESSION_SOURCE_QR:   bucket = FSM_CREDIT_BUCKET_VCD_QR; break;
+        case FSM_SESSION_SOURCE_CARD: bucket = FSM_CREDIT_BUCKET_VCD_CARD; break;
+        default:                     bucket = FSM_CREDIT_BUCKET_ECD; break;
+    }
+    fsm_add_credit_from_cents_bucket(ctx, amount_cents, bucket, source_tag);
+}
+
+static void fsm_add_credit_from_cents_bucket(fsm_ctx_t *ctx,
+                                             int32_t amount_cents,
+                                             fsm_credit_bucket_t bucket,
+                                             const char *source_tag)
+{
+    if (!ctx || amount_cents <= 0) {
+        return;
+    }
+
+    int32_t *bucket_credits = NULL;
+    int32_t *bucket_residual = NULL;
+    const char *bucket_name = "unknown";
+
+    switch (bucket) {
+        case FSM_CREDIT_BUCKET_ECD:
+            bucket_credits = &ctx->ecd_coins;
+            bucket_residual = &ctx->ecd_cents_residual;
+            bucket_name = "ecd";
+            break;
+        case FSM_CREDIT_BUCKET_VCD_CARD:
+            bucket_credits = &ctx->vcd_card_coins;
+            bucket_residual = &ctx->vcd_card_cents_residual;
+            bucket_name = "vcd_card";
+            break;
+        case FSM_CREDIT_BUCKET_VCD_QR:
+            bucket_credits = &ctx->vcd_qr_coins;
+            bucket_residual = &ctx->vcd_qr_cents_residual;
+            bucket_name = "vcd_qr";
+            break;
+        default:
+            return;
+    }
+
+    /* Cap: limite massimo credito complessivo = 99 coin */
+    const int32_t total_before = ctx->ecd_coins + ctx->vcd_card_coins + ctx->vcd_qr_coins;
+    const int32_t available_coins = (total_before >= FSM_MAX_CREDIT_COINS) ? 0 : (FSM_MAX_CREDIT_COINS - total_before);
 
     int32_t total_cents = *bucket_residual + amount_cents;
     int32_t credits_add = total_cents / FSM_CENTS_PER_CREDIT;
     int32_t cents_residual = total_cents % FSM_CENTS_PER_CREDIT;
 
+    if (credits_add > available_coins) {
+        credits_add = available_coins;
+        /* se siamo a cap, non accumuliamo residual oltre; evitiamo overflow di aggiunte successive */
+        cents_residual = 0;
+    }
+
     *bucket_residual = cents_residual;
     if (credits_add > 0) {
         *bucket_credits += credits_add;
-        ctx->credit_cents += credits_add;
     }
 
+    fsm_recalc_credit_totals(ctx);
+
     ESP_LOGI(TAG,
-             "[M] [ADD_CREDIT] src=%s type=%s in_cents=%ld add_credits=%ld residual_cents=%ld ecd=%ld vcd=%ld credit=%ld",
+             "[M] [ADD_CREDIT] src=%s bucket=%s in_cents=%ld add_credits=%ld residual_cents=%ld ecd=%ld vcd=%ld (card=%ld qr=%ld) credit=%ld cap=%d",
              source_tag ? source_tag : "payment",
              bucket_name,
              (long)amount_cents,
@@ -152,22 +226,25 @@ static void fsm_add_credit_from_cents(fsm_ctx_t *ctx,
              (long)cents_residual,
              (long)ctx->ecd_coins,
              (long)ctx->vcd_coins,
-             (long)ctx->credit_cents);
+             (long)ctx->vcd_card_coins,
+             (long)ctx->vcd_qr_coins,
+             (long)ctx->credit_cents,
+             (int)FSM_MAX_CREDIT_COINS);
 
     /* Log box-style con info ricezione crediti (44 char tra i ║) */
     const char *display_name = fsm_source_tag_to_display_name(source_tag);
     char line1[50], line2[50], line3[50], line4[50];
     snprintf(line1, sizeof(line1), " CREDITI RICEVUTI - %s", display_name);
     snprintf(line2, sizeof(line2), " Importo: %ld cent", (long)amount_cents);
-    snprintf(line3, sizeof(line3), " ECD dopo: %ld | VCD dopo: %ld", (long)ctx->ecd_coins, (long)ctx->vcd_coins);
-    snprintf(line4, sizeof(line4), " Credito totale: %ld coin", (long)ctx->credit_cents);
+    snprintf(line3, sizeof(line3), " ECD:%ld VCD:%ld (NFC:%ld QR:%ld)",
+             (long)ctx->ecd_coins, (long)ctx->vcd_coins, (long)ctx->vcd_card_coins, (long)ctx->vcd_qr_coins);
+    snprintf(line4, sizeof(line4), " Credito totale: %ld/%d coin", (long)ctx->credit_cents, (int)FSM_MAX_CREDIT_COINS);
     ESP_LOGI(TAG, "[M] ╔════════════════════════════════════════════╗");
     ESP_LOGI(TAG, "[M] ║%-44s║", line1);
     ESP_LOGI(TAG, "[M] ║%-44s║", line2);
     ESP_LOGI(TAG, "[M] ║%-44s║", line3);
     ESP_LOGI(TAG, "[M] ║%-44s║", line4);
     ESP_LOGI(TAG, "[M] ╚════════════════════════════════════════════╝");
-
 }
 
 static bool fsm_program_price_units_to_cents(int32_t price_units, int32_t *amount_cents)
@@ -240,46 +317,6 @@ static bool fsm_has_virtual_locked_session(const fsm_ctx_t *ctx)
             ctx->session_source == FSM_SESSION_SOURCE_QR);
 }
 
-static bool fsm_can_replace_touch_only_session_with_qr(const fsm_ctx_t *ctx)
-{
-    if (!ctx) {
-        return false;
-    }
-
-    if (ctx->state != FSM_STATE_CREDIT ||
-        ctx->session_mode != FSM_SESSION_MODE_OPEN_PAYMENTS) {
-        return false;
-    }
-
-    if (ctx->session_source != FSM_SESSION_SOURCE_TOUCH &&
-        ctx->session_source != FSM_SESSION_SOURCE_KEY) {
-        return false;
-    }
-
-    return (ctx->credit_cents <= 0) &&
-           (ctx->ecd_coins <= 0) &&
-           (ctx->vcd_coins <= 0) &&
-           (ctx->ecd_cents_residual <= 0) &&
-           (ctx->vcd_cents_residual <= 0);
-}
-
-static void fsm_prepare_virtual_locked_session(fsm_ctx_t *ctx, fsm_session_source_t source)
-{
-    if (!ctx) {
-        return;
-    }
-    ctx->session_source = source;
-    ctx->session_mode = FSM_SESSION_MODE_VIRTUAL_LOCKED;
-    ctx->allow_additional_payments = false;
-    if (source == FSM_SESSION_SOURCE_CARD) {
-        ctx->card_session_removed_during_run = false;
-    }
-    if (ctx->state == FSM_STATE_IDLE || ctx->state == FSM_STATE_ADS) {
-        ctx->state = FSM_STATE_CREDIT;
-        ctx->inactivity_ms = 0;
-    }
-}
-
 static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
 {
     const char *source_str = ctx ? fsm_session_source_to_string(ctx->payment_credit_source) : "UNKNOWN";
@@ -291,31 +328,48 @@ static bool fsm_try_charge_program_cycle(fsm_ctx_t *ctx, int32_t cost)
         ESP_LOGW(TAG, "****************************************");
         return false;
     }
+    /* Consumo crediti: prima ECD (monete), poi VCD con priorità NFC/CARD e infine QR */
     int32_t f_ecd = (ctx->ecd_coins >= cost) ? cost : ctx->ecd_coins;
-    int32_t f_vcd = cost - f_ecd;
-    if (f_vcd > ctx->vcd_coins) {
+    int32_t remaining = cost - f_ecd;
+
+    int32_t f_vcd_card = (remaining > 0 && ctx->vcd_card_coins > 0) ?
+                             ((ctx->vcd_card_coins >= remaining) ? remaining : ctx->vcd_card_coins) : 0;
+    remaining -= f_vcd_card;
+
+    int32_t f_vcd_qr = (remaining > 0 && ctx->vcd_qr_coins > 0) ?
+                           ((ctx->vcd_qr_coins >= remaining) ? remaining : ctx->vcd_qr_coins) : 0;
+    remaining -= f_vcd_qr;
+
+    if (remaining > 0) {
         ESP_LOGW(TAG, "****************************************");
         ESP_LOGW(TAG, "[M] [USE_CREDIT] riduzione credito FALLITA");
         ESP_LOGW(TAG, "[M] Tipo pagamento: %s", source_str);
-        ESP_LOGW(TAG, "[M] Dettaglio: insufficiente VCD cost=%ld ecd=%ld vcd=%ld",
+        ESP_LOGW(TAG, "[M] Dettaglio: credito insufficiente cost=%ld ecd=%ld vcd=%ld (card=%ld qr=%ld)",
                  (long)cost,
                  (long)ctx->ecd_coins,
-                 (long)ctx->vcd_coins);
+                 (long)ctx->vcd_coins,
+                 (long)ctx->vcd_card_coins,
+                 (long)ctx->vcd_qr_coins);
         ESP_LOGW(TAG, "****************************************");
         return false;
     }
-    ctx->ecd_coins    -= f_ecd;
-    ctx->vcd_coins    -= f_vcd;
-    ctx->ecd_used     += f_ecd;
-    ctx->vcd_used     += f_vcd;
-    ctx->credit_cents -= cost;
+    ctx->ecd_coins       -= f_ecd;
+    ctx->vcd_card_coins  -= f_vcd_card;
+    ctx->vcd_qr_coins    -= f_vcd_qr;
+    ctx->ecd_used        += f_ecd;
+    ctx->vcd_card_used   += f_vcd_card;
+    ctx->vcd_qr_used     += f_vcd_qr;
+    fsm_recalc_credit_totals(ctx);
     ESP_LOGI(TAG, "****************************************");
     ESP_LOGI(TAG, "[M] [USE_CREDIT] riduzione credito EFFETTUATA");
     ESP_LOGI(TAG, "[M] Tipo pagamento: %s", source_str);
-    ESP_LOGI(TAG, "[M] Dettaglio: cost=%ld from_ecd=%ld from_vcd=%ld", (long)cost, (long)f_ecd, (long)f_vcd);
-    ESP_LOGI(TAG, "[M] Stato dopo sconto: ecd_rem=%ld vcd_rem=%ld credit=%ld",
+    ESP_LOGI(TAG, "[M] Dettaglio: cost=%ld from_ecd=%ld from_vcd_card=%ld from_vcd_qr=%ld",
+             (long)cost, (long)f_ecd, (long)f_vcd_card, (long)f_vcd_qr);
+    ESP_LOGI(TAG, "[M] Stato dopo sconto: ecd_rem=%ld vcd_rem=%ld (card=%ld qr=%ld) credit=%ld",
              (long)ctx->ecd_coins,
              (long)ctx->vcd_coins,
+             (long)ctx->vcd_card_coins,
+             (long)ctx->vcd_qr_coins,
              (long)ctx->credit_cents);
     ESP_LOGI(TAG, "****************************************");
     return true;
@@ -557,10 +611,16 @@ void fsm_init(fsm_ctx_t *ctx)
     ctx->credit_cents = 0;
     ctx->ecd_coins = 0;
     ctx->vcd_coins = 0;
+    ctx->vcd_card_coins = 0;
+    ctx->vcd_qr_coins = 0;
     ctx->ecd_used  = 0;
     ctx->vcd_used  = 0;
+    ctx->vcd_card_used = 0;
+    ctx->vcd_qr_used = 0;
     ctx->ecd_cents_residual = 0;
     ctx->vcd_cents_residual = 0;
+    ctx->vcd_card_cents_residual = 0;
+    ctx->vcd_qr_cents_residual = 0;
     ctx->program_running = false;
     ctx->running_elapsed_ms = 0;
     ctx->pause_elapsed_ms = 0;
@@ -652,11 +712,17 @@ bool fsm_handle_event(fsm_ctx_t *ctx, fsm_event_t event)
                 fsm_reset_runtime_locked(ctx);
                 ctx->ecd_coins = retained_ecd;
                 ctx->vcd_coins = 0;
+                ctx->vcd_card_coins = 0;
+                ctx->vcd_qr_coins = 0;
                 ctx->credit_cents = retained_ecd;
                 ctx->ecd_used = 0;
                 ctx->vcd_used = 0;
+                ctx->vcd_card_used = 0;
+                ctx->vcd_qr_used = 0;
                 ctx->ecd_cents_residual = 0;
                 ctx->vcd_cents_residual = 0;
+                ctx->vcd_card_cents_residual = 0;
+                ctx->vcd_qr_cents_residual = 0;
                 ctx->session_mode = FSM_SESSION_MODE_NONE;
                 ctx->session_source = FSM_SESSION_SOURCE_NONE;
                 ctx->allow_additional_payments = false;
@@ -917,34 +983,26 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             return fsm_handle_event(ctx, FSM_EVENT_USER_ACTIVITY);
 
         case FSM_INPUT_EVENT_COIN:
-            if (!ctx->allow_additional_payments && ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
-                fsm_append_message("Pagamento aggiuntivo non consentito");
-                return false;
-            }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             /* [C] Nessun codice cliente per pagamento monete */
             ctx->customer_code[0] = '\0';
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
-                                          true,
+                                          FSM_SESSION_SOURCE_COIN,
                                           (event->text[0] != '\0') ? event->text : "coin");
                 ctx->payment_credit_source = FSM_SESSION_SOURCE_COIN;
             }
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
 
         case FSM_INPUT_EVENT_TOKEN:
-            if (!ctx->allow_additional_payments && ctx->session_mode == FSM_SESSION_MODE_VIRTUAL_LOCKED) {
-                fsm_append_message("Pagamento aggiuntivo non consentito");
-                return false;
-            }
             fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_COIN);
             /* [C] Nessun codice cliente per pagamento token */
             ctx->customer_code[0] = '\0';
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
-                                          true,
+                                          FSM_SESSION_SOURCE_COIN,
                                           (event->text[0] != '\0') ? event->text : "token");
                 if (event->from == AGN_ID_CCTALK) {
                     ctx->payment_credit_source = FSM_SESSION_SOURCE_CCTALK;
@@ -956,36 +1014,17 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
 
         case FSM_INPUT_EVENT_QR_CREDIT:
             ctx->qr_credit_pending = false;
-            // Azzera il credito VCD precedente quando arriva il nuovo QR credit
-            ctx->vcd_coins = 0;
-            ctx->vcd_used = 0;
-            ctx->vcd_cents_residual = 0;
-            ctx->credit_cents = ctx->ecd_coins + ctx->vcd_coins;  // Now vcd_coins=0, so credit = ecd only
-            bool replace_touch_only_session = fsm_can_replace_touch_only_session_with_qr(ctx);
-            bool allow_open_payments_upgrade =
-                (ctx->session_mode == FSM_SESSION_MODE_OPEN_PAYMENTS) &&
-                ctx->allow_additional_payments;
-            if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
-                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED &&
-                !replace_touch_only_session &&
-                !allow_open_payments_upgrade) {
-                fsm_append_message("Pagamento aggiuntivo non consentito");
-                return false;
-            }
-            if (replace_touch_only_session) {
-                ctx->session_source = FSM_SESSION_SOURCE_NONE;
-                ctx->session_mode = FSM_SESSION_MODE_NONE;
-                ctx->allow_additional_payments = false;
-                ESP_LOGI(TAG, "[M] QR_CREDIT sostituisce sessione touch senza credito");
-            }
-            fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_QR);
+            /* Regole 2026-05: nessun vincolo sequenza pagamenti.
+             * QR aggiunge sempre credito VCD (entro cap massimo). */
+            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_QR);
+            ctx->allow_additional_payments = true;
             /* [C] Memorizza il codice cliente da QR per successiva api/payment */
             snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s",
                      (event->text[0] != '\0') ? event->text : "");
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
-                                          false,
+                                          FSM_SESSION_SOURCE_QR,
                                           (event->text[0] != '\0') ? event->text : "qr_vcd");
                 ctx->payment_credit_source = FSM_SESSION_SOURCE_QR;
             }
@@ -999,7 +1038,7 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                     /* [M] Durante programma attivo accettiamo ricariche TAG come VCD aggiuntivo. */
                     fsm_add_credit_from_cents(ctx,
                                               event->value_i32,
-                                              false,
+                                              FSM_SESSION_SOURCE_CARD,
                                               (event->text[0] != '\0') ? event->text : "card_vcd_running");
                     ctx->payment_credit_source = FSM_SESSION_SOURCE_CARD;
                     if (event->text[0] != '\0') {
@@ -1020,16 +1059,10 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 fsm_append_message("Vend card in corso: credito aggiuntivo ignorato");
                 return false;
             }
-            bool allow_open_payments_upgrade =
-                (ctx->session_mode == FSM_SESSION_MODE_OPEN_PAYMENTS) &&
-                ctx->allow_additional_payments;
-            if (ctx->session_mode != FSM_SESSION_MODE_NONE &&
-                ctx->session_mode != FSM_SESSION_MODE_VIRTUAL_LOCKED &&
-                !allow_open_payments_upgrade) {
-                fsm_append_message("Pagamento aggiuntivo non consentito");
-                return false;
-            }
-            fsm_prepare_virtual_locked_session(ctx, FSM_SESSION_SOURCE_CARD);
+            /* Regole 2026-05: nessun vincolo sequenza pagamenti.
+             * NFC/CARD aggiunge sempre credito VCD (entro cap massimo). */
+            fsm_prepare_open_session(ctx, FSM_SESSION_SOURCE_CARD);
+            ctx->allow_additional_payments = true;
             ctx->card_session_removed_during_run = false;
             /* [C] Memorizza il codice cliente da Card per successiva api/payment */
             snprintf(ctx->customer_code, sizeof(ctx->customer_code), "%s",
@@ -1037,17 +1070,19 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             if (event->value_i32 > 0) {
                 fsm_add_credit_from_cents(ctx,
                                           event->value_i32,
-                                          false,
+                                          FSM_SESSION_SOURCE_CARD,
                                           (event->text[0] != '\0') ? event->text : "card_vcd");
                 ctx->payment_credit_source = FSM_SESSION_SOURCE_CARD;
             }
             ESP_LOGI(TAG,
-                     "[M] [CARD_FLOW] CARD_CREDIT ricevuto: session_source=%s payment_source=%s credit=%ld ecd=%ld vcd=%ld residual_vcd=%ld",
+                     "[M] [CARD_FLOW] CARD_CREDIT ricevuto: session_source=%s payment_source=%s credit=%ld ecd=%ld vcd=%ld (card=%ld qr=%ld) residual_vcd=%ld",
                      fsm_session_source_to_string(ctx->session_source),
                      fsm_session_source_to_string(ctx->payment_credit_source),
                      (long)ctx->credit_cents,
                      (long)ctx->ecd_coins,
                      (long)ctx->vcd_coins,
+                     (long)ctx->vcd_card_coins,
+                     (long)ctx->vcd_qr_coins,
                      (long)ctx->vcd_cents_residual);
             return fsm_handle_event(ctx, FSM_EVENT_PAYMENT_ACCEPTED);
         }
@@ -1358,9 +1393,15 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
             }
             if (event->aux_u32 == 1U) {
                 ctx->vcd_coins = 0;
+                ctx->vcd_card_coins = 0;
+                ctx->vcd_qr_coins = 0;
                 ctx->vcd_used = 0;
+                ctx->vcd_card_used = 0;
+                ctx->vcd_qr_used = 0;
                 ctx->vcd_cents_residual = 0;
-                ctx->credit_cents = ctx->ecd_coins;
+                ctx->vcd_card_cents_residual = 0;
+                ctx->vcd_qr_cents_residual = 0;
+                fsm_recalc_credit_totals(ctx);
             } else {
                 ctx->credit_cents = 0;
                 ctx->ecd_coins = 0;
@@ -1369,6 +1410,12 @@ bool fsm_handle_input_event(fsm_ctx_t *ctx, const fsm_input_event_t *event)
                 ctx->vcd_used  = 0;
                 ctx->ecd_cents_residual = 0;
                 ctx->vcd_cents_residual = 0;
+                ctx->vcd_card_coins = 0;
+                ctx->vcd_qr_coins = 0;
+                ctx->vcd_card_used = 0;
+                ctx->vcd_qr_used = 0;
+                ctx->vcd_card_cents_residual = 0;
+                ctx->vcd_qr_cents_residual = 0;
             }
             return fsm_handle_event(ctx, FSM_EVENT_CREDIT_ENDED);
 
