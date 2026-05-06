@@ -6,7 +6,162 @@
 
 ---
 
-## 1. Obiettivo
+## 9. Piano di Lavoro — CCTalk: razionalizzazione gestione stati e funzioni di attivazione
+
+**Priorità:** Alta  
+**Riferimento pattern:** identico a refactoring `usb_cdc_scanner` (v0.7.1)
+
+---
+
+### 9.1 Obiettivo
+
+Introdurre un enum di stato logico per il driver CCTalk e una funzione `set_state()` che
+incapsula le transizioni, eliminando la chiamata diretta a `tasks_publish_cctalk_control_event()`
+dai punti di transizione in `tasks.c` e i due flag tracking `cctalk_forced_stop_for_vcd` /
+`cctalk_forced_stop_for_program`.
+
+---
+
+### 9.2 Analisi stato attuale (AS-IS)
+
+#### API pubblica in `cctalk.h`
+```c
+esp_err_t cctalk_driver_start_acceptor(void);   // avvia accettazione monete
+esp_err_t cctalk_driver_stop_acceptor(void);    // ferma accettazione monete
+bool      cctalk_driver_is_acceptor_enabled(void);
+bool      cctalk_driver_is_acceptor_online(void);
+```
+
+#### Controllo asincrono via event queue
+Il `cctalk_task_run()` riceve eventi `ACTION_ID_CCTALK_START` / `ACTION_ID_CCTALK_STOP`
+dalla mailbox FSM e chiama direttamente `start_acceptor()` / `stop_acceptor()`.  
+Il motivo dell'architettura async è che `start_acceptor()` blocca ~300 ms
+(3 × `vTaskDelay(100ms)` durante la sequenza di setup seriale), quindi non può essere
+chiamata direttamente dalla FSM task senza bloccarla.
+
+#### Call site in `tasks.c`
+| Riga (approx) | Contesto | Azione |
+|---|---|---|
+| 2302 | Uscita OOS | `tasks_publish_cctalk_control_event(START)` |
+| 2418 | FSM loop — VCD/program stop | `tasks_publish_cctalk_control_event(STOP)` |
+| 2431 | FSM loop — ripristino dopo VCD/program | `tasks_publish_cctalk_control_event(START)` |
+| 2532 | Fine programma (`left_program_state`) | `tasks_publish_cctalk_control_event(START)` |
+
+#### Flag tracking in `tasks.c`
+```c
+bool cctalk_forced_stop_for_vcd = false;
+bool cctalk_forced_stop_for_program = false;
+```
+Questi flag evitano doppi stop/start e tracciano il motivo della sospensione.
+
+---
+
+### 9.3 Architettura target (TO-BE)
+
+#### Nuovo enum e API in `cctalk.h`
+```c
+typedef enum {
+    CCTALK_DRIVER_STATE_ACTIVE = 0,    // accetta monete (acceptor abilitato)
+    CCTALK_DRIVER_STATE_SUSPENDED,     // sospesa temporaneamente (VCD/programma)
+    CCTALK_DRIVER_STATE_OOS,           // fuori servizio (errore critico)
+} cctalk_driver_state_t;
+
+esp_err_t           cctalk_driver_set_state(cctalk_driver_state_t state);
+cctalk_driver_state_t cctalk_driver_get_state(void);
+```
+
+#### Comportamento di `set_state()`
+| Stato target | Azione interna | Nota |
+|---|---|---|
+| `ACTIVE` | pubblica `ACTION_ID_CCTALK_START` alla mailbox `AGN_ID_CCTALK` | il task la processa e chiama `start_acceptor()` |
+| `SUSPENDED` | pubblica `ACTION_ID_CCTALK_STOP` alla mailbox `AGN_ID_CCTALK` | il task chiama `stop_acceptor()` |
+| `OOS` | pubblica `ACTION_ID_CCTALK_STOP` | identico a SUSPENDED ma semantica diversa (irrecuperabile) |
+
+Il driver aggiorna immediatamente `s_logical_state` prima di pubblicare l'evento,
+così `get_state()` riflette lo stato desiderato anche prima che il task lo elabori.
+
+#### `get_component_status()` aggiornato
+| Condizione | Stato restituito |
+|---|---|
+| config disabilitata | `DISABLED` |
+| `s_driver_init_failed` | `OFFLINE` |
+| `s_logical_state == OOS` | `OFFLINE` |
+| `s_logical_state == SUSPENDED` | `ACTIVE` (sospeso volontariamente, non offline) |
+| acceptor enabled && online | `ONLINE` |
+| altrimenti | `OFFLINE` |
+
+#### Semplificazione in `tasks.c`
+I due flag `cctalk_forced_stop_for_vcd` e `cctalk_forced_stop_for_program` vengono
+eliminati: lo stato `SUSPENDED` / `ACTIVE` viene interrogato via `cctalk_driver_get_state()`.
+
+```c
+// Nuovo pattern stop (da 4 variabili booleane → 1 chiamata)
+if (cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_ACTIVE) {
+    cctalk_driver_set_state(CCTALK_DRIVER_STATE_SUSPENDED);
+    ESP_LOGI(TAG, "[M] Gettoniera CCTALK sospesa (VCD/programma)");
+}
+// Nuovo pattern start
+else if (!cctalk_stop_needed && cctalk_driver_get_state() == CCTALK_DRIVER_STATE_SUSPENDED
+         && (fsm.state == FSM_STATE_CREDIT || ...)) {
+    cctalk_driver_set_state(CCTALK_DRIVER_STATE_ACTIVE);
+    ESP_LOGI(TAG, "[M] Gettoniera CCTALK riattivata");
+}
+```
+
+---
+
+### 9.4 Modifiche per file
+
+#### 9.4.1 `components/cctalk/include/cctalk.h`
+- Aggiungere `typedef enum { ... } cctalk_driver_state_t;` prima delle funzioni driver
+- Aggiungere prototipi `cctalk_driver_set_state()` e `cctalk_driver_get_state()`
+
+#### 9.4.2 `components/cctalk/cctalk_driver.c` — sezione reale (`DNA_CCTALK == 0`)
+- Aggiungere variabile: `static volatile cctalk_driver_state_t s_logical_state = CCTALK_DRIVER_STATE_ACTIVE;`
+- Implementare `cctalk_driver_get_state()`: restituisce `s_logical_state` (protected by lock)
+- Implementare `cctalk_driver_set_state(state)`:
+  ```c
+  // aggiorna s_logical_state sotto lock
+  // pubblica ACTION_ID_CCTALK_START o ACTION_ID_CCTALK_STOP via fsm_event_publish()
+  ```
+- Aggiornare `cctalk_driver_get_component_status()` secondo la tabella §9.3
+
+#### 9.4.3 `components/cctalk/cctalk_driver.c` — sezione mock (`DNA_CCTALK == 1`)
+- `get_state()` restituisce sempre `CCTALK_DRIVER_STATE_ACTIVE`
+- `set_state()` no-op con log `[C] [MOCK] cctalk_driver_set_state(%d)`
+
+#### 9.4.4 `main/tasks.c`
+- Sostituire tutti i 4 call site di `tasks_publish_cctalk_control_event()` con `cctalk_driver_set_state()`
+- Rimuovere le variabili `cctalk_forced_stop_for_vcd` e `cctalk_forced_stop_for_program`
+- Semplificare le condizioni usando `cctalk_driver_get_state()`
+
+---
+
+### 9.5 Ordine di implementazione
+
+| Step | Descrizione | File |
+|---|---|---|
+| 1 | Aggiungere enum + prototipi | `cctalk.h` |
+| 2 | Implementare `set_state()` / `get_state()` (real) | `cctalk_driver.c` |
+| 3 | Aggiornare `get_component_status()` | `cctalk_driver.c` |
+| 4 | Implementare mock `set_state()` / `get_state()` | `cctalk_driver.c` |
+| 5 | Sostituire call site + rimuovere flag | `main/tasks.c` |
+| 6 | Build e verifica errori | — |
+
+---
+
+### 9.6 Criteri di verifica
+
+- [ ] Build senza errori/warning (`DNA_CCTALK=0` e `DNA_CCTALK=1`)
+- [ ] `grep tasks_publish_cctalk_control_event` restituisce solo la definizione della funzione
+- [ ] `grep cctalk_forced_stop_for_vcd` → 0 risultati
+- [ ] `grep cctalk_forced_stop_for_program` → 0 risultati
+- [ ] `get_component_status()` restituisce `ACTIVE` quando `SUSPENDED` (icona corretta)
+- [ ] Nessuna regressione sul polling monete e sugli eventi FSM
+
+---
+
+
 
 Migrare la comunicazione tra il firmware e la scheda display ePaper dalla porta RS232
 alla porta USB CDC, riutilizzando lo stesso driver fisico (`usb_host_cdc_acm`) già
