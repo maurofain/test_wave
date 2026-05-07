@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_timer.h"
 
 #ifndef DNA_USB_SCANNER
 #define DNA_USB_SCANNER 0
@@ -71,7 +72,24 @@ static TaskHandle_t s_usb_open_task = NULL;
 // Stato logico del dispositivo scanner (ACTIVE / SUSPENDED / OOS)
 static volatile usb_cdc_scanner_state_t s_scanner_logical_state = USB_CDC_SCANNER_STATE_ACTIVE;
 static volatile bool s_is_epaper_mode = false;
+/* EPAPER_USB: interfaccia CDC rilevata
+ * - ifnum: bInterfaceNumber (valore nel descriptor)
+ * - idx:   indice 0..N-1 nell'ordine dei descriptor di interfaccia
+ *
+ * Alcune versioni/varianti del driver CDC-ACM host interpretano il terzo parametro
+ * di open in modo diverso; logghiamo e teniamo entrambi per fallback robusto. */
 static volatile int s_epaper_cdc_ifnum = -1;
+static volatile int s_epaper_cdc_idx = -1;
+
+/* EPAPER keepalive: dopo INIT (0x00 0xAA) invia 0x00 0xAF ogni 10s.
+ * Nota: timer attivo solo in modalità runtime EPAPER_USB e solo se CDC è aperto. */
+static esp_timer_handle_t s_epaper_keepalive_timer = NULL;
+#define EPAPER_KEEPALIVE_PERIOD_US (10LL * 1000000LL)
+
+static esp_err_t usb_cdc_scanner_epaper_send_raw_internal(const uint8_t *data, size_t len);
+static void usb_cdc_scanner_epaper_keepalive_tick(void *arg);
+static void usb_cdc_scanner_epaper_keepalive_start(void);
+static void usb_cdc_scanner_epaper_keepalive_stop(void);
 
 __attribute__((weak)) bool usb_cdc_scanner_runtime_allowed(void)
 {
@@ -180,6 +198,10 @@ static void cdc_event_cb(const cdc_acm_host_dev_event_data_t *event, void *user_
     case CDC_ACM_HOST_DEVICE_DISCONNECTED:
         ESP_LOGI(TAG, "CDC device disconnected");
         s_scanner_connected = false;
+        usb_cdc_scanner_epaper_keepalive_stop();
+        if (s_is_epaper_mode) {
+            ESP_LOGI("INIT", "#### EPAPER_USB CDC disconnected (keepalive stopped)");
+        }
         serial_test_push_monitor_action("SCANNER", "CDC device disconnected");
         if (event->data.cdc_hdl) {
             cdc_acm_host_close(event->data.cdc_hdl);
@@ -198,6 +220,55 @@ static void cdc_event_cb(const cdc_acm_host_dev_event_data_t *event, void *user_
         break;
     default:
         break;
+    }
+}
+
+static void usb_cdc_scanner_epaper_keepalive_tick(void *arg)
+{
+    (void)arg;
+#if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
+    if (!s_is_epaper_mode) {
+        return;
+    }
+    if (!s_scanner_connected || s_cdc_dev == NULL) {
+        return;
+    }
+    const uint8_t ka[] = {0x00, 0xAF};
+    (void)usb_cdc_scanner_epaper_send_raw_internal(ka, sizeof(ka));
+#endif
+}
+
+static void usb_cdc_scanner_epaper_keepalive_start(void)
+{
+    if (!s_is_epaper_mode) {
+        return;
+    }
+    if (s_epaper_keepalive_timer == NULL) {
+        const esp_timer_create_args_t args = {
+            .callback = &usb_cdc_scanner_epaper_keepalive_tick,
+            .arg = NULL,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "epd_ka",
+            .skip_unhandled_events = true,
+        };
+        if (esp_timer_create(&args, &s_epaper_keepalive_timer) != ESP_OK) {
+            s_epaper_keepalive_timer = NULL;
+            ESP_LOGW("INIT", "#### EPAPER_USB keepalive timer create failed");
+            return;
+        }
+    }
+    (void)esp_timer_stop(s_epaper_keepalive_timer);
+    if (esp_timer_start_periodic(s_epaper_keepalive_timer, EPAPER_KEEPALIVE_PERIOD_US) == ESP_OK) {
+        ESP_LOGI("INIT", "#### EPAPER_USB keepalive enabled (0x00 0xAF every 10s)");
+    } else {
+        ESP_LOGW("INIT", "#### EPAPER_USB keepalive start failed");
+    }
+}
+
+static void usb_cdc_scanner_epaper_keepalive_stop(void)
+{
+    if (s_epaper_keepalive_timer != NULL) {
+        (void)esp_timer_stop(s_epaper_keepalive_timer);
     }
 }
 
@@ -222,35 +293,57 @@ static void cdc_new_device_cb(usb_device_handle_t usb_dev)
             ESP_LOGI("INIT", "[M] [USB] *****************************************");
         }
 
-        /* EPAPER_USB: prova a determinare il numero di interfaccia CDC dal configuration descriptor.
-         * cdc_acm_host_open() usa interface_idx come bInterfaceNumber (non come “index 0..N”). */
+        /* EPAPER_USB: determina l'INTERFACE INDEX (0..N-1) della CDC dal configuration descriptor.
+         * Nota: teniamo sia idx che bInterfaceNumber per compatibilità. */
         if (device_desc->idVendor == EPAPER_USB_DEFAULT_VID && device_desc->idProduct == EPAPER_USB_DEFAULT_PID) {
             const usb_config_desc_t *cfg_desc = NULL;
             if (usb_host_get_active_config_descriptor(usb_dev, &cfg_desc) == ESP_OK && cfg_desc) {
                 const uint8_t *p = (const uint8_t *)cfg_desc;
                 int len = (int)cfg_desc->wTotalLength;
-                int found = -1;
-                int found_data = -1;
+                int iface_idx = -1;
+                int found_comm_idx = -1;
+                int found_data_idx = -1;
+                uint8_t found_comm_ifnum = 0;
+                uint8_t found_data_ifnum = 0;
                 while (len >= 2) {
                     uint8_t desc_len = p[0];
                     uint8_t desc_type = p[1];
                     if (desc_len == 0 || desc_len > len) break;
                     if (desc_type == 0x04 && desc_len >= 9) { /* interface descriptor */
+                        iface_idx++;
                         uint8_t ifnum = p[2];
                         uint8_t cls = p[5];
+                        uint8_t sub = p[6];
+                        uint8_t proto = p[7];
+                        ESP_LOGI("INIT", "#### EPAPER_USB IFACE idx=%d ifnum=%u class=%02X sub=%02X proto=%02X",
+                                 iface_idx, (unsigned)ifnum, cls, sub, proto);
                         /* Prefer COMM (0x02), fallback DATA (0x0A) */
-                        if (cls == 0x02 && found < 0) found = ifnum;
-                        else if (cls == 0x0A && found_data < 0) found_data = ifnum;
+                        if (cls == 0x02 && found_comm_idx < 0) {
+                            found_comm_idx = iface_idx;
+                            found_comm_ifnum = ifnum;
+                        } else if (cls == 0x0A && found_data_idx < 0) {
+                            found_data_idx = iface_idx;
+                            found_data_ifnum = ifnum;
+                        }
                     }
                     p += desc_len;
                     len -= desc_len;
                 }
-                if (found < 0) found = found_data;
-                if (found >= 0) {
-                    s_epaper_cdc_ifnum = found;
-                    ESP_LOGI("INIT", "#### EPAPER_USB detected CDC interface bInterfaceNumber=%d", found);
+                int sel_idx = found_comm_idx;
+                uint8_t sel_ifnum = found_comm_ifnum;
+                if (sel_idx < 0) {
+                    sel_idx = found_data_idx;
+                    sel_ifnum = found_data_ifnum;
+                }
+                if (sel_idx >= 0) {
+                    s_epaper_cdc_idx = sel_idx;
+                    s_epaper_cdc_ifnum = (int)sel_ifnum;
+                    ESP_LOGI("INIT", "#### EPAPER_USB detected CDC: idx=%d bInterfaceNumber=%u",
+                             sel_idx, (unsigned)sel_ifnum);
                 } else {
-                    ESP_LOGW("INIT", "#### EPAPER_USB could not detect CDC interface number");
+                    s_epaper_cdc_idx = -1;
+                    s_epaper_cdc_ifnum = -1;
+                    ESP_LOGW("INIT", "#### EPAPER_USB could not detect CDC interface (no class 02/0A)");
                 }
             } else {
                 ESP_LOGW("INIT", "#### EPAPER_USB could not read active config descriptor");
@@ -690,12 +783,32 @@ static void usb_cdc_scanner_open_task(void *arg)
         ESP_LOGI("INIT", "#### USB_CDC_OPEN mode=%s VID=%04X PID=%04X",
                  s_is_epaper_mode ? "EPAPER_USB" : "SCANNER",
                  vid, pid);
-        uint8_t ifnum = 0;
-        if (s_is_epaper_mode && s_epaper_cdc_ifnum >= 0 && s_epaper_cdc_ifnum <= 255) {
-            ifnum = (uint8_t)s_epaper_cdc_ifnum;
-            ESP_LOGI("INIT", "#### EPAPER_USB open using bInterfaceNumber=%u", (unsigned)ifnum);
+        /* EPAPER_USB open strategy:
+         * - prova prima con bInterfaceNumber rilevato (compat con commit 3874752)
+         * - poi con interface index rilevato
+         * - poi brute force su un range più ampio (0..7) */
+        uint8_t open_param = 0;
+        esp_err_t err = ESP_FAIL;
+        if (s_is_epaper_mode) {
+            if (s_epaper_cdc_ifnum >= 0 && s_epaper_cdc_ifnum <= 255) {
+                open_param = (uint8_t)s_epaper_cdc_ifnum;
+                ESP_LOGI("INIT", "#### EPAPER_USB open try bInterfaceNumber=%u", (unsigned)open_param);
+                err = cdc_acm_host_open(vid, pid, open_param, &dev_config, &cdc_dev);
+            }
+            if (err != ESP_OK && s_epaper_cdc_idx >= 0 && s_epaper_cdc_idx <= 255) {
+                open_param = (uint8_t)s_epaper_cdc_idx;
+                ESP_LOGI("INIT", "#### EPAPER_USB open try interface_idx=%u", (unsigned)open_param);
+                err = cdc_acm_host_open(vid, pid, open_param, &dev_config, &cdc_dev);
+            }
+            if (err != ESP_OK) {
+                for (uint8_t ifx = 0; ifx < 8 && err != ESP_OK; ++ifx) {
+                    ESP_LOGI("INIT", "#### EPAPER_USB open brute_force=%u", (unsigned)ifx);
+                    err = cdc_acm_host_open(vid, pid, ifx, &dev_config, &cdc_dev);
+                }
+            }
+        } else {
+            err = cdc_acm_host_open(vid, pid, 0, &dev_config, &cdc_dev);
         }
-        esp_err_t err = cdc_acm_host_open(vid, pid, ifnum, &dev_config, &cdc_dev);
         if (err != ESP_OK && s_is_epaper_mode) {
             /* EPAPER_USB (ESP32-S2) può presentarsi come composite (class EF) e l'interfaccia CDC non
              * è necessariamente la #0. Prova alcune interfacce tipiche. */
@@ -714,6 +827,9 @@ static void usb_cdc_scanner_open_task(void *arg)
         if (err == ESP_OK) {
             ESP_LOGI(TAG, "CDC device opened");
             ESP_LOGI("INIT", "[M] [USB] CDC aperto: VID=%04X PID=%04X", vid, pid);
+            if (s_is_epaper_mode) {
+                ESP_LOGI("INIT", "#### EPAPER_USB CDC opened OK (starting EPAPER protocol)");
+            }
             s_cdc_dev = cdc_dev;
             s_scanner_connected = true;
             serial_test_push_monitor_action("SCANNER", "CDC device connected");
@@ -747,11 +863,16 @@ static void usb_cdc_scanner_open_task(void *arg)
 #endif
 
                 /* Avvio protocollo EPAPER_USB: init + testi di test */
+                ESP_LOGI("INIT", "#### EPAPER_USB TX: INIT (0x00 0xAA)");
                 const uint8_t ep_init[] = {0x00, 0xAA};
                 (void)usb_cdc_scanner_epaper_send_raw_internal(ep_init, sizeof(ep_init));
                 vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
 
+                /* Keepalive: dopo INIT invia 0x00 0xAF ogni 10 secondi */
+                usb_cdc_scanner_epaper_keepalive_start();
+
                 /* Refresh totale dopo init (regola) */
+                ESP_LOGI("INIT", "#### EPAPER_USB TX: FULL_REFRESH (0x00 0x00)");
                 const uint8_t ep_full_refresh[] = {0x00, 0x00};
                 (void)usb_cdc_scanner_epaper_send_raw_internal(ep_full_refresh, sizeof(ep_full_refresh));
                 vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_FULL_REFRESH_MS));
@@ -760,8 +881,9 @@ static void usb_cdc_scanner_open_task(void *arg)
                  * assumiamo default 0 (nessun comando). */
 
                 /* Testi font 60px (GoogleSans 60pt → font#9): "SCAN" @ (50,100), "CODE" @ (150,100) */
-                uint8_t pkt1[] = {0x01, 0xFF, 9, 50, 100, 'S','C','A','N', 0x00};
-                uint8_t pkt2[] = {0x01, 0xFF, 9, 150, 100, 'C','O','D','E', 0x00};
+                ESP_LOGI("INIT", "#### EPAPER_USB TX: TEXT boot (\"SCAN\"/\"CODE\")");
+                uint8_t pkt1[] = {0x01, 0xFF, 9, 100, 50, 'S','C','A','N', 0x00};
+                uint8_t pkt2[] = {0x01, 0xFF, 9, 100, 150, 'C','O','D','E', 0x00};
                 (void)usb_cdc_scanner_epaper_send_raw_internal(pkt1, sizeof(pkt1));
                 vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
                 (void)usb_cdc_scanner_epaper_send_raw_internal(pkt2, sizeof(pkt2));
@@ -779,6 +901,9 @@ static void usb_cdc_scanner_open_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         } else {
+            if (s_is_epaper_mode) {
+                ESP_LOGW("INIT", "#### EPAPER_USB CDC open failed (%s): EPAPER init NOT sent", esp_err_to_name(err));
+            }
             ESP_LOGI(TAG, "CDC device not found (err=%s), enumerating connected devices...", esp_err_to_name(err));
 
             uint8_t addr_list[16];
@@ -1217,7 +1342,21 @@ usb_cdc_scanner_state_t usb_cdc_scanner_get_state(void)
  */
 esp_err_t usb_cdc_scanner_set_state(usb_cdc_scanner_state_t state)
 {
+    const usb_cdc_scanner_state_t prev_state = s_scanner_logical_state;
     s_scanner_logical_state = state;
+
+    /* EPAPER_USB: lo stato logico viene usato solo internamente (UI/health),
+     * ma NON dobbiamo inviare né loggare comandi Newland (setup/on/off).
+     * Manteniamo un log molto ridotto solo sul cambio stato. */
+    if (s_is_epaper_mode) {
+        if (prev_state != state) {
+            ESP_LOGI(TAG, "[EPAPER_USB] Scanner state -> %s",
+                     (state == USB_CDC_SCANNER_STATE_ACTIVE)    ? "ACTIVE" :
+                     (state == USB_CDC_SCANNER_STATE_SUSPENDED) ? "SUSPENDED" :
+                     (state == USB_CDC_SCANNER_STATE_OOS)       ? "OOS" : "UNKNOWN");
+        }
+        return ESP_OK;
+    }
 
     switch (state) {
     case USB_CDC_SCANNER_STATE_ACTIVE: {
