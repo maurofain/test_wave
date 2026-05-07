@@ -7,6 +7,7 @@
 #include "serial_test.h"
 /* Sperimentali: invio log alla Web UI per diagnostica remota */
 #include "web_ui.h" /* Sperimentali */
+#include "../usb_cdc_epaper/include/usb_cdc_epaper.h"
 #include <string.h>
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
@@ -180,6 +181,9 @@ static void cdc_event_cb(const cdc_acm_host_dev_event_data_t *event, void *user_
     case CDC_ACM_HOST_DEVICE_DISCONNECTED:
         ESP_LOGI(TAG, "CDC device disconnected");
         s_scanner_connected = false;
+        if (s_is_epaper_mode) {
+            usb_cdc_epaper_detach("cdc_disconnect");
+        }
         serial_test_push_monitor_action("SCANNER", "CDC device disconnected");
         if (event->data.cdc_hdl) {
             cdc_acm_host_close(event->data.cdc_hdl);
@@ -516,74 +520,6 @@ static esp_err_t usb_cdc_scanner_send_framed_command(const char *payload)
     return err;
 }
 
-static esp_err_t usb_cdc_scanner_epaper_send_raw_internal(const uint8_t *data, size_t len)
-{
-#if CONFIG_USB_CDC_SCANNER_USE_CDC_ACM_HOST && (defined(USB_CDC_ACM_AVAILABLE) && USB_CDC_ACM_AVAILABLE)
-    if (!data || len == 0) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    cdc_acm_dev_hdl_t cdc_hdl = s_cdc_dev;
-    if (cdc_hdl == NULL) {
-        usb_cdc_scanner_notify_open_task();
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    /* #### Log “in evidenza” per ogni comando EPAPER inviato */
-    {
-        char hex[3 * 64 + 1] = {0};
-        size_t dump_len = (len > 64) ? 64 : len;
-        size_t o = 0;
-        for (size_t i = 0; i < dump_len && (o + 3) < sizeof(hex); ++i) {
-            o += (size_t)snprintf(&hex[o], sizeof(hex) - o, "%02X%s", data[i], (i + 1 < dump_len) ? " " : "");
-        }
-
-        if (data[0] == 0x00 && len >= 2) {
-            const uint8_t cmd = data[1];
-            const char *name = "CMD";
-            if (cmd == 0xAA) name = "INIT";
-            else if (cmd == 0x00) name = "FULL_REFRESH";
-            ESP_LOGI("INIT", "#### EPAPER_TX %s len=%u hex=%s%s", name, (unsigned)len, hex, (len > dump_len) ? " ..." : "");
-        } else if (data[0] == 0x01 && len >= 6) {
-            const uint8_t color = data[1];
-            const uint8_t font = data[2];
-            const uint8_t x = data[3];
-            const uint8_t y = data[4];
-            char text[48] = {0};
-            size_t ti = 0;
-            for (size_t i = 5; i < len && data[i] != 0x00 && ti + 1 < sizeof(text); ++i) {
-                char c = (char)data[i];
-                text[ti++] = (c >= 32 && c <= 126) ? c : '.';
-            }
-            text[ti] = 0;
-            ESP_LOGI("INIT", "#### EPAPER_TX TEXT len=%u color=%u font=%u x=%u y=%u txt=\"%s\" hex=%s%s",
-                     (unsigned)len, (unsigned)color, (unsigned)font, (unsigned)x, (unsigned)y,
-                     text, hex, (len > dump_len) ? " ..." : "");
-        } else if (data[0] == 0x02 && len >= 3) {
-            ESP_LOGI("INIT", "#### EPAPER_TX LED len=%u mask=0x%02X on=0x%02X hex=%s%s",
-                     (unsigned)len, data[1], data[2], hex, (len > dump_len) ? " ..." : "");
-        } else {
-            ESP_LOGI("INIT", "#### EPAPER_TX RAW len=%u hex=%s%s", (unsigned)len, hex, (len > dump_len) ? " ..." : "");
-        }
-    }
-
-    esp_err_t err = cdc_acm_host_data_tx_blocking(cdc_hdl, data, len, 1000);
-    if (err != ESP_OK) {
-        ESP_LOGW("INIT", "#### EPAPER_TX FAILED (%s) len=%u", esp_err_to_name(err), (unsigned)len);
-    }
-    return err;
-#else
-    (void)data;
-    (void)len;
-    return ESP_ERR_NOT_SUPPORTED;
-#endif
-}
-
-esp_err_t usb_cdc_scanner_epaper_send_raw(const uint8_t *data, size_t len)
-{
-    return usb_cdc_scanner_epaper_send_raw_internal(data, len);
-}
-
-
 /**
  * @brief Gestisce la funzione di apertura del task scanner USB CDC.
  *
@@ -746,26 +682,21 @@ static void usb_cdc_scanner_open_task(void *arg)
                 }
 #endif
 
-                /* Avvio protocollo EPAPER_USB: init + testi di test */
-                const uint8_t ep_init[] = {0x00, 0xAA};
-                (void)usb_cdc_scanner_epaper_send_raw_internal(ep_init, sizeof(ep_init));
+                /* Avvio protocollo EPAPER_USB */
+                (void)usb_cdc_epaper_attach((void *)s_cdc_dev);
+                (void)usb_cdc_epaper_send_init();
+                (void)usb_cdc_epaper_keepalive_start_1hz();
                 vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
 
                 /* Refresh totale dopo init (regola) */
                 const uint8_t ep_full_refresh[] = {0x00, 0x00};
-                (void)usb_cdc_scanner_epaper_send_raw_internal(ep_full_refresh, sizeof(ep_full_refresh));
+                (void)usb_cdc_epaper_send_raw(ep_full_refresh, sizeof(ep_full_refresh));
                 vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_FULL_REFRESH_MS));
 
                 /* “rotazione 0”: non è definita nel documento del protocollo;
                  * assumiamo default 0 (nessun comando). */
 
-                /* Testi font 60px (GoogleSans 60pt → font#9): "SCAN" @ (50,100), "CODE" @ (150,100) */
-                uint8_t pkt1[] = {0x01, 0xFF, 9, 50, 100, 'S','C','A','N', 0x00};
-                uint8_t pkt2[] = {0x01, 0xFF, 9, 150, 100, 'C','O','D','E', 0x00};
-                (void)usb_cdc_scanner_epaper_send_raw_internal(pkt1, sizeof(pkt1));
-                vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
-                (void)usb_cdc_scanner_epaper_send_raw_internal(pkt2, sizeof(pkt2));
-                vTaskDelay(pdMS_TO_TICKS(EPAPER_USB_DELAY_AFTER_WRITE_MS));
+                (void)usb_cdc_epaper_demo_send_scan_code();
             }
 
             // wait until disconnect; the event callback will handle closing
@@ -1217,6 +1148,14 @@ usb_cdc_scanner_state_t usb_cdc_scanner_get_state(void)
  */
 esp_err_t usb_cdc_scanner_set_state(usb_cdc_scanner_state_t state)
 {
+    /* EPAPER_USB: lo scanner Newland NON è presente.
+     * In questa modalità lo stesso stack USB CDC-ACM viene usato come trasporto verso il modulo ePaper,
+     * quindi dobbiamo forzare la disattivazione dello scanner e sopprimere comandi/log Newland. */
+    if (s_is_epaper_mode) {
+        s_scanner_logical_state = USB_CDC_SCANNER_STATE_SUSPENDED;
+        return ESP_OK;
+    }
+
     s_scanner_logical_state = state;
 
     switch (state) {

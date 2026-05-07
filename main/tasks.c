@@ -213,6 +213,12 @@ bool usb_cdc_scanner_runtime_allowed(void)
     /* Lo scanner deve poter restare enumerato/collegato indipendentemente
      * dai pagamenti e dallo stato RUN. L'abilitazione/disabilitazione della
      * lettura (ACTIVE/SUSPENDED) viene gestita dalla policy nel fsm_task. */
+    const device_config_t *cfg = device_config_get();
+    /* EPAPER_USB: la CDC viene usata come canale display (ePaper) e deve poter
+     * aprire/enumerare anche in OUT_OF_SERVICE per mostrare lo stato. */
+    if (cfg && cfg->display.type == DEVICE_DISPLAY_TYPE_EPAPER_USB) {
+        return true;
+    }
     return !tasks_is_out_of_service_state();
 }
 
