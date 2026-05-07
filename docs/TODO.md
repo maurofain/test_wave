@@ -4,12 +4,22 @@
 
 ## ?? DA FARE
 
-1. logica pannello epaper: questo pannello ha una funzionameno molto ridotto rispetto agli LCD. All'avvio mostra un messaggio di benvenuto . Al ricevimento del credito nelle stesse modalit? gi? esistenti mostra il credito disponibile .La scelta dei programmi avviene solo tramite pulsantiera. alla scelta di un programma inizia l'esecuzione e mantiene la logica di autorepeat gi? esistente , con countdown che ninvece di camiare colore passa in reverse, e con  sospensione e cambi programma da pulsantiera. al termine ci sar? un messaggio di ringraziamento . Nonsono previsti cambi di lingua, solo Italiano. Il modulo epapre comprende anche uno scanner QR che opera tramite la stessa porta rs232: dal modulo escono solo codici a barre/qrcode letti dalloscanner, e riceve invece i candi per la gestione del display e dei led di segnalazione (i led li vediamo per ultimi)
-2. per i testi devi utilizzare il metodo 0x01 0x01 per il countdown , il messaggio di benvenuto e il messaggio di ringraziamento , mentre per i crediti vanno usati 2 messaggi tipi 0x01 0xFF con il credito in carattere 100pt bold  e la scritta Credito messa sotto il numero in carattere 70 bold.
-3. NON IMPLEMENTARE QUESTA RIGA : Per il countdown stesso schema dei crediti ma con il nome del programma scelto in basso e considerando di fare un refresh parziale per il numero 
-4. Operazioni di pagamento
-5. implementazione del display su EPAPER : per prima cosa attiviamo un log nella dafasdi init di USB  che indichi VID e PID del device rilevato sulla porta USB.
-6. Funzioni input i2c
+
+1. stiamo lavorando sulla variante con schermo EPAPER, ricordalo nella creazione del codice per definire le condizioni in esecuzione e compilazione
+2. logica pannello epaper: questo pannello ha una funzionameno molto ridotto rispetto agli LCD. All'avvio mostra un messaggio di benvenuto . Al ricevimento del credito nelle stesse modalit? gi? esistenti mostra il credito disponibile .La scelta dei programmi avviene solo tramite pulsantiera. alla scelta di un programma inizia l'esecuzione e mantiene la logica di autorepeat gi? esistente , con countdown che ninvece di camiare colore passa in reverse, e con  sospensione e cambi programma da pulsantiera. al termine ci sar? un messaggio di ringraziamento . Nonsono previsti cambi di lingua, solo Italiano. Il modulo epapre comprende anche uno scanner QR che opera tramite la stessa porta rs232: dal modulo escono solo codici a barre/qrcode letti dalloscanner, e riceve invece i candi per la gestione del display e dei led di segnalazione (i led li vediamo per ultimi)
+3. per i testi devi utilizzare il metodo 0x01 0x01 per il countdown , il messaggio di benvenuto e il messaggio di ringraziamento , mentre per i crediti vanno usati 2 messaggi tipi 0x01 0xFF con il credito in carattere 100pt bold  e la scritta Credito messa sotto il numero in carattere 70 bold.
+4. NON IMPLEMENTARE QUESTA RIGA : Per il countdown stesso schema dei crediti ma con il nome del programma scelto in basso e considerando di fare un refresh parziale per il numero 
+5. Operazioni su epaper : devono seguire il flusso operativo : attesa credito - scelta programma - esecuzione e autorepeat - saluti. 
+   - Tutte queste funzioni sono comuni con le versioni a display ma opereranno solo con gli input i2c e modbus. 
+   - in attesa credito alterniamo ogni 2 secondi i testi 'SCAN CODE' - 'INSERT COIN' - 'USE NFC'. 
+   - Quando arrivano crediti mostriamo in alto la scritta CREDITO e il numero di credito in carattere 100px, 
+   - il numero di credito deve essere aggiornato all'ingresso di nuovi crediti. 
+   - Alla scelta programma mostriamo in alto il nome del programma (in carattere 50px troncando il nome senza andare a capo e sotto i secondi rimananti,
+   - si passa in modaliÃ  invertita quando siamo in preFineCiclo.  Il colore va riportato a normale non appenza inizia l'autoripetizione o termina il definitivamente il ciclo. 
+   - Rimane operativo il cambio programma come nelle versioni con display e quindi va aggiornato il nome e tempo restante.
+   - Alla fine di ogni programma mostriamo il messaggio 'Grazie!' per 3 secondi e ritorniamo in attesa credito/scelta programma se il credito Ã¨ finito o in visualizzazione credito se c'Ã¨ ancora credito disponibile.
+7. implementazione del display su EPAPER : per prima cosa attiviamo un log nella dafasdi init di USB  che indichi VID e PID del device rilevato sulla porta USB.
+8. Funzioni input i2c
 
    - pin IN04 : se premuto all'avvio o al rilascio durante l'esecusione del firmware deve modificare la partizione di boot a FACTORY ed eseguire il reboot
 
@@ -23,23 +33,23 @@
      | 1    | 0    | Display 7"                      |
      | 0    | 1    | Display 10.1"                   |
      | 1    | 1    | Modulo epaper                   |
-7. dopo aver inserito la moneta i crediti da DB non vengono somma, come se il token non fossa presentato
-8. sul display 10" le lingue non sono si aprono con il touch della bandiera
-9. DA COMPLETARE URGENTE : 
+9. dopo aver inserito la moneta i crediti da DB non vengono somma, come se il token non fossa presentato
+10. sul display 10" le lingue non sono si aprono con il touch della bandiera
+11. DA COMPLETARE URGENTE : 
 
    1. verifica funzionamento MH1001 con tasti
    2. 
-10. Caricamento remoto artefatti
+12. Caricamento remoto artefatti
    - Valutazione per il caricamento da remoto su chiamata di: immagini, tabelle testi e firmware. I contenuti possono essere salvati sia in SPIFFS che in SD.
-11. File da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
-12. Verifica su gestione del credito
+13. File da includere: [TRANSSCOPE_FUNCTIONS_TO_CONVERT](TRANSSCOPE_FUNCTIONS_TO_CONVERT.md)
+14. Verifica su gestione del credito
    - Il credito viene gestito in 2 modi: per l'esecuzione dei programmi usiamo il concetto di COIN (costo base del ciclo). Per la gestione dell'ammontare in denaro usiamo il centesimo di valuta (normalmente EURO).
    - Ogni acquisizione o utilizzo di credito genera un aumento del credito (VCD o ECD) in centesimi. Questo viene convertito in coin (ECD o VCD) all'acquisizione mantenendo in memoria gli eventuali frazionari (es. 50 cent).
    - Ogni servizio erogato addebita dei coin (Euro) che si sottraggono dal totale disponibile: prima ECD e poi VCD.
    - Le chiamate verso il server comunicano sempre il valore in valuta espresso in centesimi.
-13. Quando viene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
+15. Quando viene attivato un programma TUTTI i sistemi di acquisizion e credito devono essere disattivati (CCTALK, SCANNER, MDB) fino alla fine dell'esecuzione del programma e della sua autoripertizione
 
-14. Verifica la gestione generale dei componenti hardware
+16. Verifica la gestione generale dei componenti hardware
    - Tutti i component che gestiscono hardware devono avere queste funzioni e generare un report sullo stato attuale:
      1. `init`
      2. `activate`
@@ -51,7 +61,7 @@
        - `CCTalk`: esegue polling periodico, rileva la perdita del device, passa `offline` e tenta la reinizializzazione automatica con ritorno a `online` quando il device risponde di nuovo.
        - `Scanner USB`: esegue monitoraggio periodico del bus e tenta la riapertura del device; in caso di disconnessione passa `offline`. La riconnessione fisica ? gestita, ma il ciclo completo di `setup` dopo reconnect non ? ancora robusto quanto CCTalk.
        - `HttpServices`: esegue controllo periodico logico del servizio remoto, passa `offline` su errore/token invalido e gestisce recovery con relogin, keepalive e retry/backoff fino al ritorno `online`.
-15. Piano test endpoint e funzioni
+17. Piano test endpoint e funzioni
    - Strutturare i test in 4 livelli:
      - **Smoke**: endpoint raggiungibile, status code atteso, JSON valido
      - **Contract**: campi obbligatori e tipi minimi della risposta
@@ -69,32 +79,32 @@
      - Smoke completo di tutte le route `/api/test/*` e `/api/config/*`
      - 3 flow critici: SD, seriale unificato, backup config su SD
      - Report `junit.xml` + riepilogo markdown
-16. Config: valore per metodo di pagamento
+18. Config: valore per metodo di pagamento
    - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
    - Aggiungere in `/config` i valori configurabili per: gettone MDB, moneta, QR code, tessera
    - Attualmente i valori monete vengono letti dall'hardware MDB ma non sono configurabili per tutti i metodi
-17. Ricezione config da server (`api/getconfig`)
+19. Ricezione config da server (`api/getconfig`)
    - L'API server `POST /api/getconfig` ? definita ma il device non applica la configurazione ricevuta
    - Implementare il parsing della risposta e aggiornamento della config locale
 
-17. Implementazione della scheda Esp32Cam
+20. Implementazione della scheda Esp32Cam
    - prevedere la connessione tramite porta USB di un modulo erp32S3 con cam e software IA per le seguenti funzioni:
      - Rilevamento movimento per prossimit? persone
      - Riconoscimento facciale per identificazione uomo/donna
      - Valutazione eta dal volto
      - salvataggio dell'immagine per sicurezza vandalica
-18. L'interfaccia RS485 ? utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
-19. Crea la funzione status per i component SHT40, NTP, PWM, RS232
-20. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
-21. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
-22. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
-23. Permangono del glimps sullo schermo MIPI
-24. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali pi? eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
-25. manca la voce FTP nello Stato Servizi : mettila dopo NTP e riorganizza la griglia 
-26.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' con un altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 al 100%, se il valore umidit? letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2. L'aggiornamento dei dati va fatto alla lettura del sensore SHT40. Va rimosso il task PWM dall'elenco dei task in quanto gestito insieme a SHT40. in /testuniamo  la sezione 'Sensore SHT40' e 'PWM' rinominandola 'SHT40 / PWM',mantenuiamo la visualizzazione di temperaturasportiamo i controlli ora in 'PWM' aggiungerndo uno switch  AUTO/MANUAL che su AUTO disabilita tutti i comandi PWM e su MANUAL permette di testare i canali PWM
-27.  va implemetato un nuovo device associato alla porta RS232 che ? il display epaper utilizzato in alternativa al dispaly touch e descritto in /home/mauro/1P/MicroHard/test_epaper_bw . Va letto il documento /home/mauro/1P/MicroHard/test_epaper_bw/TODO.md dal punto 5 al punto 9 e vanno creati gli eventi da gestire tramnte la FSM principale per gestire questa interfaccia al posto del diasplay touch. Va creato il DNA per questo device verificando che sia disattivato (0) solo se il DNA di TOUCHSCREEN ? attivo (1), con priorit? a TOUCHCREEN. Verr? creato un documento Epaper_logic.md con la descrizione di come integrare il nuovo pannello nel flusso.
-28.  mostra in questo format tutti gli ingressi e le uscite di credito :
+21. L'interfaccia RS485 ? utilizzata esclusivamente per il protocollo MODBUS : valuta se sia conveniente incormporare RS485 e MODBUS in un unico component
+22. Crea la funzione status per i component SHT40, NTP, PWM, RS232
+23. Nella sezione 'CPU e Task' nell / del backend http cambiamo uptime rimuovendo  la barra di progressione e mettiamo al suo fianco dei dati sull'utilizzo della RAM da parte di RTOs
+24. Aggiungiamo una sezione 'Audio' in /config con controllo ON/OFF e Volume
+25. Va creata in /httpservices la simulazione per /api/payment aggiungndo un campo editabile con l'importo del pagamento (default 1) e l'invio della chiamata al server
+26. Permangono del glimps sullo schermo MIPI
+27. spostiamo i settaggi di MDB fuori dalla sezione 'Porte Seriali' e creiamo una sezione MDB con un toggle di attivazione/disattivazione e i parametri seriali pi? eventuali altri parametri che risultino utili in fase di installazione /debug. Rivediamo anche la sezione MDB in /test ed aggiungiamo della diagnastica utile
+28. manca la voce FTP nello Stato Servizi : mettila dopo NTP e riorganizza la griglia 
+29.  aggiungi in /config -> periferiche 1) di fianco a PWM1 una casella 'Heater' con un editbox numerico valori -100:100 e poi 'Humid.' con un altro valore numerico 0-100. 2) di fianco a PWM2 una casella 'Fan' con un editbox numerico valori 0:100. Questi valori regolano l'avvio dei 2 canali PWM secondo queste regole : se la tempertute letta da SHT40 >= a Fan attiva PWM2 al 100%, se SHT40 < Heater attiva PWM2 al 100%, se il valore umidit? letto sda ST40 > Humid attiva al 100% sia PWM1 che PWM2. L'aggiornamento dei dati va fatto alla lettura del sensore SHT40. Va rimosso il task PWM dall'elenco dei task in quanto gestito insieme a SHT40. in /testuniamo  la sezione 'Sensore SHT40' e 'PWM' rinominandola 'SHT40 / PWM',mantenuiamo la visualizzazione di temperaturasportiamo i controlli ora in 'PWM' aggiungerndo uno switch  AUTO/MANUAL che su AUTO disabilita tutti i comandi PWM e su MANUAL permette di testare i canali PWM
+30.  va implemetato un nuovo device associato alla porta RS232 che ? il display epaper utilizzato in alternativa al dispaly touch e descritto in /home/mauro/1P/MicroHard/test_epaper_bw . Va letto il documento /home/mauro/1P/MicroHard/test_epaper_bw/TODO.md dal punto 5 al punto 9 e vanno creati gli eventi da gestire tramnte la FSM principale per gestire questa interfaccia al posto del diasplay touch. Va creato il DNA per questo device verificando che sia disattivato (0) solo se il DNA di TOUCHSCREEN ? attivo (1), con priorit? a TOUCHCREEN. Verr? creato un documento Epaper_logic.md con la descrizione di come integrare il nuovo pannello nel flusso.
+31.  mostra in questo format tutti gli ingressi e le uscite di credito :
 [0;32mI (41869) FSM_MB: [M] ??????????????????????????????????????????????[0m
 [0;32mI (41889) FSM_MB: [M] ? CREDITI RICEVUTI - PAGAMENTO               ?[0m
 [0;32mI (41889) FSM_MB: [M] ? Importo: 4700 cent                         ?[0m
@@ -120,7 +130,7 @@
 4. in config/sdcard metti un tasto per copiare le pagine web da SPIFFS a SD
 5. Integrazione display LVGL con ciclo operativo
    - Visualizzazione credito, countdown, selezione programma e stati macchina su display 7"/5"
-   - Dipende da: ciclo operativo FSM completo (SPECIFICHE §1.1?1.5)
+   - Dipende da: ciclo operativo FSM completo (SPECIFICHE ï¿½1.1?1.5)
 
 ---
 
@@ -153,7 +163,7 @@
 21. GPIO 32 e 33 configurabili in Config e Test (IN/OUT, Pull, State)
 22. Data e ora da NTP (`2.it.pool.ntp.org`, `2.europe.pool.ntp.org`): acquisizione condizionata a connettivit?; timestamp nei log e nel titolo pagine web
 23. Log remoto via UDP con pagina HTML dedicata
-24. Rotazione schermo 90° CCW e controllo luminosit? in /config
+24. Rotazione schermo 90ï¿½ CCW e controllo luminosit? in /config
 25. Avvio app: init I?C e attivazione I/O Expander; controllo GPIO3 dell'expander 1 (blocco se = 0)
 26. Web /config: abilitazione e configurazione scanner; /test: letture e tasti Scanner ON/OFF; /tasks: verifica task
 27. Esclusione display MIPI e LVGL per uso senza interfaccia grafica (abilitazione in /config)
@@ -282,7 +292,7 @@ I file HTML/JS/CSS sono attualmente inclusi nel codice C (`web_ui.c`) ? occupano
 
 I file `/spiffs/i18n_<lang>.map.json` (it, en, de, fr, es) contengono la mappatura ID numerico ? nome simbolico per **scope** (9 entries) e **key** (476 entries). Tutti e 5 i file sono **byte-per-byte identici** (il map non ? localizzato). Vengono letti a runtime da SPIFFS per risolvere ID numerici in nomi testuali durante la costruzione delle tabelle i18n.
 
-**Spazio SPIFFS liberato**: 5 × 17.775 bytes = **86.8 KB**
+**Spazio SPIFFS liberato**: 5 ï¿½ 17.775 bytes = **86.8 KB**
 
 #### Problema attuale
 
@@ -502,7 +512,7 @@ Il credito ? espresso in coin (1 coin = 1?). Le sorgenti sono:
 | --------- | -------------------------------------------------------- |
 | `vpp`     | Valore prezzo programma (crediti per ciclo)              |
 | `vtp`     | Valore tempo programma (secondi)                         |
-| `vtt`     | Ticks totali = `vpp × 60`                                |
+| `vtt`     | Ticks totali = `vpp ï¿½ 60`                                |
 | `rdu`     | Rateo utilizzo = `vtt / vtp` ticks/sec                   |
 | `tts`     | Time-to-stop: tempo rimanente (aggiornato ogni secondo)  |
 | `vtr`     | `tts / rdu` (aggiornato ogni secondo)                    |
@@ -525,7 +535,7 @@ Il credito ? espresso in coin (1 coin = 1?). Le sorgenti sono:
 - Programma attivo: sfondo **rosso** in run, **giallo** in pausa
 - Area centrale: mostra `ecd` prima della selezione, poi `vtp` fino all'avvio, poi `tts` durante run
 - Sotto area centrale: `vtp` fino all'avvio, poi `vtt?tts` in run; in pausa: `ttp`
-- Barra laterale (+ LED strip): percentuale consumo `(vtt?ticks_usati)×100/vtt`; verde 100%?30%, rosso 29%?0%
+- Barra laterale (+ LED strip): percentuale consumo `(vtt?ticks_usati)ï¿½100/vtt`; verde 100%?30%, rosso 29%?0%
 - All'avvio programma: credito scompare se era 1, altrimenti appare ridotto (30%); secondi disponibili in grande (100%)
 - Credito iniziale mostrato nell'area centrale (carattere grande)
 
